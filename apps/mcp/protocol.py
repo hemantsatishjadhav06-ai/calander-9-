@@ -30,7 +30,7 @@ from typing import Any
 #: with this one — newer clients gracefully degrade.
 MCP_PROTOCOL_VERSION = "2025-03-26"
 
-SERVER_NAME = "brightbean-studio"
+SERVER_NAME = "sm-bean"
 SERVER_VERSION = "1.0.0"
 
 
