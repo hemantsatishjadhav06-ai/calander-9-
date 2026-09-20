@@ -42,6 +42,12 @@
   --primary-soft:  var(--brand-50);
   --primary-muted: var(--brand-100);
   --primary-ring:  var(--brand-200);
+  /* AA-safe fill for WHITE text: brand-500 (#F97316) is only ~2.8:1; brand-700
+     (#C2410C) is ~5.2:1. Use --primary-strong for solid buttons/pills that put
+     white text on the accent; keep --primary for borders, rings, links, and
+     tinted (soft/muted) fills where the accent sits on a light background. */
+  --primary-strong:       var(--brand-700);
+  --primary-strong-hover: var(--brand-800);
 
   /* Neutrals - warm stone */
   --neutral-950: #171412;

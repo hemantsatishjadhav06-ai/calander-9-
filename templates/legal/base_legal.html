@@ -45,6 +45,7 @@
     {% block legal_body %}{% endblock %}
     <footer>
       Questions? Contact {% if SUPPORT_EMAIL %}<a href="mailto:{{ SUPPORT_EMAIL }}">{{ SUPPORT_EMAIL }}</a>{% else %}your administrator{% endif %}.
+      {% if SOURCE_URL %}<br><a href="{{ SOURCE_URL }}" target="_blank" rel="noopener">Source code</a> · Open-source (AGPL-3.0).{% endif %}
     </footer>
   </main>
 </body>

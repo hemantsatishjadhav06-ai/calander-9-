@@ -15,6 +15,7 @@ def branding(request):
         "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", "") or getattr(settings, "DEFAULT_FROM_EMAIL", ""),
         "LEGAL_TERMS_URL": getattr(settings, "LEGAL_TERMS_URL", "/terms/"),
         "LEGAL_PRIVACY_URL": getattr(settings, "LEGAL_PRIVACY_URL", "/privacy/"),
+        "SOURCE_URL": getattr(settings, "SOURCE_URL", ""),
     }
 
 

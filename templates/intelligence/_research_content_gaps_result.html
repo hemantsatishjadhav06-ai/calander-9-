@@ -112,21 +112,21 @@
                     <div class="grid grid-cols-[80px_1fr_50px] items-center gap-2">
                         <div class="text-[11px] text-stone-600">Demand</div>
                         <div class="h-1 rounded-full bg-stone-200 overflow-hidden">
-                            <div class="h-full rounded-full" style="width: {% widthratio c.demand 1 100 %}%; background: var(--primary);"></div>
+                            <div class="h-full rounded-full" style="width: {% widthratio c.demand 1 100 %}%; background: var(--primary-strong);"></div>
                         </div>
                         <div class="text-[11px] font-mono tabular-nums text-stone-700 text-right">{{ c.demand|pretty_percent:0 }}</div>
                     </div>
                     <div class="grid grid-cols-[80px_1fr_50px] items-center gap-2">
                         <div class="text-[11px] text-stone-600">Supply</div>
                         <div class="h-1 rounded-full bg-stone-200 overflow-hidden">
-                            <div class="h-full rounded-full" style="width: {% widthratio c.supply 1 100 %}%; background: var(--primary);"></div>
+                            <div class="h-full rounded-full" style="width: {% widthratio c.supply 1 100 %}%; background: var(--primary-strong);"></div>
                         </div>
                         <div class="text-[11px] font-mono tabular-nums text-stone-700 text-right">{{ c.supply|pretty_percent:0 }}</div>
                     </div>
                     <div class="grid grid-cols-[80px_1fr_50px] items-center gap-2">
                         <div class="text-[11px] text-stone-600">Recency</div>
                         <div class="h-1 rounded-full bg-stone-200 overflow-hidden">
-                            <div class="h-full rounded-full" style="width: {% widthratio c.recency 1 100 %}%; background: var(--primary);"></div>
+                            <div class="h-full rounded-full" style="width: {% widthratio c.recency 1 100 %}%; background: var(--primary-strong);"></div>
                         </div>
                         <div class="text-[11px] font-mono tabular-nums text-stone-700 text-right">{{ c.recency|pretty_percent:0 }}</div>
                     </div>

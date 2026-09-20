@@ -4,7 +4,7 @@
          id="comment-{{ comment.id }}">
         <!-- Author avatar -->
         <div class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5"
-             style="background: var(--primary);">
+             style="background: var(--primary-strong);">
             {{ comment.author.display_name|make_list|first|upper }}
         </div>
         <div class="flex-1 min-w-0">
@@ -30,7 +30,7 @@
             {% if not reply.is_deleted %}
             <div class="flex gap-2 mt-2 pl-2 border-l-2 border-stone-200">
                 <div class="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0"
-                     style="background: var(--primary); opacity: 0.7;">
+                     style="background: var(--primary-strong); opacity: 0.7;">
                     {{ reply.author.display_name|make_list|first|upper }}
                 </div>
                 <div>

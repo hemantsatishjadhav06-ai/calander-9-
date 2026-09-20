@@ -37,6 +37,10 @@ SITE_NAME = env("SITE_NAME", default="SM Bean")
 SUPPORT_EMAIL = env("SUPPORT_EMAIL", default="")
 LEGAL_TERMS_URL = env("LEGAL_TERMS_URL", default="/terms/")
 LEGAL_PRIVACY_URL = env("LEGAL_PRIVACY_URL", default="/privacy/")
+# AGPL-3.0 §13: network users must be offered the Corresponding Source of this
+# (modified) version. Surfaced as a visible "Source code" link. Point this at
+# YOUR public repository of the deployed code and keep it accurate/public.
+SOURCE_URL = env("SOURCE_URL", default="https://github.com/hemantsatishjadhav06-ai/calander-9-")
 
 # Application definition
 

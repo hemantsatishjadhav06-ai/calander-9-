@@ -379,7 +379,7 @@
                         <img src="{{ ws.icon.url }}" alt="" class="w-7 h-7 rounded-md object-cover flex-shrink-0">
                         {% else %}
                         <div class="w-7 h-7 rounded-md flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
-                             style="background: var(--primary);">
+                             style="background: var(--primary-strong);">
                             {{ ws.name|make_list|first|upper }}
                         </div>
                         {% endif %}
@@ -509,7 +509,7 @@
                                             <button type="button" class="idea-pill-btn" @click="createTagDropdownOpen = !createTagDropdownOpen; createGroupDropdownOpen = false; if(createTagDropdownOpen) $nextTick(() => $refs.sidebarCreateTagSearchInput.focus())">
                                                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                                                 <span>Tags</span>
-                                                <span x-show="createSelectedTags.length" class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-white" style="background: var(--primary);" x-text="createSelectedTags.length"></span>
+                                                <span x-show="createSelectedTags.length" class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-white" style="background: var(--primary-strong);" x-text="createSelectedTags.length"></span>
                                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
                                             </button>
                                             <div x-show="createTagDropdownOpen" x-cloak x-transition class="idea-pill-dropdown">
@@ -666,7 +666,7 @@
                                 <button type="button"
                                         @click="createTagFromModal()"
                                         class="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors"
-                                        style="background: var(--primary);"
+                                        style="background: var(--primary-strong);"
                                         :class="newTagName.trim() ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'">
                                     Create
                                 </button>
@@ -914,11 +914,11 @@
                     {% if current_ws.icon %}
                     <img src="{{ current_ws.icon.url }}" alt="" class="w-7 h-7 rounded-md object-cover">
                     {% else %}
-                    <div class="w-7 h-7 rounded-md flex items-center justify-center text-white text-[11px] font-bold" style="background: var(--primary);">{{ current_ws.name|make_list|first|upper }}</div>
+                    <div class="w-7 h-7 rounded-md flex items-center justify-center text-white text-[11px] font-bold" style="background: var(--primary-strong);">{{ current_ws.name|make_list|first|upper }}</div>
                     {% endif %}
                     <span class="text-sm font-semibold text-stone-800 truncate max-w-[160px]">{{ current_ws.name }}</span>
                     {% else %}
-                    <div class="w-7 h-7 rounded-md flex items-center justify-center text-white text-[11px] font-bold" style="background: var(--primary);">P</div>
+                    <div class="w-7 h-7 rounded-md flex items-center justify-center text-white text-[11px] font-bold" style="background: var(--primary-strong);">P</div>
                     <span class="text-sm font-semibold text-stone-800">SM Bean</span>
                     {% endif %}
                     {% endwith %}
@@ -948,8 +948,14 @@
     {% include "onboarding/partials/_checklist.html" %}
 
     {% else %}
-    <main class="auth-bg min-h-screen flex items-center justify-center py-12 px-4" style="font-family: var(--font-body);">
+    <main class="auth-bg min-h-screen flex flex-col items-center justify-center py-12 px-4" style="font-family: var(--font-body);">
         {% block auth_content %}{% endblock %}
+        {% if SOURCE_URL %}
+        <p class="mt-8 text-xs" style="color: var(--text-tertiary);">
+            <a href="{{ SOURCE_URL }}" target="_blank" rel="noopener" class="hover:underline">Source code</a>
+            · Open-source (AGPL-3.0)
+        </p>
+        {% endif %}
     </main>
     {% endif %}
 
