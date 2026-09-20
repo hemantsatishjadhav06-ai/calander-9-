@@ -9,6 +9,9 @@ class CommonConfig(AppConfig):
     def ready(self):
         from django.db.models.signals import post_migrate
 
+        # Register deploy-time config checks (python manage.py check --deploy).
+        from apps.common import checks  # noqa: F401
+
         post_migrate.connect(self._register_tasks, sender=self)
 
     @staticmethod

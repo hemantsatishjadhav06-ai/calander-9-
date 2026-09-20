@@ -267,6 +267,19 @@ ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 LOGIN_REDIRECT_URL = "/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/accounts/login/"
 
+# Defense-in-depth rate limits (allauth derives the client IP from REMOTE_ADDR,
+# not a spoofable header). These back up apps.accounts.middleware.AuthRateLimit
+# so brute-force and password-reset email-bombing are capped even if the
+# middleware is bypassed or reordered. Format: "<count>/<period>/<scope>".
+ACCOUNT_RATE_LIMITS = {
+    "login_failed": "10/5m/ip",
+    "login": "30/5m/ip",
+    "signup": "20/h/ip",
+    "reset_password": "5/h/ip",
+    "reset_password_from_key": "5/h/ip",
+    "confirm_email": "10/h/ip",
+}
+
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",

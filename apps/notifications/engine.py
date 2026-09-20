@@ -385,16 +385,12 @@ def _dispatch_email(delivery: NotificationDelivery) -> None:
 def _dispatch_webhook(delivery: NotificationDelivery) -> None:
     """Send notification via webhook (HTTP POST with HMAC-SHA256 signature).
 
-    The webhook URL is re-validated with is_safe_url at dispatch time (not just
-    when stored), and redirects are not followed. This narrows the DNS-rebind
-    window between validation and connection. We still rely on the OS-level DNS
-    cache to resolve consistently within a single dispatch; deployments with
-    aggressive DNS-rebind threat models should additionally enforce egress
-    firewall rules.
+    The webhook URL is resolved to a vetted public IP and the request is
+    pinned to that literal address at dispatch time (see apps.common.net),
+    closing the DNS-rebind TOCTOU. Redirects are never followed, so a
+    302→private-IP bait-and-switch surfaces as a delivery failure.
     """
-    import httpx
-
-    from apps.common.validators import is_safe_url
+    from apps.common.net import UnsafeUrlError, pinned_request
 
     notification = delivery.notification
 
@@ -402,12 +398,6 @@ def _dispatch_webhook(delivery: NotificationDelivery) -> None:
     if not webhook_url:
         logger.info("No webhook_url in notification data, skipping webhook delivery")
         return
-
-    # Re-validate immediately before the request. The single-pass DNS resolve
-    # used by is_safe_url is reused by httpx via the OS resolver cache; this
-    # is the simplest defence that doesn't add an httpx-transport dependency.
-    if not is_safe_url(webhook_url):
-        raise RuntimeError("Webhook URL rejected: must be a public http(s) endpoint")
 
     payload = json.dumps(
         {
@@ -434,10 +424,14 @@ def _dispatch_webhook(delivery: NotificationDelivery) -> None:
         "X-Event-Type": notification.event_type,
     }
 
-    # follow_redirects=False prevents a 302→private-IP bait-and-switch from a
-    # legitimate-looking endpoint. Any redirect is surfaced as a delivery
-    # failure, not silently followed.
-    response = httpx.post(webhook_url, content=payload, headers=headers, timeout=10.0, follow_redirects=False)
+    # pinned_request resolves the host to a vetted public IP and connects to
+    # that literal address (TLS SNI/Host pinned to the hostname), closing the
+    # DNS-rebinding TOCTOU. It never follows redirects, so a 302→private-IP
+    # bait-and-switch is surfaced as a delivery failure below, not followed.
+    try:
+        response = pinned_request("POST", webhook_url, content=payload, headers=headers, timeout=10.0)
+    except UnsafeUrlError as exc:
+        raise RuntimeError(f"Webhook URL rejected: {exc}") from exc
     if 300 <= response.status_code < 400:
         raise RuntimeError(f"Webhook URL replied with redirect {response.status_code} — refusing to follow.")
     if response.status_code >= 400:

@@ -23,8 +23,8 @@ from django.utils import timezone
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.common.net import UnsafeUrlError, pinned_request
 from apps.common.validators import (
-    is_safe_url,
     parse_and_truncate_tag_string,
     parse_and_truncate_youtube_tag_string,
     safe_xml_fromstring,
@@ -3847,32 +3847,30 @@ def _build_event_from_entry(feed, parsed_feed, entry):
 
 
 def _safe_fetch_feed(url, headers, *, timeout=8.0, max_redirects=5):
-    """Fetch *url* with manual redirect handling, re-validating each hop with
-    is_safe_url. Returns (response, final_url) on success or (None, None) on
-    any reject path (initial-URL failed SSRF check, intermediate hop failed
-    SSRF check, broken redirect, transport error).
+    """Fetch *url* with manual redirect handling, pinning every hop to its
+    vetted public IP. Returns (response, final_url) on success or (None, None)
+    on any reject path (URL failed the SSRF check, broken redirect, transport
+    error).
+
+    pinned_request resolves each hostname to a public IP and connects to that
+    literal address (with TLS SNI/Host pinned to the hostname), so a rebinding
+    DNS answer can't swap in a private address between validation and connect.
+    Redirects are handled here, one hop at a time, each independently pinned.
     """
-    if not is_safe_url(url):
-        return None, None
     current_url = url
     try:
-        response = httpx.get(current_url, headers=headers, timeout=timeout, follow_redirects=False)
-    except httpx.RequestError:
+        response = pinned_request("GET", current_url, headers=headers, timeout=timeout)
+        for _ in range(max_redirects):
+            if response.status_code not in (301, 302, 303, 307, 308):
+                return response, current_url
+            location = response.headers.get("Location")
+            if not location:
+                return None, None
+            next_url = urljoin(current_url, location)
+            response = pinned_request("GET", next_url, headers=headers, timeout=timeout)
+            current_url = next_url
+    except (UnsafeUrlError, httpx.RequestError):
         return None, None
-    for _ in range(max_redirects):
-        if response.status_code not in (301, 302, 303, 307, 308):
-            return response, current_url
-        location = response.headers.get("Location")
-        if not location:
-            return None, None
-        next_url = urljoin(current_url, location)
-        if not is_safe_url(next_url):
-            return None, None
-        try:
-            response = httpx.get(next_url, headers=headers, timeout=timeout, follow_redirects=False)
-        except httpx.RequestError:
-            return None, None
-        current_url = next_url
     # Too many redirects.
     return None, None
 
@@ -3880,10 +3878,11 @@ def _safe_fetch_feed(url, headers, *, timeout=8.0, max_redirects=5):
 def _fetch_feed_events_for_workspace(feeds):
     """Fetch and aggregate recent events across all workspace feeds.
 
-    Each feed is re-validated against is_safe_url at fetch time (not just at
-    add time), and redirects are followed manually with per-hop SSRF checks.
-    This closes the DNS-rebind / redirect-bait window that would otherwise
-    let a previously-valid feed URL reach internal hosts on subsequent polls.
+    Each feed is re-resolved and pinned to a vetted public IP at fetch time
+    (not just at add time), and redirects are followed manually with each hop
+    independently pinned. This closes the DNS-rebind / redirect-bait window
+    that would otherwise let a previously-valid feed URL reach internal hosts
+    on subsequent polls.
     """
     if not feeds:
         return []

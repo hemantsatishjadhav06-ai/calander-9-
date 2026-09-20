@@ -1,5 +1,6 @@
 import hashlib
 
+from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -65,17 +66,41 @@ class AuthRateLimitMiddleware:
             ip = self._get_client_ip(request)
             cache_key = f"auth_ratelimit:{hashlib.md5(ip.encode()).hexdigest()}"
 
-            attempts = cache.get(cache_key, 0)
-            if attempts >= AUTH_RATE_LIMIT:
-                return HttpResponse("Too many requests. Please try again later.", status=429)
-
-            cache.set(cache_key, attempts + 1, AUTH_RATE_WINDOW)
+            # Anchor the window at the first attempt (add seeds the TTL; incr
+            # bumps without touching it) so a steady stream of requests can't
+            # keep pushing the expiry out. cache.add returns False when the key
+            # already exists.
+            if not cache.add(cache_key, 1, AUTH_RATE_WINDOW):
+                try:
+                    attempts = cache.incr(cache_key)
+                except ValueError:
+                    # Key's TTL lapsed between add and incr — re-seed.
+                    cache.set(cache_key, 1, AUTH_RATE_WINDOW)
+                    attempts = 1
+                if attempts > AUTH_RATE_LIMIT:
+                    return HttpResponse("Too many requests. Please try again later.", status=429)
 
         return self.get_response(request)
 
     @staticmethod
     def _get_client_ip(request):
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            return x_forwarded_for.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR", "")
+        """Return the client IP, trusting X-Forwarded-For only from known proxies.
+
+        A remote client can set X-Forwarded-For to any value, so honouring it
+        unconditionally lets an attacker rotate the header per request to land
+        in a fresh rate-limit bucket every time — defeating the throttle (and,
+        by extension, brute-force / password-reset email-bombing protection).
+        Only trust XFF when the socket peer (REMOTE_ADDR) is a proxy we run,
+        listed in ``settings.BB_TRUSTED_PROXIES``; otherwise use REMOTE_ADDR,
+        the only IP we can vouch for. Mirrors ``apps/api/limits._client_ip``.
+        """
+        remote = request.META.get("REMOTE_ADDR", "")
+        trusted = set(getattr(settings, "BB_TRUSTED_PROXIES", ()) or ())
+        if trusted and remote in trusted:
+            forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+            if forwarded:
+                # Leftmost hop that isn't itself a trusted proxy is the client.
+                for hop in (h.strip() for h in forwarded.split(",") if h.strip()):
+                    if hop not in trusted:
+                        return hop
+        return remote
