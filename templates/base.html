@@ -219,6 +219,35 @@
 </head>
 <body class="text-gray-900 min-h-screen" style="background: var(--surface-page);">
     {% csrf_token %}
+    <!-- Global HTMX loading indicator: a thin top progress bar shown during
+         any HTMX request (calendar/analytics/publish swaps had no feedback). -->
+    <div id="htmx-progress" aria-hidden="true"></div>
+    <style>
+      #htmx-progress{position:fixed;top:0;left:0;height:3px;width:0;max-width:100%;
+        background:var(--primary,#F97316);z-index:9999;opacity:0;pointer-events:none;
+        transition:width .2s ease, opacity .25s ease;}
+      #htmx-progress.active{opacity:1;}
+      @media (prefers-reduced-motion: reduce){#htmx-progress{transition:opacity .1s;}}
+    </style>
+    <script nonce="{{ request.csp_nonce }}">
+      (function(){
+        var timer;
+        function bar(){ return document.getElementById('htmx-progress'); }
+        document.body.addEventListener('htmx:beforeRequest', function(){
+          var b=bar(); if(!b) return;
+          clearTimeout(timer); b.classList.add('active'); b.style.width='35%';
+          timer=setTimeout(function(){ b.style.width='75%'; }, 250);
+        });
+        function finish(){
+          var b=bar(); if(!b) return;
+          clearTimeout(timer); b.style.width='100%';
+          setTimeout(function(){ b.classList.remove('active'); b.style.width='0'; }, 250);
+        }
+        document.body.addEventListener('htmx:afterRequest', finish);
+        document.body.addEventListener('htmx:responseError', finish);
+        document.body.addEventListener('htmx:sendError', finish);
+      })();
+    </script>
     <script nonce="{{ request.csp_nonce }}">
         document.body.addEventListener('htmx:configRequest', function(event) {
             event.detail.headers['X-CSRFToken'] = document.querySelector('[name=csrfmiddlewaretoken]').value;
