@@ -5,12 +5,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ SITE_NAME }} — Open-source social media management</title>
-  <meta name="description" content="{{ SITE_NAME }} is open-source, self-hostable social media management: plan, compose, schedule, approve and publish across 10+ platforms from one dashboard. No per-seat or per-channel fees.">
+  <meta name="description" content="{{ SITE_NAME }} is open-source, self-hostable social media management: plan, compose, schedule, approve and publish across 11 platforms from one dashboard. Seats, channels and workspaces are never metered.">
   <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ SITE_NAME }}">
   <meta property="og:title" content="{{ SITE_NAME }} — own your social stack">
-  <meta property="og:description" content="Open-source, self-hostable social media management across 10+ platforms. No per-seat or per-channel fees.">
+  <meta property="og:description" content="Open-source, self-hostable social media management across 11 platforms. Seats, channels and workspaces are never metered.">
   <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}/">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
@@ -111,18 +111,18 @@
       <div class="wrap">
         <span class="pill">Open-source · self-hostable · AGPL-3.0</span>
         <h1>Own your social stack.</h1>
-        <p class="sub">{{ SITE_NAME }} is social media management for creators, agencies and SMBs — plan, compose, schedule, approve and publish across 10+ platforms from one dashboard. No per-seat, per-channel, or per-workspace fees.</p>
+        <p class="sub">{{ SITE_NAME }} runs the whole content lifecycle for agencies and teams managing many client brands: compose once, route through client approval, publish across 11 platforms. Self-host it and your seats, channels and workspaces are never metered.</p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started free</a>
-          <a class="btn btn-ghost" href="{% url 'account_login' %}">Sign in</a>
+          <a class="btn btn-ghost" href="{% url 'pricing' %}">See pricing</a>
         </div>
-        <small>Every feature, every platform — no paid tier or feature gate.</small>
+        <small>Every publishing feature, unlimited seats and channels. Only the optional AI add-on is billed separately.</small>
       </div>
     </section>
 
     <div class="platforms">
       <div class="wrap">
-        <div class="lbl">Publish directly to first-party APIs — no aggregator</div>
+        <div class="lbl">Connected straight to each platform's official API — no reseller in between</div>
         <div class="plat-row">
           <span>Facebook</span><span>Instagram</span><span>LinkedIn</span><span>TikTok</span>
           <span>YouTube</span><span>Pinterest</span><span>Threads</span><span>Bluesky</span>
@@ -158,8 +158,8 @@
           <p>Built for people managing many client accounts who'd rather own their social stack than rent it.</p>
         </div>
         <div class="why-grid">
-          <div class="why-item"><h3>No per-seat pricing</h3><p>Add every teammate, client, workspace and channel. There's no paid tier, feature gate, or upsell.</p></div>
-          <div class="why-item"><h3>Your data, your infra</h3><p>Deploy on your own VPS or cloud. Tokens and credentials are encrypted at rest — no aggregator in the middle.</p></div>
+          <div class="why-item"><h3>Nothing is metered</h3><p>Add every teammate, client, workspace and channel you want — seats and channels are never counted or charged. Publishing, approvals, inbox and analytics are all included; only the optional AI add-on is billed separately.</p></div>
+          <div class="why-item"><h3>Your data, your infra</h3><p>Deploy on your own VPS or cloud. You connect through your own platform developer apps, so it's your rate limits and your data — with no third party in between.</p></div>
           <div class="why-item"><h3>Open source</h3><p>AGPL-3.0. Read the code, extend it, and never get locked in to a vendor's roadmap.</p></div>
         </div>
       </div>
@@ -168,7 +168,7 @@
     <section class="final">
       <div class="wrap">
         <h2>Ready to plan your next month of content?</h2>
-        <p>Create your workspace, connect your accounts, and schedule your first post in minutes.</p>
+        <p>Create your workspace and start drafting straight away. Bluesky, Mastodon and DEV.to connect in minutes; Meta, TikTok and LinkedIn need their own app-review process first — we document every step.</p>
         <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started free</a>
       </div>
     </section>

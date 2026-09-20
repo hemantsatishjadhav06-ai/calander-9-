@@ -7,12 +7,14 @@ from django.db.models import Count, Q
 def branding(request):
     """Site name, support email, and legal URLs for every template.
 
-    SUPPORT_EMAIL falls back to DEFAULT_FROM_EMAIL so mailto links are never
-    empty. Legal URLs default to the in-app placeholder pages.
+    SUPPORT_EMAIL is deliberately NOT defaulted to DEFAULT_FROM_EMAIL: that is a
+    no-reply sender, not a support channel, and falling back to it made every
+    ``{% if SUPPORT_EMAIL %}`` guard true while pointing users at a black hole.
+    Unset means unset, so templates can degrade honestly.
     """
     return {
         "SITE_NAME": getattr(settings, "SITE_NAME", "SM Bean"),
-        "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", "") or getattr(settings, "DEFAULT_FROM_EMAIL", ""),
+        "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", ""),
         "LEGAL_TERMS_URL": getattr(settings, "LEGAL_TERMS_URL", "/terms/"),
         "LEGAL_PRIVACY_URL": getattr(settings, "LEGAL_PRIVACY_URL", "/privacy/"),
         "SOURCE_URL": getattr(settings, "SOURCE_URL", ""),

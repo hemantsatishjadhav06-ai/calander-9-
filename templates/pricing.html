@@ -49,6 +49,7 @@
     .feats li{display:flex;gap:9px;align-items:flex-start;}
     .feats li::before{content:"✓";color:var(--green);font-weight:800;flex:none;}
     .plan .cta{margin-top:auto;}
+    .cta-note{margin:0;font-size:13.5px;color:var(--muted);line-height:1.5;}
     .note{text-align:center;color:var(--muted);font-size:13.5px;padding:22px 0 8px;max-width:70ch;margin:0 auto;}
     .faq{padding:56px 0 64px;max-width:760px;margin:0 auto;}
     .faq h2{text-align:center;font-size:26px;margin-bottom:28px;}
@@ -67,6 +68,7 @@
     <div class="wrap nav-inner">
       <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>{{ SITE_NAME }}</a>
       <div class="nav-cta">
+        <a class="link" href="/">Features</a>
         <a class="link" href="{% url 'account_login' %}">Sign in</a>
         <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started</a>
       </div>
@@ -75,8 +77,8 @@
 
   <main>
     <div class="head wrap">
-      <h1>Free to self-host. Effortless if you'd rather not.</h1>
-      <p>{{ SITE_NAME }} is open-source (AGPL-3.0). Run it yourself for free with every feature and platform, or let us host and maintain it for you.</p>
+      <h1>Free to run yourself. Or let us run it for you.</h1>
+      <p>{{ SITE_NAME }} is open-source (AGPL-3.0). Self-host it for free — every publishing feature, all 11 platforms, and seats, channels and workspaces that are never metered. Or hand the servers to us.</p>
     </div>
 
     <div class="wrap">
@@ -86,16 +88,16 @@
           <div class="price">Free<small> forever</small></div>
           <p class="tag">Deploy on your own VPS or cloud. You own the data and the infra.</p>
           <ul class="feats">
-            <li>Every feature — no gates or per-seat fees</li>
-            <li>Unlimited orgs, workspaces, members &amp; channels</li>
-            <li>All 10+ platform integrations</li>
+            <li>Every publishing, approval &amp; analytics feature</li>
+            <li>Unlimited orgs, workspaces, members &amp; channels — never metered</li>
+            <li>All 11 platform integrations</li>
             <li>Community support</li>
           </ul>
           <div class="cta"><a class="btn btn-ghost" href="{% if SOURCE_URL %}{{ SOURCE_URL }}{% else %}{% url 'account_signup' %}{% endif %}"{% if SOURCE_URL %} target="_blank" rel="noopener"{% endif %}>Get the source</a></div>
         </div>
 
         <div class="plan featured">
-          <span class="badge">Most popular</span>
+          <span class="badge">Now in early access</span>
           <h3>Managed Cloud</h3>
           <div class="price">Early access</div>
           <p class="tag">We run, update, back up and monitor {{ SITE_NAME }} for you — no servers to manage.</p>
@@ -105,7 +107,10 @@
             <li>Daily backups &amp; uptime monitoring</li>
             <li>Email support</li>
           </ul>
-          <div class="cta"><a class="btn btn-primary" href="{% if SUPPORT_EMAIL %}mailto:{{ SUPPORT_EMAIL }}?subject=Managed%20Cloud%20early%20access{% else %}{% url 'account_signup' %}{% endif %}">Request early access</a></div>
+          <div class="cta">
+            {% if SUPPORT_EMAIL %}<a class="btn btn-primary" href="mailto:{{ SUPPORT_EMAIL }}?subject=Managed%20Cloud%20early%20access">Request early access</a>
+            {% else %}<p class="cta-note">Managed hosting isn't offered on this instance. Contact whoever runs it.</p>{% endif %}
+          </div>
         </div>
 
         <div class="plan">
@@ -118,15 +123,19 @@
             <li>Migration &amp; onboarding help</li>
             <li>Volume &amp; reseller terms</li>
           </ul>
-          <div class="cta"><a class="btn btn-ghost" href="{% if SUPPORT_EMAIL %}mailto:{{ SUPPORT_EMAIL }}?subject=Agency%20%2F%20Enterprise%20enquiry{% else %}{% url 'account_signup' %}{% endif %}">Talk to us</a></div>
+          <div class="cta">
+            {% if SUPPORT_EMAIL %}<a class="btn btn-ghost" href="mailto:{{ SUPPORT_EMAIL }}?subject=Agency%20%2F%20Enterprise%20inquiry">Talk to us</a>
+            {% else %}<p class="cta-note">Agency plans aren't offered on this instance. Contact whoever runs it.</p>{% endif %}
+          </div>
         </div>
       </div>
-      <p class="note">The software is and stays free and open-source under AGPL-3.0. Managed Cloud and Agency plans pay for hosting, maintenance and support — never for features.</p>
+      <p class="note">The software is and stays free and open-source under AGPL-3.0. Managed Cloud and Agency plans pay for hosting, maintenance and support — not for publishing features. The one exception is the optional AI Intelligence add-on, which runs on a paid third-party model and is billed by usage.</p>
     </div>
 
     <section class="faq wrap">
       <h2>Common questions</h2>
-      <div class="qa"><h3>Is it really free?</h3><p>Yes — self-hosting {{ SITE_NAME }} is free forever, with every feature and platform. There's no paid tier, feature gate, or per-seat/per-channel charge.</p></div>
+      <div class="qa"><h3>Is it really free?</h3><p>Yes. Self-hosting {{ SITE_NAME }} is free forever, and seats, workspaces and channels are never metered. Publishing, scheduling, approvals, the client portal, inbox and analytics are all included. One optional add-on — AI Intelligence — runs on a paid third-party model and is billed by usage; everything else is free.</p></div>
+      <div class="qa"><h3>How long does it take to connect my accounts?</h3><p>It depends on the platform. Bluesky, Mastodon and DEV.to connect in minutes. Meta (Facebook/Instagram/Threads), TikTok and LinkedIn require you to register your own developer app and pass their review first, which can take days — we document each one step by step.</p></div>
       <div class="qa"><h3>What am I paying for on Managed Cloud?</h3><p>Convenience: we host, update, back up and monitor the app so you don't run servers. The code stays open-source.</p></div>
       <div class="qa"><h3>Can I move between self-hosted and managed?</h3><p>Yes. It's the same open-source app — export and move your data whenever you like. No lock-in.</p></div>
       <div class="qa"><h3>Which platforms are supported?</h3><p>Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business, Mastodon and DEV.to — via each platform's official API.</p></div>
