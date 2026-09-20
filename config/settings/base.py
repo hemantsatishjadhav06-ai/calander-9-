@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, []),
+    CSRF_TRUSTED_ORIGINS=(list, []),
     APP_URL=(str, "http://localhost:8000"),
     STORAGE_BACKEND=(str, "local"),
     EMAIL_BACKEND_TYPE=(str, "smtp"),
@@ -20,6 +21,11 @@ environ.Env.read_env(BASE_DIR / ".env", overwrite=False)
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+# Trusted origins for CSRF (scheme + host, e.g. https://app.example.com). Behind
+# a TLS-terminating proxy (Railway), a login POST is rejected 403 unless the
+# browser's Origin is trusted here, so read it from the environment in every
+# settings module rather than only in development.
+CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 APP_URL = env("APP_URL")
 
 # Application definition
