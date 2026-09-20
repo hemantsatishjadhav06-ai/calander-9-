@@ -1,0 +1,149 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing — {{ SITE_NAME }}</title>
+  <meta name="description" content="{{ SITE_NAME }} is free and open-source to self-host — every feature, every platform, no per-seat or per-channel fees. Or let us run it for you with Managed Cloud.">
+  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}/pricing/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ SITE_NAME }}">
+  <meta property="og:title" content="{{ SITE_NAME }} pricing — free to self-host">
+  <meta property="og:description" content="Open-source and free to self-host. Managed hosting and agency support available.">
+  <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
+  <style>
+    :root{
+      --bg:#ffffff; --alt:#faf8f5; --ink:#1a1714; --body:#4a4642; --muted:#7a746d;
+      --border:#eae6e0; --accent:#C2410C; --accent-ink:#9A3412; --accent-soft:#FFF3EC; --green:#5C6829;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--body);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent-ink);text-decoration:none;}
+    h1,h2,h3{color:var(--ink);line-height:1.14;margin:0;letter-spacing:-.02em;text-wrap:balance;}
+    .wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:15px;padding:12px 20px;border-radius:10px;border:1px solid transparent;cursor:pointer;transition:filter .15s,background .15s;width:100%;}
+    .btn-primary{background:var(--accent);color:#fff;}
+    .btn-primary:hover{filter:brightness(.93);}
+    .btn-ghost{background:transparent;color:var(--ink);border-color:var(--border);}
+    .btn-ghost:hover{background:var(--alt);}
+    header.nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);}
+    .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px;}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;color:var(--ink);letter-spacing:-.02em;}
+    .mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--green));display:inline-block;flex:none;}
+    .nav-cta{display:flex;align-items:center;gap:10px;}
+    .nav-cta a.link{color:var(--body);font-weight:600;font-size:14px;padding:9px 6px;}
+    .nav-cta .btn{width:auto;padding:9px 16px;font-size:14px;}
+    .head{text-align:center;padding:64px 0 8px;}
+    .head h1{font-size:clamp(32px,5vw,48px);font-weight:800;}
+    .head p{font-size:clamp(16px,2.4vw,19px);color:var(--body);max-width:52ch;margin:18px auto 0;}
+    .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:44px 0 8px;align-items:stretch;}
+    .plan{display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:28px 24px;}
+    .plan.featured{border-color:var(--accent);box-shadow:0 8px 30px rgba(194,65,12,.10);position:relative;}
+    .badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 12px;border-radius:999px;}
+    .plan h3{font-size:19px;}
+    .price{margin:14px 0 4px;font-size:34px;font-weight:800;color:var(--ink);letter-spacing:-.03em;}
+    .price small{font-size:15px;font-weight:600;color:var(--muted);}
+    .plan .tag{color:var(--body);font-size:14.5px;min-height:44px;}
+    .feats{list-style:none;padding:0;margin:18px 0 24px;display:flex;flex-direction:column;gap:9px;font-size:14px;color:var(--body);}
+    .feats li{display:flex;gap:9px;align-items:flex-start;}
+    .feats li::before{content:"✓";color:var(--green);font-weight:800;flex:none;}
+    .plan .cta{margin-top:auto;}
+    .note{text-align:center;color:var(--muted);font-size:13.5px;padding:22px 0 8px;max-width:70ch;margin:0 auto;}
+    .faq{padding:56px 0 64px;max-width:760px;margin:0 auto;}
+    .faq h2{text-align:center;font-size:26px;margin-bottom:28px;}
+    .qa{border-top:1px solid var(--border);padding:18px 0;}
+    .qa h3{font-size:16px;margin-bottom:6px;}
+    .qa p{margin:0;font-size:14.5px;color:var(--body);}
+    footer{border-top:1px solid var(--border);padding:32px 0;color:var(--muted);font-size:13.5px;}
+    .foot-inner{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+    .foot-links{display:flex;gap:18px;flex-wrap:wrap;}
+    .foot-links a{color:var(--body);}
+    @media (max-width:820px){ .plans{grid-template-columns:1fr;max-width:440px;margin:0 auto;} }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>{{ SITE_NAME }}</a>
+      <div class="nav-cta">
+        <a class="link" href="{% url 'account_login' %}">Sign in</a>
+        <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="head wrap">
+      <h1>Free to self-host. Effortless if you'd rather not.</h1>
+      <p>{{ SITE_NAME }} is open-source (AGPL-3.0). Run it yourself for free with every feature and platform, or let us host and maintain it for you.</p>
+    </div>
+
+    <div class="wrap">
+      <div class="plans">
+        <div class="plan">
+          <h3>Self-hosted</h3>
+          <div class="price">Free<small> forever</small></div>
+          <p class="tag">Deploy on your own VPS or cloud. You own the data and the infra.</p>
+          <ul class="feats">
+            <li>Every feature — no gates or per-seat fees</li>
+            <li>Unlimited orgs, workspaces, members &amp; channels</li>
+            <li>All 10+ platform integrations</li>
+            <li>Community support</li>
+          </ul>
+          <div class="cta"><a class="btn btn-ghost" href="{% if SOURCE_URL %}{{ SOURCE_URL }}{% else %}{% url 'account_signup' %}{% endif %}"{% if SOURCE_URL %} target="_blank" rel="noopener"{% endif %}>Get the source</a></div>
+        </div>
+
+        <div class="plan featured">
+          <span class="badge">Most popular</span>
+          <h3>Managed Cloud</h3>
+          <div class="price">Early access</div>
+          <p class="tag">We run, update, back up and monitor {{ SITE_NAME }} for you — no servers to manage.</p>
+          <ul class="feats">
+            <li>Fully hosted &amp; auto-updated</li>
+            <li>Managed Postgres, Redis &amp; object storage</li>
+            <li>Daily backups &amp; uptime monitoring</li>
+            <li>Email support</li>
+          </ul>
+          <div class="cta"><a class="btn btn-primary" href="{% if SUPPORT_EMAIL %}mailto:{{ SUPPORT_EMAIL }}?subject=Managed%20Cloud%20early%20access{% else %}{% url 'account_signup' %}{% endif %}">Request early access</a></div>
+        </div>
+
+        <div class="plan">
+          <h3>Agency &amp; Enterprise</h3>
+          <div class="price">Custom</div>
+          <p class="tag">White-label, onboarding, SLAs and priority support for teams running many clients.</p>
+          <ul class="feats">
+            <li>White-label branding &amp; custom domain</li>
+            <li>Priority support &amp; SLA</li>
+            <li>Migration &amp; onboarding help</li>
+            <li>Volume &amp; reseller terms</li>
+          </ul>
+          <div class="cta"><a class="btn btn-ghost" href="{% if SUPPORT_EMAIL %}mailto:{{ SUPPORT_EMAIL }}?subject=Agency%20%2F%20Enterprise%20enquiry{% else %}{% url 'account_signup' %}{% endif %}">Talk to us</a></div>
+        </div>
+      </div>
+      <p class="note">The software is and stays free and open-source under AGPL-3.0. Managed Cloud and Agency plans pay for hosting, maintenance and support — never for features.</p>
+    </div>
+
+    <section class="faq wrap">
+      <h2>Common questions</h2>
+      <div class="qa"><h3>Is it really free?</h3><p>Yes — self-hosting {{ SITE_NAME }} is free forever, with every feature and platform. There's no paid tier, feature gate, or per-seat/per-channel charge.</p></div>
+      <div class="qa"><h3>What am I paying for on Managed Cloud?</h3><p>Convenience: we host, update, back up and monitor the app so you don't run servers. The code stays open-source.</p></div>
+      <div class="qa"><h3>Can I move between self-hosted and managed?</h3><p>Yes. It's the same open-source app — export and move your data whenever you like. No lock-in.</p></div>
+      <div class="qa"><h3>Which platforms are supported?</h3><p>Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business, Mastodon and DEV.to — via each platform's official API.</p></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot-inner">
+      <div>© {{ SITE_NAME }} · Open-source (AGPL-3.0)</div>
+      <div class="foot-links">
+        <a href="/">Home</a>
+        <a href="{% url 'account_login' %}">Sign in</a>
+        <a href="{{ LEGAL_TERMS_URL }}">Terms</a>
+        <a href="{{ LEGAL_PRIVACY_URL }}">Privacy</a>
+        {% if SOURCE_URL %}<a href="{{ SOURCE_URL }}" target="_blank" rel="noopener">Source</a>{% endif %}
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

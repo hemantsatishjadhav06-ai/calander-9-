@@ -99,6 +99,7 @@
     <div class="wrap nav-inner">
       <div class="brand"><span class="mark" aria-hidden="true"></span>{{ SITE_NAME }}</div>
       <div class="nav-cta">
+        <a class="nav-signin" href="{% url 'pricing' %}">Pricing</a>
         <a class="nav-signin" href="{% url 'account_login' %}">Sign in</a>
         <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started</a>
       </div>
@@ -177,6 +178,7 @@
     <div class="wrap foot-inner">
       <div>© {{ SITE_NAME }} · Open-source (AGPL-3.0)</div>
       <div class="foot-links">
+        <a href="{% url 'pricing' %}">Pricing</a>
         <a href="{% url 'account_login' %}">Sign in</a>
         <a href="{{ LEGAL_TERMS_URL }}">Terms</a>
         <a href="{{ LEGAL_PRIVACY_URL }}">Privacy</a>

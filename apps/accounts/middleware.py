@@ -28,6 +28,7 @@ EXEMPT_PATH_PREFIXES = (
     # back to it.
     "/terms/",
     "/privacy/",
+    "/pricing/",
     "/health/",
     "/static/",
     # Uploaded media, served by config/urls.py when SERVE_MEDIA is on. No view

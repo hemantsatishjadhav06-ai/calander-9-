@@ -99,6 +99,7 @@ urlpatterns = [
     # LEGAL_PRIVACY_URL to point at your hosted policies).
     path("terms/", TemplateView.as_view(template_name="legal/terms.html"), name="terms"),
     path("privacy/", TemplateView.as_view(template_name="legal/privacy.html"), name="privacy"),
+    path("pricing/", TemplateView.as_view(template_name="pricing.html"), name="pricing"),
     # Silence the two probes seen 404ing in production and give crawlers a robots.
     path("robots.txt", robots_txt, name="robots_txt"),
     path(
