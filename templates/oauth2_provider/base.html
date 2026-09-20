@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Authorize · SM Bean{% endblock title %}</title>
+    <title>{% block title %}Authorize · {{ SITE_NAME }}{% endblock title %}</title>
     <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
     <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
 
@@ -44,7 +44,19 @@
         }
         .bb-wrap { width: 100%; max-width: 420px; }
         .bb-head { text-align: center; margin-bottom: 28px; }
-        .bb-logo { width: 48px; height: 48px; object-fit: contain; }
+        .bb-logo {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto;
+            border-radius: 12px;
+            background: #C2410C;
+            color: #fff;
+            font-size: 20px;
+            font-weight: 700;
+            line-height: 48px;
+            text-align: center;
+            letter-spacing: -0.01em;
+        }
         .bb-eyebrow {
             display: block;
             margin-top: 12px;

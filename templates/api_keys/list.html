@@ -1,5 +1,5 @@
 {% extends "layouts/settings.html" %}
-{% block title %}API Keys - Settings - SM Bean{% endblock %}
+{% block title %}API Keys - Settings - {{ SITE_NAME }}{% endblock %}
 {% block content %}
 <div x-data="{ showIssueModal: false, showRevealModal: {% if reveal_token %}true{% else %}false{% endif %} }">
     <div class="flex items-start justify-between mb-8 gap-6">

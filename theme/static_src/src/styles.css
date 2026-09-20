@@ -13,7 +13,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Brand Tokens - BrightBean Orange */
+  /* Brand Tokens - Primary (orange) */
   --brand-50:  #FFF7ED;
   --brand-100: #FFEDD5;
   --brand-200: #FED7AA;
@@ -25,8 +25,8 @@
   --brand-800: #9A3412;
   --brand-900: #7C2D12;
 
-  /* Brand Tokens - BrightBean Green (the bean in the logo) — used for
-     selection controls (checkboxes, toggle switches) */
+  /* Brand Tokens - Accent (green) — used for selection controls
+     (checkboxes, toggle switches) */
   --brand-green-100: #EFF2DC;
   --brand-green-200: #DDE4B9;
   --brand-green-500: #94A43F;

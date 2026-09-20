@@ -527,6 +527,7 @@ def _send_invite_email(invitation) -> bool:
 
     app_url = getattr(settings, "APP_URL", "http://localhost:8000").rstrip("/")
     accept_url = f"{app_url}/members/invite/{invitation.token}/accept/"
+    site_name = getattr(settings, "SITE_NAME", "")
 
     context = {
         "invitation": invitation,
@@ -534,9 +535,16 @@ def _send_invite_email(invitation) -> bool:
         "org_name": invitation.organization.name,
         "invited_by": invitation.invited_by,
         "app_url": app_url,
+        # Emails render outside the request cycle, so context processors don't
+        # run — pass branding explicitly.
+        "SITE_NAME": site_name,
     }
 
-    subject = f"You've been invited to join {invitation.organization.name} on SM Bean"
+    # A deployment may blank SITE_NAME to white-label; drop the suffix rather
+    # than trailing a bare "on".
+    subject = f"You've been invited to join {invitation.organization.name}"
+    if site_name:
+        subject = f"{subject} on {site_name}"
     text_content = render_to_string("members/email/invite.txt", context)
     html_content = render_to_string("members/email/invite.html", context)
 

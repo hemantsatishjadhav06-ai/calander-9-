@@ -8,5 +8,5 @@
 View all: {{ app_url }}/notifications/
 
 ---
-You received this because of your notification settings.
+You received this from {{ SITE_NAME }} because of your notification settings.
 Manage preferences: {{ app_url }}/notifications/preferences/

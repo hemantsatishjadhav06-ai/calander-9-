@@ -64,8 +64,8 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
                 {% endcomment %}
                 {% if account.keeps_platform_grant_on_disconnect %}
                 <p class="text-xs text-stone-500 mb-3">
-                    This removes the account from SM Bean only. To revoke our access entirely,
-                    remove SM Bean in Facebook &rsaquo; Settings &rsaquo; Apps and Websites.
+                    This removes the account from {{ SITE_NAME }} only. To revoke our access entirely,
+                    remove {{ SITE_NAME }} in Facebook &rsaquo; Settings &rsaquo; Apps and Websites.
                 </p>
                 {% endif %}
                 <div class="flex gap-2 justify-end">

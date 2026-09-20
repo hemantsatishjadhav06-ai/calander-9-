@@ -766,6 +766,8 @@ def _send_digest_email(user, event_type: str | None, notifications: list) -> Non
     heading = _digest_heading(event_type, total)
     shown = notifications[:BATCH_MAX_ITEMS]
 
+    site_name = getattr(settings, "SITE_NAME", "")
+
     context = {
         "heading": heading,
         "notifications": shown,
@@ -774,13 +776,20 @@ def _send_digest_email(user, event_type: str | None, notifications: list) -> Non
         "user": user,
         "date": timezone.now(),
         "app_url": getattr(settings, "APP_URL", "http://localhost:8000"),
+        # Emails render outside the request cycle, so context processors don't
+        # run — pass branding explicitly.
+        "SITE_NAME": site_name,
     }
 
     text_content = render_to_string("notifications/email/digest.txt", context)
     html_content = render_to_string("notifications/email/digest.html", context)
 
+    # Headings are bare counts ("3 updates"), which in an inbox is both
+    # unsearchable and indistinguishable from spam. Attribute it to the brand.
+    subject = " · ".join(p for p in (heading, site_name) if p)
+
     msg = EmailMultiAlternatives(
-        subject=heading,
+        subject=subject,
         body=text_content,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@localhost"),
         to=[user.email],
