@@ -1,0 +1,27 @@
+{% extends "legal/base_legal.html" %}
+{% block legal_title %}Terms of Service · {{ SITE_NAME }}{% endblock %}
+{% block legal_body %}
+<h1>Terms of Service</h1>
+<p class="muted">These terms govern your use of {{ SITE_NAME }}.</p>
+
+<h2>1. Acceptance</h2>
+<p>By creating an account or using {{ SITE_NAME }}, you agree to these terms. If you do not agree, do not use the service.</p>
+
+<h2>2. Your account</h2>
+<p>You are responsible for activity under your account and for keeping your credentials secure. You must provide accurate information and be authorized to connect any social accounts you add.</p>
+
+<h2>3. Acceptable use</h2>
+<p>You agree not to misuse the service, violate the terms of the connected platforms, publish unlawful content, or attempt to disrupt or gain unauthorized access to the service.</p>
+
+<h2>4. Your content</h2>
+<p>You retain ownership of the content you create and publish. You grant {{ SITE_NAME }} the limited rights needed to store, process, and deliver that content to the platforms you connect.</p>
+
+<h2>5. Availability &amp; changes</h2>
+<p>The service is provided on an "as is" and "as available" basis. Features may change, and access may be suspended for maintenance or misuse.</p>
+
+<h2>6. Termination</h2>
+<p>You may stop using the service at any time. We may suspend or terminate access for breach of these terms.</p>
+
+<h2>7. Contact</h2>
+<p>For questions about these terms, contact {% if SUPPORT_EMAIL %}<a href="mailto:{{ SUPPORT_EMAIL }}">{{ SUPPORT_EMAIL }}</a>{% else %}your administrator{% endif %}.</p>
+{% endblock %}

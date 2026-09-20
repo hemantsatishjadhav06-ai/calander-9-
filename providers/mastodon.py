@@ -6,6 +6,8 @@ import logging
 from datetime import datetime
 from urllib.parse import urlencode
 
+from django.conf import settings
+
 from .base import SocialProvider
 from .exceptions import OAuthError, PublishError
 from .types import (
@@ -102,10 +104,11 @@ class MastodonProvider(SocialProvider):
             "POST",
             url,
             json={
-                "client_name": "Brightbean",
+                # Shown on the user's Mastodon "authorized apps" screen.
+                "client_name": "SM Bean",
                 "redirect_uris": redirect_uri,
                 "scopes": " ".join(self.required_scopes),
-                "website": "https://brightbean.xyz",
+                "website": getattr(settings, "APP_URL", "") or "",
             },
         )
         data = resp.json()

@@ -23,6 +23,11 @@ EXEMPT_PATH_PREFIXES = (
     "/accounts/logout/",
     "/accounts/google/",
     "/accounts/3rdparty/",
+    # Public policy pages: a not-yet-accepted user must be able to read the
+    # Terms/Privacy linked from the acceptance page without being redirected
+    # back to it.
+    "/terms/",
+    "/privacy/",
     "/health/",
     "/static/",
     # Uploaded media, served by config/urls.py when SERVE_MEDIA is on. No view

@@ -1,6 +1,6 @@
 {
-  "name": "BrightBean Studio",
-  "short_name": "Bean",
+  "name": "SM Bean",
+  "short_name": "SM Bean",
   "icons": [
     {
       "src": "web-app-manifest-192x192.png",
@@ -15,7 +15,7 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#ffda99",
+  "theme_color": "#F97316",
   "background_color": "#ffffff",
   "display": "standalone"
 }

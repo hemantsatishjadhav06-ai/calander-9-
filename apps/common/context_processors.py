@@ -1,6 +1,21 @@
 """Context processors for sidebar and global template data."""
 
+from django.conf import settings
 from django.db.models import Count, Q
+
+
+def branding(request):
+    """Site name, support email, and legal URLs for every template.
+
+    SUPPORT_EMAIL falls back to DEFAULT_FROM_EMAIL so mailto links are never
+    empty. Legal URLs default to the in-app placeholder pages.
+    """
+    return {
+        "SITE_NAME": getattr(settings, "SITE_NAME", "SM Bean"),
+        "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", "") or getattr(settings, "DEFAULT_FROM_EMAIL", ""),
+        "LEGAL_TERMS_URL": getattr(settings, "LEGAL_TERMS_URL", "/terms/"),
+        "LEGAL_PRIVACY_URL": getattr(settings, "LEGAL_PRIVACY_URL", "/privacy/"),
+    }
 
 
 def sidebar_context(request):
