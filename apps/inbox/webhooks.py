@@ -39,7 +39,9 @@ def _meta_verify(request, configured_token: str):
         logger.error("Webhook verify token not configured. Rejecting verification.")
         return HttpResponseForbidden("Webhook verify token not configured.")
 
-    if mode == "subscribe" and token is not None and hmac.compare_digest(token, configured_token):
+    # Compare on bytes: hmac.compare_digest raises TypeError on non-ASCII str,
+    # which an attacker could trigger via ?hub.verify_token=<unicode> → 500.
+    if mode == "subscribe" and token is not None and hmac.compare_digest(token.encode(), configured_token.encode()):
         return HttpResponse(challenge, content_type="text/plain")
     return HttpResponseForbidden("Verification failed.")
 

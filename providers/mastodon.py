@@ -40,6 +40,10 @@ class MastodonProvider(SocialProvider):
     - ``client_secret``– obtained from app registration
     """
 
+    # instance_url is user-controlled → pin every request to a vetted public IP
+    # (SSRF / DNS-rebind defense). See SocialProvider._request.
+    PIN_DNS = True
+
     def __init__(self, credentials: dict | None = None):
         super().__init__(credentials)
         instance = self.credentials.get("instance_url", "")

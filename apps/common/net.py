@@ -35,8 +35,14 @@ def _host_header(parsed) -> str:
     return host
 
 
-def build_pinned_request(client: httpx.Client, method: str, url: str, *, headers=None, content=None) -> httpx.Request:
-    """Build an httpx.Request pinned to *url*'s vetted public IP.
+def pin_url(url: str, headers=None) -> tuple[str, dict, dict]:
+    """Resolve *url* to a vetted public IP and return the pieces to connect to
+    that literal address while pinning TLS SNI + Host to the hostname:
+    ``(pinned_url, headers_with_host, extensions)``.
+
+    Use directly with httpx:
+        pinned, hdrs, ext = pin_url(url, headers)
+        client.request(method, pinned, headers=hdrs, extensions=ext, ...)
 
     Raises UnsafeUrlError if the URL is not http(s) or resolves to a
     private/reserved/loopback/link-local address.
@@ -46,17 +52,27 @@ def build_pinned_request(client: httpx.Client, method: str, url: str, *, headers
     if ip is None:
         raise UnsafeUrlError(f"URL rejected (must be a public http(s) endpoint): {url}")
 
-    pinned_url = httpx.URL(url).copy_with(host=ip)  # httpx brackets IPv6 for us
+    pinned_url = str(httpx.URL(url).copy_with(host=ip))  # httpx brackets IPv6 for us
 
     req_headers = dict(headers or {})
     # Connect target is the IP, but the server must still see the real Host.
     req_headers["Host"] = _host_header(parsed)
 
-    extensions = {}
+    extensions: dict = {}
     if parsed.scheme == "https":
         # Verify the cert against the real hostname, not the IP we dialled.
         extensions["sni_hostname"] = parsed.hostname
 
+    return pinned_url, req_headers, extensions
+
+
+def build_pinned_request(client: httpx.Client, method: str, url: str, *, headers=None, content=None) -> httpx.Request:
+    """Build an httpx.Request pinned to *url*'s vetted public IP.
+
+    Raises UnsafeUrlError if the URL is not http(s) or resolves to a
+    private/reserved/loopback/link-local address.
+    """
+    pinned_url, req_headers, extensions = pin_url(url, headers)
     return client.build_request(method, pinned_url, headers=req_headers, content=content, extensions=extensions)
 
 

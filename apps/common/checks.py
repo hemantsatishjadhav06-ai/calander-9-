@@ -87,4 +87,23 @@ def check_production_config(app_configs, **kwargs):
             )
         )
 
+    # Behind a TLS-terminating proxy (SECURE_PROXY_SSL_HEADER is set), every
+    # request's REMOTE_ADDR is the proxy's IP unless BB_TRUSTED_PROXIES lists it.
+    # With it empty, all clients share one rate-limit bucket → 10 bad logins from
+    # anyone 429s everyone (self-inflicted auth DoS), and X-Forwarded-For is
+    # ignored so throttling/audit IPs are all the proxy's.
+    if getattr(settings, "SECURE_PROXY_SSL_HEADER", None) and not getattr(settings, "BB_TRUSTED_PROXIES", ()):
+        errors.append(
+            CheckWarning(
+                "SECURE_PROXY_SSL_HEADER is set but BB_TRUSTED_PROXIES is empty.",
+                hint=(
+                    "Behind a proxy, set BB_TRUSTED_PROXIES to the proxy IP(s) so the "
+                    "auth rate-limiter derives the real client IP from X-Forwarded-For. "
+                    "Otherwise every client shares the proxy's IP and one user's failed "
+                    "logins rate-limit everyone."
+                ),
+                id="smbean.W006",
+            )
+        )
+
     return errors

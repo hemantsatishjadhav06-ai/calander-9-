@@ -283,11 +283,14 @@ ACCOUNT_LOGOUT_REDIRECT_URL = "/accounts/login/"
 # so brute-force and password-reset email-bombing are capped even if the
 # middleware is bypassed or reordered. Format: "<count>/<period>/<scope>".
 ACCOUNT_RATE_LIMITS = {
-    "login_failed": "10/5m/ip",
+    # Keep a per-key (per-account/email) clause alongside the per-IP one so a
+    # distributed botnet can't brute-force or reset-bomb a single account by
+    # rotating source IPs — the /key clause is what allauth's defaults carry.
+    "login_failed": "10/5m/ip,5/5m/key",
     "login": "30/5m/ip",
     "signup": "20/h/ip",
-    "reset_password": "5/h/ip",
-    "reset_password_from_key": "5/h/ip",
+    "reset_password": "5/h/ip,5/h/key",
+    "reset_password_from_key": "5/h/ip,5/h/key",
     "confirm_email": "10/h/ip",
 }
 
