@@ -416,13 +416,16 @@ img.sidebar-logo-mark {
   cursor: pointer;
   transition: all var(--dur-base) var(--ease-out);
   letter-spacing: 0.005em;
-  background: var(--primary);
+  /* White text needs a darker fill than --primary (brand-500 #F97316 is only
+     ~2.8:1). brand-700 (#C2410C) is ~5.2:1 → WCAG AA. --primary stays the
+     accent for links/rings where it sits on light backgrounds. */
+  background: var(--brand-700);
   color: var(--text-inverse);
   box-shadow: var(--shadow-primary);
   width: 100%;
 }
 .btn-brand:hover {
-  background: var(--primary-hover);
+  background: var(--brand-800);
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(249,115,22,0.35);
 }

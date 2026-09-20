@@ -5,6 +5,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SM Bean{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}SM Bean — plan, schedule, approve and publish social media across 10+ platforms from one dashboard.{% endblock %}">
+    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SM Bean">
+    <meta property="og:title" content="{% block og_title %}SM Bean{% endblock %}">
+    <meta property="og:description" content="Plan, schedule, approve and publish social media across 10+ platforms from one dashboard.">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/brightbean-studio-logo.webp' %}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="SM Bean">
+    <meta name="twitter:description" content="Plan, schedule, approve and publish social media across 10+ platforms from one dashboard.">
+    <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/brightbean-studio-logo.webp' %}">
     <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
     <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
     <link rel="icon" type="image/png" sizes="96x96" href="{% static 'favicon/favicon-96x96.png' %}">

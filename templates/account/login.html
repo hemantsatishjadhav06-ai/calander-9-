@@ -6,11 +6,12 @@
 {% block auth_content %}
 <style>
   .auth-card .btn-brand {
-    background-color: #93a240;
+    /* Darkened for WCAG AA: white text on #6B7A30 is ~4.7:1 (was #93a240 ~2.7:1). */
+    background-color: #6B7A30;
     box-shadow: 0 4px 14px rgba(147, 162, 64, 0.28);
   }
   .auth-card .btn-brand:hover {
-    background-color: #849139;
+    background-color: #5C6829;
     box-shadow: 0 6px 20px rgba(147, 162, 64, 0.35);
   }
   .auth-card .btn-brand:focus {

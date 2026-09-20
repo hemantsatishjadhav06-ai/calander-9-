@@ -4,8 +4,10 @@ from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import include, path, re_path
 from django.views.generic import TemplateView
+from django.views.generic.base import RedirectView
 from django.views.static import serve
 
 from apps.accounts.views import health_check
@@ -13,6 +15,24 @@ from apps.api.api import api as agent_api
 from apps.oauth_server import views as oauth_views
 
 logger = logging.getLogger(__name__)
+
+
+def robots_txt(request):
+    """Minimal robots.txt: index public pages, keep app internals out."""
+    lines = [
+        "User-agent: *",
+        "Disallow: /accounts/",
+        "Disallow: /organizations/",
+        "Disallow: /workspace/",
+        "Disallow: /settings/",
+        "Disallow: /api/",
+        "Disallow: /oauth/",
+        "Disallow: /admin/",
+        "Disallow: /portal/",
+        "Allow: /$",
+        "",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -78,6 +98,13 @@ urlpatterns = [
     # LEGAL_PRIVACY_URL to point at your hosted policies).
     path("terms/", TemplateView.as_view(template_name="legal/terms.html"), name="terms"),
     path("privacy/", TemplateView.as_view(template_name="legal/privacy.html"), name="privacy"),
+    # Silence the two probes seen 404ing in production and give crawlers a robots.
+    path("robots.txt", robots_txt, name="robots_txt"),
+    path(
+        "favicon.ico",
+        RedirectView.as_view(url=settings.STATIC_URL + "favicon/favicon.ico", permanent=True),
+        name="favicon",
+    ),
     path("organizations/media/", include("apps.media_library.urls_org")),
     path("", include("apps.accounts.urls_root")),
 ]
