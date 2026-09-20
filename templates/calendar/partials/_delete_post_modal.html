@@ -10,6 +10,7 @@ Expects context: workspace, csrf_token.
      @open-delete-modal.window="showDeleteModal = true; deletePostId = $event.detail.postId; deleteAccountId = $event.detail.accountId || null">
     <template x-teleport="body">
         <div x-show="showDeleteModal" class="fixed inset-0 z-[60] flex items-center justify-center"
+             role="dialog" aria-modal="true" aria-label="Delete post"
              @keydown.escape.window="showDeleteModal = false"
              style="display: none;">
             <div class="fixed inset-0 bg-black/30 backdrop-blur-sm" @click="showDeleteModal = false"

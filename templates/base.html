@@ -467,8 +467,8 @@
                          class="idea-modal-overlay"
                          @click.self="closeCreateModal()"
                          @keydown.escape.window="closeCreateModal()">
-                        <div class="idea-modal" @click.stop>
-                            <button type="button" class="idea-modal-close" @click="closeCreateModal()" title="Close">
+                        <div class="idea-modal" @click.stop role="dialog" aria-modal="true" aria-label="Create idea">
+                            <button type="button" class="idea-modal-close" @click="closeCreateModal()" title="Close" aria-label="Close">
                                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
                             <form action="{% url 'composer:idea_create' workspace_id=request.workspace.id %}"
@@ -1411,6 +1411,7 @@
         <div x-show="createWsOpen" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center">
             <div class="absolute inset-0 bg-black/40" @click="createWsOpen = false"></div>
             <div class="relative bg-white rounded-xl shadow-xl ring-1 ring-stone-200 w-full max-w-md mx-4 p-6"
+                 role="dialog" aria-modal="true" aria-label="Create workspace"
                  x-show="createWsOpen"
                  x-transition:enter="transition ease-out duration-150"
                  x-transition:enter-start="opacity-0 scale-95"
