@@ -644,6 +644,38 @@ OAUTH2_PROVIDER = {
     "REQUEST_APPROVAL_PROMPT": "auto",
     # Claude's OAuth callback is always https; reject non-TLS redirect URIs.
     "ALLOWED_REDIRECT_URI_SCHEMES": ["https"],
+    # RFC 9700 (OAuth 2.0 Security BCP). django-oauth-toolkit ships these off
+    # for backward compatibility and flips them in 4.0; ``check --deploy``
+    # warns about each one until then. Every flag below is a no-op for the one
+    # flow this server actually serves — MCP clients registering through DCR
+    # and using authorization_code + PKCE — and removes attack surface we were
+    # carrying for nothing:
+    #   IMPLICIT/PASSWORD_GRANT   grants no client here uses, and that RFC 9700
+    #                             §2.1.2/§2.4 say not to offer at all.
+    #   PKCE_METHOD               rejects ``plain``. Already enforced ahead of
+    #                             the Grant row by S256OnlyOAuth2Validator; this
+    #                             makes the library agree rather than relying on
+    #                             our override alone.
+    #   ACCESS_TOKEN_TRANSPORT    stops accepting a bearer token in the query
+    #                             string, where it lands in access logs,
+    #                             Referer headers and browser history.
+    #   AUTHZ_RESPONSE_ISS        adds RFC 9207 ``iss`` to the authorize
+    #                             response, which is what lets a client detect a
+    #                             mix-up attack. Unknown params are ignored by
+    #                             clients that don't read it.
+    "COMPLIANT_BCP_RFC9700_IMPLICIT_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PASSWORD_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PKCE_METHOD": True,
+    "COMPLIANT_BCP_RFC9700_ACCESS_TOKEN_TRANSPORT": True,
+    "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS": True,
+    # Replaying a rotated refresh token means it leaked; revoke the whole
+    # family rather than issuing from it. ROTATE_REFRESH_TOKEN above is what
+    # makes a replay detectable in the first place.
+    "REFRESH_TOKEN_REUSE_PROTECTION": True,
+    # NOT enabled: COMPLIANT_BCP_RFC9700_TOKEN_STORAGE. It hashes tokens at
+    # rest, which is the right end state, but it cannot read the tokens already
+    # stored — every live MCP connection would break and have to reconnect. It
+    # belongs in a deliberate migration, not in a deploy.
 }
 
 
