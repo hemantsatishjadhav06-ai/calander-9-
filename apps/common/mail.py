@@ -18,7 +18,7 @@ Four things can stop a message, checked in this order:
 3. The per-recipient hourly/daily cap, for ``notification``-class mail only.
 4. The global daily cap, which nothing bypasses.
 
-The class comes from an ``X-Brightbean-Email-Class`` header (see
+The class comes from an ``X-SMBean-Email-Class`` header (see
 ``transactional()``). ``transactional`` mail — password reset, an invitation, a
 magic link — skips the per-recipient cap but never the global one, so a storm of
 notifications can never lock someone out of their own account.
@@ -38,7 +38,7 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-EMAIL_CLASS_HEADER = "X-Brightbean-Email-Class"
+EMAIL_CLASS_HEADER = "X-SMBean-Email-Class"
 CLASS_TRANSACTIONAL = "transactional"
 CLASS_NOTIFICATION = "notification"
 

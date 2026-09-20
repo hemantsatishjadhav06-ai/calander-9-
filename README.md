@@ -1,33 +1,25 @@
-<p align="center">
-  <a href="https://github.com/brightbeanxyz/brightbean-studio">
-    <img src=".github/assets/brightbean-studio-logo.webp" alt="BrightBean Studio" width="280">
-  </a>
-</p>
+<h1 align="center">SM Bean</h1>
 
 <p align="center">
   <strong>Open-source social media management for creators, agencies, and SMBs.</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/brightbeanxyz/brightbean-studio/actions/workflows/ci.yml"><img src="https://github.com/brightbeanxyz/brightbean-studio/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/workflows/ci.yml"><img src="https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License: AGPL-3.0"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.12%2B-blue.svg" alt="Python 3.12+"></a>
   <a href="https://www.djangoproject.com/"><img src="https://img.shields.io/badge/Django-5.x-green.svg" alt="Django 5.x"></a>
 </p>
 
-<p align="center">
-  <a href="https://brightbean.xyz/studio/"><img src="https://img.shields.io/badge/Free%20hosted%20version-brightbean.xyz%2Fstudio-FFB300?style=for-the-badge" alt="Free hosted version at brightbean.xyz/studio"></a>
-</p>
-
 ---
 
-## About BrightBean Studio
+## About SM Bean
 
-BrightBean Studio is an open-source, self-hostable social media management platform built for creators, agencies and SMBs. It does what Sendible, SocialPilot, or ContentStudio do, but free and without per-seat, per-channel, or per-workspace limits. Plan, compose, schedule, approve, publish, and monitor content across Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business Profile, Mastodon, and DEV.to from a single multi-workspace dashboard.
+SM Bean is an open-source, self-hostable social media management platform built for creators, agencies and SMBs. It does what Sendible, SocialPilot, or ContentStudio do, but free and without per-seat, per-channel, or per-workspace limits. Plan, compose, schedule, approve, publish, and monitor content across Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business Profile, Mastodon, and DEV.to from a single multi-workspace dashboard.
 
-It's for people managing many client accounts under one roof who'd rather own their social stack than pay $100–300/month to a SaaS vendor. Every feature is available to every user. No paid tier, no feature gate, no upsell.
+It's for people managing many client accounts under one roof who'd rather own their social stack than pay $100–300/month to a SaaS vendor. Seats, workspaces and channels are never metered, and publishing, scheduling, approvals, the client portal, inbox and analytics are all included. One optional add-on — AI Intelligence — runs on a paid third-party model and is billed by usage.
 
-A free hosted version is available at [brightbean.xyz/studio](https://brightbean.xyz/studio/). You can also deploy it yourself with a one-click button on Heroku, Render, or Railway, run it on your own VPS via Docker, or run it locally. All platform integrations talk directly to the official first-party APIs using your own developer credentials, so there's no aggregator middleman, no vendor lock-in, and no third party sitting between you and your data.
+Deploy it with a one-click button on Heroku or Render, run it on your own VPS via Docker, or run it locally. All platform integrations talk directly to the official first-party APIs using your own developer credentials, so there's no aggregator middleman, no vendor lock-in, and no third party sitting between you and your data.
 
 ## Features
 
@@ -50,15 +42,15 @@ A free hosted version is available at [brightbean.xyz/studio](https://brightbean
 
 <table>
   <tr>
-    <td colspan="2"><img src=".github/assets/BrightBean%20Studio%20Calendar.webp" alt="Calendar view"><br><sub><b>Visual calendar</b> - drag-and-drop scheduling with recurring slots and queues.</sub></td>
+    <td colspan="2"><img src=".github/assets/calendar.webp" alt="Calendar view"><br><sub><b>Visual calendar</b> - drag-and-drop scheduling with recurring slots and queues.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src=".github/assets/BrightBean%20Studio%20Post%20Editor.webp" alt="Post editor"><br><sub><b>Post editor</b> - composer with per-platform overrides and previews.</sub></td>
-    <td width="50%"><img src=".github/assets/BrightBean%20Studio%20Idea%20Kanban%20Board.webp" alt="Idea kanban board"><br><sub><b>Idea board</b> - Kanban workflow to keep track of all your post ideas.</sub></td>
+    <td width="50%"><img src=".github/assets/post-editor.webp" alt="Post editor"><br><sub><b>Post editor</b> - composer with per-platform overrides and previews.</sub></td>
+    <td width="50%"><img src=".github/assets/idea-board.webp" alt="Idea kanban board"><br><sub><b>Idea board</b> - Kanban workflow to keep track of all your post ideas.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src=".github/assets/BrightBean%20Social%20Media%20Platforms.webp" alt="Connected platforms"><br><sub><b>Connect anything</b> - 10+ first-party integrations, no aggregator.</sub></td>
-    <td width="50%"><img src=".github/assets/BrightBean%20Studio%20Analytics.webp" alt="Analytics dashboard"><br><sub><b>Performance analytics</b> - per-post and channel-level metrics with KPI cards and trend charts.</sub></td>
+    <td width="50%"><img src=".github/assets/platforms.webp" alt="Connected platforms"><br><sub><b>Connect anything</b> - 10+ first-party integrations, no aggregator.</sub></td>
+    <td width="50%"><img src=".github/assets/analytics.webp" alt="Analytics dashboard"><br><sub><b>Performance analytics</b> - per-post and channel-level metrics with KPI cards and trend charts.</sub></td>
   </tr>
 </table>
 
@@ -82,17 +74,11 @@ A free hosted version is available at [brightbean.xyz/studio](https://brightbean
 
 ---
 
-### Hosted Version
-
-A free hosted version of Brightbean Studio is available at [brightbean.xyz/studio](https://brightbean.xyz/studio/). It runs the same codebase as this repository, with no setup or maintenance required.
-
-If you'd rather self-host, choose one of the options below.
-
 ### One-Click Deploy
 
-| Heroku | Render | Railway |
-|:------:|:------:|:-------:|
-| [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/brightbeanxyz/brightbean-studio) | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/brightbeanxyz/brightbean-studio) | [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/brightbean-studio?referralCode=brightbean) |
+| Heroku | Render |
+|:------:|:------:|
+| [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/hemantsatishjadhav06-ai/calander-9-) | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/hemantsatishjadhav06-ai/calander-9-) |
 
 After deploying, set these environment variables in your platform's dashboard:
 
@@ -124,8 +110,8 @@ For social media API keys, see [Platform Credentials](#platform-credentials). Fu
 ## Quick Start (Docker)
 
 ```bash
-git clone https://github.com/brightbeanxyz/brightbean-studio.git
-cd brightbean-studio
+git clone https://github.com/hemantsatishjadhav06-ai/calander-9-.git
+cd calander-9-
 cp .env.example .env
 ```
 
@@ -166,8 +152,8 @@ Run everything natively - no Docker, no PostgreSQL install. Uses SQLite for the 
 **1. Clone and configure**
 
 ```bash
-git clone https://github.com/brightbeanxyz/brightbean-studio.git
-cd brightbean-studio
+git clone https://github.com/hemantsatishjadhav06-ai/calander-9-.git
+cd calander-9-
 cp .env.example .env
 ```
 
@@ -274,8 +260,8 @@ ruff format .
 
 ```bash
 # On your server:
-git clone https://github.com/brightbeanxyz/brightbean-studio.git
-cd brightbean-studio
+git clone https://github.com/hemantsatishjadhav06-ai/calander-9-.git
+cd calander-9-
 cp .env.example .env
 # Edit .env:
 #   SECRET_KEY=<generate a random 50+ char string>
@@ -304,7 +290,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 | Platform | Config file | Notes |
 |----------|-------------|-------|
 | **Heroku** | `Procfile` + `app.json` | Deploy-button ready. Must use Basic+ dynos (Eco dynos break the worker). |
-| **Railway** | `railway.toml` | The [one-click template](https://railway.com/deploy/brightbean-studio) provisions three services: web (Gunicorn, runs `migrate` on startup), worker (`python manage.py process_tasks`), and managed PostgreSQL. The web service's startup `migrate` fires the `post_migrate` hooks that register the recurring tasks, so scheduling works out of the box. |
+| **Railway** | `railway.toml` | Deploying this repository from [Railway](https://railway.com/new) provisions three services: web (Gunicorn, runs `migrate` on startup), worker (`python manage.py process_tasks`), and managed PostgreSQL. The web service's startup `migrate` fires the `post_migrate` hooks that register the recurring tasks, so scheduling works out of the box. |
 | **Render** | `render.yaml` | Blueprint with web, worker, PostgreSQL. Must use paid tier. |
 
 All platforms with ephemeral filesystems require `STORAGE_BACKEND=s3` - see `.env.example` for S3 configuration.
@@ -320,7 +306,7 @@ See `architecture.md` for detailed per-platform instructions and cost breakdowns
 ## Project Structure
 
 ```
-brightbean-studio/
+calander-9-/
 ├── config/
 │   ├── settings/
 │   │   ├── base.py            # Shared settings
@@ -365,7 +351,7 @@ brightbean-studio/
 
 To connect social media accounts, you need API credentials from each platform's developer portal. You can set these via environment variables in `.env` (see `.env.example`) or, per organization, through the Django admin at `{APP_URL}/admin/` → **Credentials → Platform credentials** (superuser only). If a platform is configured in both places, the `.env` value takes precedence.
 
-**Admin UI access (superuser only):** The Django admin at `{APP_URL}/admin/` (for example `https://brightbean.example.com/admin/`) is restricted to superuser accounts — only a superuser can view or edit platform credentials there. If you don't already have one, create a superuser, then sign in and open **Credentials → Platform credentials**:
+**Admin UI access (superuser only):** The Django admin at `{APP_URL}/admin/` (for example `https://social.example.com/admin/`) is restricted to superuser accounts — only a superuser can view or edit platform credentials there. If you don't already have one, create a superuser, then sign in and open **Credentials → Platform credentials**:
 
 ```bash
 python manage.py createsuperuser
@@ -378,7 +364,7 @@ python manage.py createsuperuser
 {APP_URL}/social-accounts/callback/{platform}/
 ```
 
-For example, if your `APP_URL` is `https://brightbean.example.com`, the Facebook redirect URI would be `https://brightbean.example.com/social-accounts/callback/facebook/`.
+For example, if your `APP_URL` is `https://social.example.com`, the Facebook redirect URI would be `https://social.example.com/social-accounts/callback/facebook/`.
 
 > **TikTok:** use the slug `social1` instead of `tiktok` — TikTok rejects redirect URIs containing their brand name. See the [TikTok](#tiktok) section.
 
@@ -473,7 +459,7 @@ The Instagram (Direct) connector uses the **Instagram API with Instagram Login**
 
 ### LinkedIn
 
-Brightbean Studio supports two LinkedIn paths. Pick whichever your LinkedIn dev app can obtain - or both, on separate apps.
+SM Bean supports two LinkedIn paths. Pick whichever your LinkedIn dev app can obtain - or both, on separate apps.
 
 **Path A - Personal-only (any individual developer can do this):**
 
@@ -514,7 +500,7 @@ Brightbean Studio supports two LinkedIn paths. Pick whichever your LinkedIn dev 
    PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET=your-client-secret
    ```
 
-If you set only the Path B (Company) credentials, Brightbean Studio automatically reuses them for personal connections too - refresh tokens (365-day) and inbox both work. You only need Path A vars if you have a separate Personal-only app.
+If you set only the Path B (Company) credentials, SM Bean automatically reuses them for personal connections too - refresh tokens (365-day) and inbox both work. You only need Path A vars if you have a separate Personal-only app.
 
 > **Note:** "Sign In with LinkedIn using OpenID Connect" / "Share on LinkedIn" and "Community Management API" are **mutually exclusive** on a single LinkedIn app. You need separate apps for Path A and Path B.
 
@@ -582,19 +568,19 @@ No developer app registration needed. Users connect by entering their Bluesky ha
 
 1. Log in to [Bluesky](https://bsky.app/)
 2. Go to **Settings → Privacy and Security → App Passwords**
-3. Create a new app password and use it when connecting your account in Brightbean Studio
+3. Create a new app password and use it when connecting your account in SM Bean
 
 ### Mastodon
 
-No developer app registration needed. Brightbean Studio automatically registers an OAuth application on each Mastodon instance when a user connects their account. Users just need to enter their instance URL (e.g., `mastodon.social`).
+No developer app registration needed. SM Bean automatically registers an OAuth application on each Mastodon instance when a user connects their account. Users just need to enter their instance URL (e.g., `mastodon.social`).
 
 ### DEV.to
 
 No developer app registration needed. Users connect by entering a personal **API key**:
 
 1. Log in to [DEV.to](https://dev.to/) and open **[Settings → Extensions](https://dev.to/settings/extensions)**
-2. Under **DEV Community API Keys**, enter a description (e.g. `Brightbean`) and click **Generate API Key**
-3. Copy the generated key and paste it when connecting your account in Brightbean Studio
+2. Under **DEV Community API Keys**, enter a description (e.g. `SM Bean`) and click **Generate API Key**
+3. Copy the generated key and paste it when connecting your account in SM Bean
 
 Posts publish as DEV.to articles (title + Markdown body). The key can be revoked at any time from the same settings page.
 
@@ -631,7 +617,7 @@ It reports the token's granted scopes (a missing `pages_manage_engagement` is wh
 
 ## API & MCP for Agents
 
-BrightBean Studio ships a REST API and an MCP (Model Context Protocol) server so agents and scripts can read analytics, manage media, and create or schedule posts. Both share the same authentication, permission model, rate limits, and audit log. Pick whichever protocol fits your client.
+SM Bean ships a REST API and an MCP (Model Context Protocol) server so agents and scripts can read analytics, manage media, and create or schedule posts. Both share the same authentication, permission model, rate limits, and audit log. Pick whichever protocol fits your client.
 
 **Base URL:** `{APP_URL}/api/v1/` (e.g. `https://your-studio.example.com/api/v1/`)
 
@@ -712,18 +698,17 @@ The MCP server lives at `POST {APP_URL}/api/v1/mcp` and speaks JSON-RPC 2.0 over
 
 The server is at `{APP_URL}/api/v1/mcp` and supports two authentication modes — pick whichever your client uses.
 
-**Claude Desktop (and other native OAuth connectors).** In Claude Desktop open **Settings → Connectors → Add custom connector**, name it, and enter the server URL `{APP_URL}/api/v1/mcp`. Claude registers itself (Dynamic Client Registration) and opens a browser to log in to BrightBean Studio and approve access — **no API key required**. Any Studio user can connect; the connection acts with **their own** workspace permissions (read-only roles get the read tools, while posting/scheduling/uploading require the matching permission), operating on their last-active workspace. Requires Studio to be served over a public **https** URL.
+**Claude Desktop (and other native OAuth connectors).** In Claude Desktop open **Settings → Connectors → Add custom connector**, name it, and enter the server URL `{APP_URL}/api/v1/mcp`. Claude registers itself (Dynamic Client Registration) and opens a browser to log in to SM Bean and approve access — **no API key required**. Any Studio user can connect; the connection acts with **their own** workspace permissions (read-only roles get the read tools, while posting/scheduling/uploading require the matching permission), operating on their last-active workspace. Requires Studio to be served over a public **https** URL.
 
 **Claude Code, Cursor, custom agents (static API key).** Point the client at the same URL and send an API key as a Bearer token (`Authorization: Bearer bb_studio_...`). For Claude Code:
 
 ```bash
-claude mcp add --transport http brightbean {APP_URL}/api/v1/mcp \
+claude mcp add --transport http smbean {APP_URL}/api/v1/mcp \
   --header "Authorization: Bearer bb_studio_..."
 ```
 
 ### Pre-built agent skill
 
-Don't want to wire up your own client? The companion [brightbean-studio-agent](https://github.com/brightbeanxyz/brightbean-studio-agent) repository hosts a holistic agent skill that drives BrightBean Studio end-to-end through the REST API and MCP tools documented above.
 
 ---
 

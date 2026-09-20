@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Brightbean, please report it responsibly.
+If you discover a security vulnerability in SM Bean, please report it responsibly.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 

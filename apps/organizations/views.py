@@ -118,7 +118,7 @@ def _handle_name_update(request, org):
     """Handle organization name change.
 
     The name is interpolated into the Subject of every invitation this org
-    sends ("You've been invited to join <name> on Brightbean"), so it is
+    sends ("You've been invited to join <name> on <site>"), so it is
     cleaned here rather than trusted: control characters out, whitespace
     collapsed, length bounded.
     """

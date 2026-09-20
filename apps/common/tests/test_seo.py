@@ -12,6 +12,24 @@ def test_robots_txt():
     assert b"Disallow: /api/" in resp.content
 
 
+def test_robots_txt_points_at_the_sitemap():
+    """An absolute URL: crawlers ignore a relative Sitemap: line."""
+    resp = Client().get("/robots.txt")
+    assert b"Sitemap: http://testserver/sitemap.xml" in resp.content
+
+
+def test_sitemap_lists_the_public_pages_only():
+    resp = Client().get("/sitemap.xml")
+    assert resp.status_code == 200
+    assert resp["Content-Type"].startswith("application/xml")
+    body = resp.content.decode()
+    for path in ("http://testserver/", "http://testserver/pricing/", "http://testserver/terms/"):
+        assert f"<loc>{path}</loc>" in body
+    # The app surface is disallowed in robots.txt; it must not be advertised here.
+    assert "/workspace/" not in body
+    assert "/accounts/" not in body
+
+
 def test_favicon_redirects_to_static():
     resp = Client().get("/favicon.ico")
     assert resp.status_code == 301

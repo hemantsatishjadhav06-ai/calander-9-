@@ -556,7 +556,7 @@ def generate_video_thumbnail(file_path):
     fd = None
     thumb_path = None
     try:
-        fd, thumb_path = tempfile.mkstemp(suffix=".jpg", prefix="brightbean_thumb_")
+        fd, thumb_path = tempfile.mkstemp(suffix=".jpg", prefix="smbean_thumb_")
         # Close the fd immediately - ffmpeg will write to the path directly
         os.close(fd)
         fd = None
@@ -608,7 +608,7 @@ def extract_video_frames(source, timestamps, *, width=160, timeout=None):
     per_frame_timeout = timeout or getattr(settings, "MEDIA_LIBRARY_FFMPEG_TIMEOUT", 300)
     frames = []
     for t in timestamps:
-        fd, out_path = tempfile.mkstemp(suffix=".jpg", prefix="brightbean_frame_")
+        fd, out_path = tempfile.mkstemp(suffix=".jpg", prefix="smbean_frame_")
         os.close(fd)
         try:
             result = subprocess.run(

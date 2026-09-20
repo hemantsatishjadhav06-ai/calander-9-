@@ -1,5 +1,5 @@
 # Build config (Dockerfile) for the Railway one-click template:
-#   https://railway.com/deploy/brightbean-studio
+#   https://railway.com/new
 # The template provisions three services that share this image:
 #   - web:     Gunicorn (Dockerfile CMD), runs `python manage.py migrate` on startup
 #   - worker:  `python manage.py process_tasks`  (django-background-tasks)

@@ -349,6 +349,50 @@ class TestErrorClassification:
         assert exc.status_code == 403
         assert _is_insufficient_scope(exc)
 
+    def test_generic_failure_surfaces_googles_words_not_its_markup(self):
+        """Google's message ships an <a href> that reached the error banner.
+
+        The base class falls back to ``response.text`` — the whole JSON
+        envelope, markup included. Google already says why in plain words.
+        """
+        body = {
+            "error": {
+                "code": 400,
+                "message": 'Invalid video. See the <a href="/docs">docs</a>.',
+                "errors": [{"reason": "invalidVideo"}],
+            }
+        }
+
+        exc = YouTubeProvider()._error_for_response(self._error(400, body))
+
+        assert type(exc) is APIError
+        assert exc.status_code == 400
+        assert "Invalid video. See the docs." in str(exc)
+        assert "<a href" not in str(exc)
+        assert '{"error"' not in str(exc)
+
+    def test_a_scope_refusal_named_only_in_the_reason_still_flags_reconnect(self):
+        """``_is_insufficient_scope`` sniffs the message, so reasons must ride along.
+
+        Google states some 403s only in ``errors[].reason``; the message says
+        nothing that would match. Dropping the reason would silently stop those
+        accounts from being flagged for reconnect.
+        """
+        from apps.analytics.tasks import _is_insufficient_scope
+
+        body = {
+            "error": {
+                "code": 403,
+                "message": "The request is missing a valid API key.",
+                "errors": [{"reason": "insufficientPermissions"}],
+            }
+        }
+
+        exc = YouTubeProvider()._error_for_response(self._error(403, body))
+
+        assert type(exc) is APIError
+        assert _is_insufficient_scope(exc)
+
     def test_429_still_raises_plain_rate_limit_error(self):
         """The base contract an override must preserve."""
         resp = self._error(429, {"error": {"code": 429}})

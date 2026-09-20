@@ -1,4 +1,4 @@
-"""OAuth discovery metadata for the BrightBean Studio MCP Authorization Server.
+"""OAuth discovery metadata for the SM Bean MCP Authorization Server.
 
 An MCP client (e.g. Claude Desktop) discovers the OAuth endpoints by fetching:
   - RFC 8414 authorization-server metadata -> /.well-known/oauth-authorization-server

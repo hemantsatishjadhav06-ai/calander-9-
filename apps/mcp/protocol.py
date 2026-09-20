@@ -1,6 +1,6 @@
 """JSON-RPC 2.0 / MCP protocol primitives.
 
-We implement just enough of the spec to serve the Brightbean Studio
+We implement just enough of the spec to serve the SM Bean
 tool surface over the Streamable HTTP transport. The bits we *don't*
 implement (and don't need for v1):
 
@@ -15,7 +15,7 @@ implement (and don't need for v1):
 
 The reason for rolling our own rather than depending on the official
 ``mcp`` SDK: the SDK's HTTP transport assumes Starlette/ASGI, and the
-Brightbean app is WSGI on Django + Ninja. Re-implementing the small
+SM Bean app is WSGI on Django + Ninja. Re-implementing the small
 JSON-RPC core keeps dependencies and abstractions to a minimum.
 """
 

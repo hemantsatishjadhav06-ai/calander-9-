@@ -183,6 +183,53 @@ def send_magic_link(request, workspace_id, membership_id):
 
 
 # ---------------------------------------------------------------------------
+# Revoke Portal Link
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_workspace_role("manager")
+@require_POST
+@ratelimit(key="user", rate="10/m", method="POST", block=True)
+def revoke_magic_link(request, workspace_id, membership_id):
+    """Expire this client's active portal links without removing them.
+
+    A portal link is a bearer credential valid for its whole lifetime, and
+    until now the only way to cut one off early was to delete the client's
+    membership — losing their approval history to revoke a forwarded link.
+    """
+    workspace = request.workspace
+    membership = get_object_or_404(
+        WorkspaceMembership,
+        id=membership_id,
+        workspace=workspace,
+        workspace_role=WorkspaceMembership.WorkspaceRole.CLIENT,
+    )
+
+    active = MagicLinkToken.objects.filter(
+        user=membership.user,
+        workspace=workspace,
+        expires_at__gt=timezone.now(),
+    ).values_list("id", flat=True)
+    for token_id in list(active):
+        portal_services.revoke_magic_link(token_id, workspace)
+
+    if request.headers.get("HX-Request"):
+        return render(
+            request,
+            "client_portal/admin/partials/client_row.html",
+            {
+                "client": {
+                    "membership": membership,
+                    "user": membership.user,
+                    "token": None,
+                },
+            },
+        )
+    return redirect("client_portal_admin:client_list", workspace_id=workspace.id)
+
+
+# ---------------------------------------------------------------------------
 # Remove Client
 # ---------------------------------------------------------------------------
 
