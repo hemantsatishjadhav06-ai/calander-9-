@@ -899,8 +899,17 @@ def _capture_proposed_publish_at(post, post_id, workspace, form, *, clear_when_b
 @login_required
 @require_permission("create_posts")
 @require_POST
+@transaction.atomic
 def save_post(request, workspace_id, post_id=None):
-    """Save or update a post (draft, schedule, or publish action)."""
+    """Save or update a post (draft, schedule, or publish action).
+
+    ``@transaction.atomic`` is load-bearing: this view performs a dozen related
+    writes (post, pending media, tags, recurrence, PlatformPost children, bulk
+    scheduled_at propagation, approval reverts, child transitions, version row).
+    Without one boundary, a failure part-way through left a post the user
+    believes is scheduled whose children the publisher never picks up — or the
+    reverse — with no recovery path.
+    """
     workspace = _get_workspace(request, workspace_id)
     action = request.POST.get("action", "save_draft")
 
@@ -986,10 +995,6 @@ def save_post(request, workspace_id, post_id=None):
             return JsonResponse({"errors": {"queue": "No active queue found for the selected channel."}}, status=400)
         # Queueing assigns real per-platform slots below — drop any proposal.
         post.proposed_publish_at = None
-        post.save()
-        # Ensure PlatformPost rows exist for every selected account before the
-        # queue service writes per-platform scheduled_at values.
-        _sync_platform_posts(request, post, workspace, initial_status="draft")
         # "Next Available" always places the post in the queue's soonest open
         # slot. It deliberately ignores the Schedule-panel date/time: those
         # inputs are prefilled from the post's own scheduled_at/proposed time
@@ -998,8 +1003,13 @@ def save_post(request, workspace_id, post_id=None):
         try:
             # One transaction across every queue: if a later queue is full, the
             # earlier queues' slot writes roll back instead of leaving a child
-            # half-queued.
+            # half-queued. The post save and child sync are inside it too, so a
+            # full queue doesn't leave a saved post with half-queued children.
             with transaction.atomic():
+                post.save()
+                # Ensure PlatformPost rows exist for every selected account
+                # before the queue service writes per-platform scheduled_at.
+                _sync_platform_posts(request, post, workspace, initial_status="draft")
                 for q in queues:
                     add_to_queue(post, q)
                 # Transition every child whose scheduled_at was filled in.
@@ -1027,11 +1037,13 @@ def save_post(request, workspace_id, post_id=None):
             return JsonResponse({"errors": {"queue": "No active queue found for the selected channel."}}, status=400)
         # Queueing assigns real per-platform slots below — drop any proposal.
         post.proposed_publish_at = None
-        post.save()
-        _sync_platform_posts(request, post, workspace, initial_status="draft")
         try:
-            # One transaction across every queue (see add_to_queue above).
+            # One transaction across every queue (see add_to_queue above), and
+            # across the post + children themselves: a full queue must not
+            # leave a saved post with half-queued children behind.
             with transaction.atomic():
+                post.save()
+                _sync_platform_posts(request, post, workspace, initial_status="draft")
                 for q in queues:
                     add_to_queue(post, q, priority=True)
                 _transition_post_children(post, "scheduled", only=_scoped_platform_post_ids(request, post))
@@ -1988,7 +2000,9 @@ def unsplash_import(request, workspace_id, post_id=None):
     if not new_assets:
         if quota_exceeded:
             return JsonResponse(
-                {"error": "Storage quota exceeded. Free up space or upgrade your plan."},
+                # "Upgrade your plan" is meaningless on a self-hosted install,
+                # where the operator just raises the quota.
+                {"error": "You're out of storage. Delete unused media, or ask your admin to raise the limit."},
                 status=413,
             )
         return JsonResponse({"error": "Could not import the selected photos."}, status=502)
@@ -3151,7 +3165,9 @@ def idea_group_reorder(request, workspace_id):
 def category_list(request, workspace_id):
     """Settings page for managing content categories."""
     workspace = _get_workspace(request, workspace_id)
-    categories = ContentCategory.objects.for_workspace(workspace.id)
+    # Annotate the count the template needs: `cat.posts.count` in the loop was
+    # two extra queries per category.
+    categories = ContentCategory.objects.for_workspace(workspace.id).annotate(post_count=models.Count("posts"))
     form = ContentCategoryForm()
 
     return render(

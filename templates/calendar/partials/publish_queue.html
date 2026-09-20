@@ -72,7 +72,7 @@ Shows all scheduled platform posts grouped by date. Loaded via HTMX into #tab-co
                                 {% endif %}
                             </div>
                             {% endfor %}
-                            {% with extra=pp.post.media_attachments.count %}
+                            {% with extra=pp.post.media_attachments.all|length %}
                             {% if extra > 4 %}
                             <div class="w-12 h-12 rounded-lg bg-stone-100 flex items-center justify-center flex-shrink-0">
                                 <span class="text-xs font-semibold text-stone-400">+{{ extra|add:"-4" }}</span>

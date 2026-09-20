@@ -360,16 +360,27 @@ def _dispatch_email(delivery: NotificationDelivery) -> None:
     notification = delivery.notification
     user = notification.user
 
+    site_name = getattr(settings, "SITE_NAME", "SM Bean")
+    data = notification.data if isinstance(notification.data, dict) else {}
+    workspace_name = data.get("workspace_name") or ""
+
     context = {
         "notification": notification,
         "user": user,
         "app_url": getattr(settings, "APP_URL", "http://localhost:8000"),
+        # Emails render outside the request cycle, so context processors don't
+        # run — pass branding explicitly.
+        "SITE_NAME": site_name,
+        "workspace_name": workspace_name,
     }
 
     text_content = render_to_string("notifications/email/notification.txt", context)
     html_content = render_to_string("notifications/email/notification.html", context)
 
-    subject = notification.title
+    # Titles are short status words ("Approved", "Post rejected"), so a bare
+    # title made the inbox subject a single unattributed word — unsearchable and
+    # indistinguishable from spam. Qualify it with the workspace and the brand.
+    subject = " · ".join(p for p in (notification.title, workspace_name, site_name) if p)
 
     msg = EmailMultiAlternatives(
         subject=subject,

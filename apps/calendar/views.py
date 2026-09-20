@@ -8,6 +8,7 @@ from datetime import date, datetime, time, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db.models import Count as DbCount
 from django.db.models import QuerySet
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -1563,7 +1564,13 @@ def update_posting_slot(request, workspace_id, slot_id):
 def queue_list(request, workspace_id):
     """List all queues for this workspace."""
     workspace = _get_workspace(request, workspace_id)
-    queues = Queue.objects.for_workspace(workspace.id).select_related("social_account", "category")
+    # Annotate the count the template needs: `queue.entries.count` in the loop
+    # was two extra queries per queue.
+    queues = (
+        Queue.objects.for_workspace(workspace.id)
+        .select_related("social_account", "category")
+        .annotate(entry_count=DbCount("entries"))
+    )
     accounts = SocialAccount.objects.for_workspace(workspace.id).filter(
         connection_status=SocialAccount.ConnectionStatus.CONNECTED,
     )

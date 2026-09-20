@@ -44,11 +44,13 @@ Shows all published/partially_published platform posts. Loaded via HTMX into #ta
                             </div>
                         </div>
                         {% endif %}
-                        {% if pp.post.media_attachments.count > 1 %}
+                        {% with extra=pp.post.media_attachments.all|length %}
+                        {% if extra > 1 %}
                         <div class="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] font-bold px-1 rounded-tl">
-                            +{{ pp.post.media_attachments.count|add:"-1" }}
+                            +{{ extra|add:"-1" }}
                         </div>
                         {% endif %}
+                        {% endwith %}
                     </div>
                     {% else %}
                     <div class="w-10 h-10 rounded-lg bg-stone-50 flex items-center justify-center">

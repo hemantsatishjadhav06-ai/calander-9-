@@ -73,6 +73,8 @@ class Organization(models.Model):
           org is nulled first (defensive; provision-for-member would reset it
           anyway, but the delete_user path wouldn't).
         """
+        from django.db import transaction
+
         from apps.accounts.models import User
         from apps.accounts.signals import provision_organization_and_workspace
         from apps.members.models import OrgMembership
@@ -80,19 +82,22 @@ class Organization(models.Model):
 
         member_ids = list(OrgMembership.objects.filter(organization=self).values_list("user_id", flat=True))
         ws_ids = list(Workspace.objects.filter(organization=self).values_list("id", flat=True))
-
-        if ws_ids:
-            User.objects.filter(last_workspace_id__in=ws_ids).update(last_workspace_id=None)
-
-        self.delete()  # CASCADE: workspaces, memberships, credentials, media, etc.
-
         requesting_user_id = requesting_user.pk if requesting_user else None
-        for uid in member_ids:
-            if uid == requesting_user_id:
-                User.objects.filter(pk=uid).delete()
-                continue
-            try:
-                user = User.objects.get(pk=uid)
-            except User.DoesNotExist:
-                continue
-            provision_organization_and_workspace(user)
+
+        # One boundary over destroy-then-reprovision. Without it, a failure
+        # while re-provisioning member N left members N..last with no org and
+        # no workspace — a permanently broken login, unrecoverable without a
+        # shell, because the org they belonged to was already gone.
+        with transaction.atomic():
+            if ws_ids:
+                User.objects.filter(last_workspace_id__in=ws_ids).update(last_workspace_id=None)
+
+            self.delete()  # CASCADE: workspaces, memberships, credentials, media, etc.
+
+            if requesting_user_id in member_ids:
+                User.objects.filter(pk=requesting_user_id).delete()
+
+            # Fetch the survivors in one query instead of one per member.
+            survivors = User.objects.filter(pk__in=[uid for uid in member_ids if uid != requesting_user_id])
+            for user in survivors:
+                provision_organization_and_workspace(user)

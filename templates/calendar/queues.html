@@ -96,7 +96,7 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="text-xs text-stone-400">{{ queue.entries.count }} post{{ queue.entries.count|pluralize }}</span>
+                        <span class="text-xs text-stone-400">{{ queue.entry_count }} post{{ queue.entry_count|pluralize }}</span>
                         <a href="{% url 'calendar:queue_detail' workspace_id=workspace.id queue_id=queue.id %}"
                            class="text-xs font-semibold py-1.5 px-3 rounded-full border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-stone-800 transition-colors">
                             View
