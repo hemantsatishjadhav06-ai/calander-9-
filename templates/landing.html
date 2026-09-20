@@ -1,0 +1,188 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ SITE_NAME }} — Open-source social media management</title>
+  <meta name="description" content="{{ SITE_NAME }} is open-source, self-hostable social media management: plan, compose, schedule, approve and publish across 10+ platforms from one dashboard. No per-seat or per-channel fees.">
+  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ SITE_NAME }}">
+  <meta property="og:title" content="{{ SITE_NAME }} — own your social stack">
+  <meta property="og:description" content="Open-source, self-hostable social media management across 10+ platforms. No per-seat or per-channel fees.">
+  <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}/">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
+  <style>
+    :root{
+      --bg:#ffffff; --alt:#faf8f5; --ink:#1a1714; --body:#4a4642; --muted:#7a746d;
+      --border:#eae6e0; --accent:#C2410C; --accent-ink:#9A3412; --accent-soft:#FFF3EC;
+      --green:#5C6829;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--body);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      line-height:1.6;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent-ink);text-decoration:none;}
+    h1,h2,h3{color:var(--ink);line-height:1.12;margin:0;letter-spacing:-.02em;text-wrap:balance;}
+    .wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:15px;
+      padding:12px 22px;border-radius:10px;border:1px solid transparent;cursor:pointer;transition:filter .15s,background .15s;}
+    .btn-primary{background:var(--accent);color:#fff;}
+    .btn-primary:hover{filter:brightness(.93);}
+    .btn-ghost{background:transparent;color:var(--ink);border-color:var(--border);}
+    .btn-ghost:hover{background:var(--alt);}
+
+    /* nav */
+    header.nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);}
+    .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px;}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;color:var(--ink);letter-spacing:-.02em;}
+    .mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--green));display:inline-block;flex:none;}
+    .nav-cta{display:flex;align-items:center;gap:10px;}
+    .nav-cta .btn{padding:9px 16px;font-size:14px;}
+    .nav-signin{color:var(--body);font-weight:600;font-size:14px;padding:9px 6px;}
+
+    /* hero */
+    .hero{padding:72px 0 56px;text-align:center;}
+    .pill{display:inline-block;background:var(--accent-soft);color:var(--accent-ink);font-size:12.5px;font-weight:600;
+      padding:6px 12px;border-radius:999px;letter-spacing:.02em;margin-bottom:22px;}
+    .hero h1{font-size:clamp(34px,6vw,60px);font-weight:800;}
+    .hero p.sub{font-size:clamp(17px,2.5vw,21px);color:var(--body);max-width:44ch;margin:22px auto 0;}
+    .hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:32px;}
+    .hero small{display:block;margin-top:16px;color:var(--muted);font-size:13px;}
+
+    /* platform strip */
+    .platforms{border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--alt);padding:28px 0;}
+    .platforms .lbl{text-align:center;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+    .plat-row{display:flex;flex-wrap:wrap;gap:10px 22px;justify-content:center;font-weight:600;color:var(--body);font-size:15px;}
+    .plat-row span{white-space:nowrap;}
+
+    /* sections */
+    section{padding:64px 0;}
+    .sec-head{text-align:center;max-width:52ch;margin:0 auto 44px;}
+    .sec-head h2{font-size:clamp(26px,4vw,36px);font-weight:800;}
+    .sec-head p{color:var(--body);font-size:17px;margin-top:14px;}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+    .card{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:24px;}
+    .card .ic{width:38px;height:38px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);
+      display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;margin-bottom:14px;}
+    .card h3{font-size:17px;margin-bottom:7px;}
+    .card p{font-size:14.5px;color:var(--body);margin:0;}
+
+    /* differentiator */
+    .why{background:var(--ink);color:#e9e4de;}
+    .why h2{color:#fff;}
+    .why .sec-head p{color:#c7c0b8;}
+    .why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+    .why-item h3{color:#fff;font-size:17px;margin-bottom:6px;}
+    .why-item p{color:#c7c0b8;font-size:14.5px;margin:0;}
+
+    /* final cta */
+    .final{text-align:center;background:var(--alt);}
+    .final h2{font-size:clamp(26px,4vw,38px);}
+    .final p{color:var(--body);font-size:17px;margin:14px auto 28px;max-width:46ch;}
+
+    footer{border-top:1px solid var(--border);padding:32px 0;color:var(--muted);font-size:13.5px;}
+    .foot-inner{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+    .foot-links{display:flex;gap:18px;flex-wrap:wrap;}
+    .foot-links a{color:var(--body);}
+    .foot-links a:hover{color:var(--accent-ink);}
+
+    @media (max-width:820px){ .grid,.why-grid{grid-template-columns:1fr 1fr;} }
+    @media (max-width:560px){ .grid,.why-grid{grid-template-columns:1fr;} .nav-signin{display:none;} }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>{{ SITE_NAME }}</div>
+      <div class="nav-cta">
+        <a class="nav-signin" href="{% url 'account_login' %}">Sign in</a>
+        <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <span class="pill">Open-source · self-hostable · AGPL-3.0</span>
+        <h1>Own your social stack.</h1>
+        <p class="sub">{{ SITE_NAME }} is social media management for creators, agencies and SMBs — plan, compose, schedule, approve and publish across 10+ platforms from one dashboard. No per-seat, per-channel, or per-workspace fees.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started free</a>
+          <a class="btn btn-ghost" href="{% url 'account_login' %}">Sign in</a>
+        </div>
+        <small>Every feature, every platform — no paid tier or feature gate.</small>
+      </div>
+    </section>
+
+    <div class="platforms">
+      <div class="wrap">
+        <div class="lbl">Publish directly to first-party APIs — no aggregator</div>
+        <div class="plat-row">
+          <span>Facebook</span><span>Instagram</span><span>LinkedIn</span><span>TikTok</span>
+          <span>YouTube</span><span>Pinterest</span><span>Threads</span><span>Bluesky</span>
+          <span>Google Business</span><span>Mastodon</span><span>DEV.to</span>
+        </div>
+      </div>
+    </div>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <h2>Everything you need to run many accounts</h2>
+          <p>One multi-workspace dashboard for the whole content lifecycle — from idea to published, with approvals and analytics in between.</p>
+        </div>
+        <div class="grid">
+          <div class="card"><div class="ic">◫</div><h3>Multi-workspace &amp; teams</h3><p>Unlimited orgs → workspaces → members, granular roles, invitations, and a separate client role.</p></div>
+          <div class="card"><div class="ic">✎</div><h3>Content composer</h3><p>Per-platform caption &amp; media overrides, version history, reusable templates, and a Kanban idea board.</p></div>
+          <div class="card"><div class="ic">▦</div><h3>Calendar &amp; scheduling</h3><p>Visual calendar with recurring posting slots and named queues that auto-assign to the next open slot.</p></div>
+          <div class="card"><div class="ic">↑</div><h3>Publishing engine</h3><p>Direct first-party integrations, automatic retries, per-account rate-limit tracking, and a 90-day audit log.</p></div>
+          <div class="card"><div class="ic">✓</div><h3>Approval workflows</h3><p>Configurable internal &amp; client stages with threaded comments, reminders, and a full audit trail.</p></div>
+          <div class="card"><div class="ic">✉</div><h3>Unified inbox</h3><p>Comments, mentions, DMs and reviews from every platform in one place, with sentiment and assignments.</p></div>
+          <div class="card"><div class="ic">▲</div><h3>Analytics</h3><p>Per-post and channel performance from each platform's native API, with KPI cards and trend charts.</p></div>
+          <div class="card"><div class="ic">▤</div><h3>Media library</h3><p>Org- &amp; workspace-scoped libraries, auto platform-optimized variants, alt text, and stock-photo search.</p></div>
+          <div class="card"><div class="ic">◎</div><h3>Client portal</h3><p>Passwordless magic-link access so clients approve or reject posts without creating an account.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="why">
+      <div class="wrap">
+        <div class="sec-head">
+          <h2>Why teams self-host {{ SITE_NAME }}</h2>
+          <p>Built for people managing many client accounts who'd rather own their social stack than rent it.</p>
+        </div>
+        <div class="why-grid">
+          <div class="why-item"><h3>No per-seat pricing</h3><p>Add every teammate, client, workspace and channel. There's no paid tier, feature gate, or upsell.</p></div>
+          <div class="why-item"><h3>Your data, your infra</h3><p>Deploy on your own VPS or cloud. Tokens and credentials are encrypted at rest — no aggregator in the middle.</p></div>
+          <div class="why-item"><h3>Open source</h3><p>AGPL-3.0. Read the code, extend it, and never get locked in to a vendor's roadmap.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="final">
+      <div class="wrap">
+        <h2>Ready to plan your next month of content?</h2>
+        <p>Create your workspace, connect your accounts, and schedule your first post in minutes.</p>
+        <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started free</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot-inner">
+      <div>© {{ SITE_NAME }} · Open-source (AGPL-3.0)</div>
+      <div class="foot-links">
+        <a href="{% url 'account_login' %}">Sign in</a>
+        <a href="{{ LEGAL_TERMS_URL }}">Terms</a>
+        <a href="{{ LEGAL_PRIVACY_URL }}">Privacy</a>
+        {% if SOURCE_URL %}<a href="{{ SOURCE_URL }}" target="_blank" rel="noopener">Source code</a>{% endif %}
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

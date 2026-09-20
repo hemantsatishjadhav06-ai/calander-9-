@@ -49,6 +49,18 @@ def health_check(request):
     )
 
 
+def home(request):
+    """Public landing for anonymous visitors; the app dashboard for logged-in users.
+
+    Root used to be login-gated, so a cold visitor only ever saw the login page
+    (no marketing/value-prop surface). Anonymous → landing page; authenticated →
+    the existing dashboard routing.
+    """
+    if request.user.is_authenticated:
+        return dashboard(request)
+    return render(request, "landing.html")
+
+
 @login_required
 def dashboard(request):
     """Main dashboard - redirects to last used workspace or shows org overview."""
