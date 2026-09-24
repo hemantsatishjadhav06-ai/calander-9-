@@ -97,10 +97,12 @@ def check_production_config(app_configs, **kwargs):
             CheckWarning(
                 "SECURE_PROXY_SSL_HEADER is set but BB_TRUSTED_PROXIES is empty.",
                 hint=(
-                    "Behind a proxy, set BB_TRUSTED_PROXIES to the proxy IP(s) so the "
-                    "auth rate-limiter derives the real client IP from X-Forwarded-For. "
-                    "Otherwise every client shares the proxy's IP and one user's failed "
-                    "logins rate-limit everyone."
+                    "Behind a proxy, set BB_TRUSTED_PROXIES to the proxy IP(s) or CIDR "
+                    "range(s) so the auth rate-limiter derives the real client IP from "
+                    "X-Forwarded-For. Otherwise every client shares the proxy's IP and "
+                    "one user's failed logins rate-limit everyone. On a managed platform "
+                    "whose edge address is not stable per deploy, use the range it "
+                    "forwards from (Railway: 100.64.0.0/10)."
                 ),
                 id="smbean.W006",
             )

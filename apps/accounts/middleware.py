@@ -1,10 +1,11 @@
 import hashlib
 
-from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
+
+from apps.common.net import client_ip
 
 # Paths that are rate-limited for unauthenticated POST requests (auth flows)
 AUTH_RATE_LIMITED_PATHS = (
@@ -90,23 +91,9 @@ class AuthRateLimitMiddleware:
 
     @staticmethod
     def _get_client_ip(request):
-        """Return the client IP, trusting X-Forwarded-For only from known proxies.
+        """The client IP, trusting X-Forwarded-For only from a proxy we run.
 
-        A remote client can set X-Forwarded-For to any value, so honouring it
-        unconditionally lets an attacker rotate the header per request to land
-        in a fresh rate-limit bucket every time — defeating the throttle (and,
-        by extension, brute-force / password-reset email-bombing protection).
-        Only trust XFF when the socket peer (REMOTE_ADDR) is a proxy we run,
-        listed in ``settings.BB_TRUSTED_PROXIES``; otherwise use REMOTE_ADDR,
-        the only IP we can vouch for. Mirrors ``apps/api/limits._client_ip``.
+        Shared with ``apps.api.limits`` so the throttle and the audit log can
+        never disagree about who a request came from.
         """
-        remote = request.META.get("REMOTE_ADDR", "")
-        trusted = set(getattr(settings, "BB_TRUSTED_PROXIES", ()) or ())
-        if trusted and remote in trusted:
-            forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-            if forwarded:
-                # Leftmost hop that isn't itself a trusted proxy is the client.
-                for hop in (h.strip() for h in forwarded.split(",") if h.strip()):
-                    if hop not in trusted:
-                        return hop
-        return remote
+        return client_ip(request) or ""

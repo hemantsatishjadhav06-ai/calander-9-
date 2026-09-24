@@ -15,11 +15,17 @@ Redirects are never followed here — callers that allow redirects must handle
 each hop themselves and re-validate it, or the pin is bypassed on the next hop.
 """
 
+import ipaddress
+import logging
+from functools import lru_cache
 from urllib.parse import urlparse
 
 import httpx
+from django.conf import settings
 
 from .validators import resolve_public_ip
+
+logger = logging.getLogger(__name__)
 
 
 class UnsafeUrlError(Exception):
@@ -92,3 +98,73 @@ def pinned_request(
     with httpx.Client(timeout=timeout, follow_redirects=False) as client:
         request = build_pinned_request(client, method, url, headers=headers, content=content)
         return client.send(request)
+
+
+# ---------------------------------------------------------------------------
+# Trusted-proxy client IP
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _trusted_networks(entries: tuple[str, ...]) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+    """Parse ``BB_TRUSTED_PROXIES`` entries into networks, once per value.
+
+    A bare address parses as a single-host network, so exact IPs keep working
+    exactly as before. Entries that are not valid addresses or networks are
+    dropped rather than raising: a typo in env config must not take the site
+    down, and dropping one only means that hop stops being trusted.
+    """
+    networks = []
+    for entry in entries:
+        try:
+            networks.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            logger.warning("Ignoring unparseable BB_TRUSTED_PROXIES entry %r", entry)
+    return tuple(networks)
+
+
+def is_trusted_proxy(addr: str | None) -> bool:
+    """True when *addr* falls inside a configured trusted-proxy range.
+
+    CIDR ranges matter on managed platforms: Railway, Fly and friends front the
+    app with an edge whose address comes from a private range and is not stable
+    per deploy, so an exact-match-only list is impossible to fill in correctly.
+    An empty setting trusts nothing, which is the right default for an app
+    reachable without a proxy in front of it.
+    """
+    if not addr:
+        return False
+    networks = _trusted_networks(tuple(getattr(settings, "BB_TRUSTED_PROXIES", ()) or ()))
+    if not networks:
+        return False
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    return any(ip in network for network in networks)
+
+
+def client_ip(request) -> str | None:
+    """The originating client IP, honouring ``X-Forwarded-For`` only from a proxy we run.
+
+    A remote client can put anything in ``X-Forwarded-For``, so honouring it
+    unconditionally lets an attacker rotate the header per request to land in a
+    fresh rate-limit bucket every time — defeating the throttle, and letting
+    them pin audit-log rows to a victim's IP. Only trust the header when the
+    socket peer is itself a trusted proxy; otherwise the peer is the only
+    address we can vouch for.
+
+    Within a trusted chain the leftmost hop that is not itself a trusted proxy
+    is the client: per RFC 7239 the rightmost entry is the proxy closest to us.
+    """
+    remote = request.META.get("REMOTE_ADDR")
+    if not is_trusted_proxy(remote):
+        return remote
+
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded:
+        for hop in (h.strip() for h in forwarded.split(",") if h.strip()):
+            if not is_trusted_proxy(hop):
+                return hop
+        # Every hop was a trusted proxy — the peer is all we have.
+    return remote
