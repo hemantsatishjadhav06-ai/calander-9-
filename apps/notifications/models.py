@@ -50,6 +50,10 @@ class Notification(models.Model):
     data = models.JSONField(default=dict, blank=True)
     is_read = models.BooleanField(default=False, db_index=True)
     read_at = models.DateTimeField(null=True, blank=True)
+    # False when the user has the in-app channel off for this event type. The
+    # row still exists — it is what the email and webhook deliveries hang off —
+    # but the bell, the drawer, the history page and the unread badge skip it.
+    shown_in_app = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

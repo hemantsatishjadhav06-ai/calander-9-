@@ -17,7 +17,7 @@ from .models import (
 @require_GET
 def notification_drawer(request):
     """HTMX partial: renders the 50 most recent notifications for the drawer."""
-    notifications = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
+    notifications = Notification.objects.filter(user=request.user, shown_in_app=True).order_by("-created_at")[:50]
     return render(
         request,
         "notifications/partials/drawer.html",
@@ -34,7 +34,7 @@ def notification_list(request):
     event_type = request.GET.get("event_type", "")
     read_status = request.GET.get("read_status", "")
 
-    qs = Notification.objects.filter(user=request.user)
+    qs = Notification.objects.filter(user=request.user, shown_in_app=True)
 
     if event_type:
         qs = qs.filter(event_type=event_type)
@@ -85,7 +85,9 @@ def mark_as_read(request, notification_id):
 @require_POST
 def mark_all_read(request):
     """Mark all notifications as read."""
-    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True, read_at=timezone.now())
+    Notification.objects.filter(user=request.user, is_read=False, shown_in_app=True).update(
+        is_read=True, read_at=timezone.now()
+    )
 
     if request.htmx:
         return notification_drawer(request)
@@ -96,7 +98,7 @@ def mark_all_read(request):
 @require_GET
 def unread_count(request):
     """JSON endpoint for polling unread badge count."""
-    count = Notification.objects.filter(user=request.user, is_read=False).count()
+    count = Notification.objects.filter(user=request.user, is_read=False, shown_in_app=True).count()
     return JsonResponse({"count": count})
 
 

@@ -3,7 +3,7 @@
 import pytest
 
 from apps.notifications.engine import BATCH_HEADINGS, _digest_heading, _webhook_signing_key, notify
-from apps.notifications.models import EventType
+from apps.notifications.models import Channel, EventType, Notification, NotificationDelivery, NotificationPreference
 
 
 @pytest.mark.django_db
@@ -28,3 +28,29 @@ def test_webhook_signatures_never_use_secret_key_directly(settings):
     assert len(key) == 32
     settings.WEBHOOK_SECRET = "dedicated"
     assert _webhook_signing_key() == b"dedicated"
+
+
+@pytest.mark.django_db
+def test_in_app_off_keeps_the_bell_quiet_but_still_emails(client, user):
+    """The row exists (email hangs off it); the bell, drawer and badge skip it."""
+    NotificationPreference.objects.create(
+        user=user, event_type=EventType.POST_SUBMITTED, channel=Channel.IN_APP, is_enabled=False
+    )
+    NotificationPreference.objects.create(
+        user=user, event_type=EventType.POST_SUBMITTED, channel=Channel.EMAIL, is_enabled=True
+    )
+    notification = notify(user=user, event_type=EventType.POST_SUBMITTED, title="Quiet please")
+    assert notification is not None
+    assert notification.shown_in_app is False
+    assert NotificationDelivery.objects.filter(notification=notification, channel=Channel.EMAIL).exists()
+    assert not NotificationDelivery.objects.filter(notification=notification, channel=Channel.IN_APP).exists()
+
+    client.force_login(user)
+    assert client.get("/notifications/unread-count/").json()["count"] == 0
+    drawer = client.get("/notifications/drawer/", HTTP_HX_REQUEST="true")
+    assert b"Quiet please" not in drawer.content
+
+    loud = notify(user=user, event_type=EventType.POST_FAILED, title="Loud one")
+    assert loud is not None and loud.shown_in_app is True
+    assert client.get("/notifications/unread-count/").json()["count"] == 1
+    assert Notification.objects.filter(user=user).count() == 2

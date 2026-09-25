@@ -175,6 +175,8 @@ def notify(
         logger.warning("Unknown event_type: %s", event_type)
         return None
 
+    channels_to_dispatch = _resolve_channels(user, event_type)
+
     # Titles are built from user- and platform-supplied names ("New comment
     # from <sender>"), and the column is 255 wide: cut here, once, rather than
     # letting a long display name raise DataError in every caller.
@@ -184,9 +186,8 @@ def notify(
         title=title[:255],
         body=body,
         data=data or {},
+        shown_in_app=Channel.IN_APP in channels_to_dispatch,
     )
-
-    channels_to_dispatch = _resolve_channels(user, event_type)
     digest_mode = _is_digest_mode(user)
 
     if _is_in_quiet_hours(user) and event_type in NON_CRITICAL_EVENTS:
