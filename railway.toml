@@ -12,16 +12,21 @@
 # a worker service running `run_worker`, and `migrate` on each deploy — the
 # Dockerfile CMD only starts Gunicorn, so neither happens on its own.
 #
-# The health check below hits /health/ (database + cache) before Railway moves
-# traffic to a new deploy; the request arrives with Host `healthcheck.railway.app`,
-# which config/settings/base.py allows automatically when RAILWAY_ENVIRONMENT is set.
+# THIS FILE APPLIES TO EVERY SERVICE BUILT FROM THE REPO — web and worker
+# alike (the worker's build log shows the Dockerfile steps). So nothing here
+# may be web-only:
+#   - No healthcheckPath. The worker serves no HTTP, so a health check here
+#     fails every worker deploy. Set `/health/` on the web service itself
+#     (Settings > Deploy > Healthcheck path), with `healthcheck.railway.app`
+#     allowed — config/settings/base.py adds it when RAILWAY_ENVIRONMENT is set.
+#   - No preDeployCommand. Both services would run `migrate` at once.
+#   - Restart ALWAYS, not ON_FAILURE: the worker exits 0 when it stops
+#     gracefully (SIGTERM, or `--duration`), and ON_FAILURE leaves a cleanly
+#     exited worker stopped — no publishing until someone notices.
 
 [build]
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-healthcheckPath = "/health/"
-healthcheckTimeout = 120
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 5
+restartPolicyType = "always"

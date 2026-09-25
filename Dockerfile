@@ -15,8 +15,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# The lock, not the ranges: every build installs exactly the versions CI
+# tested, each checked against its hash. Regenerate it after editing
+# requirements.txt (see the header of requirements.lock).
+COPY requirements.lock .
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY . .
 
@@ -47,4 +50,9 @@ EXPOSE 8000
 # Exec form, so gunicorn is PID 1 and receives SIGTERM itself. In shell form
 # it ran under `sh -c`, which does not forward the signal: Railway sent
 # SIGTERM, nothing drained, and the container was SIGKILLed mid-request.
-CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4"]
+# `check --deploy` first: its warnings (DEBUG on, a missing secret, an unset
+# salt, insecure cookies — see apps/common/checks.py) land in the deploy log on
+# every start, and an Error-level check stops the container before it takes
+# traffic. It runs here rather than as a Railway pre-deploy command because the
+# pre-deploy step is shared with the worker service (see railway.toml).
+CMD ["sh", "-c", "python manage.py check --deploy && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4"]
