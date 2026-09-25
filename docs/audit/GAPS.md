@@ -32,17 +32,8 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 |---|-----|------|-----|----------|--------|
 | F2 | P2 | A11y | Modals have no focus trap, most lack `role="dialog"`, several ignore Escape (invite modals, publish approvals, token reveal, composer ×12, settings, media library). Needs Alpine Focus + `x-trap` + roles across ~20 templates. | audit | Open |
 | F4 | P2 | A11y | Body copy in `text-stone-400` / `--text-ghost` (≈2.6:1) at ~350 sites and `text-stone-300` at 36; labels and table headers included. Needs a palette pass: reserve those for icons, move copy to `--text-tertiary`. | audit | Open |
-| F6 | P2 | Forms | Composer validation errors lose the field name (`Object.values(errors).flat()`), render in a toast without `role="alert"`, and vanish after 5s. | `compose.html:2722`, `composer/views.py:968` | Open |
 | F7 | P2 | A11y | Inputs with no associated label (event form, categories, idea modal, inbox filter bar, composer ×10, create landing ×8, queues, posting slots, library search). | audit | Open |
 | F8 | P2 | A11y | 63 icon-only buttons with no accessible name; toggles without `aria-expanded`. | audit | Open |
-| F10 | P2 | Forms | Calendar event errors reach the user as raw JSON (`{"error": ...}`) through the global HTMX handler; an end date before the start is silently coerced. | `apps/calendar/views.py` event views | Open |
-| F11 | P3 | Forms | Category create/edit rejects with a bare "Invalid data." | `composer/views.py:3254` | Open |
-| F12 | P2 | Notifications | No unread-notification indicator anywhere: `notificationBell()` in `base.html` is never mounted (and uses the Alpine v2 `__x` API); the drawer partial targets a container no template has. | `base.html:996`, `notifications/partials/drawer.html` | Open — mount a bell in the header |
-| F14 | P3 | UX | Idea modal: Save and Cancel look identical, no initial focus, failure is a `window.alert` that drops the server's reason. | `base.html:635`, `:1196` | Open |
-| C6 | P2 | Concurrency | Web-side status writes (`_transition_or_skip`, chip endpoint, `_sync_platform_posts`, `_bulk_save_platform_posts`, `reschedule_post`) write in-memory state without re-checking the from-status in the WHERE clause; a hold placed while the engine claims the row can be overwritten. The engine's own writes are now guarded, which closes the resurrect-and-republish half of this. | `apps/approvals/services.py:53`, `apps/composer/views.py:1300`, `apps/calendar/views.py:1194` | Open — convert to `filter(id, status=<from>).update()` |
-| C11 | P2 | Product | Disconnecting an account hard-deletes every PlatformPost, PublishLog, analytics snapshot, queue and posting slot on it, and single-target published posts. Now atomic and refused mid-publish, but a soft-disconnect (clear tokens, keep history) is a product decision. | `apps/social_accounts/views.py` `disconnect` | Owner decision |
-| M18 | P3 | Perf | The onboarding checklist runs four existence queries on every authenticated page render. | `apps/onboarding/context_processors.py` | Open — cache per (user, workspace) briefly |
-| M16 | P3 | Members | The org's daily invite budget is charged before the send; a failed send keeps the row and the spent slot. | `apps/members/services.py:144` | Open |
 
 ## Fixed in round 5
 
@@ -113,6 +104,15 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | E7 | P3 | Ops | `check --deploy` now runs in the web container's start command, so its warnings land in every deploy log and an Error-level check stops the container before it takes traffic. Not a Railway pre-deploy step, because that is shared with the worker. | round 6 | `check --deploy` with production settings: warnings only |
 | E9 | P3 | Ops | Multi-replica workers need `--keep-locks`; documented in the README and the command's help. Every shipped target runs one replica. | round 5 | documented |
 | D8 | P1 | Deploy | `railway.toml` applies to the worker too (its build log shows the Dockerfile steps). The `/health/` check added in round 5 would have failed every worker deploy, and the `on_failure` restart policy leaves a worker stopped after a clean exit. The file now holds only settings safe for both services, with restart `always`. | round 6 | worker build log |
+| C6 | P2 | Concurrency | Web-side status writes wrote back a status read earlier. `PlatformPost.save_guarded()` writes only if the row still has the status it was loaded with; approval services, chip menu, Schedule, drag and bulk actions use it; content sync and the engine's success write name their fields. | round 6 | `GuardedWriteTests` |
+| G1 | P1 | AuthZ | **Ten composer endpoints had no permission check**: a read-only viewer could upload media, attach/remove media on others' posts, save templates, create tags and categories, and rename categories. Gated; post-scoped ones also require author or `edit_others_posts`. | round 6 | `ViewerGateTests` |
+| C11 | P2 | Accounts | "Disconnect" promised to keep history and deleted every post, publish log and analytics row. Now a soft disconnect (credential dropped, scheduled posts back to draft, history kept, reconnect picks the row up); a separate Remove for disconnected accounts deletes. | round 6 | `DisconnectKeepsHistoryTests` |
+| F6 | P2 | Forms | Composer errors now name their field, are announced as an alert, and persist until the next save. | round 6 | `ComposerErrorLabelTests` |
+| F10, F11 | P2 | Forms | Event and category errors are plain text naming the field; bad dates on edit are reported, and an end date before the start is refused instead of silently changed. | round 6 | `ReadableErrorTests` |
+| F12 | P2 | Notifications | Live unread badge on the sidebar Notifications link (the old bell was never mounted and used Alpine 2's API). | round 6 | `NotificationBadgeTests` |
+| F14 | P3 | UX | Idea modal: primary Save button, title focused on open, labelled fields, server's reason shown on failure. | round 6 | — |
+| M16 | P3 | Members | A failed invitation email no longer spends the org's daily invite budget. | round 6 | `InviteBudgetRefundTests` |
+| M18 | P3 | Perf | Onboarding checklist cached for a minute instead of four queries per page. | round 6 | `ChecklistCacheTests` |
 
 ## Fixed in rounds 1–4 (for the record)
 
