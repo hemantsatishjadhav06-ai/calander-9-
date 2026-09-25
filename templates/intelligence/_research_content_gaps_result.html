@@ -6,7 +6,7 @@
     <div class="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-stone-100">
         <div class="min-w-0">
             <div class="text-sm font-semibold text-stone-900 truncate">{{ result.niche.name }}</div>
-            <div class="text-[11px] font-mono text-stone-400">{{ result.niche.slug }}</div>
+            <div class="text-[11px] font-mono text-stone-500">{{ result.niche.slug }}</div>
         </div>
         {% if result.gaps %}
         <span class="text-[11px] flex-shrink-0 px-2 py-0.5 rounded-md bg-stone-100 text-stone-600 font-medium">{{ result.gaps|length }} gap{{ result.gaps|length|pluralize }}</span>

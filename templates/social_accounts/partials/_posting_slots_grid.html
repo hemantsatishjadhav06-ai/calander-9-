@@ -25,7 +25,7 @@ Context: account (with prefetched posting_slots), workspace_id.
                             {% csrf_token %}
                             <input type="hidden" name="social_account_id" value="{{ account.id }}">
                             <input type="hidden" name="day_of_week" value="{{ day.value }}">
-                            <button type="submit"
+                            <button aria-label="{% if day.is_active %}Disable {{ day.name }}{% else %}Enable {{ day.name }}{% endif %}" type="submit"
                                     class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 cursor-pointer {% if day.is_active %}bg-green-500{% else %}bg-stone-300{% endif %}"
                                     title="{% if day.is_active %}Disable {{ day.name }}{% else %}Enable {{ day.name }}{% endif %}">
                                 <span class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform duration-200 {% if day.is_active %}translate-x-[18px]{% else %}translate-x-[3px]{% endif %}"></span>
@@ -58,11 +58,11 @@ Context: account (with prefetched posting_slots), workspace_id.
                                           hx-swap="none" class="inline">
                                         {% csrf_token %}
                                         <input type="hidden" name="social_account_id" value="{{ account.id }}">
-                                        <button type="submit"
+                                        <button aria-label="Remove slot" type="submit"
                                                 x-show="hovered" x-transition.opacity
                                                 class="w-4 h-4 flex items-center justify-center text-stone-300 hover:text-red-500 transition-all cursor-pointer"
                                                 title="Remove slot">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </form>
                                 </div>
@@ -74,18 +74,18 @@ Context: account (with prefetched posting_slots), workspace_id.
                                       class="flex items-center gap-1">
                                     {% csrf_token %}
                                     <input type="hidden" name="social_account_id" value="{{ account.id }}">
-                                    <input type="time" name="time" value="{{ slot.time|time:'H:i' }}"
+                                    <input type="time" name="time" value="{{ slot.time|time:'H:i' }}" aria-label="Slot time"
                                            class="w-[90px] text-xs px-1.5 py-1 rounded border border-stone-200 outline-none focus:border-orange-400"
                                            @keydown.escape="editing = false">
-                                    <button type="submit"
+                                    <button aria-label="Save" type="submit"
                                             class="w-5 h-5 flex items-center justify-center text-green-600 hover:text-green-700 cursor-pointer"
                                             title="Save">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                        <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                     </button>
-                                    <button type="button" @click="editing = false"
+                                    <button aria-label="Cancel" type="button" @click="editing = false"
                                             class="w-5 h-5 flex items-center justify-center text-stone-400 hover:text-stone-600 cursor-pointer"
                                             title="Cancel">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                     </button>
                                 </form>
                             </div>
@@ -94,10 +94,10 @@ Context: account (with prefetched posting_slots), workspace_id.
 
                         <!-- Add slot -->
                         <div x-data="{ adding: false, newTime: '09:00' }" class="mt-2">
-                            <button x-show="!adding" @click="adding = true; $nextTick(() => $refs.timeInput_{{ day.value }}.focus())"
+                            <button aria-label="Add time slot" x-show="!adding" @click="adding = true; $nextTick(() => $refs.timeInput_{{ day.value }}.focus())"
                                     class="inline-flex items-center justify-center w-6 h-6 rounded-full text-stone-300 hover:text-orange-500 hover:bg-orange-50 transition-colors cursor-pointer"
                                     title="Add time slot">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                             </button>
                             <form x-show="adding" x-cloak
                                   hx-post="{% url 'calendar:save_posting_slot' workspace_id=workspace_id %}" hx-disabled-elt="find button[type=submit]"
@@ -107,19 +107,19 @@ Context: account (with prefetched posting_slots), workspace_id.
                                 {% csrf_token %}
                                 <input type="hidden" name="social_account_id" value="{{ account.id }}">
                                 <input type="hidden" name="day_of_week" value="{{ day.value }}">
-                                <input type="time" name="time" x-model="newTime"
+                                <input type="time" name="time" x-model="newTime" aria-label="New slot time"
                                        x-ref="timeInput_{{ day.value }}"
                                        @keydown.escape="adding = false"
                                        class="w-[90px] text-xs px-1.5 py-1 rounded border border-stone-200 outline-none focus:border-orange-400">
-                                <button type="submit"
+                                <button aria-label="Add" type="submit"
                                         class="w-5 h-5 flex items-center justify-center text-green-600 hover:text-green-700 cursor-pointer"
                                         title="Add">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                 </button>
-                                <button type="button" @click="adding = false"
+                                <button aria-label="Cancel" type="button" @click="adding = false"
                                         class="w-5 h-5 flex items-center justify-center text-stone-400 hover:text-stone-600 cursor-pointer"
                                         title="Cancel">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
                             </form>
                         </div>

@@ -102,7 +102,7 @@
 <div x-data="{ ...mediaLibrary(), folderSidebarOpen: false }" class="flex flex-1 min-h-0 -m-3 sm:-m-4 lg:-m-6 -mb-3 sm:-mb-4 lg:-mb-6">
 
   <!-- Mobile folder sidebar toggle -->
-  <button @click="folderSidebarOpen = !folderSidebarOpen"
+  <button :aria-expanded="folderSidebarOpen" @click="folderSidebarOpen = !folderSidebarOpen"
           class="lg:hidden fixed bottom-4 left-4 z-40 flex items-center gap-2 px-3 py-2.5 bg-white border border-stone-200 rounded-xl shadow-lg text-sm font-medium text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer"
           x-show="!detailOpen">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6a2 2 0 012-2h2l2 2h6a2 2 0 012 2v2M4 6v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2H4z"/></svg>
@@ -124,11 +124,11 @@
     <div class="p-4">
       <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--text-tertiary, #78716C);">Folders</span>
-        <button @click="showNewFolder = true"
+        <button aria-label="New folder" @click="showNewFolder = true"
                 class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-stone-100 cursor-pointer transition-colors"
                 style="color: var(--text-tertiary, #78716C);"
                 title="New folder">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         </button>
       </div>
 
@@ -168,9 +168,10 @@
 
       <!-- Search -->
       <div class="relative flex-1 min-w-[160px] sm:max-w-sm">
-        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--text-ghost, #A8A29E);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--text-ghost, #766F6A);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         <input type="search"
                name="q"
+               aria-label="Search media"
                value="{{ query }}"
                placeholder="Search media..."
                class="input-focus w-full pl-9 pr-4 py-2 text-sm border rounded-lg outline-none"
@@ -194,7 +195,7 @@
       <div class="flex-1"></div>
 
       <!-- Sort -->
-      <select name="sort"
+      <select name="sort" aria-label="Sort media"
               class="text-xs border rounded-lg pl-3 pr-7 py-2 outline-none cursor-pointer appearance-none"
               style="border-color: var(--border, #E7E5E4); color: var(--text-secondary, #57534E); background-image: url(&quot;data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2378716C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;); background-repeat: no-repeat; background-position: right 8px center;"
               hx-get="{% url 'media_library:index' workspace_id=workspace.id %}{% if current_folder %}?folder={{ current_folder }}{% endif %}"
@@ -211,15 +212,15 @@
 
       <!-- View toggle -->
       <div class="flex border rounded-lg overflow-hidden" style="border-color: var(--border, #E7E5E4);">
-        <button @click="viewMode = 'grid'"
+        <button aria-label="Grid view" :aria-pressed="viewMode === 'grid'" @click="viewMode = 'grid'"
                 :class="viewMode === 'grid' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:text-stone-600'"
                 class="p-2 transition-colors">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+          <svg aria-hidden="true" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
         </button>
-        <button @click="viewMode = 'list'"
+        <button aria-label="List view" :aria-pressed="viewMode === 'list'" @click="viewMode = 'list'"
                 :class="viewMode === 'list' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:text-stone-600'"
                 class="p-2 transition-colors">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+          <svg aria-hidden="true" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
         </button>
       </div>
 
@@ -248,9 +249,9 @@
            @keydown.space.prevent="if (!uploading) $refs.fileInput.click()">
         <template x-if="!uploading">
           <div>
-            <svg class="w-10 h-10 mx-auto mb-3" style="color: var(--text-ghost, #A8A29E);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <svg class="w-10 h-10 mx-auto mb-3" style="color: var(--text-ghost, #766F6A);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
             <p class="text-sm font-medium" style="color: var(--text-secondary, #57534E);">Drop files here to upload</p>
-            <p class="text-xs mt-1" style="color: var(--text-ghost, #A8A29E);">Images up to 20MB, videos up to 1GB</p>
+            <p class="text-xs mt-1" style="color: var(--text-ghost, #766F6A);">Images up to 20MB, videos up to 1GB</p>
           </div>
         </template>
         <template x-if="uploading">
@@ -309,6 +310,7 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
+         x-trap.noscroll="detailOpen" role="dialog" aria-modal="true" aria-label="Asset details" tabindex="-1"
          id="detail-panel">
       <!-- Content loaded via HTMX -->
     </div>

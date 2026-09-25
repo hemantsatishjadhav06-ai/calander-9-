@@ -75,7 +75,11 @@
   --text-primary:   var(--neutral-900);
   --text-secondary: var(--neutral-600);
   --text-tertiary:  var(--neutral-500);
-  --text-ghost:     var(--neutral-400);
+  /* Was neutral-400 (#A8A29E, ~2.5:1 on white) - too faint for any text.
+     #766F6A clears WCAG AA 4.5:1 on white, --surface-page and --surface-1/2,
+     so every placeholder, label and caption that uses the ghost token passes.
+     Purely decorative greys (dividers, icon strokes) can use --neutral-400. */
+  --text-ghost:     #766F6A;
   --text-inverse:   #FFFFFF;
 
   /* Illustrations */

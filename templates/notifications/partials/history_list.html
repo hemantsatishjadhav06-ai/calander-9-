@@ -62,8 +62,8 @@
                 {% endif %}
             </div>
             <div class="flex items-center gap-3 mt-1.5">
-                <span class="text-[11px] text-stone-400 font-medium tabular-nums">{{ n.created_at|timesince }} ago</span>
-                <span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{{ n.get_event_type_display }}</span>
+                <span class="text-[11px] text-stone-500 font-medium tabular-nums">{{ n.created_at|timesince }} ago</span>
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-stone-500">{{ n.get_event_type_display }}</span>
                 {% if not n.is_read %}
                 <button
                     hx-post="{% url 'notifications:mark_as_read' n.id %}"
@@ -97,7 +97,7 @@
             Prev
         </a>
         {% endif %}
-        <span class="text-xs text-stone-400 font-medium tabular-nums px-1">Page {{ page }}</span>
+        <span class="text-xs text-stone-500 font-medium tabular-nums px-1">Page {{ page }}</span>
         {% if has_next %}
         <a
             href="?page={{ page|add:"1" }}{% if selected_event_type %}&event_type={{ selected_event_type }}{% endif %}{% if selected_read_status %}&read_status={{ selected_read_status }}{% endif %}"
@@ -120,7 +120,7 @@
         <svg class="w-7 h-7 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
     </div>
     <p class="text-sm font-semibold text-stone-600">No notifications</p>
-    <p class="text-xs text-stone-400 mt-1 max-w-[240px] text-center leading-relaxed">
+    <p class="text-xs text-stone-500 mt-1 max-w-[240px] text-center leading-relaxed">
         {% if selected_event_type or selected_read_status %}
         No notifications match your filters. Try adjusting them.
         {% else %}

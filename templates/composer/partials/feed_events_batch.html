@@ -2,13 +2,13 @@
 {% for event in events %}
 {% with event_url=event.link|default:event.feed_website_url|default:'#' %}
 <article class="flex items-start gap-4 p-3 border border-stone-200 rounded-xl hover:bg-stone-50/50 transition-colors">
-    <a href="{{ event_url }}" target="_blank" rel="noopener noreferrer"
+    <a aria-label="{{ event.title }}" href="{{ event_url }}" target="_blank" rel="noopener noreferrer"
        class="block w-[140px] h-[96px] rounded-lg overflow-hidden bg-stone-100 flex-shrink-0">
         {% if event.image_url %}
         <img src="{{ event.image_url }}" alt="" loading="lazy" class="w-full h-full object-cover">
         {% else %}
         <div class="w-full h-full flex items-center justify-center">
-            <svg class="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 019 9"/><path d="M4 4a16 16 0 0116 16"/><circle cx="5" cy="19" r="1"/></svg>
+            <svg aria-hidden="true" class="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 019 9"/><path d="M4 4a16 16 0 0116 16"/><circle cx="5" cy="19" r="1"/></svg>
         </div>
         {% endif %}
     </a>

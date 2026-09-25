@@ -49,7 +49,7 @@
                 <div class="flex-1 min-w-0">
                     <h3 class="text-sm font-semibold text-stone-900 truncate">{{ page.name }}</h3>
                     {% if page.category %}
-                    <p class="text-xs text-stone-400">{{ page.category }}</p>
+                    <p class="text-xs text-stone-500">{{ page.category }}</p>
                     {% endif %}
                     {% if not page.can_publish %}
                     <p class="text-xs text-amber-600 mt-0.5">Missing Facebook content publishing access</p>
@@ -59,7 +59,7 @@
                 </div>
 
                 {% if page.followers_count %}
-                <span class="text-xs text-stone-400">{{ page.followers_count }} followers</span>
+                <span class="text-xs text-stone-500">{{ page.followers_count }} followers</span>
                 {% endif %}
             </label>
             {% endfor %}

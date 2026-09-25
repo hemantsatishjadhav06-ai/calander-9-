@@ -159,8 +159,8 @@
                         {% csrf_token %}
                         <h3 style="font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Connect Bluesky</h3>
                         <div style="margin-bottom: 12px;">
-                            <label style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">Handle</label>
-                            <input type="text" name="handle" placeholder="you.bsky.social" required style="
+                            <label for="bsky-handle" style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">Handle</label>
+                            <input type="text" id="bsky-handle" name="handle" placeholder="you.bsky.social" required style="
                                 width: 100%; padding: 9px 12px;
                                 font-size: 0.875rem; font-family: var(--font-body);
                                 border: 1.5px solid var(--border);
@@ -171,8 +171,8 @@
                             ">
                         </div>
                         <div style="margin-bottom: 16px;">
-                            <label style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">App Password</label>
-                            <input type="password" name="app_password" required style="
+                            <label for="bsky-app-password" style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">App Password</label>
+                            <input type="password" id="bsky-app-password" name="app_password" required style="
                                 width: 100%; padding: 9px 12px;
                                 font-size: 0.875rem; font-family: var(--font-body);
                                 border: 1.5px solid var(--border);
@@ -233,8 +233,8 @@
                         {% csrf_token %}
                         <h3 style="font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Connect Mastodon</h3>
                         <div style="margin-bottom: 16px;">
-                            <label style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">Instance URL</label>
-                            <input type="text" name="instance_url" placeholder="mastodon.social" required style="
+                            <label for="mastodon-instance-url" style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">Instance URL</label>
+                            <input type="text" id="mastodon-instance-url" name="instance_url" placeholder="mastodon.social" required style="
                                 width: 100%; padding: 9px 12px;
                                 font-size: 0.875rem; font-family: var(--font-body);
                                 border: 1.5px solid var(--border);

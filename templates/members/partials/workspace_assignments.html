@@ -14,7 +14,7 @@
             <label for="assign-ws-{{ wd.workspace.id }}" class="flex-1 text-sm cursor-pointer" style="color: var(--text-primary);">
                 {{ wd.workspace.name }}
             </label>
-            <select name="ws_role_{{ wd.workspace.id }}"
+            <select name="ws_role_{{ wd.workspace.id }}" aria-label="Role in {{ wd.workspace.name }}"
                     class="text-xs px-2 py-1 rounded border outline-none"
                     style="border-color: var(--border); background: var(--surface-0); color: var(--text-primary);">
                 {% for value, label in workspace_role_choices %}

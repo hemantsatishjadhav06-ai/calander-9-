@@ -10,6 +10,7 @@
         <input type="checkbox"
                :checked="isSelected('{{ message.id }}')"
                @change="toggleSelect('{{ message.id }}')"
+               aria-label="Select message"
                class="w-3.5 h-3.5 rounded border-stone-300 text-orange-500 focus:ring-orange-200 cursor-pointer">
     </div>
 
@@ -34,9 +35,9 @@
         <div class="flex items-center gap-2 mb-0.5">
             <span class="inbox-row-sender text-[13px] font-semibold text-stone-700 truncate">{{ message.sender_name }}</span>
             {% if message.sender_handle %}
-            <span class="text-[11px] text-stone-400 truncate">@{{ message.sender_handle }}</span>
+            <span class="text-[11px] text-stone-500 truncate">@{{ message.sender_handle }}</span>
             {% endif %}
-            <span class="text-[11px] text-stone-400 ml-auto flex-shrink-0" title="{{ message.received_at|date:'N j, Y g:i A' }}">{{ message.received_at|timesince }} ago</span>
+            <span class="text-[11px] text-stone-500 ml-auto flex-shrink-0" title="{{ message.received_at|date:'N j, Y g:i A' }}">{{ message.received_at|timesince }} ago</span>
         </div>
         <p class="inbox-row-preview text-[12px] text-stone-500 truncate leading-snug">{{ message.body|truncatewords:20 }}</p>
         <div class="flex items-center gap-1.5 mt-1.5">

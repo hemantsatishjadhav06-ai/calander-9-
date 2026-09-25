@@ -11,18 +11,19 @@ reveal modal on top of the freshly-rendered list page.
          style="background: rgba(0,0,0,0.4);">
         <div @click.outside="showIssueModal = false"
              x-show="showIssueModal" x-transition
+             x-trap.noscroll="showIssueModal" role="dialog" aria-modal="true" aria-labelledby="issue-key-title"
              class="w-full max-w-xl mx-4 rounded-xl flex flex-col"
              style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.18); max-height: 90vh;">
             <form method="POST" action="{% url 'api_keys:issue' %}" class="flex flex-col min-h-0">
                 {% csrf_token %}
                 <div class="flex items-start justify-between px-6 pt-6 pb-5 flex-shrink-0">
                     <div>
-                        <h3 class="text-lg font-semibold" style="color: var(--text-primary);">Issue a new API key</h3>
+                        <h3 id="issue-key-title" class="text-lg font-semibold" style="color: var(--text-primary);">Issue a new API key</h3>
                         <p class="text-xs mt-1" style="color: var(--text-tertiary);">
                             The plaintext token is shown <strong>once</strong> immediately after creation.
                         </p>
                     </div>
-                    <button type="button" @click="showIssueModal = false"
+                    <button type="button" @click="showIssueModal = false" aria-label="Close"
                             class="text-xl leading-none px-2 cursor-pointer"
                             style="color: var(--text-tertiary);">&times;</button>
                 </div>

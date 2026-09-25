@@ -33,12 +33,12 @@
               class="mt-3 p-4 bg-stone-50 rounded-xl border border-stone-200 flex items-end gap-3">
             {% csrf_token %}
             <div class="flex-1">
-                <label class="block text-xs font-semibold text-stone-700 mb-1">Name</label>
-                <input type="text" name="name" placeholder="e.g., Educational" required class="form-input w-full text-sm">
+                <label for="category-name" class="block text-xs font-semibold text-stone-700 mb-1">Name</label>
+                <input type="text" id="category-name" name="name" placeholder="e.g., Educational" required class="form-input w-full text-sm">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-stone-700 mb-1">Color</label>
-                <input type="color" name="color" value="#3B82F6" class="w-10 h-[38px] rounded-lg border border-stone-200 cursor-pointer p-0.5">
+                <label for="category-color" class="block text-xs font-semibold text-stone-700 mb-1">Color</label>
+                <input type="color" id="category-color" name="color" value="#3B82F6" class="w-10 h-[38px] rounded-lg border border-stone-200 cursor-pointer p-0.5">
             </div>
             <button type="submit" class="btn-brand text-sm py-2 px-4">Save</button>
             <button type="button" @click="showForm = false" class="text-sm text-stone-500 hover:text-stone-700 py-2 px-3">Cancel</button>
@@ -61,17 +61,17 @@
                     <div class="flex items-center gap-3 w-full">
                         <span class="w-4 h-4 rounded-full flex-shrink-0" style="background: {{ cat.color }};"></span>
                         <span class="flex-1 text-sm font-medium text-stone-800">{{ cat.name }}</span>
-                        <span class="text-xs text-stone-400">{{ cat.post_count }} post{{ cat.post_count|pluralize }}</span>
-                        <button @click="editing = true" class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-stone-600 transition-all p-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <span class="text-xs text-stone-500">{{ cat.post_count }} post{{ cat.post_count|pluralize }}</span>
+                        <button aria-label="Edit category {{ cat.name }}" @click="editing = true" class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-stone-400 hover:text-stone-600 transition-all p-1">
+                            <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         </button>
                         <form x-data hx-post="{% url 'composer:category_delete' workspace_id=workspace.id category_id=cat.id %}"
                               hx-swap="none"
                               class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all"
                               @submit="if(!confirm('Delete this category?')) $event.preventDefault()">
                             {% csrf_token %}
-                            <button type="submit" class="text-stone-400 hover:text-red-500 transition-colors p-1">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            <button aria-label="Delete category {{ cat.name }}" type="submit" class="text-stone-400 hover:text-red-500 transition-colors p-1">
+                                <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                         </form>
                     </div>
@@ -84,8 +84,8 @@
                           @htmx:after-request="editing = false"
                           class="flex items-center gap-3 w-full">
                         {% csrf_token %}
-                        <input type="color" name="color" value="{{ cat.color }}" class="w-8 h-8 rounded border border-stone-200 cursor-pointer p-0.5">
-                        <input type="text" name="name" value="{{ cat.name }}" class="form-input flex-1 text-sm" required>
+                        <input type="color" name="color" value="{{ cat.color }}" aria-label="Color for {{ cat.name }}" class="w-8 h-8 rounded border border-stone-200 cursor-pointer p-0.5">
+                        <input type="text" name="name" value="{{ cat.name }}" aria-label="Category name" class="form-input flex-1 text-sm" required>
                         <button type="submit" class="text-sm font-semibold" style="color: var(--primary);">Save</button>
                         <button type="button" @click="editing = false" class="text-sm text-stone-500">Cancel</button>
                     </form>

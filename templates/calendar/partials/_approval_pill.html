@@ -3,5 +3,5 @@
         hx-target="#tab-content" hx-swap="innerHTML"
         class="px-3.5 py-1.5 text-[0.8125rem] font-semibold rounded-full transition-colors {% if status_filter == pid %}text-white{% else %}text-stone-600 hover:bg-stone-100{% endif %}"
         {% if status_filter == pid %}style="background: var(--primary-strong);"{% endif %}>
-    {{ label }} <span class="{% if status_filter == pid %}opacity-75{% else %}text-stone-400{% endif %}">{{ count }}</span>
+    {{ label }} <span class="{% if status_filter == pid %}opacity-75{% else %}text-stone-500{% endif %}">{{ count }}</span>
 </button>

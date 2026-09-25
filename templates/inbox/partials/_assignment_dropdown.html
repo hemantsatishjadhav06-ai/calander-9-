@@ -1,6 +1,6 @@
 <!-- Assignment dropdown -->
 <div x-data="{ assignOpen: false }" class="relative">
-    <button @click="assignOpen = !assignOpen"
+    <button aria-haspopup="true" :aria-expanded="assignOpen" @click="assignOpen = !assignOpen"
             class="inline-flex items-center gap-1 text-[12px] font-medium text-stone-500 hover:text-stone-700 px-2 py-1 rounded-md hover:bg-stone-50 transition-all cursor-pointer">
         {% if message.assigned_to %}
         <div class="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0" style="background: var(--accent-indigo);">
