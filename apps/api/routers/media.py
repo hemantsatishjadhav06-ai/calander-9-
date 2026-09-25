@@ -134,10 +134,11 @@ def upload(
     if folder_id is not None:
         from apps.media_library.models import MediaFolder
 
+        # Scoped to the key's workspace, as the cookie-auth upload view is —
+        # org-wide scoping let a key file an asset into another workspace's
+        # folder tree.
         folder = get_object_or_404(
-            MediaFolder.objects.filter(
-                organization=workspace.organization,
-            ),
+            MediaFolder.objects.filter(workspace=workspace),
             id=folder_id,
         )
 

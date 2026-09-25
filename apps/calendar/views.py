@@ -1589,6 +1589,7 @@ def queue_list(request, workspace_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def queue_create(request, workspace_id):
     """Create a new queue."""
@@ -1647,6 +1648,7 @@ def queue_detail(request, workspace_id, queue_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def queue_delete(request, workspace_id, queue_id):
     """Delete a queue."""
@@ -1660,6 +1662,7 @@ def queue_delete(request, workspace_id, queue_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def queue_reorder(request, workspace_id, queue_id):
     """Reorder queue entries via HTMX drag-and-drop."""
@@ -1679,6 +1682,7 @@ def queue_reorder(request, workspace_id, queue_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def queue_entry_remove(request, workspace_id, queue_id, entry_id):
     """Remove a single post from a queue, leaving a gap (comment §3).
@@ -1695,6 +1699,7 @@ def queue_entry_remove(request, workspace_id, queue_id, entry_id):
     if entry is not None:
         from .services import remove_from_queue
 
+        _require_can_edit_queued_post(request, entry.post)
         remove_from_queue(entry)
 
     if request.htmx:
@@ -1703,6 +1708,7 @@ def queue_entry_remove(request, workspace_id, queue_id, entry_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def queue_entry_reslot(request, workspace_id, queue_id, entry_id):
     """Move a queued post to the queue's next open slot (comment §4)."""
@@ -1716,6 +1722,7 @@ def queue_entry_reslot(request, workspace_id, queue_id, entry_id):
 
     from .services import QueueFullError, reslot_to_next_available
 
+    _require_can_edit_queued_post(request, entry.post)
     try:
         reslot_to_next_available(entry)
     except QueueFullError:
@@ -1729,6 +1736,18 @@ def queue_entry_reslot(request, workspace_id, queue_id, entry_id):
 # ---------------------------------------------------------------------------
 # Custom Calendar Events CRUD
 # ---------------------------------------------------------------------------
+
+
+def _require_can_edit_queued_post(request, post):
+    """Author, or ``edit_others_posts`` — same rule as ``bulk_platform_action``.
+
+    Queue entry operations move other people's posts; a contributor may reslot
+    their own but not a colleague's.
+    """
+    membership = request.workspace_membership
+    perms = membership.effective_permissions if membership else {}
+    if post.author_id != request.user.id and not perms.get("edit_others_posts", False):
+        raise PermissionDenied("You do not have permission to change this post.")
 
 
 @login_required

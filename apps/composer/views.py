@@ -81,6 +81,18 @@ def _is_valid_uuid(value):
     return True
 
 
+def _require_can_edit_post(request, post):
+    """Author, or ``edit_others_posts`` — the rule ``save_post`` enforces.
+
+    Shared by every view that mutates or deletes an existing post so they
+    cannot drift apart again; three of them had no check at all.
+    """
+    membership = request.workspace_membership
+    perms = membership.effective_permissions if membership else {}
+    if post.author_id != request.user.id and not perms.get("edit_others_posts", False):
+        raise PermissionDenied("You do not have permission to change this post.")
+
+
 def _parse_selected_account_ids(raw):
     """Split a comma-separated ``selected_accounts`` value into account IDs.
 
@@ -1218,6 +1230,7 @@ def save_post(request, workspace_id, post_id=None):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def transition_platform_post(request, workspace_id, post_id, platform_post_id):
     """Transition a single PlatformPost to a target editorial status.
@@ -1238,6 +1251,7 @@ def transition_platform_post(request, workspace_id, post_id, platform_post_id):
     if not target:
         return JsonResponse({"error": "target_status required"}, status=400)
 
+    _require_can_edit_post(request, pp.post)
     membership = request.workspace_membership
     perms = membership.effective_permissions if membership else {}
     approval_states = {"approved", "pending_review", "pending_client", "changes_requested", "rejected"}
@@ -2332,9 +2346,16 @@ def remove_media(request, workspace_id, post_id, media_id):
 
 
 @login_required
+@require_permission("upload_media")
 @require_POST
 def remove_pending_media(request, workspace_id, asset_id):
-    """Remove a pending media asset (before post is saved)."""
+    """Remove a pending media asset (before post is saved).
+
+    Only an asset this session uploaded and has not yet attached — one in its
+    own ``pending_media_*`` list — is deleted. Anything else is left alone:
+    this used to delete any workspace asset by id, which made it an ungated
+    bypass of the media library's ``delete_media`` check.
+    """
     workspace = _get_workspace(request, workspace_id)
 
     from apps.media_library.models import MediaAsset
@@ -2343,15 +2364,16 @@ def remove_pending_media(request, workspace_id, asset_id):
     session_key = f"pending_media_{workspace.id}"
     pending = request.session.get(session_key, [])
     asset_id_str = str(asset_id)
-    if asset_id_str in pending:
+    was_pending = asset_id_str in pending
+    if was_pending:
         pending.remove(asset_id_str)
         request.session[session_key] = pending
 
-    # Delete the asset and its files from storage (R2)
-    asset = MediaAsset.objects.filter(id=asset_id, workspace=workspace).first()
-    if asset:
-        with contextlib.suppress(Exception):
-            delete_asset(asset)
+        # Delete the asset and its files from storage (R2)
+        asset = MediaAsset.objects.filter(id=asset_id, workspace=workspace).first()
+        if asset:
+            with contextlib.suppress(Exception):
+                delete_asset(asset)
 
     # Return updated pending list
     pending_assets = MediaAsset.objects.filter(id__in=pending, workspace=workspace)
@@ -2405,6 +2427,7 @@ def drafts_list(request, workspace_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def post_delete(request, workspace_id, post_id):
     """Delete a post or a single platform post via HTMX.
@@ -2413,9 +2436,14 @@ def post_delete(request, workspace_id, post_id):
     that social account is removed.  If it was the last PlatformPost the parent
     Post is deleted as well.  Without the parameter the entire Post (and all
     its PlatformPosts) is deleted.
+
+    Same rule as ``save_post``: the author may delete their own post; anyone
+    else needs ``edit_others_posts``. Without it a read-only viewer could
+    hard-delete every post in the workspace.
     """
     workspace = _get_workspace(request, workspace_id)
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
+    _require_can_edit_post(request, post)
 
     account_id = request.GET.get("account") or request.POST.get("account")
     if account_id:
@@ -3222,6 +3250,7 @@ def category_edit(request, workspace_id, category_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def category_delete(request, workspace_id, category_id):
     """Delete a content category via HTMX."""
@@ -3295,6 +3324,7 @@ def save_as_template(request, workspace_id, post_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def template_delete(request, workspace_id, template_id):
     """Delete a post template."""
