@@ -27,9 +27,12 @@
             <input type="hidden" name="visibility" :value="visibility">
 
             <!-- Attachment -->
-            <label class="cursor-pointer text-stone-400 hover:text-stone-600 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
-                <input type="file" name="attachment" accept="image/*" class="hidden">
+            {# sr-only, not hidden: a display:none input cannot take keyboard focus, so
+               attaching an image was mouse-only. The ring shows where focus is. #}
+            <label class="cursor-pointer text-stone-500 hover:text-stone-700 transition-colors rounded focus-within:ring-2 focus-within:ring-orange-400"
+                   title="Attach an image">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                <input type="file" name="attachment" accept="image/*" class="sr-only" aria-label="Attach an image">
             </label>
         </div>
 

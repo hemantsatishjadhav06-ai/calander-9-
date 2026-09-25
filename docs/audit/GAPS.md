@@ -30,10 +30,8 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 
 | # | Sev | Area | Gap | Evidence | Status |
 |---|-----|------|-----|----------|--------|
-| F2 | P2 | A11y | Modals have no focus trap, most lack `role="dialog"`, several ignore Escape (invite modals, publish approvals, token reveal, composer ×12, settings, media library). Needs Alpine Focus + `x-trap` + roles across ~20 templates. | audit | Open |
-| F4 | P2 | A11y | Body copy in `text-stone-400` / `--text-ghost` (≈2.6:1) at ~350 sites and `text-stone-300` at 36; labels and table headers included. Needs a palette pass: reserve those for icons, move copy to `--text-tertiary`. | audit | Open |
-| F7 | P2 | A11y | Inputs with no associated label (event form, categories, idea modal, inbox filter bar, composer ×10, create landing ×8, queues, posting slots, library search). | audit | Open |
-| F8 | P2 | A11y | 63 icon-only buttons with no accessible name; toggles without `aria-expanded`. | audit | Open |
+| F17 | P3 | A11y | Tailwind's `text-stone-500` is 4.44:1 on the page background `#F7F6F2` (just under 4.5:1). It passes on the white cards where nearly all of that text sits. | round-6 sweep | Open — nudge the page surface or use `--text-ghost` (4.57:1) for copy placed directly on it |
+| F18 | P3 | A11y | The create page's tag-filter chip nests a `<button>` inside an `<a>` (invalid HTML; both are labelled now). | `templates/composer/create_landing.html` | Open |
 
 ## Fixed in round 5
 
@@ -113,6 +111,10 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | F14 | P3 | UX | Idea modal: primary Save button, title focused on open, labelled fields, server's reason shown on failure. | round 6 | — |
 | M16 | P3 | Members | A failed invitation email no longer spends the org's daily invite budget. | round 6 | `InviteBudgetRefundTests` |
 | M18 | P3 | Perf | Onboarding checklist cached for a minute instead of four queries per page. | round 6 | `ChecklistCacheTests` |
+| F2 | P2 | A11y | 38 modal panels in 20 templates: `role="dialog"`, `aria-modal`, labelled, focus-trapped with the official Alpine Focus plugin (vendored, loaded before Alpine in both layouts); Escape added to the seven that ignored it. The API-token reveal keeps no Escape on purpose (it forces "I've saved it"). | round 6 | `test_a11y_sweep` |
+| F4 | P2 | A11y | `--text-ghost` moved to #766F6A (4.94:1 on white, 4.57:1 on the page); 218 text uses of stone-300/400 moved to stone-500; placeholders and inline colours too. Icons, spinners and disabled controls keep the lighter tones. | round 6 | `test_a11y_sweep` |
+| F7 | P2 | A11y | ~89 form controls given accessible names (for/id where a label exists, `aria-label` otherwise, bound ids inside `x-for`); flatpickr's generated inputs inherit the name. The comment attachment input was `display:none` (unreachable by keyboard); now `sr-only` with a focus ring. | round 6 | `test_a11y_sweep` |
+| F8 | P2 | A11y | 71 icon-only buttons, 21 icon-only links and 22 close buttons named; decorative SVGs hidden; 27 toggles expose `aria-expanded`/`aria-haspopup`; view toggles expose `aria-pressed`. | round 6 | `test_a11y_sweep` |
 
 ## Fixed in rounds 1–4 (for the record)
 
