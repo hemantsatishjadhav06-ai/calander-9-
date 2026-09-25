@@ -25,7 +25,6 @@ def robots_txt(request):
         "Disallow: /accounts/",
         "Disallow: /organizations/",
         "Disallow: /workspace/",
-        "Disallow: /settings/",
         "Disallow: /api/",
         "Disallow: /oauth/",
         "Disallow: /admin/",
@@ -64,7 +63,6 @@ urlpatterns = [
     path("organizations/api-keys/", include("apps.api_keys.urls")),
     path("workspaces/", include("apps.workspaces.urls")),
     path("members/", include("apps.members.urls")),
-    path("settings/", include("apps.settings_manager.urls")),
     path("social-accounts/", include("apps.social_accounts.urls")),
     # Content Pipeline (Stream A)
     path("workspace/<uuid:workspace_id>/", include("apps.composer.urls")),

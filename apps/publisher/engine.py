@@ -46,7 +46,7 @@ from apps.social_accounts.error_messages import (
     friendly_publish_error,
 )
 from providers import get_provider
-from providers.exceptions import ProviderError, RateLimitError
+from providers.exceptions import ProviderError, RateLimitError, TokenExpiredError
 from providers.types import PostType, PublishContent, PublishState
 
 from .models import PublishLog, RateLimitState
@@ -650,6 +650,22 @@ class PublishEngine:
             )
 
             user_message = friendly_publish_error(e)
+            # An expired token is the one failure a retry can never fix and
+            # that names its own remedy. Three backoff attempts used to run
+            # anyway, then the post failed with "try again" while the channel
+            # still read Connected. Fail now, and mark the account so the UI
+            # and the analytics sync both stop trusting it. First comments
+            # keep their own retry logic: their token is re-read per attempt.
+            if isinstance(e, TokenExpiredError):
+                from apps.social_accounts.models import SocialAccount
+
+                SocialAccount.objects.filter(pk=platform_post.social_account_id).update(
+                    connection_status=SocialAccount.ConnectionStatus.ERROR,
+                    last_error=f"Publishing failed: the access token was rejected. Reconnect this account. ({error_msg[:200]})",
+                    updated_at=timezone.now(),
+                )
+                self._fail_permanently(platform_post, error_msg, user_message=user_message)
+                return {"success": False, "error": error_msg}
             if getattr(e, "retryable", True):
                 self._schedule_retry(
                     platform_post,

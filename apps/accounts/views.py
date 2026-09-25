@@ -8,7 +8,7 @@ from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
 logger = logging.getLogger(__name__)
 
@@ -286,6 +286,13 @@ def accept_terms(request):
     return render(request, "account/accept_terms.html")
 
 
+@require_POST
 def logout_view(request):
+    """POST only, like Django's own LogoutView.
+
+    A GET that ends the session is followed by browser link prefetchers and
+    corporate URL scanners, which logged real users out mid-draft — found when
+    a link crawler in the test suite was silently signed out part-way through.
+    """
     logout(request)
     return redirect("account_login")

@@ -82,14 +82,23 @@ def sidebar_context(request):
             .order_by("platform", "account_name")
         )
 
-        # Connectable platforms: not yet connected in this workspace.
-        # Show all known platforms (configured or not) so the sidebar
-        # always surfaces what can be connected. The connect page itself
-        # handles the "not configured" case with an admin prompt, and shares
-        # PlatformVisibility.visible_choices() with us so the two can't disagree.
+        # Connectable platforms: not yet connected in this workspace AND
+        # actually connectable — credentials configured, or a platform that
+        # needs none. This used to list every known platform so the sidebar
+        # "always surfaces what can be connected"; on a fresh install that
+        # meant advertising Instagram, LinkedIn and TikTok, the three whose
+        # connect cards render a dead "Not Configured" pill. Same helper the
+        # connect page uses, so the two cannot disagree.
+        from apps.social_accounts.views import _get_configured_platforms
+
         connected_platforms = {ch.platform for ch in sidebar_channels}
+        configured_platforms = _get_configured_platforms(workspace.organization_id)
         sidebar_connectable_platforms = sorted(
-            ((p, label) for p, label in PlatformVisibility.visible_choices() if p not in connected_platforms),
+            (
+                (p, label)
+                for p, label in PlatformVisibility.visible_choices()
+                if p not in connected_platforms and p in configured_platforms
+            ),
             key=_connect_suggestion_rank,
         )
 

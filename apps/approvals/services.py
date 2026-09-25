@@ -264,16 +264,22 @@ def reject_post(target, user, workspace, comment):
 
 
 def request_hold(target, user, workspace, comment):
-    """Client requests a hold on an already-approved post. Comment is required.
+    """Client requests a hold on an approved or already-scheduled post. Comment is required.
 
     Parks the post in ``on_hold`` — out of the publish path (the publisher only
     picks up ``scheduled`` rows, and there is no ``on_hold → scheduled`` edge) —
     and notifies the team so they can resume, rework, or drop it.
+
+    ``scheduled`` is eligible on purpose. It used to be ``approved`` only, so the
+    moment the team put an approved post on the calendar it left the client's
+    reach: "pull it, it goes out in twenty minutes" had no path. A row the
+    publisher has already claimed (``publishing``) is not eligible; that race
+    is lost honestly rather than half-cancelled.
     """
     if not comment.strip():
         raise ValueError("A comment is required when requesting a hold.")
 
-    post, targets, is_bundled = _resolve_targets(target, eligible_from_states={"approved"})
+    post, targets, is_bundled = _resolve_targets(target, eligible_from_states={"approved", "scheduled"})
 
     moved = []
     with transaction.atomic():

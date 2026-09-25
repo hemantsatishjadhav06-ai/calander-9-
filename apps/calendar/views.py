@@ -181,7 +181,12 @@ def _get_filtered_platform_posts(workspace, request):
 
     qs = (
         PlatformPost.objects.filter(post__workspace_id=workspace.id)
-        .select_related("post", "post__author", "post__category", "social_account")
+        # post__recurrence_rule: the chip shows a repeat icon via
+        # ``pp.post.recurrence_rule``, a reverse one-to-one that fired one
+        # query per rendered chip — 33 on a 300-post month. Measured: the
+        # calendar climbed 44 → 71 queries with volume while Drafts and Queues
+        # stayed flat.
+        .select_related("post", "post__author", "post__category", "post__recurrence_rule", "social_account")
         # Chips render the post's first media thumbnail; without this each chip
         # would fire its own media_attachments + media_asset queries (N+1) on
         # every month/week/day render.

@@ -134,7 +134,7 @@ def portal_approval_queue(request):
     # are not the first rows dropped by the [:50] cap — they're exactly the ones a
     # client may still want to hold.
     decided_posts = list(
-        base.filter(platform_posts__status__in=["approved", "on_hold"])
+        base.filter(platform_posts__status__in=["approved", "scheduled", "on_hold"])
         .distinct()
         .order_by(F("scheduled_at").asc(nulls_first=True), "-created_at")[:50]
     )
@@ -170,7 +170,9 @@ def portal_approval_queue(request):
         child_statuses = {pp.status for pp in post.platform_posts.all()}
         post.client_pending = "pending_client" in child_statuses
         post.client_on_hold = "on_hold" in child_statuses
-        post.client_approved = "approved" in child_statuses
+        # "scheduled" counts as approved from the client's side: it is their
+        # approved post, now on the calendar, and still theirs to hold.
+        post.client_approved = "approved" in child_statuses or "scheduled" in child_statuses
 
     return render(
         request,
@@ -250,10 +252,10 @@ def portal_reject(request, post_id):
 @portal_auth_required
 @require_POST
 def portal_request_hold(request, post_id):
-    """Client requests a hold on an already-approved post (before it publishes)."""
+    """Client requests a hold on an approved or scheduled post (before it publishes)."""
     workspace = request.portal_workspace
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
-    if not post.platform_posts.filter(status="approved").exists():
+    if not post.platform_posts.filter(status__in=["approved", "scheduled"]).exists():
         raise Http404
     comment_text = request.POST.get("comment", "")
 

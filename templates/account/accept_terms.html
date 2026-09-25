@@ -69,7 +69,10 @@
 
         <!-- Sign out link -->
         <p class="text-center text-sm mt-6" style="color: var(--text-secondary);">
-            <a href="{% url 'accounts:logout' %}" class="font-semibold hover:underline" style="color: var(--primary);">Sign out</a>
+            <form method="post" action="{% url 'accounts:logout' %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="font-semibold hover:underline cursor-pointer bg-transparent border-0 p-0" style="color: var(--primary);">Sign out</button>
+            </form>
         </p>
     </div>
 </main>
