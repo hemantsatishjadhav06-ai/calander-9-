@@ -604,7 +604,22 @@ class PublishEngine:
                 else:
                     platform_post.status = PlatformPost.Status.PUBLISHED
                     platform_post.published_at = timezone.now()
-                platform_post.save()
+                # The fields this path owns, not the whole row: a full save
+                # wrote back every column as it was read before the upload
+                # (minutes ago for video), and for a row deleted meanwhile it
+                # fell back to an INSERT.
+                platform_post.save(
+                    update_fields=[
+                        "platform_post_id",
+                        "platform_extra",
+                        "retry_count",
+                        "next_retry_at",
+                        "publish_error",
+                        "status",
+                        "published_at",
+                        "updated_at",
+                    ]
+                )
 
                 if not result.get("async_publish"):
                     # A published post leaves the queue: drop the QueueEntry that

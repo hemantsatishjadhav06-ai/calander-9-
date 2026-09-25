@@ -159,6 +159,20 @@ def reserve_budget(scope: str, key: str, period_start: datetime, limit: int, *, 
         return fail_open
 
 
+def release_budget(scope: str, key: str, period_start: datetime) -> None:
+    """Give back one unit claimed by :func:`reserve_budget` for mail that never went out."""
+    from django.db.models import F
+
+    from .models import EmailSendCounter
+
+    try:
+        EmailSendCounter.objects.filter(scope=scope, key=key, period_start=period_start, count__gt=0).update(
+            count=F("count") - 1
+        )
+    except DatabaseError:
+        logger.exception("Could not release email budget for %s:%s", scope, key)
+
+
 def _is_suppressed(addresses: list[str]) -> bool:
     from .models import EmailSuppression
 

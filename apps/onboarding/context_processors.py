@@ -20,7 +20,7 @@ def onboarding_checklist(request):
     if checklist_dismissed:
         return {"checklist_dismissed": True, "checklist_items": []}
 
-    checklist_items = get_checklist_items(workspace)
+    checklist_items = _cached_checklist_items(workspace)
     completed_count = sum(1 for item in checklist_items if item["completed"])
     total_count = len(checklist_items)
 
@@ -34,3 +34,20 @@ def onboarding_checklist(request):
         "checklist_completed_count": completed_count,
         "checklist_total_count": total_count,
     }
+
+
+# The checklist is evaluated for the sidebar on every authenticated page, and
+# each evaluation is four existence queries. Its answers change a handful of
+# times in a workspace's life, so a minute's staleness costs nothing.
+CHECKLIST_CACHE_SECONDS = 60
+
+
+def _cached_checklist_items(workspace):
+    from django.core.cache import cache
+
+    key = f"onboarding_checklist:{workspace.id}"
+    items = cache.get(key)
+    if items is None:
+        items = get_checklist_items(workspace)
+        cache.set(key, items, CHECKLIST_CACHE_SECONDS)
+    return items

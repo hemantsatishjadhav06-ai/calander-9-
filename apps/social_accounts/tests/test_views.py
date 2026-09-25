@@ -806,7 +806,7 @@ class TestRetryWebhooksView:
 
 @pytest.mark.django_db
 class TestDisconnectView:
-    def test_disconnect_removes_account(self, authenticated_client, workspace):
+    def test_disconnect_keeps_account_but_drops_the_credential(self, authenticated_client, workspace):
         account = SocialAccount.objects.create(
             workspace=workspace,
             platform="facebook",
@@ -825,7 +825,10 @@ class TestDisconnectView:
             response = authenticated_client.post(url)
 
         assert response.status_code == 302
-        assert SocialAccount.objects.filter(pk=account.pk).count() == 0
+        # Disconnect keeps the account and its history; only the credential goes.
+        account.refresh_from_db()
+        assert account.connection_status == SocialAccount.ConnectionStatus.DISCONNECTED
+        assert account.oauth_access_token == ""
 
     def test_disconnect_requires_post(self, authenticated_client, workspace):
         account = SocialAccount.objects.create(

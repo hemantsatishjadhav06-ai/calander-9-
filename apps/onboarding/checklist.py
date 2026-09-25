@@ -1,6 +1,6 @@
 """Onboarding checklist evaluation logic.
 
-Computes the 5 checklist items and their completion status for a workspace.
+Computes the 4 checklist items and their completion status for a workspace.
 Used by the workspace dashboard to render the dynamic "Get Started" card.
 """
 

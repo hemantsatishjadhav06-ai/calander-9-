@@ -148,7 +148,7 @@ def create_invitation(org, email, org_role, workspace_assignments, invited_by, *
             f"this organization. Check the address with them directly rather than sending it again."
         )
 
-    _check_org_invite_budget(org)
+    budget_day = _check_org_invite_budget(org)
 
     invitation = Invitation.objects.create(
         organization=org,
@@ -166,6 +166,7 @@ def create_invitation(org, email, org_role, workspace_assignments, invited_by, *
         # caller being told the email went out. ``last_sent_at`` stays null,
         # which is the signal the views use.
         logger.warning("Invitation %s created but the email was not sent", invitation.pk)
+        _release_org_invite_budget(org, budget_day)
 
     return invitation
 
@@ -192,7 +193,7 @@ def _recent_send_count(org, email) -> int:
     )
 
 
-def _check_org_invite_budget(org) -> None:
+def _check_org_invite_budget(org):
     """Stop one organization inviting the world in a day.
 
     A new signup owns an organization one request after registering, with no
@@ -210,6 +211,18 @@ def _check_org_invite_budget(org) -> None:
         raise ValueError(
             f"This organization has sent its {limit} invitation emails for today. You can send more tomorrow."
         )
+    return day_start
+
+
+def _release_org_invite_budget(org, day_start) -> None:
+    """Refund the daily slot when the invitation email did not go out.
+
+    The cap counts emails sent. Charging for a send the mail server refused
+    meant a bad afternoon of SMTP could spend a team's whole day of invites.
+    """
+    from apps.common.mail import release_budget
+
+    release_budget("invite_org_day", str(org.id), day_start)
 
 
 def accept_invitation(invitation, user, *, require_email_match=True):
@@ -318,7 +331,7 @@ def resend_invitation(invitation):
     # same daily allowance. Charging only ``create`` would have made the cap a
     # third of what it claims: 25 invitations each resent twice is 75 emails
     # from an organization told it had spent its 25.
-    _check_org_invite_budget(invitation.organization)
+    budget_day = _check_org_invite_budget(invitation.organization)
 
     import secrets
 
@@ -332,6 +345,7 @@ def resend_invitation(invitation):
 
     if not _send_invite_email(invitation):
         invitation.token, invitation.expires_at = previous_token, previous_expiry
+        _release_org_invite_budget(invitation.organization, budget_day)
         # Either a competing request took the slot between the checks above and
         # the atomic reservation, or the send itself was refused. Reporting
         # success would leave someone waiting for an email that is not coming.

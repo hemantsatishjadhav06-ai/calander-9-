@@ -59,8 +59,9 @@ def _transition_or_skip(pp, target_status):
     pp.transition_to(target_status)
     # TRANSITION_FIELDS, not a hand-written list: transition_to writes the retry
     # budget and publish handle too, and omitting them drops the reset silently.
-    pp.save(update_fields=[*PlatformPost.TRANSITION_FIELDS, "updated_at"])
-    return True
+    # Guarded: if the publisher claimed the row (or anyone else moved it) since
+    # it was read, nothing is written and the row counts as skipped.
+    return pp.save_guarded([*PlatformPost.TRANSITION_FIELDS, "updated_at"])
 
 
 def _record_action(post, platform_post, user, action, comment=""):

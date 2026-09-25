@@ -121,6 +121,19 @@ USER_TRANSITION_TARGETS = frozenset(
 )
 
 
+def _form_error_text(form):
+    """Form errors as one plain line per field: "Color: Enter a valid hex colour."
+
+    HTMX callers show the response body as text, so this is what the user reads.
+    """
+    lines = []
+    for name, errors in form.errors.items():
+        label = "" if name == "__all__" else str(form.fields[name].label or name.replace("_", " ").capitalize())
+        for message in errors:
+            lines.append(f"{label}: {message}" if label else str(message))
+    return "\n".join(lines) or "Please check the form and try again."
+
+
 def _parse_selected_account_ids(raw):
     """Split a comma-separated ``selected_accounts`` value into account IDs.
 
@@ -393,7 +406,19 @@ def _sync_platform_posts(request, post, workspace, initial_status=None):
                     extra["video_cover_timestamp_ms"] = cover_ms_val
             pp.platform_extra = extra
 
-        pp.save()
+        # Content fields only. A full save wrote this request's in-memory
+        # status back too — read before the publisher or a client hold moved
+        # the row — and could undo either. Status changes go through
+        # _transition_post_children.
+        pp.save(
+            update_fields=[
+                "platform_specific_title",
+                "platform_specific_caption",
+                "platform_specific_first_comment",
+                "platform_extra",
+                "updated_at",
+            ]
+        )
 
 
 def _validate_pinterest_board_selection(request, post, workspace):
@@ -875,7 +900,9 @@ def _transition_post_children(post, target, *, allow_via_draft=True, only=None):
             else:
                 skipped.append(pp)
                 continue
-            pp.save(update_fields=[*PlatformPost.TRANSITION_FIELDS, "updated_at"])
+            if not pp.save_guarded([*PlatformPost.TRANSITION_FIELDS, "updated_at"]):
+                skipped.append(pp)
+                continue
             moved.append(pp)
         except ValueError:
             skipped.append(pp)
@@ -1362,7 +1389,8 @@ def transition_platform_post(request, workspace_id, post_id, platform_post_id):
         # cancelled and sync_post_scheduled_at cleared the parent's.
         pp.scheduled_at = pp.post.scheduled_at
         update_fields.append("scheduled_at")
-    pp.save(update_fields=update_fields)
+    if not pp.save_guarded(update_fields):
+        return JsonResponse({"error": "This post changed while you were editing it. Reload and try again."}, status=409)
     # Committing a child to publishing obsoletes any draft-stage proposal.
     # Clear it directly rather than via sync_post_scheduled_at: this view sets
     # ``scheduled`` WITHOUT a ``scheduled_at``, and the publisher relies on the
@@ -1605,6 +1633,7 @@ def thumbnail_picker(request, workspace_id):
 
 
 @login_required
+@require_permission("upload_media")
 @require_POST
 def thumbnail_upload(request, workspace_id):
     """Upload an image from the local machine to the media library and return
@@ -1981,6 +2010,7 @@ def unsplash_search(request, workspace_id):
 
 
 @login_required
+@require_permission("upload_media")
 @require_POST
 def unsplash_import(request, workspace_id, post_id=None):
     """Download selected Unsplash photos server-side and attach them as media.
@@ -2013,6 +2043,7 @@ def unsplash_import(request, workspace_id, post_id=None):
     post = None
     if post_id:
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
+        _require_can_edit_post(request, post)
 
     auth_headers = {"Authorization": f"Client-ID {settings.UNSPLASH_ACCESS_KEY}"}
     new_assets = []
@@ -2233,11 +2264,13 @@ def tiktok_creator_info(request, workspace_id, account_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def attach_media(request, workspace_id, post_id):
     """Attach a media asset to a post."""
     workspace = _get_workspace(request, workspace_id)
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
+    _require_can_edit_post(request, post)
     media_asset_id = request.POST.get("media_asset_id")
 
     if not media_asset_id:
@@ -2276,6 +2309,7 @@ def attach_media(request, workspace_id, post_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def attach_pending_media(request, workspace_id):
     """Attach a library media asset as pending (before post is saved)."""
@@ -2352,6 +2386,7 @@ def _attach_asset_for_composer(request, workspace, asset, post=None):
 
 
 @login_required
+@require_permission("upload_media")
 @require_POST
 def upload_media(request, workspace_id, post_id=None):
     """Upload a file directly from the composer and optionally attach to a post."""
@@ -2388,6 +2423,7 @@ def upload_media(request, workspace_id, post_id=None):
 
     if post_id:
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
+        _require_can_edit_post(request, post)
         attachment = _attach_asset_for_composer(request, workspace, asset, post)
         # Option A: changing media on an approved post sends it back for re-approval.
         _revert_approved_to_review(post)
@@ -2417,11 +2453,13 @@ def upload_media(request, workspace_id, post_id=None):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def remove_media(request, workspace_id, post_id, media_id):
     """Remove a media attachment from a post."""
     workspace = _get_workspace(request, workspace_id)
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
+    _require_can_edit_post(request, post)
     PostMedia.objects.filter(id=media_id, post=post).delete()
 
     # Option A: changing media on an approved post sends it back for re-approval.
@@ -3315,6 +3353,7 @@ def category_list(request, workspace_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def category_create(request, workspace_id):
     """Create a new content category via HTMX."""
@@ -3322,7 +3361,7 @@ def category_create(request, workspace_id):
     form = ContentCategoryForm(request.POST)
 
     if not form.is_valid():
-        return HttpResponse("Invalid data.", status=400)
+        return HttpResponse(_form_error_text(form), status=400)
 
     category = form.save(commit=False)
     category.workspace = workspace
@@ -3337,6 +3376,7 @@ def category_create(request, workspace_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def category_edit(request, workspace_id, category_id):
     """Edit a content category via HTMX."""
@@ -3345,7 +3385,7 @@ def category_edit(request, workspace_id, category_id):
     form = ContentCategoryForm(request.POST, instance=category)
 
     if not form.is_valid():
-        return HttpResponse("Invalid data.", status=400)
+        return HttpResponse(_form_error_text(form), status=400)
 
     form.save()
     return HttpResponse(
@@ -3391,11 +3431,13 @@ def template_list(request, workspace_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def save_as_template(request, workspace_id, post_id):
     """Save the current post as a reusable template."""
     workspace = _get_workspace(request, workspace_id)
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
+    _require_can_edit_post(request, post)
 
     name = request.POST.get("template_name", "").strip()
     if not name:
@@ -3788,6 +3830,7 @@ def tag_list(request, workspace_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def tag_create(request, workspace_id):
     """Create a new tag and return it as JSON."""
