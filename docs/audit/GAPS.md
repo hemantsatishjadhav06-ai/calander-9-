@@ -30,8 +30,6 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 
 | # | Sev | Area | Gap | Evidence | Status |
 |---|-----|------|-----|----------|--------|
-| F17 | P3 | A11y | Tailwind's `text-stone-500` is 4.44:1 on the page background `#F7F6F2` (just under 4.5:1). It passes on the white cards where nearly all of that text sits. | round-6 sweep | Open — nudge the page surface or use `--text-ghost` (4.57:1) for copy placed directly on it |
-| F18 | P3 | A11y | The create page's tag-filter chip nests a `<button>` inside an `<a>` (invalid HTML; both are labelled now). | `templates/composer/create_landing.html` | Open |
 
 ## Fixed in round 5
 
@@ -115,6 +113,8 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | F4 | P2 | A11y | `--text-ghost` moved to #766F6A (4.94:1 on white, 4.57:1 on the page); 218 text uses of stone-300/400 moved to stone-500; placeholders and inline colours too. Icons, spinners and disabled controls keep the lighter tones. | round 6 | `test_a11y_sweep` |
 | F7 | P2 | A11y | ~89 form controls given accessible names (for/id where a label exists, `aria-label` otherwise, bound ids inside `x-for`); flatpickr's generated inputs inherit the name. The comment attachment input was `display:none` (unreachable by keyboard); now `sr-only` with a focus ring. | round 6 | `test_a11y_sweep` |
 | F8 | P2 | A11y | 71 icon-only buttons, 21 icon-only links and 22 close buttons named; decorative SVGs hidden; 27 toggles expose `aria-expanded`/`aria-haspopup`; view toggles expose `aria-pressed`. | round 6 | `test_a11y_sweep` |
+| F17 | P3 | A11y | Tailwind's stone-500 was 4.44:1 on the page background; the theme now sets it to #766F6A (4.57:1 there, visually identical). | round 6 | — |
+| F18 | P3 | A11y | A `<button>` nested inside an `<a>` (the tag-filter clear chip) is now a single labelled link. | round 6 | — |
 
 ## Fixed in rounds 1–4 (for the record)
 

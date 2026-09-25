@@ -4,6 +4,14 @@
 @source "../../../templates/**/*.html";
 @source "../../../apps/**/templates/**/*.html";
 
+/* stone-500 is the colour secondary copy uses everywhere. Tailwind's #78716C
+   is 4.44:1 on --surface-page (#F7F6F2), just under WCAG AA's 4.5:1; this
+   visually identical shade is 4.57:1 there and 4.94:1 on white. Same value as
+   --text-ghost below. */
+@theme {
+  --color-stone-500: #766F6A;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    WHITE-LABEL TOKEN ARCHITECTURE
    Layer 1 → Brand Tokens   (swap these to white-label)

@@ -431,9 +431,7 @@
             {% if active_tag %}
             <div class="tag-chip">
                 {{ active_tag }}
-                <a href="{% url 'composer:create_landing' workspace_id=workspace.id %}">
-                    <button aria-label="Clear tag filter" type="button">&times;</button>
-                </a>
+                <a href="{% url 'composer:create_landing' workspace_id=workspace.id %}" aria-label="Clear tag filter">&times;</a>
             </div>
             {% endif %}
 
