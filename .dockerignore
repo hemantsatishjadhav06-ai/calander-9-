@@ -1,0 +1,34 @@
+# The Dockerfile does `COPY . .`; without this, a local build copied the
+# virtualenv, .git, node_modules, test media and any .env — secrets included —
+# into image layers. CI builds from a clean checkout and so never noticed.
+.git
+.gitignore
+.github
+.venv
+.venv*
+venv
+venv*
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+htmlcov
+.coverage
+.coverage.*
+node_modules
+theme/static_src/node_modules
+staticfiles
+media
+test_media
+*.log
+.env
+.env.*
+!.env.example
+*.sqlite3
+docker-compose*.yml
+Dockerfile
+.dockerignore
+docs
+development_specs

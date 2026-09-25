@@ -29,6 +29,7 @@ from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 
+from apps.common.background import keep_schedule
 from apps.members.models import OrgMembership
 
 from .models import (
@@ -238,8 +239,12 @@ def _reschedule_or_fail(pending: PendingActivation, exc: Exception):
 # Periodic reconcile
 # ---------------------------------------------------------------------------
 
+# Registered on this interval by apps.intelligence.apps when the integration is enabled.
+INTELLIGENCE_RECONCILE_INTERVAL_SECONDS = 6 * 3600
+
 
 @background(schedule=0)
+@keep_schedule
 def reconcile_intelligence_subscriptions():
     """Catch drift between Intelligence and local IntelligenceSubscription
     rows that webhook-driven sync may have missed (e.g., a

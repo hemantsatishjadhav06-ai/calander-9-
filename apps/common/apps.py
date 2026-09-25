@@ -7,12 +7,11 @@ class CommonConfig(AppConfig):
     verbose_name = "Common"
 
     def ready(self):
-        from django.db.models.signals import post_migrate
-
         # Register deploy-time config checks (python manage.py check --deploy).
         from apps.common import checks  # noqa: F401
+        from apps.common.background import connect_recurring_tasks
 
-        post_migrate.connect(self._register_tasks, sender=self)
+        connect_recurring_tasks(self, self._register_tasks)
 
     @staticmethod
     def _register_tasks(sender, **kwargs):

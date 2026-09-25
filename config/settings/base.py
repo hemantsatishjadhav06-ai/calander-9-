@@ -21,6 +21,10 @@ environ.Env.read_env(BASE_DIR / ".env", overwrite=False)
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+# Railway's deploy health check (railway.toml ``healthcheckPath``) calls /health/
+# with this Host; without it Django answers 400 and every deploy is rolled back.
+if env("RAILWAY_ENVIRONMENT", default="") and "healthcheck.railway.app" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS = [*ALLOWED_HOSTS, "healthcheck.railway.app"]
 # Trusted origins for CSRF (scheme + host, e.g. https://app.example.com). Behind
 # a TLS-terminating proxy (Railway), a login POST is rejected 403 unless the
 # browser's Origin is trusted here, so read it from the environment in every
@@ -188,6 +192,13 @@ else:
 DATABASES = {
     "default": env.db("DATABASE_URL", default="postgres://postgres:postgres@localhost:5432/brightbean"),
 }
+# Reuse connections across requests instead of a TCP + TLS + auth handshake per
+# request (CONN_MAX_AGE defaults to 0). Health checks drop a connection the
+# server closed (a Postgres restart, an idle timeout) instead of failing the
+# next request on it. Gunicorn runs 4 threads and the worker one, so this is
+# at most five persistent connections per container.
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 
 # Custom user model
 AUTH_USER_MODEL = "accounts.User"
@@ -353,6 +364,9 @@ if EMAIL_BACKEND_TYPE == "smtp":
     EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
     EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
     EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+    # Without a timeout a hung SMTP server holds the request (password reset,
+    # invite) or the worker's digest sweep open indefinitely.
+    EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 else:
     EMAIL_INNER_BACKEND = "django.core.mail.backends.console.EmailBackend"
 

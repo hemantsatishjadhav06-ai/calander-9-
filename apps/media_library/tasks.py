@@ -6,6 +6,8 @@ import tempfile
 from background_task import background
 from django.core.files.base import File
 
+from apps.common.background import keep_schedule
+
 from .models import MediaAsset, MediaAssetVersion
 from .services import (
     ImageTooLargeError,
@@ -224,6 +226,7 @@ PENDING_UPLOAD_SWEEP_INTERVAL_SECONDS = 60 * 60  # hourly
 
 
 @background(schedule=0)
+@keep_schedule
 def sweep_pending_uploads():
     """Delete expired, never-finalized presigned uploads and their objects.
 
@@ -253,6 +256,7 @@ ORPHANED_MEDIA_SWEEP_INTERVAL_SECONDS = 24 * 60 * 60  # daily
 
 
 @background(schedule=0)
+@keep_schedule
 def run_orphaned_media_sweep():
     """Delete media assets no longer referenced by any post, idea, or template.
 

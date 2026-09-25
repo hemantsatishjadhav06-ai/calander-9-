@@ -211,7 +211,7 @@ python manage.py runserver
 Tab 3 - Background worker:
 ```bash
 source .venv/bin/activate
-python manage.py process_tasks
+python manage.py run_worker
 ```
 
 Open http://localhost:8000 and log in with the superuser you created.
@@ -222,7 +222,7 @@ Open http://localhost:8000 and log in with the superuser you created.
 source .venv/bin/activate                # activate Python env
 python manage.py runserver               # start web server
 # (open another tab)
-python manage.py process_tasks           # start worker
+python manage.py run_worker              # start worker
 ```
 
 > **Note:** SQLite is fine for local development and small deployments. For production or heavy concurrent usage, switch to PostgreSQL.
@@ -290,14 +290,14 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 | Platform | Config file | Notes |
 |----------|-------------|-------|
 | **Heroku** | `Procfile` + `app.json` | Deploy-button ready. Must use Basic+ dynos (Eco dynos break the worker). |
-| **Railway** | `railway.toml` | Deploying this repository from [Railway](https://railway.com/new) provisions three services: web (Gunicorn, runs `migrate` on startup), worker (`python manage.py process_tasks`), and managed PostgreSQL. The web service's startup `migrate` fires the `post_migrate` hooks that register the recurring tasks, so scheduling works out of the box. |
+| **Railway** | `railway.toml` | Deploying this repository from [Railway](https://railway.com/new) provisions three services: web (Gunicorn, runs `migrate` on startup), worker (`python manage.py run_worker`), and managed PostgreSQL. The web service's startup `migrate` fires the `post_migrate` hooks that register the recurring tasks, so scheduling works out of the box. |
 | **Render** | `render.yaml` | Blueprint with web, worker, PostgreSQL. Must use paid tier. |
 
 All platforms with ephemeral filesystems require `STORAGE_BACKEND=s3` - see `.env.example` for S3 configuration.
 
 **Memory sizing.** Importing the app costs roughly 100 MB before it serves a request, and a warmed Gunicorn worker settles near 200 MB - so the shipped command runs a single threaded worker (`--workers 1 --threads 4`), which fits a 512 MB dyno with room for media handling. Raise `--workers` only when you raise the memory to match; a rule of thumb is 250 MB per worker. Do **not** add `--max-requests`: gthread stops heartbeating at the start of the request that trips the counter, so the arbiter kills the worker mid-request once `--timeout` (30s) passes - which drops whichever upload happened to be that request, and uploads here can be up to 1 GB. The `worker` process needs the same headroom: it downloads videos to disk and streams them to the platform, and if it is killed mid-publish (Heroku's R15, an OOM kill, a deploy) the affected post is failed by the confirmation sweep rather than left in limbo.
 
-**Why the worker runs with `--duration 3600`.** `process_tasks` is a single non-forking process that runs every task in the same heap and never restarts, so a peak allocation raises RSS permanently - CPython and glibc keep the freed pages in their own arenas. Left alone it ratchets: on a 512 MB Basic dyno it climbed from ~280 MB after a deploy to 566 MB over 15 hours and sat at 110% of quota. `--duration` is checked at the *top* of the run loop, so a task in flight always finishes; the process then exits 0 between tasks and the platform restarts it at its floor. Nothing is lost - a recycle cannot interrupt a publish, and `confirm_pending_publishes` settles anything in flight regardless. Don't go below ~1800s, where Heroku's crash cool-off starts to engage. Other deploy targets keep the plain command: `docker-compose.yml` has no `restart:` policy on the worker, so there a clean exit would simply stop it.
+**Why the worker runs with `--duration 3600`.** `run_worker` is django-background-tasks' `process_tasks` with three fixes for life as a platform-managed service: it stops gracefully on SIGTERM (the library only listens for SIGTSTP, so a deploy used to kill it mid-task), it releases the task locks a killed worker leaves behind (otherwise `run_publish_cycle` stays locked for an hour after every crash - an hour with no publishing), and it re-registers any recurring schedule the library deleted after repeated failures. Pass `--keep-locks` if you ever run more than one worker replica. Underneath, `process_tasks` is a single non-forking process that runs every task in the same heap and never restarts, so a peak allocation raises RSS permanently - CPython and glibc keep the freed pages in their own arenas. Left alone it ratchets: on a 512 MB Basic dyno it climbed from ~280 MB after a deploy to 566 MB over 15 hours and sat at 110% of quota. `--duration` is checked at the *top* of the run loop, so a task in flight always finishes; the process then exits 0 between tasks and the platform restarts it at its floor. Nothing is lost - a recycle cannot interrupt a publish, and `confirm_pending_publishes` settles anything in flight regardless. Don't go below ~1800s, where Heroku's crash cool-off starts to engage. Other deploy targets keep the plain command: `docker-compose.yml` has no `restart:` policy on the worker, so there a clean exit would simply stop it.
 
 **`MALLOC_ARENA_MAX`.** glibc gives each thread its own arena (up to 64 MB) capped at `8 x nproc`, and containers report the host's core count, so the cap is effectively unbounded. This app has real thread churn - the publisher builds a fresh pool every 15s and boto3's managed transfer adds ten threads per download - and those arenas are never returned to the OS. On Heroku this is already set to 2 by the repo's `.profile`, which applies to web, worker, the release phase and one-off `heroku run` dynos alike; it is written as a default rather than an override, so a config var still wins if you want to tune it. Deploy targets that build from the `Dockerfile` (Render, Railway, docker-compose) do not read `.profile` - set it in their own environment config if the host is memory-tight.
 
@@ -745,7 +745,7 @@ The redirect URI registered on the platform must exactly match `{APP_URL}/social
 Threads uses its own App ID, not the Facebook one. Set `PLATFORM_THREADS_APP_ID` / `PLATFORM_THREADS_APP_SECRET` from **Use cases → Access the Threads API → Settings**, and register `{APP_URL}/social-accounts/callback/threads/` in that same panel — the Facebook Login redirect URI list does not cover Threads. See the [Meta](#meta-facebook-instagram-threads) section.
 
 **Background tasks not running (posts not publishing)**
-Make sure the worker is running: `python manage.py process_tasks`. In Docker: check `docker compose logs worker`.
+Make sure the worker is running: `python manage.py run_worker`. In Docker: check `docker compose logs worker`.
 
 **A post is stuck on "Publishing"**
 It shouldn't stay there. `confirm_pending_publishes` runs every 60s and settles anything in that status: asynchronous publishes (TikTok accepts the upload, then transcodes) are confirmed against the platform and marked published or failed with the platform's own reason, and a post whose worker died mid-publish is failed after `PUBLISHER_STALE_PUBLISHING_TIMEOUT` so it becomes editable and retryable again. It is never re-published automatically - we can't tell "the platform never saw it" from "the platform took it and we crashed before recording that", and a duplicate video on a live account can't be undone. A third case is kept distinct on purpose: when the platform accepted the upload but we can't reach it to ask what happened, the sweep keeps reconciling for `PUBLISHER_UNCONFIRMED_TIMEOUT` (6h by default) and, if it never learns the answer, fails the post with copy that tells the user to **check the account before republishing** rather than to try again - the post may already be live. If posts sit on "Publishing" for longer than that, the worker isn't running (see above) or is being killed repeatedly - check its memory.
