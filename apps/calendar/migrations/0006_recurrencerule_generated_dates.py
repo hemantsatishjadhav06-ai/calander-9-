@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="recurrencerule",
             name="generated_dates",
-            field=models.JSONField(blank=True, default=list),
+            field=models.JSONField(blank=True, default=list, null=True),
         ),
     ]

@@ -67,8 +67,17 @@ def test_an_all_trusted_chain_falls_back_to_the_peer():
 
 @override_settings(BB_TRUSTED_PROXIES=("10.0.0.0/8",))
 def test_a_junk_hop_is_not_treated_as_a_client():
-    """``is_trusted_proxy`` returning False for junk must not make it the answer."""
-    assert client_ip(req("10.0.0.1", "not-an-ip, 203.0.113.9")) == "not-an-ip"
+    """The nearest untrusted hop wins; junk further left is never reached."""
+    assert client_ip(req("10.0.0.1", "not-an-ip, 203.0.113.9")) == "203.0.113.9"
+    # Junk nearest the proxy means the chain can't be trusted: use the peer.
+    assert client_ip(req("10.0.0.1", "203.0.113.9, not-an-ip")) == "10.0.0.1"
+
+
+@override_settings(BB_TRUSTED_PROXIES=("10.0.0.0/8",))
+def test_a_client_written_prefix_cannot_move_the_bucket():
+    """The edge appends the real address; whatever the client put first is ignored."""
+    for forged in ("1.1.1.1", "8.8.8.8", "9.9.9.9"):
+        assert client_ip(req("10.0.0.1", f"{forged}, 203.0.113.9")) == "203.0.113.9"
 
 
 @override_settings(BB_TRUSTED_PROXIES=("10.0.0.0/8", "nonsense", "192.168.1.1"))

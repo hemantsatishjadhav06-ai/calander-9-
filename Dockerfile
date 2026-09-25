@@ -50,6 +50,13 @@ EXPOSE 8000
 # Exec form, so gunicorn is PID 1 and receives SIGTERM itself. In shell form
 # it ran under `sh -c`, which does not forward the signal: Railway sent
 # SIGTERM, nothing drained, and the container was SIGKILLed mid-request.
+# Run as an unprivileged user. Only the local media directory is handed to it
+# (STORAGE_BACKEND=local writes there); the code and collected static files
+# stay root-owned and read-only to the process. Not `chown -R /app`: that
+# would copy every file into a new layer and roughly double the image.
+RUN useradd --create-home --uid 10001 app && mkdir -p /app/media && chown app:app /app/media
+USER app
+
 # `check --deploy` first: its warnings (DEBUG on, a missing secret, an unset
 # salt, insecure cookies — see apps/common/checks.py) land in the deploy log on
 # every start, and an Error-level check stops the container before it takes

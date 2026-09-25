@@ -3702,6 +3702,12 @@ def csv_confirm_import(request, workspace_id):
     rows = csv_data["rows"]
     created_count = 0
     error_count = 0
+    # A dated row is a scheduled post only for someone who may publish
+    # directly — the rule the composer, API and MCP all apply. Anyone else's
+    # dated rows go to review with the date as the proposed time; an import
+    # used to be a way round client approval.
+    membership = request.workspace_membership
+    may_publish = bool((membership.effective_permissions if membership else {}).get("publish_directly"))
 
     for row in rows:
         try:
@@ -3735,7 +3741,7 @@ def csv_confirm_import(request, workspace_id):
                     t = datetime.strptime(time_str, "%H:%M").time() if time_str else time_cls(9, 0)
                     naive_dt = datetime.combine(d, t)
                     post.scheduled_at = naive_dt.replace(tzinfo=tz)
-                    initial_pp_status = "scheduled"
+                    initial_pp_status = "scheduled" if may_publish else "pending_review"
 
             # First comment
             if "first_comment" in mapping and mapping["first_comment"] < len(row):

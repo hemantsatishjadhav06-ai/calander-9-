@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="notification",
             name="shown_in_app",
-            field=models.BooleanField(default=True),
+            field=models.BooleanField(db_default=True, default=True),
         ),
     ]

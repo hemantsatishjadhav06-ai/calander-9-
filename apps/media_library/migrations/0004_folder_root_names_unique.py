@@ -3,6 +3,31 @@
 from django.db import migrations, models
 
 
+def rename_duplicate_root_folders(apps, schema_editor):
+    """Suffix duplicate top-level folder names so the new constraint can be built.
+
+    Root folders (no parent) with the same name in one workspace were allowed
+    before; nulls_distinct=False forbids them, and adding the constraint over
+    existing duplicates would fail the deploy.
+    """
+    from django.db.models import Count
+
+    MediaFolder = apps.get_model("media_library", "MediaFolder")
+    dupes = (
+        MediaFolder.objects.filter(parent_folder__isnull=True)
+        .values("workspace_id", "name")
+        .annotate(n=Count("id"))
+        .filter(n__gt=1)
+    )
+    for group in dupes:
+        folders = MediaFolder.objects.filter(
+            workspace_id=group["workspace_id"], parent_folder__isnull=True, name=group["name"]
+        ).order_by("created_at", "id")
+        for index, folder in enumerate(folders[1:], start=2):
+            folder.name = f"{group['name'][:240]} ({index})"
+            folder.save(update_fields=["name"])
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -12,6 +37,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(rename_duplicate_root_folders, migrations.RunPython.noop),
         migrations.RemoveConstraint(
             model_name="mediafolder",
             name="unique_folder_name_per_parent",

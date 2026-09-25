@@ -13,6 +13,8 @@ AUTH_RATE_LIMITED_PATHS = (
     "/accounts/signup/",
     "/accounts/password/reset/",
     "/accounts/password/reset/key/",
+    # The Django admin's own login had no throttle at all.
+    "/admin/login/",
 )
 
 # Rate limit: 10 POST requests per minute per IP for auth endpoints

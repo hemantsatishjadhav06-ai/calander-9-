@@ -31,6 +31,17 @@ class AccountAdapter(DefaultAccountAdapter):
             headers={**(headers or {}), **transactional()},
         )
 
+    def get_client_ip(self, request):
+        """allauth keys its login/signup/reset rate limits on this.
+
+        The default is REMOTE_ADDR, which behind the platform edge is the edge:
+        one bucket for everybody, so ten failed logins from anyone locked
+        everyone out. Use the trusted-proxy-aware address instead.
+        """
+        from apps.common.net import client_ip
+
+        return client_ip(request) or super().get_client_ip(request)
+
     def is_open_for_signup(self, request):
         """Honour settings.SIGNUP_MODE; an invitation link always gets through."""
         return may_sign_up(request)

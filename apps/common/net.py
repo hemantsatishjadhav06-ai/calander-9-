@@ -165,8 +165,15 @@ def client_ip(request) -> str | None:
     socket peer is itself a trusted proxy; otherwise the peer is the only
     address we can vouch for.
 
-    Within a trusted chain the leftmost hop that is not itself a trusted proxy
-    is the client: per RFC 7239 the rightmost entry is the proxy closest to us.
+    The header is read from the right. Each proxy appends the address it saw,
+    so the rightmost entries were written by proxies we trust and everything
+    to their left came from further away — ultimately from the client, who
+    can write anything there. The first hop from the right that is not a
+    trusted proxy is therefore the nearest address a trusted proxy vouched
+    for: the client. Reading from the left instead returned the one value the
+    client controls, so rotating it per request rotated the rate-limit bucket.
+    A hop that is not an IP at all means the chain cannot be trusted; the peer
+    is used instead.
     """
     remote = request.META.get("REMOTE_ADDR")
     if not is_trusted_proxy(remote):
@@ -174,8 +181,14 @@ def client_ip(request) -> str | None:
 
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded:
-        for hop in (h.strip() for h in forwarded.split(",") if h.strip()):
-            if not is_trusted_proxy(hop):
-                return hop
+        hops = [h.strip() for h in forwarded.split(",") if h.strip()]
+        for hop in reversed(hops):
+            if is_trusted_proxy(hop):
+                continue
+            try:
+                ipaddress.ip_address(hop)
+            except ValueError:
+                return remote
+            return hop
         # Every hop was a trusted proxy — the peer is all we have.
     return remote

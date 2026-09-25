@@ -25,6 +25,8 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | O10 | P1 | Deploy | **After this PR merges**, change the Railway worker service's start command from `python manage.py process_tasks` to `python manage.py run_worker` (no `--duration` on Railway; that flag is for Heroku's memory ratchet). Before the merge it would crash-loop, because `main` has no such command. | Owner, after merge: Railway > sm-bean-worker > Settings > Start command; confirm "Worker ready" in its logs |
 | O11 | P1 | Security | The web service's Railway pre-deploy command re-creates a superuser and **re-sets its password from `DJANGO_SUPERUSER_PASSWORD` on every deploy**, and prints its email to the deploy log. For a demo that is convenient; for production it means a password held in a plain env var silently overrides any change made in the app. | Owner, before launch: set a strong admin password in the app, then change the pre-deploy command to `python manage.py migrate --noinput` and delete the two `DJANGO_SUPERUSER_*` variables |
 | O12 | P2 | Deploy | Railway has no health check on the web service, so a deploy that cannot serve still takes traffic. It cannot live in `railway.toml` (that file also drives the worker, which serves no HTTP). | Owner, after merge: Railway > sm-bean > Settings > Healthcheck path `/health/`. The `healthcheck.railway.app` host is allowed automatically once this PR is live |
+| O13 | P1 | Launch | **Launch scope.** All three reviews: no public launch yet; a closed beta of 3–10 hand-picked agencies, free, under a beta agreement. Keep `SIGNUP_MODE=invite_only` (the default) until then. | Owner decision — see `docs/audit/LAUNCH_REVIEW.md` |
+| O14 | P1 | Deploy | Before merging: take a `pg_dump` and enable Railway Postgres backups. After merging and the web migrate: **restart the worker**, which deploys alongside web and could otherwise run new code before the new columns exist. | Owner, on merge day |
 
 ## Open — engineering
 
@@ -115,6 +117,16 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | F8 | P2 | A11y | 71 icon-only buttons, 21 icon-only links and 22 close buttons named; decorative SVGs hidden; 27 toggles expose `aria-expanded`/`aria-haspopup`; view toggles expose `aria-pressed`. | round 6 | `test_a11y_sweep` |
 | F17 | P3 | A11y | Tailwind's stone-500 was 4.44:1 on the page background; the theme now sets it to #766F6A (4.57:1 there, visually identical). | round 6 | — |
 | F18 | P3 | A11y | A `<button>` nested inside an `<a>` (the tag-filter clear chip) is now a single labelled link. | round 6 | — |
+| L1 | P1 | Launch | Signup was open to anyone with no switch to close it (CEO, CMO, CTO reviews). `SIGNUP_MODE=invite_only` is the default: invitation links always work, `SIGNUP_ALLOWLIST` admits listed addresses/domains, everyone else sees an invite-only page. `ACCOUNT_EMAIL_VERIFICATION` is configurable for when SMTP is live. | launch review | `test_signup_policy` |
+| L2 | P1 | Launch | Public pages promised data export, backups and monitoring, white-label, SLAs, and "publish across 11 platforms". Removed or corrected; CTAs follow the signup mode. | launch review | `PublicClaimsTests` |
+| L3 | P2 | Launch | The connect page gave customers server-admin instructions for platforms they cannot enable; they now see "Coming soon". The checklist counts a scheduled post, not a draft, and refreshes when a channel connects. | launch review | `ConnectPageCopyTests`, `ChecklistActivationTests` |
+| G2 | P1 | AuthZ | **CSV import let a contributor schedule posts without approval.** Dated rows are scheduled only for `publish_directly`; everyone else's go to review. | launch review (CTO) | `CsvImportApprovalTests` |
+| S2 | P1 | Security | `client_ip` returned the *leftmost* untrusted `X-Forwarded-For` hop, the one value a client controls. It now walks from the proxy side. | launch review (CTO) | `test_a_client_written_prefix_cannot_move_the_bucket` |
+| S3 | P1 | Security | allauth's own login/signup/reset rate limits keyed on the edge proxy's address: ten failed logins from anyone locked everyone out. The adapter now supplies the real client IP. | launch review (CTO) | `ClientIpForRateLimitsTests` |
+| S4 | P1 | Security | `/admin/login/` had no throttle. Added to the auth rate-limited paths. | launch review (CTO) | `AdminLoginThrottleTests` |
+| S5 | P3 | Security | `WEBHOOK_SECRET` was never read from the environment, so outbound webhook signatures could not be verified by receivers. Read, documented in `.env.example`. | launch review (CTO) | — |
+| D9 | P2 | Deploy | Two new columns would have made a one-click rollback fail (old code's INSERTs); now `db_default` / nullable. Migration `media_library 0004` renames duplicate root folders before adding its constraint instead of failing the deploy. | launch review (CTO) | `RollbackSafeColumnsTests` |
+| D10 | P3 | Deploy | The container ran as root. It now runs as an unprivileged user that can write only the local media directory. | launch review (CTO) | CI Docker build |
 
 ## Fixed in rounds 1–4 (for the record)
 

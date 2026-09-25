@@ -23,7 +23,10 @@ DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 # Railway's deploy health check (railway.toml ``healthcheckPath``) calls /health/
 # with this Host; without it Django answers 400 and every deploy is rolled back.
-if env("RAILWAY_ENVIRONMENT", default="") and "healthcheck.railway.app" not in ALLOWED_HOSTS:
+_ON_RAILWAY = any(
+    env(name, default="") for name in ("RAILWAY_ENVIRONMENT", "RAILWAY_ENVIRONMENT_NAME", "RAILWAY_ENVIRONMENT_ID")
+)
+if _ON_RAILWAY and "healthcheck.railway.app" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS = [*ALLOWED_HOSTS, "healthcheck.railway.app"]
 # Trusted origins for CSRF (scheme + host, e.g. https://app.example.com). Behind
 # a TLS-terminating proxy (Railway), a login POST is rejected 403 unless the
@@ -389,6 +392,10 @@ else:
 # way, because the count is what tells us where the limit belongs.
 # EMAIL_SENDING_ENABLED=false is the blunt lever, and needs a config change
 # rather than a deploy.
+# Signs outbound notification webhooks (X-Signature-256). Share this value
+# with whoever receives them so they can verify deliveries; unset, deliveries
+# are signed with a key derived from SECRET_KEY that no receiver can check.
+WEBHOOK_SECRET = env("WEBHOOK_SECRET", default="")
 EMAIL_SENDING_ENABLED = env.bool("EMAIL_SENDING_ENABLED", default=True)
 EMAIL_DAILY_SEND_LIMIT = env.int("EMAIL_DAILY_SEND_LIMIT", default=2000)
 EMAIL_RECIPIENT_HOURLY_LIMIT = env.int("EMAIL_RECIPIENT_HOURLY_LIMIT", default=6)
