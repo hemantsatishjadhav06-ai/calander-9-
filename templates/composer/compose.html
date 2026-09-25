@@ -983,7 +983,7 @@
                                             <!-- Required hover prompt for the disabled private option (mouse); the
                                                  always-visible note below the dropdown covers keyboard/SR users. -->
                                             <span x-show="ttBrandContent && lvl === 'SELF_ONLY'"
-                                                  class="pointer-events-none absolute left-3 -top-6 opacity-0 group-hover:opacity-100 transition-opacity bg-stone-800 text-white text-[11px] rounded px-2 py-1 whitespace-nowrap z-50 shadow">
+                                                  class="pointer-events-none absolute left-3 -top-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity bg-stone-800 text-white text-[11px] rounded px-2 py-1 whitespace-nowrap z-50 shadow">
                                                 Branded content visibility cannot be set to private.
                                             </span>
                                         </li>
@@ -1831,7 +1831,7 @@
                                   :class="unsplashSelected[photo.id] ? 'bg-orange-500 border-orange-500' : 'bg-black/25 border-white/90'">
                                 <svg x-show="unsplashSelected[photo.id]" class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                             </span>
-                            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pt-4 pb-1.5 text-[10px] text-white truncate opacity-0 group-hover:opacity-100 transition-opacity"
+                            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pt-4 pb-1.5 text-[10px] text-white truncate opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                                   x-text="photo.photographer + ' / Unsplash'"></span>
                         </div>
                     </template>

@@ -101,7 +101,7 @@
 
             <!-- Remove from queue (leaves a gap; the slot frees up) -->
             <button type="button"
-                    class="text-stone-300 hover:text-red-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                    class="text-stone-300 hover:text-red-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
                     hx-post="{% url 'calendar:queue_entry_remove' workspace_id=workspace.id queue_id=queue.id entry_id=entry.id %}"
                     hx-confirm="Remove this post from the queue? Its slot will free up."
                     @click.stop

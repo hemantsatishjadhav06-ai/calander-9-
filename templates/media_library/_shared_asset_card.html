@@ -41,7 +41,7 @@
 
   {% if is_admin %}
   <!-- Admin kebab menu (sibling of thumbnail to avoid overflow-hidden clipping the dropdown) -->
-  <div class="absolute z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+  <div class="absolute z-30 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150"
        style="bottom: 52px; right: 8px;"
        :class="menuOpen ? 'opacity-100' : ''"
        @click.stop>

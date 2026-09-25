@@ -42,7 +42,7 @@
                 <h3 class="text-[14px] font-semibold text-stone-800">{{ reply.title }}</h3>
                 <p class="text-[13px] text-stone-500 mt-0.5 leading-relaxed">{{ reply.body|truncatewords:30 }}</p>
             </div>
-            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex-shrink-0">
                 <a href="{% url 'inbox:saved_reply_edit' workspace_id=workspace.id reply_id=reply.id %}"
                    class="w-7 h-7 flex items-center justify-center rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-all">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>

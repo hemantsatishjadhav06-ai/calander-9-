@@ -32,7 +32,6 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | E7 | P3 | Ops | `manage.py check --deploy` is not part of the deploy path. The custom checks in `apps/common/checks.py` only run when someone runs it by hand. | `railway.toml` | Open — add to the pre-deploy command once the live environment is confirmed to pass it (a failing check would block every deploy) |
 | E9 | P3 | Ops | With more than one worker replica, `run_worker`'s boot-time lock release must be disabled (`--keep-locks`). Every shipped target runs one replica; documented in the README. | `apps/common/management/commands/run_worker.py` | Documented |
 | F2 | P2 | A11y | Modals have no focus trap, most lack `role="dialog"`, several ignore Escape (invite modals, publish approvals, token reveal, composer ×12, settings, media library). Needs Alpine Focus + `x-trap` + roles across ~20 templates. | audit | Open |
-| F3 | P2 | A11y | Hover-only controls (`opacity-0 group-hover:opacity-100`, `x-show="hovered"`) are invisible to keyboard users at 14 sites. Add `group-focus-within:opacity-100`. | audit | Open |
 | F4 | P2 | A11y | Body copy in `text-stone-400` / `--text-ghost` (≈2.6:1) at ~350 sites and `text-stone-300` at 36; labels and table headers included. Needs a palette pass: reserve those for icons, move copy to `--text-tertiary`. | audit | Open |
 | F6 | P2 | Forms | Composer validation errors lose the field name (`Object.values(errors).flat()`), render in a toast without `role="alert"`, and vanish after 5s. | `compose.html:2722`, `composer/views.py:968` | Open |
 | F7 | P2 | A11y | Inputs with no associated label (event form, categories, idea modal, inbox filter bar, composer ×10, create landing ×8, queues, posting slots, library search). | audit | Open |
@@ -109,6 +108,7 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | F1 | P1 | Inbox | Saved replies could not be created or edited from the UI: the New/edit links rendered a page with no form and no list. | this round | `SavedRepliesPageTests` |
 | F5 | P2 | Responsive | Drafts and Sent tables were clipped at 375px with no way to scroll. | this round | — |
 | F9 | P2 | Forms | Double-submit on nine HTMX forms (comments, events, categories, queues, folders, both invite modals, posting slots, workspace assignments). | this round | — |
+| F3 | P2 | A11y | Hover-revealed controls (`group-hover:opacity-100`, `group-hover:flex`) were invisible to keyboard users at 18 sites across 13 templates; they now also appear on `group-focus-within`. | this round | — |
 | F13, F15, F16 | P3 | UX/A11y | Empty states with no next step; Django messages not announced (`role="status"`/`alert`); client-invite modal's inline error slot never used. | this round | — |
 
 ## Fixed in rounds 1–4 (for the record)

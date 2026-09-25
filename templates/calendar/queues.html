@@ -102,7 +102,7 @@
                             View
                         </a>
                         <form x-data hx-post="{% url 'calendar:queue_delete' workspace_id=workspace.id queue_id=queue.id %}" hx-swap="none"
-                              class="opacity-0 group-hover:opacity-100 transition-all"
+                              class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all"
                               @submit="if(!confirm('Delete this queue?')) $event.preventDefault()">
                             {% csrf_token %}
                             <button type="submit" class="text-stone-400 hover:text-red-500 p-1">
