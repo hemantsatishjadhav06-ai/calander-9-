@@ -1,9 +1,9 @@
-{{ notification.title }}
+{{ notification.title }}{% if workspace_name %} — {{ workspace_name }}{% endif %}
 
 {{ notification.body }}
 
-{% if notification.data.action_url %}View details: {{ notification.data.action_url }}{% endif %}
+{% if notification.data.action_url %}Open it here: {{ notification.data.action_url }}{% else %}See it in {{ SITE_NAME }}: {{ app_url }}/notifications/{% endif %}
 
 ---
-You received this because of your notification settings.
-Manage preferences: {{ app_url }}/notifications/preferences/
+You're getting this because email alerts are on for "{{ notification.get_event_type_display }}".
+Change that: {{ app_url }}/notifications/preferences/

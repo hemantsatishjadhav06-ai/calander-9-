@@ -1,8 +1,12 @@
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+from django import forms
 
 from apps.accounts.models import OAuthConnection
+from apps.accounts.signup_policy import may_sign_up
 from apps.common.mail import transactional
+
+NOT_INVITED_MESSAGE = "This address hasn't been invited yet. Ask your team for an invitation link."
 
 
 class AccountAdapter(DefaultAccountAdapter):
@@ -27,9 +31,39 @@ class AccountAdapter(DefaultAccountAdapter):
             headers={**(headers or {}), **transactional()},
         )
 
+    def get_client_ip(self, request):
+        """allauth keys its login/signup/reset rate limits on this.
+
+        The default is REMOTE_ADDR, which behind the platform edge is the edge:
+        one bucket for everybody, so ten failed logins from anyone locked
+        everyone out. Use the trusted-proxy-aware address instead.
+        """
+        from apps.common.net import client_ip
+
+        return client_ip(request) or super().get_client_ip(request)
+
+    def is_open_for_signup(self, request):
+        """Honour settings.SIGNUP_MODE; an invitation link always gets through."""
+        return may_sign_up(request)
+
+    def clean_email(self, email):
+        email = super().clean_email(email)
+        request = getattr(self, "request", None)
+        if request is not None and not may_sign_up(request, email):
+            raise forms.ValidationError(NOT_INVITED_MESSAGE)
+        return email
+
 
 class SocialAccountAdapter(DefaultSocialAccountAdapter):
     """Custom adapter that syncs Google social logins to OAuthConnection."""
+
+    def is_open_for_signup(self, request, sociallogin):
+        """Same rule as email signup; the provider's address is known up front."""
+        email = ""
+        for address in sociallogin.email_addresses:
+            email = address.email
+            break
+        return may_sign_up(request, email or None) if email else may_sign_up(request)
 
     def populate_user(self, request, sociallogin, data):
         """Set user.name from Google profile (custom User model has 'name', not first/last)."""

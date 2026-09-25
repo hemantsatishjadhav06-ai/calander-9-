@@ -23,8 +23,8 @@ from django.utils import timezone
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.common.net import UnsafeUrlError, pinned_request
 from apps.common.validators import (
-    is_safe_url,
     parse_and_truncate_tag_string,
     parse_and_truncate_youtube_tag_string,
     safe_xml_fromstring,
@@ -81,6 +81,59 @@ def _is_valid_uuid(value):
     return True
 
 
+def _reject_if_no_channels(request, workspace):
+    """400 when the form names no channel to publish to, else ``None``.
+
+    The message names the real cause: with no connected account the picker is
+    empty and "select a channel" is not an instruction the user can follow.
+    """
+    if _parse_selected_account_ids(request.POST.get("selected_accounts", "")):
+        return None
+    has_any_account = SocialAccount.objects.filter(
+        workspace=workspace, connection_status=SocialAccount.ConnectionStatus.CONNECTED
+    ).exists()
+    if has_any_account:
+        message = "Select at least one channel to publish this post to."
+    else:
+        message = (
+            "No channels are connected to this workspace yet, so there is nowhere to publish to. "
+            "Save it as a draft, or connect a channel from the sidebar first."
+        )
+    return JsonResponse({"errors": {"channels": message}}, status=400)
+
+
+def _require_can_edit_post(request, post):
+    """Author, or ``edit_others_posts`` — the rule ``save_post`` enforces.
+
+    Shared by every view that mutates or deletes an existing post so they
+    cannot drift apart again; three of them had no check at all.
+    """
+    membership = request.workspace_membership
+    perms = membership.effective_permissions if membership else {}
+    if post.author_id != request.user.id and not perms.get("edit_others_posts", False):
+        raise PermissionDenied("You do not have permission to change this post.")
+
+
+# Statuses a person may set on a single channel from the composer. The rest
+# (publishing, published) are the publisher's to write.
+USER_TRANSITION_TARGETS = frozenset(
+    {"draft", "pending_review", "pending_client", "approved", "changes_requested", "rejected", "on_hold", "scheduled"}
+)
+
+
+def _form_error_text(form):
+    """Form errors as one plain line per field: "Color: Enter a valid hex colour."
+
+    HTMX callers show the response body as text, so this is what the user reads.
+    """
+    lines = []
+    for name, errors in form.errors.items():
+        label = "" if name == "__all__" else str(form.fields[name].label or name.replace("_", " ").capitalize())
+        for message in errors:
+            lines.append(f"{label}: {message}" if label else str(message))
+    return "\n".join(lines) or "Please check the form and try again."
+
+
 def _parse_selected_account_ids(raw):
     """Split a comma-separated ``selected_accounts`` value into account IDs.
 
@@ -120,7 +173,15 @@ def _remove_deselected_platform_posts(request, post, selected_ids):
     scope = _get_account_scope(request)
     if scope:
         qs = qs.filter(social_account_id=scope)
-    qs.exclude(status__in=PlatformPost.PROTECTED_STATUSES).delete()
+    doomed = qs.exclude(status__in=PlatformPost.PROTECTED_STATUSES)
+    # A queue entry whose channel row is gone would sit on the queue page
+    # forever (the bulk-delete path already does this).
+    from apps.calendar.models import QueueEntry
+
+    QueueEntry.objects.filter(
+        post=post, queue__social_account_id__in=doomed.values_list("social_account_id", flat=True)
+    ).delete()
+    doomed.delete()
 
 
 def _scoped_platform_post_ids(request, post):
@@ -345,7 +406,19 @@ def _sync_platform_posts(request, post, workspace, initial_status=None):
                     extra["video_cover_timestamp_ms"] = cover_ms_val
             pp.platform_extra = extra
 
-        pp.save()
+        # Content fields only. A full save wrote this request's in-memory
+        # status back too — read before the publisher or a client hold moved
+        # the row — and could undo either. Status changes go through
+        # _transition_post_children.
+        pp.save(
+            update_fields=[
+                "platform_specific_title",
+                "platform_specific_caption",
+                "platform_specific_first_comment",
+                "platform_extra",
+                "updated_at",
+            ]
+        )
 
 
 def _validate_pinterest_board_selection(request, post, workspace):
@@ -375,7 +448,11 @@ def _validate_pinterest_board_selection(request, post, workspace):
 
 def _save_version(post, user):
     """Create a PostVersion snapshot."""
-    version_number = (post.versions.count()) + 1
+    from django.db.models import Max
+
+    # Max+1 rather than count+1: a gap left by a rolled-back save made count+1
+    # collide with an existing number and 500 the whole save.
+    version_number = (post.versions.aggregate(n=Max("version_number"))["n"] or 0) + 1
     snapshot = {
         "title": post.title,
         "caption": post.caption,
@@ -804,7 +881,16 @@ def _transition_post_children(post, target, *, allow_via_draft=True, only=None):
         try:
             if pp.can_transition_to(target):
                 pp.transition_to(target)
-            elif allow_via_draft and pp.can_transition_to("draft") and target != "draft":
+            elif (
+                allow_via_draft
+                and pp.status != PlatformPost.Status.ON_HOLD
+                and pp.can_transition_to("draft")
+                and target != "draft"
+            ):
+                # on_hold is excluded: a client's brake is lifted only through
+                # resume_hold (to approved), never by a teammate pressing
+                # Schedule — the models module documents that there is no
+                # on_hold → scheduled edge for exactly this reason.
                 pp.transition_to("draft")
                 if pp.can_transition_to(target):
                     pp.transition_to(target)
@@ -814,7 +900,9 @@ def _transition_post_children(post, target, *, allow_via_draft=True, only=None):
             else:
                 skipped.append(pp)
                 continue
-            pp.save(update_fields=[*PlatformPost.TRANSITION_FIELDS, "updated_at"])
+            if not pp.save_guarded([*PlatformPost.TRANSITION_FIELDS, "updated_at"]):
+                skipped.append(pp)
+                continue
             moved.append(pp)
         except ValueError:
             skipped.append(pp)
@@ -899,8 +987,17 @@ def _capture_proposed_publish_at(post, post_id, workspace, form, *, clear_when_b
 @login_required
 @require_permission("create_posts")
 @require_POST
+@transaction.atomic
 def save_post(request, workspace_id, post_id=None):
-    """Save or update a post (draft, schedule, or publish action)."""
+    """Save or update a post (draft, schedule, or publish action).
+
+    ``@transaction.atomic`` is load-bearing: this view performs a dozen related
+    writes (post, pending media, tags, recurrence, PlatformPost children, bulk
+    scheduled_at propagation, approval reverts, child transitions, version row).
+    Without one boundary, a failure part-way through left a post the user
+    believes is scheduled whose children the publisher never picks up — or the
+    reverse — with no recovery path.
+    """
     workspace = _get_workspace(request, workspace_id)
     action = request.POST.get("action", "save_draft")
 
@@ -924,7 +1021,14 @@ def save_post(request, workspace_id, post_id=None):
         form = PostForm(request.POST)
 
     if not form.is_valid():
-        return JsonResponse({"errors": form.errors}, status=400)
+        # Labels travel with the errors so the composer can say *which* field
+        # is wrong; a bare "This field is required." told the user nothing.
+        labels = {
+            name: str(form.fields[name].label or name.replace("_", " ").capitalize())
+            for name in form.errors
+            if name in form.fields
+        }
+        return JsonResponse({"errors": form.errors, "error_labels": labels}, status=400)
 
     post = form.save(commit=False)
     post.workspace = workspace
@@ -941,6 +1045,30 @@ def save_post(request, workspace_id, post_id=None):
     pending_target = None  # what to transition existing children to after sync
     initial_status = "draft"  # default status for newly created PlatformPosts
 
+    # A post with no channel selected has nothing to publish to. The composer
+    # disables Schedule / Publish / Queue client-side when nothing is ticked,
+    # but nothing enforced it here, so a direct POST (or a form submit on a
+    # page whose JS had not hydrated) wrote a post that read "scheduled for
+    # <date>" and could never fire — the sync below deletes every deselected
+    # child, so the result was a Post with zero PlatformPost rows. Drafts are
+    # exempt: a caption with no channel yet is a legitimate thing to save.
+    if action in ("schedule", "publish_now", "add_to_queue"):
+        no_channel_error = _reject_if_no_channels(request, workspace)
+        if no_channel_error is not None:
+            return no_channel_error
+
+    if action == "schedule":
+        # Same gate as publish_now, the chip menu, drag and the API: only
+        # ``publish_directly`` commits a time. Anyone else's "Schedule" is a
+        # proposal — the post goes to review carrying the chosen time.
+        membership = request.workspace_membership
+        perms = membership.effective_permissions if membership else {}
+        if not perms.get("publish_directly", False):
+            # An approved post is cleared to go out, so its author may put it
+            # on the calendar; anything else needs the reviewers first.
+            statuses = set(post.platform_posts.values_list("status", flat=True)) if post.pk else set()
+            if not statuses or statuses != {PlatformPost.Status.APPROVED}:
+                action = "submit_for_approval"
     if action == "schedule":
         aware_dt = _combine_schedule_dt(
             workspace,
@@ -986,10 +1114,6 @@ def save_post(request, workspace_id, post_id=None):
             return JsonResponse({"errors": {"queue": "No active queue found for the selected channel."}}, status=400)
         # Queueing assigns real per-platform slots below — drop any proposal.
         post.proposed_publish_at = None
-        post.save()
-        # Ensure PlatformPost rows exist for every selected account before the
-        # queue service writes per-platform scheduled_at values.
-        _sync_platform_posts(request, post, workspace, initial_status="draft")
         # "Next Available" always places the post in the queue's soonest open
         # slot. It deliberately ignores the Schedule-panel date/time: those
         # inputs are prefilled from the post's own scheduled_at/proposed time
@@ -998,8 +1122,13 @@ def save_post(request, workspace_id, post_id=None):
         try:
             # One transaction across every queue: if a later queue is full, the
             # earlier queues' slot writes roll back instead of leaving a child
-            # half-queued.
+            # half-queued. The post save and child sync are inside it too, so a
+            # full queue doesn't leave a saved post with half-queued children.
             with transaction.atomic():
+                post.save()
+                # Ensure PlatformPost rows exist for every selected account
+                # before the queue service writes per-platform scheduled_at.
+                _sync_platform_posts(request, post, workspace, initial_status="draft")
                 for q in queues:
                     add_to_queue(post, q)
                 # Transition every child whose scheduled_at was filled in.
@@ -1027,11 +1156,13 @@ def save_post(request, workspace_id, post_id=None):
             return JsonResponse({"errors": {"queue": "No active queue found for the selected channel."}}, status=400)
         # Queueing assigns real per-platform slots below — drop any proposal.
         post.proposed_publish_at = None
-        post.save()
-        _sync_platform_posts(request, post, workspace, initial_status="draft")
         try:
-            # One transaction across every queue (see add_to_queue above).
+            # One transaction across every queue (see add_to_queue above), and
+            # across the post + children themselves: a full queue must not
+            # leave a saved post with half-queued children behind.
             with transaction.atomic():
+                post.save()
+                _sync_platform_posts(request, post, workspace, initial_status="draft")
                 for q in queues:
                     add_to_queue(post, q, priority=True)
                 _transition_post_children(post, "scheduled", only=_scoped_platform_post_ids(request, post))
@@ -1206,6 +1337,7 @@ def save_post(request, workspace_id, post_id=None):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def transition_platform_post(request, workspace_id, post_id, platform_post_id):
     """Transition a single PlatformPost to a target editorial status.
@@ -1225,11 +1357,20 @@ def transition_platform_post(request, workspace_id, post_id, platform_post_id):
     target = (request.POST.get("target_status") or "").strip()
     if not target:
         return JsonResponse({"error": "target_status required"}, status=400)
+    # Editorial targets only. ``publishing`` and ``published`` belong to the
+    # engine: setting them here faked a publish with no platform id, and any
+    # move out of ``publishing`` while an upload is in flight made the row due
+    # again on the next tick — a double post.
+    if target not in USER_TRANSITION_TARGETS:
+        return JsonResponse({"error": f"Cannot set status {target!r} by hand."}, status=400)
+    if pp.status == PlatformPost.Status.PUBLISHING:
+        return JsonResponse({"error": "This post is being published right now."}, status=409)
 
+    _require_can_edit_post(request, pp.post)
     membership = request.workspace_membership
     perms = membership.effective_permissions if membership else {}
     approval_states = {"approved", "pending_review", "pending_client", "changes_requested", "rejected"}
-    if target in ("scheduled", "publishing") and not perms.get("publish_directly", False):
+    if target == "scheduled" and not perms.get("publish_directly", False):
         raise PermissionDenied("You do not have permission to schedule this post.")
     if target in approval_states and not perms.get("approve_posts", False) and target != "pending_review":
         raise PermissionDenied("You do not have permission to make approval decisions.")
@@ -1241,7 +1382,15 @@ def transition_platform_post(request, workspace_id, post_id, platform_post_id):
         pp.transition_to(target)
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
-    pp.save(update_fields=[*PlatformPost.TRANSITION_FIELDS, "updated_at"])
+    update_fields = [*PlatformPost.TRANSITION_FIELDS, "updated_at"]
+    if target == "scheduled" and pp.scheduled_at is None and pp.post.scheduled_at is not None:
+        # Pin the time on the child. Relying on the Coalesce fallback alone
+        # stranded this row as "scheduled" with no time once a sibling was
+        # cancelled and sync_post_scheduled_at cleared the parent's.
+        pp.scheduled_at = pp.post.scheduled_at
+        update_fields.append("scheduled_at")
+    if not pp.save_guarded(update_fields):
+        return JsonResponse({"error": "This post changed while you were editing it. Reload and try again."}, status=409)
     # Committing a child to publishing obsoletes any draft-stage proposal.
     # Clear it directly rather than via sync_post_scheduled_at: this view sets
     # ``scheduled`` WITHOUT a ``scheduled_at``, and the publisher relies on the
@@ -1323,14 +1472,14 @@ def autosave(request, workspace_id, post_id=None):
                     continue
             del request.session[session_key]
 
-    # Sync platform selections
+    # Sync platform selections. Resolved through the workspace, exactly as
+    # _sync_platform_posts does: a bare ``social_account_id=`` accepted any
+    # UUID, so a crafted autosave could bind another workspace's channel to
+    # this post and a later Schedule would publish through it.
     selected_ids = _parse_selected_account_ids(request.POST.get("selected_accounts", ""))
     _remove_deselected_platform_posts(request, post, selected_ids)
-    for acc_id in selected_ids:
-        PlatformPost.objects.get_or_create(
-            post=post,
-            social_account_id=acc_id,
-        )
+    for account in SocialAccount.objects.filter(id__in=selected_ids, workspace=workspace):
+        PlatformPost.objects.get_or_create(post=post, social_account=account)
 
     # Option A: an autosave that changed an approved post's content reverts it to
     # pending_review so edited content can't publish without a fresh review.
@@ -1484,6 +1633,7 @@ def thumbnail_picker(request, workspace_id):
 
 
 @login_required
+@require_permission("upload_media")
 @require_POST
 def thumbnail_upload(request, workspace_id):
     """Upload an image from the local machine to the media library and return
@@ -1860,6 +2010,7 @@ def unsplash_search(request, workspace_id):
 
 
 @login_required
+@require_permission("upload_media")
 @require_POST
 def unsplash_import(request, workspace_id, post_id=None):
     """Download selected Unsplash photos server-side and attach them as media.
@@ -1892,6 +2043,7 @@ def unsplash_import(request, workspace_id, post_id=None):
     post = None
     if post_id:
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
+        _require_can_edit_post(request, post)
 
     auth_headers = {"Authorization": f"Client-ID {settings.UNSPLASH_ACCESS_KEY}"}
     new_assets = []
@@ -1988,7 +2140,9 @@ def unsplash_import(request, workspace_id, post_id=None):
     if not new_assets:
         if quota_exceeded:
             return JsonResponse(
-                {"error": "Storage quota exceeded. Free up space or upgrade your plan."},
+                # "Upgrade your plan" is meaningless on a self-hosted install,
+                # where the operator just raises the quota.
+                {"error": "You're out of storage. Delete unused media, or ask your admin to raise the limit."},
                 status=413,
             )
         return JsonResponse({"error": "Could not import the selected photos."}, status=502)
@@ -2110,11 +2264,13 @@ def tiktok_creator_info(request, workspace_id, account_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def attach_media(request, workspace_id, post_id):
     """Attach a media asset to a post."""
     workspace = _get_workspace(request, workspace_id)
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
+    _require_can_edit_post(request, post)
     media_asset_id = request.POST.get("media_asset_id")
 
     if not media_asset_id:
@@ -2153,6 +2309,7 @@ def attach_media(request, workspace_id, post_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def attach_pending_media(request, workspace_id):
     """Attach a library media asset as pending (before post is saved)."""
@@ -2229,6 +2386,7 @@ def _attach_asset_for_composer(request, workspace, asset, post=None):
 
 
 @login_required
+@require_permission("upload_media")
 @require_POST
 def upload_media(request, workspace_id, post_id=None):
     """Upload a file directly from the composer and optionally attach to a post."""
@@ -2265,6 +2423,7 @@ def upload_media(request, workspace_id, post_id=None):
 
     if post_id:
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
+        _require_can_edit_post(request, post)
         attachment = _attach_asset_for_composer(request, workspace, asset, post)
         # Option A: changing media on an approved post sends it back for re-approval.
         _revert_approved_to_review(post)
@@ -2294,11 +2453,13 @@ def upload_media(request, workspace_id, post_id=None):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def remove_media(request, workspace_id, post_id, media_id):
     """Remove a media attachment from a post."""
     workspace = _get_workspace(request, workspace_id)
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
+    _require_can_edit_post(request, post)
     PostMedia.objects.filter(id=media_id, post=post).delete()
 
     # Option A: changing media on an approved post sends it back for re-approval.
@@ -2318,9 +2479,16 @@ def remove_media(request, workspace_id, post_id, media_id):
 
 
 @login_required
+@require_permission("upload_media")
 @require_POST
 def remove_pending_media(request, workspace_id, asset_id):
-    """Remove a pending media asset (before post is saved)."""
+    """Remove a pending media asset (before post is saved).
+
+    Only an asset this session uploaded and has not yet attached — one in its
+    own ``pending_media_*`` list — is deleted. Anything else is left alone:
+    this used to delete any workspace asset by id, which made it an ungated
+    bypass of the media library's ``delete_media`` check.
+    """
     workspace = _get_workspace(request, workspace_id)
 
     from apps.media_library.models import MediaAsset
@@ -2329,15 +2497,16 @@ def remove_pending_media(request, workspace_id, asset_id):
     session_key = f"pending_media_{workspace.id}"
     pending = request.session.get(session_key, [])
     asset_id_str = str(asset_id)
-    if asset_id_str in pending:
+    was_pending = asset_id_str in pending
+    if was_pending:
         pending.remove(asset_id_str)
         request.session[session_key] = pending
 
-    # Delete the asset and its files from storage (R2)
-    asset = MediaAsset.objects.filter(id=asset_id, workspace=workspace).first()
-    if asset:
-        with contextlib.suppress(Exception):
-            delete_asset(asset)
+        # Delete the asset and its files from storage (R2)
+        asset = MediaAsset.objects.filter(id=asset_id, workspace=workspace).first()
+        if asset:
+            with contextlib.suppress(Exception):
+                delete_asset(asset)
 
     # Return updated pending list
     pending_assets = MediaAsset.objects.filter(id__in=pending, workspace=workspace)
@@ -2363,7 +2532,9 @@ def drafts_list(request, workspace_id):
     # Easiest correct query: any post whose only child statuses are "draft".
     drafts = (
         Post.objects.for_workspace(workspace.id)
-        .filter(platform_posts__status="draft")
+        # No channel selected yet is still a draft — before this it was
+        # invisible everywhere, because the join on platform_posts dropped it.
+        .filter(models.Q(platform_posts__status="draft") | models.Q(platform_posts__isnull=True))
         .exclude(
             platform_posts__status__in=[
                 "pending_review",
@@ -2391,6 +2562,7 @@ def drafts_list(request, workspace_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def post_delete(request, workspace_id, post_id):
     """Delete a post or a single platform post via HTMX.
@@ -2399,18 +2571,31 @@ def post_delete(request, workspace_id, post_id):
     that social account is removed.  If it was the last PlatformPost the parent
     Post is deleted as well.  Without the parameter the entire Post (and all
     its PlatformPosts) is deleted.
+
+    Same rule as ``save_post``: the author may delete their own post; anyone
+    else needs ``edit_others_posts``. Without it a read-only viewer could
+    hard-delete every post in the workspace.
     """
     workspace = _get_workspace(request, workspace_id)
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
+    _require_can_edit_post(request, post)
 
     account_id = request.GET.get("account") or request.POST.get("account")
+    # Never delete a row the publisher is working on (same rule as bulk delete).
+    # The engine's success and retry writes would re-insert a deleted row —
+    # Django falls back to INSERT when an UPDATE matches nothing — or publish
+    # a post the user believes is gone.
     if account_id:
         pp = get_object_or_404(PlatformPost, post=post, social_account_id=account_id)
+        if pp.status == PlatformPost.Status.PUBLISHING:
+            return HttpResponse("This post is being published right now; wait for it to finish.", status=409)
         pp.delete()
         # If no platform posts remain, clean up the parent post too.
         if not post.platform_posts.exists():
             post.delete()
     else:
+        if post.platform_posts.filter(status=PlatformPost.Status.PUBLISHING).exists():
+            return HttpResponse("This post is being published right now; wait for it to finish.", status=409)
         post.delete()
 
     return HttpResponse(
@@ -3151,7 +3336,9 @@ def idea_group_reorder(request, workspace_id):
 def category_list(request, workspace_id):
     """Settings page for managing content categories."""
     workspace = _get_workspace(request, workspace_id)
-    categories = ContentCategory.objects.for_workspace(workspace.id)
+    # Annotate the count the template needs: `cat.posts.count` in the loop was
+    # two extra queries per category.
+    categories = ContentCategory.objects.for_workspace(workspace.id).annotate(post_count=models.Count("posts"))
     form = ContentCategoryForm()
 
     return render(
@@ -3166,6 +3353,7 @@ def category_list(request, workspace_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def category_create(request, workspace_id):
     """Create a new content category via HTMX."""
@@ -3173,7 +3361,7 @@ def category_create(request, workspace_id):
     form = ContentCategoryForm(request.POST)
 
     if not form.is_valid():
-        return HttpResponse("Invalid data.", status=400)
+        return HttpResponse(_form_error_text(form), status=400)
 
     category = form.save(commit=False)
     category.workspace = workspace
@@ -3188,6 +3376,7 @@ def category_create(request, workspace_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def category_edit(request, workspace_id, category_id):
     """Edit a content category via HTMX."""
@@ -3196,7 +3385,7 @@ def category_edit(request, workspace_id, category_id):
     form = ContentCategoryForm(request.POST, instance=category)
 
     if not form.is_valid():
-        return HttpResponse("Invalid data.", status=400)
+        return HttpResponse(_form_error_text(form), status=400)
 
     form.save()
     return HttpResponse(
@@ -3206,6 +3395,7 @@ def category_edit(request, workspace_id, category_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def category_delete(request, workspace_id, category_id):
     """Delete a content category via HTMX."""
@@ -3241,11 +3431,13 @@ def template_list(request, workspace_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def save_as_template(request, workspace_id, post_id):
     """Save the current post as a reusable template."""
     workspace = _get_workspace(request, workspace_id)
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
+    _require_can_edit_post(request, post)
 
     name = request.POST.get("template_name", "").strip()
     if not name:
@@ -3279,6 +3471,7 @@ def save_as_template(request, workspace_id, post_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def template_delete(request, workspace_id, template_id):
     """Delete a post template."""
@@ -3509,6 +3702,12 @@ def csv_confirm_import(request, workspace_id):
     rows = csv_data["rows"]
     created_count = 0
     error_count = 0
+    # A dated row is a scheduled post only for someone who may publish
+    # directly — the rule the composer, API and MCP all apply. Anyone else's
+    # dated rows go to review with the date as the proposed time; an import
+    # used to be a way round client approval.
+    membership = request.workspace_membership
+    may_publish = bool((membership.effective_permissions if membership else {}).get("publish_directly"))
 
     for row in rows:
         try:
@@ -3542,7 +3741,7 @@ def csv_confirm_import(request, workspace_id):
                     t = datetime.strptime(time_str, "%H:%M").time() if time_str else time_cls(9, 0)
                     naive_dt = datetime.combine(d, t)
                     post.scheduled_at = naive_dt.replace(tzinfo=tz)
-                    initial_pp_status = "scheduled"
+                    initial_pp_status = "scheduled" if may_publish else "pending_review"
 
             # First comment
             if "first_comment" in mapping and mapping["first_comment"] < len(row):
@@ -3637,6 +3836,7 @@ def tag_list(request, workspace_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def tag_create(request, workspace_id):
     """Create a new tag and return it as JSON."""
@@ -3847,32 +4047,30 @@ def _build_event_from_entry(feed, parsed_feed, entry):
 
 
 def _safe_fetch_feed(url, headers, *, timeout=8.0, max_redirects=5):
-    """Fetch *url* with manual redirect handling, re-validating each hop with
-    is_safe_url. Returns (response, final_url) on success or (None, None) on
-    any reject path (initial-URL failed SSRF check, intermediate hop failed
-    SSRF check, broken redirect, transport error).
+    """Fetch *url* with manual redirect handling, pinning every hop to its
+    vetted public IP. Returns (response, final_url) on success or (None, None)
+    on any reject path (URL failed the SSRF check, broken redirect, transport
+    error).
+
+    pinned_request resolves each hostname to a public IP and connects to that
+    literal address (with TLS SNI/Host pinned to the hostname), so a rebinding
+    DNS answer can't swap in a private address between validation and connect.
+    Redirects are handled here, one hop at a time, each independently pinned.
     """
-    if not is_safe_url(url):
-        return None, None
     current_url = url
     try:
-        response = httpx.get(current_url, headers=headers, timeout=timeout, follow_redirects=False)
-    except httpx.RequestError:
+        response = pinned_request("GET", current_url, headers=headers, timeout=timeout)
+        for _ in range(max_redirects):
+            if response.status_code not in (301, 302, 303, 307, 308):
+                return response, current_url
+            location = response.headers.get("Location")
+            if not location:
+                return None, None
+            next_url = urljoin(current_url, location)
+            response = pinned_request("GET", next_url, headers=headers, timeout=timeout)
+            current_url = next_url
+    except (UnsafeUrlError, httpx.RequestError):
         return None, None
-    for _ in range(max_redirects):
-        if response.status_code not in (301, 302, 303, 307, 308):
-            return response, current_url
-        location = response.headers.get("Location")
-        if not location:
-            return None, None
-        next_url = urljoin(current_url, location)
-        if not is_safe_url(next_url):
-            return None, None
-        try:
-            response = httpx.get(next_url, headers=headers, timeout=timeout, follow_redirects=False)
-        except httpx.RequestError:
-            return None, None
-        current_url = next_url
     # Too many redirects.
     return None, None
 
@@ -3880,17 +4078,18 @@ def _safe_fetch_feed(url, headers, *, timeout=8.0, max_redirects=5):
 def _fetch_feed_events_for_workspace(feeds):
     """Fetch and aggregate recent events across all workspace feeds.
 
-    Each feed is re-validated against is_safe_url at fetch time (not just at
-    add time), and redirects are followed manually with per-hop SSRF checks.
-    This closes the DNS-rebind / redirect-bait window that would otherwise
-    let a previously-valid feed URL reach internal hosts on subsequent polls.
+    Each feed is re-resolved and pinned to a vetted public IP at fetch time
+    (not just at add time), and redirects are followed manually with each hop
+    independently pinned. This closes the DNS-rebind / redirect-bait window
+    that would otherwise let a previously-valid feed URL reach internal hosts
+    on subsequent polls.
     """
     if not feeds:
         return []
 
     headers = {
         "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.1",
-        "User-Agent": "Brightbean RSS Reader/1.0",
+        "User-Agent": "SM Bean RSS Reader/1.0",
     }
     all_events = []
     for feed in feeds:
@@ -3994,7 +4193,7 @@ def _validate_rss_url(rss_url):
     """Validate that a URL points to a reachable RSS/Atom XML feed."""
     headers = {
         "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.1",
-        "User-Agent": "Brightbean RSS Validator/1.0",
+        "User-Agent": "SM Bean RSS Validator/1.0",
     }
     response, _final_url = _safe_fetch_feed(rss_url, headers)
     if response is None:

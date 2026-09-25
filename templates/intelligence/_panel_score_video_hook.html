@@ -34,7 +34,7 @@
                         {% if can_manage_billing %}<a href="{% url 'intelligence:subscribe' org_id=organization.id %}">Activate Intelligence</a> to analyze your own video hooks.{% else %}Ask an admin to activate Intelligence to analyze your own video hooks.{% endif %}
                     </p>
                     {% else %}
-                    <p class="mt-2 text-[11px] text-stone-400">First call on a video can take 25–29 s. Cache hits return instantly.</p>
+                    <p class="mt-2 text-[11px] text-stone-500">First call on a video can take 25–29 s. Cache hits return instantly.</p>
                     {% endif %}
                 </div>
             </form>

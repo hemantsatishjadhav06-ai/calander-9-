@@ -45,7 +45,7 @@
             text-align: left;
         ">
             {% csrf_token %}
-            <label style="
+            <label for="dashboard-workspace-name" style="
                 display: block;
                 font-size: 0.8125rem;
                 font-weight: 600;
@@ -54,6 +54,7 @@
             ">Workspace name</label>
             <input
                 type="text"
+                id="dashboard-workspace-name"
                 name="name"
                 placeholder="e.g. My Brand, Client Name"
                 required

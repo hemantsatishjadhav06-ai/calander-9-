@@ -1,6 +1,6 @@
 """Onboarding checklist evaluation logic.
 
-Computes the 5 checklist items and their completion status for a workspace.
+Computes the 4 checklist items and their completion status for a workspace.
 Used by the workspace dashboard to render the dynamic "Get Started" card.
 """
 
@@ -37,9 +37,13 @@ def get_checklist_items(workspace):
         },
         {
             "key": "create_post",
-            "title": "Create your first post",
-            "description": "Draft and schedule content for your audience",
-            "completed": Post.objects.for_workspace(workspace_id).exists(),
+            "title": "Schedule your first post",
+            "description": "Put a post on the calendar for one of your channels",
+            # Activation is a post on its way out, not a draft: a lone draft
+            # used to tick this and the checklist declared the team onboarded.
+            "completed": Post.objects.for_workspace(workspace_id)
+            .filter(platform_posts__status__in=["scheduled", "publishing", "published"])
+            .exists(),
             "url": reverse(
                 "composer:compose",
                 kwargs={"workspace_id": workspace_id},
@@ -63,10 +67,11 @@ def get_checklist_items(workspace):
             "key": "invite_members",
             "title": "Invite your team",
             "description": "Add team members to collaborate on content",
-            "completed": WorkspaceMembership.objects.filter(
-                workspace_id=workspace_id,
-                workspace_role=WorkspaceMembership.WorkspaceRole.CLIENT,
-            ).exists(),
+            # Any teammate counts. This used to require a *client* membership, so
+            # a team that invited editors and managers sat at 3/4 forever.
+            "completed": WorkspaceMembership.objects.filter(workspace_id=workspace_id)
+            .exclude(workspace_role=WorkspaceMembership.WorkspaceRole.OWNER)
+            .exists(),
             "url": reverse("members:list"),
             "icon_color": "sky",
             "icon_svg": '<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6m3-3h-6"/>',

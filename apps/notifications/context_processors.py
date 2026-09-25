@@ -3,6 +3,6 @@ def unread_notification_count(request):
     if hasattr(request, "user") and request.user.is_authenticated:
         from .models import Notification
 
-        count = Notification.objects.filter(user=request.user, is_read=False).count()
+        count = Notification.objects.filter(user=request.user, is_read=False, shown_in_app=True).count()
         return {"unread_notification_count": count}
     return {"unread_notification_count": 0}

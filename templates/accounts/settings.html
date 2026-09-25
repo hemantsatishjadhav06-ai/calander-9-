@@ -1,5 +1,5 @@
 {% extends "layouts/settings.html" %}
-{% block title %}Profile - Settings - SM Bean{% endblock %}
+{% block title %}Profile - Settings - {{ SITE_NAME }}{% endblock %}
 {% block content %}
 <div class="max-w-2xl">
     <h2 class="text-xl font-semibold mb-8" style="color: var(--text-primary);">Profile</h2>
@@ -20,12 +20,12 @@
                 <template x-if="preview">
                     <div class="relative">
                         <img :src="preview" alt="Profile photo" class="w-16 h-16 rounded-full object-cover border" style="border-color: var(--border);">
-                        <button type="button"
+                        <button aria-label="Remove photo" type="button"
                                 @click="preview = ''; $refs.avatarInput.value = ''; fileName = ''"
                                 class="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer"
                                 style="background: var(--neutral-200); color: var(--text-secondary);"
                                 title="Remove photo">
-                            <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            <svg aria-hidden="true" width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
                 </template>
@@ -141,7 +141,7 @@
             <div>
                 <h3 class="text-base font-semibold mb-1" style="color: var(--text-primary);">Delete your account</h3>
                 <p class="text-sm" style="color: var(--text-secondary); max-width: 480px;">
-                    When you delete your account, you lose access to SM Bean account services, and we permanently delete your personal data.
+                    When you delete your account, you lose access to {{ SITE_NAME }} account services, and we permanently delete your personal data.
                 </p>
             </div>
 
@@ -161,21 +161,22 @@
                 <div @click.outside="showDeleteModal = false"
                      x-show="showDeleteModal"
                      x-transition
+                     x-trap.noscroll="showDeleteModal" role="dialog" aria-modal="true" aria-labelledby="delete-account-title"
                      class="w-full max-w-md rounded-xl shadow-xl"
                      style="background: var(--surface-0);">
 
                     <!-- Header -->
                     <div class="flex items-center justify-between px-6 py-4" style="border-bottom: 1px solid var(--border);">
-                        <h3 class="text-base font-semibold" style="color: var(--text-primary);">Delete your account</h3>
-                        <button type="button" @click="showDeleteModal = false" class="cursor-pointer" style="color: var(--text-tertiary);">
-                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        <h3 id="delete-account-title" class="text-base font-semibold" style="color: var(--text-primary);">Delete your account</h3>
+                        <button type="button" @click="showDeleteModal = false" class="cursor-pointer" style="color: var(--text-tertiary);" aria-label="Close">
+                            <svg aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
 
                     <!-- Body -->
                     <div class="px-6 py-5">
                         <p class="text-sm" style="color: var(--text-secondary);">
-                            Are you sure you want to delete your account? This action is permanent and cannot be undone. You will lose access to all SM Bean services, and your personal data will be permanently deleted.
+                            Are you sure you want to delete your account? This action is permanent and cannot be undone. You will lose access to all {{ SITE_NAME }} services, and your personal data will be permanently deleted.
                         </p>
                     </div>
 

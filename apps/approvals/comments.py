@@ -88,10 +88,18 @@ def update_comment(comment_id, user, body, *, workspace=None):
 
 
 def delete_comment(comment_id, user, workspace):
-    """Soft-delete a comment. Authors and managers can delete."""
+    """Soft-delete a comment. Authors and managers can delete.
+
+    The lookup is scoped to ``workspace``: the caller's membership is checked
+    against the workspace in the URL, so a comment id from any other tenant
+    must not resolve here. ``update_comment`` had this guard; this path did
+    not, and the view's own ``get_object_or_404(Post, workspace=...)`` runs
+    only after the delete has already committed.
+    """
     comment = PostComment.objects.filter(
         id=comment_id,
         deleted_at__isnull=True,
+        post__workspace=workspace,
     ).first()
 
     if not comment:

@@ -1,15 +1,64 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
+from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
+
+logger = logging.getLogger(__name__)
 
 
 def health_check(request):
-    """Health check endpoint at /health/."""
-    return JsonResponse({"status": "ok"})
+    """Readiness check at /health/.
+
+    Returns 200 only when the database and cache both answer. A bare
+    ``{"status": "ok"}`` reports healthy even while publishing is down (the
+    worker, DB or Redis could be gone), which gives uptime monitors a false
+    green — so verify the dependencies the app can't serve requests without.
+    """
+    checks = {}
+    healthy = True
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        checks["database"] = "ok"
+    except Exception:
+        logger.exception("Health check: database unreachable")
+        checks["database"] = "error"
+        healthy = False
+
+    try:
+        cache.set("_healthcheck", "1", 5)
+        checks["cache"] = "ok" if cache.get("_healthcheck") == "1" else "error"
+        healthy = healthy and checks["cache"] == "ok"
+    except Exception:
+        logger.exception("Health check: cache unreachable")
+        checks["cache"] = "error"
+        healthy = False
+
+    return JsonResponse(
+        {"status": "ok" if healthy else "degraded", "checks": checks},
+        status=200 if healthy else 503,
+    )
+
+
+def home(request):
+    """Public landing for anonymous visitors; the app dashboard for logged-in users.
+
+    Root used to be login-gated, so a cold visitor only ever saw the login page
+    (no marketing/value-prop surface). Anonymous → landing page; authenticated →
+    the existing dashboard routing.
+    """
+    if request.user.is_authenticated:
+        return dashboard(request)
+    return render(request, "landing.html")
 
 
 @login_required
@@ -237,6 +286,13 @@ def accept_terms(request):
     return render(request, "account/accept_terms.html")
 
 
+@require_POST
 def logout_view(request):
+    """POST only, like Django's own LogoutView.
+
+    A GET that ends the session is followed by browser link prefetchers and
+    corporate URL scanners, which logged real users out mid-draft — found when
+    a link crawler in the test suite was silently signed out part-way through.
+    """
     logout(request)
     return redirect("account_login")

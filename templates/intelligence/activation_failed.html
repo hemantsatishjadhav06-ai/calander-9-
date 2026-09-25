@@ -15,7 +15,7 @@
   <h1 class="text-xl font-semibold text-stone-900 mb-2">We couldn't activate Intelligence</h1>
   <p class="text-sm text-stone-600 mb-6">{{ message }}</p>
   {% if code %}
-    <p class="text-xs text-stone-400 font-mono mb-6">code: {{ code }}</p>
+    <p class="text-xs text-stone-500 font-mono mb-6">code: {{ code }}</p>
   {% endif %}
 
   {% comment %}
@@ -41,8 +41,8 @@
 
   <p class="text-xs text-stone-500 mt-8">
     If Stripe charged you and you don't see your subscription, contact
-    <a href="mailto:support@brightbean.xyz"
-       class="text-orange-600 hover:text-orange-700 cursor-pointer">support@brightbean.xyz</a>.
+    <a href="mailto:{{ SUPPORT_EMAIL }}"
+       class="text-orange-600 hover:text-orange-700 cursor-pointer">{{ SUPPORT_EMAIL }}</a>.
   </p>
 </div>
 {% endblock %}

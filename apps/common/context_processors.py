@@ -1,6 +1,26 @@
 """Context processors for sidebar and global template data."""
 
+from django.conf import settings
 from django.db.models import Count, Q
+
+
+def branding(request):
+    """Site name, support email, and legal URLs for every template.
+
+    SUPPORT_EMAIL is deliberately NOT defaulted to DEFAULT_FROM_EMAIL: that is a
+    no-reply sender, not a support channel, and falling back to it made every
+    ``{% if SUPPORT_EMAIL %}`` guard true while pointing users at a black hole.
+    Unset means unset, so templates can degrade honestly.
+    """
+    return {
+        "SITE_NAME": getattr(settings, "SITE_NAME", "SM Bean"),
+        "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", ""),
+        "LEGAL_TERMS_URL": getattr(settings, "LEGAL_TERMS_URL", "/terms/"),
+        "LEGAL_PRIVACY_URL": getattr(settings, "LEGAL_PRIVACY_URL", "/privacy/"),
+        "SOURCE_URL": getattr(settings, "SOURCE_URL", ""),
+        # Public CTAs say "Get started" only when anyone can actually sign up.
+        "SIGNUP_OPEN": getattr(settings, "SIGNUP_MODE", "invite_only") == "open",
+    }
 
 
 def sidebar_context(request):
@@ -64,14 +84,23 @@ def sidebar_context(request):
             .order_by("platform", "account_name")
         )
 
-        # Connectable platforms: not yet connected in this workspace.
-        # Show all known platforms (configured or not) so the sidebar
-        # always surfaces what can be connected. The connect page itself
-        # handles the "not configured" case with an admin prompt, and shares
-        # PlatformVisibility.visible_choices() with us so the two can't disagree.
+        # Connectable platforms: not yet connected in this workspace AND
+        # actually connectable — credentials configured, or a platform that
+        # needs none. This used to list every known platform so the sidebar
+        # "always surfaces what can be connected"; on a fresh install that
+        # meant advertising Instagram, LinkedIn and TikTok, the three whose
+        # connect cards render a dead "Not Configured" pill. Same helper the
+        # connect page uses, so the two cannot disagree.
+        from apps.social_accounts.views import _get_configured_platforms
+
         connected_platforms = {ch.platform for ch in sidebar_channels}
+        configured_platforms = _get_configured_platforms(workspace.organization_id)
         sidebar_connectable_platforms = sorted(
-            ((p, label) for p, label in PlatformVisibility.visible_choices() if p not in connected_platforms),
+            (
+                (p, label)
+                for p, label in PlatformVisibility.visible_choices()
+                if p not in connected_platforms and p in configured_platforms
+            ),
             key=_connect_suggestion_rank,
         )
 

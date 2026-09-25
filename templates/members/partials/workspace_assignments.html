@@ -1,5 +1,5 @@
 <!-- Workspace Assignment Form (loaded via HTMX into modal) -->
-<form hx-post="{% url 'members:manage_workspaces' membership_id=membership.id %}"
+<form hx-post="{% url 'members:manage_workspaces' membership_id=membership.id %}" hx-disabled-elt="find button[type=submit]"
       hx-target="#member-{{ membership.id }}"
       hx-swap="outerHTML">
     {% csrf_token %}
@@ -14,7 +14,7 @@
             <label for="assign-ws-{{ wd.workspace.id }}" class="flex-1 text-sm cursor-pointer" style="color: var(--text-primary);">
                 {{ wd.workspace.name }}
             </label>
-            <select name="ws_role_{{ wd.workspace.id }}"
+            <select name="ws_role_{{ wd.workspace.id }}" aria-label="Role in {{ wd.workspace.name }}"
                     class="text-xs px-2 py-1 rounded border outline-none"
                     style="border-color: var(--border); background: var(--surface-0); color: var(--text-primary);">
                 {% for value, label in workspace_role_choices %}
@@ -30,7 +30,7 @@
     <div class="flex justify-end">
         <button type="submit"
                 class="btn-opacity px-5 py-2 text-sm font-medium rounded-full cursor-pointer transition-colors"
-                style="background: var(--primary); color: white;">
+                style="background: var(--primary-strong); color: white;">
             Save Assignments
         </button>
     </div>

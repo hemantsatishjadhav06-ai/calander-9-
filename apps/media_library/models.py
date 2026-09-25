@@ -39,9 +39,13 @@ class MediaFolder(models.Model):
     class Meta:
         db_table = "media_library_folder"
         constraints = [
+            # nulls_distinct=False: a root folder has parent_folder NULL, and
+            # Postgres treats NULLs as distinct by default, so two root folders
+            # with the same name were allowed.
             models.UniqueConstraint(
                 fields=["workspace", "parent_folder", "name"],
                 name="unique_folder_name_per_parent",
+                nulls_distinct=False,
             ),
         ]
         ordering = ["name"]

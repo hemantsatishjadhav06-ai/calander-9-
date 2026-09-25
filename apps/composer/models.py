@@ -396,7 +396,10 @@ class PlatformPost(models.Model):
         "pending_client": {"approved", "changes_requested", "rejected"},
         "changes_requested": {"pending_review", "draft"},
         "rejected": {"draft", "pending_review"},
-        "scheduled": {"publishing", "draft"},
+        # scheduled → on_hold is the client's brake on a post the team has
+        # already put on the calendar; it lifts back to approved, never
+        # straight to scheduled, so the team re-confirms the time.
+        "scheduled": {"publishing", "draft", "on_hold"},
         "publishing": {"published", "failed", "scheduled"},  # scheduled = retry
         "failed": {"publishing", "draft", "scheduled"},
         # Client-requested hold: parked out of the publish path. The team resolves
@@ -549,6 +552,44 @@ class PlatformPost(models.Model):
     # ------------------------------------------------------------------
     # State machine
     # ------------------------------------------------------------------
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        # The status this row had when it was read; save_guarded() writes only
+        # if the row still has it.
+        instance._loaded_status = instance.__dict__.get("status")
+        return instance
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # A plain save is authoritative for this instance from here on.
+        self._loaded_status = self.status
+
+    def save_guarded(self, fields) -> bool:
+        """Write *fields* only if the row's status is still the one we read.
+
+        Web-side writers (the approval services, the composer's chip menu and
+        Schedule, calendar drag and bulk actions) load a row, decide, and write
+        back. Between the read and the write the publisher may have claimed
+        the row, or a client may have put it on hold; a plain save wrote the
+        stale decision over that — a hold overwritten on an in-flight publish,
+        or ``publishing`` reset to something the publisher then re-sends.
+
+        Returns False, writing nothing, when the row moved on (or was deleted).
+        Callers treat that as a conflict: report it, or skip the row.
+        """
+        values = {name: getattr(self, name) for name in fields if name != "updated_at"}
+        values["updated_at"] = timezone.now()
+        rows = type(self).objects.filter(pk=self.pk)
+        expected = getattr(self, "_loaded_status", None)
+        if expected is not None:
+            rows = rows.filter(status=expected)
+        if not rows.update(**values):
+            return False
+        self.updated_at = values["updated_at"]
+        self._loaded_status = self.status
+        return True
 
     def can_transition_to(self, new_status):
         """Check if a status transition is valid."""

@@ -281,3 +281,14 @@ class SafeXmlFromStringTest(SimpleTestCase):
         from apps.common.validators import safe_xml_fromstring
 
         self.assertIsNone(safe_xml_fromstring(b"<rss><channel></rss>"))
+
+
+def test_shared_address_space_is_not_public():
+    """100.64.0.0/10 (CGNAT) is where cloud providers put internal services."""
+    from unittest.mock import patch
+
+    from apps.common.validators import resolve_public_ip
+
+    info = [(2, 1, 6, "", ("100.64.1.1", 443))]
+    with patch("socket.getaddrinfo", return_value=info):
+        assert resolve_public_ip("https://internal.example.com/") is None

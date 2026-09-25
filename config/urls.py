@@ -4,7 +4,11 @@ from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import include, path, re_path
+from django.utils.html import escape
+from django.views.generic import TemplateView
+from django.views.generic.base import RedirectView
 from django.views.static import serve
 
 from apps.accounts.views import health_check
@@ -12,6 +16,40 @@ from apps.api.api import api as agent_api
 from apps.oauth_server import views as oauth_views
 
 logger = logging.getLogger(__name__)
+
+
+def robots_txt(request):
+    """Minimal robots.txt: index public pages, keep app internals out."""
+    lines = [
+        "User-agent: *",
+        "Disallow: /accounts/",
+        "Disallow: /organizations/",
+        "Disallow: /workspace/",
+        "Disallow: /api/",
+        "Disallow: /oauth/",
+        "Disallow: /admin/",
+        "Disallow: /portal/",
+        "Allow: /$",
+        "",
+        f"Sitemap: {request.build_absolute_uri('/sitemap.xml')}",
+        "",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
+
+
+def sitemap_xml(request):
+    """The four public pages, so crawlers do not have to guess at them.
+
+    Hand-rolled rather than django.contrib.sitemaps: the public surface is a
+    fixed handful of URLs with no model behind them, and the framework would
+    add an app, a template loader path and a Site lookup to emit the same
+    nine lines.
+    """
+    paths = ["/", "/pricing/", "/terms/", "/privacy/"]
+    urls = "".join(f"<url><loc>{escape(request.build_absolute_uri(p))}</loc></url>" for p in paths)
+    body = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
+    return HttpResponse(body, content_type="application/xml")
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -25,7 +63,6 @@ urlpatterns = [
     path("organizations/api-keys/", include("apps.api_keys.urls")),
     path("workspaces/", include("apps.workspaces.urls")),
     path("members/", include("apps.members.urls")),
-    path("settings/", include("apps.settings_manager.urls")),
     path("social-accounts/", include("apps.social_accounts.urls")),
     # Content Pipeline (Stream A)
     path("workspace/<uuid:workspace_id>/", include("apps.composer.urls")),
@@ -73,6 +110,19 @@ urlpatterns = [
     path("portal/", include("apps.client_portal.urls")),
     path("notifications/", include("apps.notifications.urls")),
     path("onboarding/", include("apps.onboarding.urls")),
+    # Public legal placeholder pages (override with LEGAL_TERMS_URL /
+    # LEGAL_PRIVACY_URL to point at your hosted policies).
+    path("terms/", TemplateView.as_view(template_name="legal/terms.html"), name="terms"),
+    path("privacy/", TemplateView.as_view(template_name="legal/privacy.html"), name="privacy"),
+    path("pricing/", TemplateView.as_view(template_name="pricing.html"), name="pricing"),
+    # Silence the two probes seen 404ing in production and give crawlers a robots.
+    path("robots.txt", robots_txt, name="robots_txt"),
+    path("sitemap.xml", sitemap_xml, name="sitemap_xml"),
+    path(
+        "favicon.ico",
+        RedirectView.as_view(url=settings.STATIC_URL + "favicon/favicon.ico", permanent=True),
+        name="favicon",
+    ),
     path("organizations/media/", include("apps.media_library.urls_org")),
     path("", include("apps.accounts.urls_root")),
 ]

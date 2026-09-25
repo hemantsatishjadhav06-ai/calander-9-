@@ -62,7 +62,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install --require-hashes -r requirements.lock
 
       - name: mypy
         run: mypy apps/ config/ providers/ tests/ --ignore-missing-imports
@@ -108,7 +108,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install --require-hashes -r requirements.lock
 
       # Catches a model change whose migration was never generated. The
       # companion hazard — a migration that is fine against an empty table but

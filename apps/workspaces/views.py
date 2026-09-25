@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import redirect, render
@@ -103,6 +104,12 @@ def workspace_settings(request, workspace_id):
                 workspace.delete()
             messages.success(request, f'Workspace "{workspace_name}" has been permanently deleted.')
             return redirect("organizations:workspaces")
+
+        # The generic update below (name, logo) fell through for every member,
+        # so a read-only viewer could rename the workspace. The three actions
+        # above already gate on is_owner_or_manager; this path must too.
+        if not is_owner_or_manager:
+            raise PermissionDenied("Only workspace owners and managers can change workspace settings.")
 
         name = request.POST.get("name", "").strip()
 

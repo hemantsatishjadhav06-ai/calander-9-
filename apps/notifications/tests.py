@@ -294,11 +294,10 @@ class TestWebhookDispatchSSRFGuard:
     def test_accepts_public_url(self, user):
         from apps.notifications.engine import _dispatch_webhook
 
+        # Dispatch now goes through apps.common.net.pinned_request (which pins
+        # the connection to a vetted public IP). Patch that seam.
         mock_response = Mock(status_code=200)
-        with (
-            patch("socket.getaddrinfo", return_value=[(0, 0, 0, "", ("8.8.8.8", 0))]),
-            patch("httpx.post", return_value=mock_response) as httpx_post,
-        ):
+        with patch("apps.common.net.pinned_request", return_value=mock_response) as pinned:
             delivery = self._build_delivery(user, "https://hooks.example.com/abc")
             _dispatch_webhook(delivery)
-            httpx_post.assert_called_once()
+            pinned.assert_called_once()

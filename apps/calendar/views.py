@@ -8,6 +8,7 @@ from datetime import date, datetime, time, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db.models import Count as DbCount
 from django.db.models import QuerySet
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -180,7 +181,12 @@ def _get_filtered_platform_posts(workspace, request):
 
     qs = (
         PlatformPost.objects.filter(post__workspace_id=workspace.id)
-        .select_related("post", "post__author", "post__category", "social_account")
+        # post__recurrence_rule: the chip shows a repeat icon via
+        # ``pp.post.recurrence_rule``, a reverse one-to-one that fired one
+        # query per rendered chip — 33 on a 300-post month. Measured: the
+        # calendar climbed 44 → 71 queries with volume while Drafts and Queues
+        # stayed flat.
+        .select_related("post", "post__author", "post__category", "post__recurrence_rule", "social_account")
         # Chips render the post's first media thumbnail; without this each chip
         # would fire its own media_attachments + media_asset queries (N+1) on
         # every month/week/day render.
@@ -1168,7 +1174,16 @@ def reschedule_post(request, workspace_id):
             pp.platform_post_id = ""
         if pp.status in _IMPLICIT_SCHEDULE_STATUSES and pp.can_transition_to("scheduled"):
             pp.transition_to("scheduled")
-        pp.save(update_fields=fields)
+        elif pp.status == "scheduled":
+            # Moving an already-scheduled row in time must also drop any retry
+            # backoff from an earlier failed attempt, or the ladder could fire
+            # it at the old time.
+            pp.retry_count = 0
+            pp.next_retry_at = None
+        if not pp.save_guarded(fields):
+            return JsonResponse(
+                {"error": "This post changed while you were moving it. Reload and try again."}, status=409
+            )
         # Keep any queue entry's slot mirror in step with the manual reschedule
         # so the queue list shows the real time (the slot ops read scheduled_at,
         # but the detail page still orders by assigned_slot_datetime).
@@ -1193,17 +1208,13 @@ def _bulk_save_platform_posts(rows):
     ``updated_at`` is ``auto_now``, which ``bulk_update`` does not apply, so it
     is stamped explicitly — same reason the per-row saves list it.
     """
-    from django.utils import timezone as _tz
-
     if not rows:
-        return
-    stamp = _tz.now()
-    for row in rows:
-        row.updated_at = stamp
-    PlatformPost.objects.bulk_update(
-        rows,
-        [*PlatformPost.TRANSITION_FIELDS, "scheduled_at", "updated_at"],
-    )
+        return set()
+    # Row by row, each guarded on the status it was read with: a single
+    # bulk_update cannot carry a per-row WHERE, and without one a bulk
+    # "unschedule" could overwrite a row the publisher had just claimed.
+    fields = [*PlatformPost.TRANSITION_FIELDS, "scheduled_at", "updated_at"]
+    return {row.pk for row in rows if row.save_guarded(fields)}
 
 
 def _sync_queue_entries(touched):
@@ -1292,8 +1303,14 @@ def bulk_platform_action(request, workspace_id):
             for pp in deletable:
                 affected.add(pp.post_id)
                 touched.append((pp, None))
-            PlatformPost.objects.filter(id__in=[pp.id for pp in deletable]).delete()
-            count = len(deletable)
+            # The status is re-checked in the DELETE itself: a row the
+            # publisher claimed after it was read is left alone.
+            _, per_model = (
+                PlatformPost.objects.filter(id__in=[pp.id for pp in deletable])
+                .exclude(status__in=PlatformPost.PROTECTED_STATUSES)
+                .delete()
+            )
+            count = per_model.get(PlatformPost._meta.label, 0)
         elif action == "draft":
             # Unschedule: back to draft and drop the time.
             changed = []
@@ -1307,8 +1324,9 @@ def bulk_platform_action(request, workspace_id):
                 changed.append(pp)
                 affected.add(pp.post_id)
                 touched.append((pp, None))
-            _bulk_save_platform_posts(changed)
-            count = len(changed)
+            saved = _bulk_save_platform_posts(changed)
+            touched = [(row, slot) for row, slot in touched if row.pk in saved]
+            count = len(saved)
         else:
             # Publish now. Rows on the same channel are staggered a minute apart
             # rather than all stamped with the same instant: posting slots exist
@@ -1342,8 +1360,9 @@ def bulk_platform_action(request, workspace_id):
                 changed.append(pp)
                 affected.add(pp.post_id)
                 touched.append((pp, slot))
-            _bulk_save_platform_posts(changed)
-            count = len(changed)
+            saved = _bulk_save_platform_posts(changed)
+            touched = [(row, slot) for row, slot in touched if row.pk in saved]
+            count = len(saved)
 
         _sync_queue_entries(touched)
 
@@ -1563,7 +1582,13 @@ def update_posting_slot(request, workspace_id, slot_id):
 def queue_list(request, workspace_id):
     """List all queues for this workspace."""
     workspace = _get_workspace(request, workspace_id)
-    queues = Queue.objects.for_workspace(workspace.id).select_related("social_account", "category")
+    # Annotate the count the template needs: `queue.entries.count` in the loop
+    # was two extra queries per queue.
+    queues = (
+        Queue.objects.for_workspace(workspace.id)
+        .select_related("social_account", "category")
+        .annotate(entry_count=DbCount("entries"))
+    )
     accounts = SocialAccount.objects.for_workspace(workspace.id).filter(
         connection_status=SocialAccount.ConnectionStatus.CONNECTED,
     )
@@ -1582,6 +1607,7 @@ def queue_list(request, workspace_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def queue_create(request, workspace_id):
     """Create a new queue."""
@@ -1640,6 +1666,7 @@ def queue_detail(request, workspace_id, queue_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def queue_delete(request, workspace_id, queue_id):
     """Delete a queue."""
@@ -1653,6 +1680,7 @@ def queue_delete(request, workspace_id, queue_id):
 
 
 @login_required
+@require_permission("edit_others_posts")
 @require_POST
 def queue_reorder(request, workspace_id, queue_id):
     """Reorder queue entries via HTMX drag-and-drop."""
@@ -1672,6 +1700,7 @@ def queue_reorder(request, workspace_id, queue_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def queue_entry_remove(request, workspace_id, queue_id, entry_id):
     """Remove a single post from a queue, leaving a gap (comment §3).
@@ -1688,6 +1717,7 @@ def queue_entry_remove(request, workspace_id, queue_id, entry_id):
     if entry is not None:
         from .services import remove_from_queue
 
+        _require_can_edit_queued_post(request, entry.post)
         remove_from_queue(entry)
 
     if request.htmx:
@@ -1696,6 +1726,7 @@ def queue_entry_remove(request, workspace_id, queue_id, entry_id):
 
 
 @login_required
+@require_permission("create_posts")
 @require_POST
 def queue_entry_reslot(request, workspace_id, queue_id, entry_id):
     """Move a queued post to the queue's next open slot (comment §4)."""
@@ -1709,6 +1740,7 @@ def queue_entry_reslot(request, workspace_id, queue_id, entry_id):
 
     from .services import QueueFullError, reslot_to_next_available
 
+    _require_can_edit_queued_post(request, entry.post)
     try:
         reslot_to_next_available(entry)
     except QueueFullError:
@@ -1724,6 +1756,29 @@ def queue_entry_reslot(request, workspace_id, queue_id, entry_id):
 # ---------------------------------------------------------------------------
 
 
+def _require_can_edit_queued_post(request, post):
+    """Author, or ``edit_others_posts`` — same rule as ``bulk_platform_action``.
+
+    Queue entry operations move other people's posts; a contributor may reslot
+    their own but not a colleague's.
+    """
+    membership = request.workspace_membership
+    perms = membership.effective_permissions if membership else {}
+    if post.author_id != request.user.id and not perms.get("edit_others_posts", False):
+        raise PermissionDenied("You do not have permission to change this post.")
+
+
+def _event_error(request, message):
+    """A 400 the calendar's HTMX error toast can show as-is.
+
+    The global handler displays the response body as text, so a JSON body
+    reached the user as ``{"error": "Invalid date format."}``.
+    """
+    if request.htmx:
+        return HttpResponse(message, status=400, content_type="text/plain; charset=utf-8")
+    return JsonResponse({"error": message}, status=400)
+
+
 @login_required
 @require_permission("create_posts")
 @require_POST
@@ -1737,19 +1792,21 @@ def event_create(request, workspace_id):
     description = request.POST.get("description", "").strip()
 
     if not title or not start_date_str or not end_date_str:
-        return JsonResponse({"error": "Title, start date, and end date required."}, status=400)
+        return _event_error(request, "Title, start date and end date are required.")
 
     if not is_valid_hex_color(color):
-        return JsonResponse({"error": "Color must be a 6-digit hex value like #3B82F6."}, status=400)
+        return _event_error(request, "Colour must be a 6-digit hex value like #3B82F6.")
 
     try:
         start = date.fromisoformat(start_date_str)
         end = date.fromisoformat(end_date_str)
     except (ValueError, TypeError):
-        return JsonResponse({"error": "Invalid date format."}, status=400)
+        return _event_error(request, "Dates must look like 2026-10-01.")
 
     if end < start:
-        end = start
+        # Said, not silently "fixed": moving the end date to the start date
+        # created a different event from the one the user typed.
+        return _event_error(request, "The end date is before the start date.")
 
     CustomCalendarEvent.objects.create(
         workspace=workspace,
@@ -1774,23 +1831,27 @@ def event_edit(request, workspace_id, event_id):
     workspace = _get_workspace(request, workspace_id)
     event = get_object_or_404(CustomCalendarEvent, id=event_id, workspace=workspace)
 
-    event.title = request.POST.get("title", event.title).strip()
+    title = request.POST.get("title", event.title).strip()
+    if not title:
+        return _event_error(request, "The event needs a title.")
+    event.title = title
     event.description = request.POST.get("description", event.description).strip()
     new_color = request.POST.get("color", event.color)
     if not is_valid_hex_color(new_color):
-        return JsonResponse({"error": "Color must be a 6-digit hex value like #3B82F6."}, status=400)
+        return _event_error(request, "Colour must be a 6-digit hex value like #3B82F6.")
     event.color = new_color
 
-    import contextlib
-
-    start_str = request.POST.get("start_date")
-    end_str = request.POST.get("end_date")
-    if start_str:
-        with contextlib.suppress(ValueError, TypeError):
-            event.start_date = date.fromisoformat(start_str)
-    if end_str:
-        with contextlib.suppress(ValueError, TypeError):
-            event.end_date = date.fromisoformat(end_str)
+    # A bad date used to be swallowed and the old one kept, so the save
+    # "succeeded" without doing what the user asked.
+    try:
+        if request.POST.get("start_date"):
+            event.start_date = date.fromisoformat(request.POST["start_date"])
+        if request.POST.get("end_date"):
+            event.end_date = date.fromisoformat(request.POST["end_date"])
+    except (ValueError, TypeError):
+        return _event_error(request, "Dates must look like 2026-10-01.")
+    if event.end_date < event.start_date:
+        return _event_error(request, "The end date is before the start date.")
 
     event.save()
 

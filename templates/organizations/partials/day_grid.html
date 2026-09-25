@@ -8,15 +8,15 @@ Context: day_slots, target_date, default_workspace.
     <div class="flex border-b border-stone-100 min-h-[64px] cal-add-cell {% if is_today and hour == current_hour %}bg-orange-50/50{% endif %}" style="position: relative;">
         <!-- Time label -->
         <div class="w-20 flex-shrink-0 border-r border-stone-200 px-3 py-2 text-right">
-            <span class="text-xs font-medium tabular-nums {% if is_today and hour == current_hour %}text-orange-600 font-semibold{% else %}text-stone-400{% endif %}">
+            <span class="text-xs font-medium tabular-nums {% if is_today and hour == current_hour %}text-orange-600 font-semibold{% else %}text-stone-500{% endif %}">
                 {% if hour < 10 %}0{% endif %}{{ hour }}:00
             </span>
         </div>
         <!-- Posts in this hour -->
         <div class="flex-1 p-2 space-y-1">
             {% if default_workspace and not is_past_day and not is_today or default_workspace and not is_past_day and hour >= current_hour %}
-            <a href="{% url 'composer:compose' workspace_id=default_workspace.id %}?scheduled_date={{ target_date|date:'Y-m-d' }}&scheduled_time={{ hour }}:00" class="cal-add-btn" style="position:static; margin-left:auto;" title="Create post">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            <a aria-label="Create post" href="{% url 'composer:compose' workspace_id=default_workspace.id %}?scheduled_date={{ target_date|date:'Y-m-d' }}&scheduled_time={{ hour }}:00" class="cal-add-btn" style="position:static; margin-left:auto;" title="Create post">
+                <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
             </a>
             {% endif %}
             {% for pp in hour_posts %}

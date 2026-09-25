@@ -7,9 +7,9 @@ class ApprovalsConfig(AppConfig):
     verbose_name = "Approvals"
 
     def ready(self):
-        from django.db.models.signals import post_migrate
+        from apps.common.background import connect_recurring_tasks
 
-        post_migrate.connect(self._register_tasks, sender=self)
+        connect_recurring_tasks(self, self._register_tasks)
 
     @staticmethod
     def _register_tasks(sender, **kwargs):

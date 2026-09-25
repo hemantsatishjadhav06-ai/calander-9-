@@ -99,7 +99,7 @@
                 <div class="text-xs font-medium text-stone-700">Views / sub</div>
                 <div>
                     <div class="h-1.5 rounded-full bg-stone-100 overflow-hidden">
-                        <div class="h-full rounded-full" style="width: {{ engp.view_to_sub_ratio|default:0 }}%; background: var(--primary);"></div>
+                        <div class="h-full rounded-full" style="width: {{ engp.view_to_sub_ratio|default:0 }}%; background: var(--primary-strong);"></div>
                     </div>
                     <div class="flex justify-between mt-1 text-[11px] text-stone-500 tabular-nums">
                         <span>You: <span class="text-stone-900 font-medium">{{ eng.view_to_sub_ratio|pretty_percent }}</span></span>
@@ -113,7 +113,7 @@
                 <div class="text-xs font-medium text-stone-700">Likes / view</div>
                 <div>
                     <div class="h-1.5 rounded-full bg-stone-100 overflow-hidden">
-                        <div class="h-full rounded-full" style="width: {{ engp.like_to_view_ratio|default:0 }}%; background: var(--primary);"></div>
+                        <div class="h-full rounded-full" style="width: {{ engp.like_to_view_ratio|default:0 }}%; background: var(--primary-strong);"></div>
                     </div>
                     <div class="flex justify-between mt-1 text-[11px] text-stone-500 tabular-nums">
                         <span>You: <span class="text-stone-900 font-medium">{{ eng.like_to_view_ratio|pretty_percent:2 }}</span></span>
@@ -127,7 +127,7 @@
                 <div class="text-xs font-medium text-stone-700">Comments / view</div>
                 <div>
                     <div class="h-1.5 rounded-full bg-stone-100 overflow-hidden">
-                        <div class="h-full rounded-full" style="width: {{ engp.comment_to_view_ratio|default:0 }}%; background: var(--primary);"></div>
+                        <div class="h-full rounded-full" style="width: {{ engp.comment_to_view_ratio|default:0 }}%; background: var(--primary-strong);"></div>
                     </div>
                     <div class="flex justify-between mt-1 text-[11px] text-stone-500 tabular-nums">
                         <span>You: <span class="text-stone-900 font-medium">{{ eng.comment_to_view_ratio|pretty_percent:2 }}</span></span>
@@ -207,7 +207,7 @@
             {% endfor %}
         </div>
         {% if niche.title_patterns.common_niche_phrases|length > 12 %}
-        <div class="mt-2 text-[11px] text-stone-400">
+        <div class="mt-2 text-[11px] text-stone-500">
             + {{ niche.title_patterns.common_niche_phrases|length|add:"-12" }} more
         </div>
         {% endif %}

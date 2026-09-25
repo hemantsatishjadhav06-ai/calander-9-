@@ -26,6 +26,7 @@ from django.views.decorators.http import require_POST
 from django_ratelimit.decorators import ratelimit
 
 from .models import EmailSuppression
+from .net import ratelimit_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -68,14 +69,16 @@ def _verify(request, secret: str) -> bool:
 
     for candidate in signatures.split():
         version, _, value = candidate.partition(",")
-        if version == "v1" and hmac.compare_digest(expected, value):
+        # Bytes: compare_digest raises TypeError on a non-ASCII str, and the
+        # header is attacker-controlled.
+        if version == "v1" and hmac.compare_digest(expected.encode(), value.encode()):
             return True
     return False
 
 
 @csrf_exempt
 @require_POST
-@ratelimit(key="ip", rate="60/m", block=True)
+@ratelimit(key=ratelimit_client_ip, rate="60/m", block=True)
 def resend_webhook(request):
     """Record bounces and spam complaints as suppressions.
 

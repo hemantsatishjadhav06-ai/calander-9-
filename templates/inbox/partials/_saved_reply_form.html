@@ -10,13 +10,13 @@
             <div>
                 <label for="id_body" class="block text-[13px] font-semibold text-stone-700 mb-1">Reply Body</label>
                 {{ form.body }}
-                <p class="text-[11px] text-stone-400 mt-1">Variables: <code>{sender_name}</code>, <code>{account_name}</code>, <code>{post_url}</code></p>
+                <p class="text-[11px] text-stone-500 mt-1">Variables: <code>{sender_name}</code>, <code>{account_name}</code>, <code>{post_url}</code></p>
             </div>
         </div>
         <div class="flex items-center gap-3 mt-6">
             <button type="submit"
                     class="inline-flex items-center gap-1.5 px-5 py-2 text-[13px] font-semibold text-white rounded-full transition-all duration-150 cursor-pointer"
-                    style="background: var(--primary); box-shadow: var(--shadow-primary);">
+                    style="background: var(--primary-strong); box-shadow: var(--shadow-primary);">
                 {% if saved_reply %}Update{% else %}Create{% endif %} Reply
             </button>
             <a href="{% url 'inbox:saved_replies' workspace_id=workspace.id %}"

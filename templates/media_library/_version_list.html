@@ -32,7 +32,7 @@
       {% if version.change_description %}
       <p class="text-xs mt-0.5 truncate" style="color: var(--text-secondary, #57534E);">{{ version.change_description }}</p>
       {% endif %}
-      <p class="text-xs mt-0.5" style="color: var(--text-ghost, #A8A29E);">{{ version.created_at|date:"M j, Y g:i A" }}</p>
+      <p class="text-xs mt-0.5" style="color: var(--text-ghost, #766F6A);">{{ version.created_at|date:"M j, Y g:i A" }}</p>
     </div>
 
     {% if asset.current_version_id != version.id and not asset.is_shared %}
@@ -48,5 +48,5 @@
   {% endfor %}
 </div>
 {% else %}
-<p class="text-xs py-3 text-center" style="color: var(--text-ghost, #A8A29E);">No version history yet. Edits will appear here.</p>
+<p class="text-xs py-3 text-center" style="color: var(--text-ghost, #766F6A);">No version history yet. Edits will appear here.</p>
 {% endif %}

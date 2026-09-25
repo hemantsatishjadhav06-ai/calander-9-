@@ -77,6 +77,17 @@ class TestInstagramLoginWebhookVerify:
         )
         assert response.status_code == 403
 
+    @override_settings(INSTAGRAM_LOGIN_WEBHOOK_VERIFY_TOKEN="secret-token")
+    def test_non_ascii_token_returns_403_not_500(self, client):
+        # hmac.compare_digest on non-ASCII str raises TypeError → used to 500.
+        # We compare on bytes, so a unicode token is just a mismatch → 403.
+        url = reverse("inbox_webhooks:webhook_instagram_login")
+        response = client.get(
+            url,
+            {"hub.mode": "subscribe", "hub.verify_token": "sécret-tökèn", "hub.challenge": "hello"},
+        )
+        assert response.status_code == 403
+
 
 @pytest.mark.django_db
 class TestInstagramLoginWebhookReceive:

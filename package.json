@@ -1,5 +1,5 @@
 {
-  "name": "brightbean-studio",
+  "name": "smbean",
   "private": true,
   "scripts": {
     "heroku-postbuild": "cd theme/static_src && npm ci && npm run build"

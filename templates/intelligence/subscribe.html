@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load intelligence_extras humanize %}
 
-{% block title %}Activate Intelligence - {{ organization.name }} - SM Bean{% endblock %}
+{% block title %}Activate Intelligence - {{ organization.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block page_header %}
 <div class="flex items-start justify-between gap-4 mb-4 lg:mb-[25px]">
@@ -71,7 +71,7 @@
         {% if not plans %}
         <div class="rounded-xl border border-stone-200 bg-stone-50 p-6 text-center">
             <p class="text-sm text-stone-600">No plans are available for this deployment.</p>
-            <p class="text-xs text-stone-400 mt-1">Contact support if you think this is a mistake.</p>
+            <p class="text-xs text-stone-500 mt-1">Contact support if you think this is a mistake.</p>
         </div>
         {% else %}
         <div>
@@ -104,7 +104,7 @@
                            class="sr-only" required{% if forloop.counter == 2 %} checked{% endif %}>
                     {% if forloop.counter == 2 %}
                     <span class="absolute -top-2.5 right-4 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
-                          style="background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(249, 115, 22, 0.3);">
+                          style="background: var(--primary-strong); color: white; box-shadow: 0 2px 6px rgba(249, 115, 22, 0.3);">
                         Most popular
                     </span>
                     {% endif %}
@@ -220,7 +220,7 @@
     }
     label.plan-card:has(> input[type="radio"]:checked) .plan-card-check {
         border-color: var(--primary);
-        background: var(--primary);
+        background: var(--primary-strong);
     }
     label.plan-card:has(> input[type="radio"]:checked) .plan-card-check-icon {
         display: block !important;

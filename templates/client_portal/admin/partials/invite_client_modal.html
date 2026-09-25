@@ -4,21 +4,24 @@
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="background: rgba(0,0,0,0.4);">
         <div @click.outside="showInviteModal = false"
+             @keydown.escape.window="showInviteModal = false"
              x-show="showInviteModal"
+             x-trap.noscroll="showInviteModal"
+             role="dialog" aria-modal="true" aria-labelledby="invite-client-modal-title"
              x-transition
              class="w-full max-w-md rounded-xl shadow-xl flex flex-col"
              style="background: var(--surface-0);">
 
             <!-- Header -->
             <div class="flex items-center justify-between px-6 py-4 flex-shrink-0" style="border-bottom: 1px solid var(--border);">
-                <h3 class="text-base font-semibold" style="color: var(--text-primary);">Invite Client</h3>
-                <button @click="showInviteModal = false" class="cursor-pointer" style="color: var(--text-tertiary);">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <h3 id="invite-client-modal-title" class="text-base font-semibold" style="color: var(--text-primary);">Invite Client</h3>
+                <button type="button" @click="showInviteModal = false" class="cursor-pointer" style="color: var(--text-tertiary);" aria-label="Close">
+                    <svg aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
 
             <!-- Form -->
-            <form hx-post="{% url 'client_portal_admin:invite_client' workspace_id=request.workspace.id %}"
+            <form hx-post="{% url 'client_portal_admin:invite_client' workspace_id=request.workspace.id %}" hx-disabled-elt="find button[type=submit]" data-inline-error="#client-invite-error"
                   hx-target="#pending-invites-section"
                   hx-swap="innerHTML"
                   @htmx:after-request.window="if(event.detail.successful) { showInviteModal = false; document.getElementById('no-invites-placeholder')?.remove(); }"
@@ -50,7 +53,7 @@
                     </button>
                     <button type="submit"
                             class="btn-opacity px-5 py-2 text-sm font-medium rounded-full cursor-pointer"
-                            style="background: var(--primary); color: white;">
+                            style="background: var(--primary-strong); color: white;">
                         Send Invitation
                     </button>
                 </div>

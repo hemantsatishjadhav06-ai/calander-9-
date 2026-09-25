@@ -9,8 +9,8 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <div class="flex items-center gap-3">
-                <a href="{% url 'notifications:list' %}" class="text-stone-400 hover:text-stone-600 transition-colors duration-150">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                <a aria-label="Back to notifications" href="{% url 'notifications:list' %}" class="text-stone-400 hover:text-stone-600 transition-colors duration-150">
+                    <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </a>
                 <h2 class="text-xl font-semibold text-stone-900 tracking-tight">Notification Preferences</h2>
             </div>
@@ -30,9 +30,9 @@
 
             {# Table header #}
             <div class="grid grid-cols-[1fr_80px_80px_80px] gap-0 px-5 py-2.5 border-b border-stone-100 bg-stone-50/30">
-                <div class="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Event</div>
+                <div class="text-[10px] font-bold text-stone-500 uppercase tracking-widest">Event</div>
                 {% for ch_value, ch_label in channel_choices %}
-                <div class="text-[10px] font-bold text-stone-400 uppercase tracking-widest text-center">{{ ch_label }}</div>
+                <div class="text-[10px] font-bold text-stone-500 uppercase tracking-widest text-center">{{ ch_label }}</div>
                 {% endfor %}
             </div>
 
@@ -117,7 +117,7 @@
                             placeholder="e.g. America/New_York"
                             class="w-full text-[13px] text-stone-700 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-500 transition-all duration-150 font-mono"
                         >
-                        <p class="text-[11px] text-stone-400 mt-1">IANA timezone identifier. Leave as UTC if unsure.</p>
+                        <p class="text-[11px] text-stone-500 mt-1">IANA timezone identifier. Leave as UTC if unsure.</p>
                     </div>
                 </div>
 

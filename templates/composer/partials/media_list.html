@@ -22,11 +22,11 @@ Context: media_attachments, post, workspace.
     </div>
     {% endif %}
     {% if post %}
-    <button type="button" class="remove-btn"
+    <button aria-label="Remove media" type="button" class="remove-btn"
             hx-post="{% url 'composer:remove_media' workspace_id=workspace.id post_id=post.id media_id=attachment.id %}"
             hx-target="#media-list"
             hx-swap="innerHTML">
-        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
+        <svg aria-hidden="true" class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
     </button>
     {% endif %}
 </div>

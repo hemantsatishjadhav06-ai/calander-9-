@@ -36,10 +36,11 @@
         <!-- Actions -->
         {% if is_admin and member.user.id != current_user.id %}
         <div class="flex-shrink-0 relative">
-            <button @click="showActions = !showActions; if (showActions) { const r = $el.getBoundingClientRect(); menuStyle = { position: 'fixed', top: (r.bottom + 4) + 'px', left: (r.right - 208) + 'px', zIndex: 9999 } }"
+            <button type="button" aria-label="Actions for {{ member.user.display_name }}" aria-haspopup="true" :aria-expanded="showActions"
+                    @click="showActions = !showActions; if (showActions) { const r = $el.getBoundingClientRect(); menuStyle = { position: 'fixed', top: (r.bottom + 4) + 'px', left: (r.right - 208) + 'px', zIndex: 9999 } }"
                     class="btn-neutral-100 p-1.5 rounded-lg transition-colors cursor-pointer"
                     style="color: var(--text-tertiary);">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                <svg aria-hidden="true" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
             </button>
 
             <!-- Dropdown (teleported to body so it escapes the card's overflow:hidden) -->
@@ -59,9 +60,9 @@
                       hx-swap="outerHTML"
                       class="px-3 py-2" style="border-bottom: 1px solid var(--border);">
                     {% csrf_token %}
-                    <label class="text-xs font-medium block mb-1" style="color: var(--text-secondary);">Organization Role</label>
+                    <label for="org-role-{{ member.membership.id }}" class="text-xs font-medium block mb-1" style="color: var(--text-secondary);">Organization Role</label>
                     <div class="flex gap-2">
-                        <select name="org_role" class="text-xs flex-1 px-2 py-1 rounded border outline-none"
+                        <select id="org-role-{{ member.membership.id }}" name="org_role" class="text-xs flex-1 px-2 py-1 rounded border outline-none"
                                 style="border-color: var(--border); background: var(--surface-0); color: var(--text-primary);">
                             {% for value, label in org_role_choices %}
                             <option value="{{ value }}" {% if value == member.membership.org_role %}selected{% endif %}>{{ label }}</option>
@@ -127,14 +128,16 @@
              class="fixed inset-0 z-50 flex items-center justify-center"
              style="background: rgba(0,0,0,0.4);">
             <div @click.outside="showWorkspaces = false"
+                 @keydown.escape.window="showWorkspaces = false"
+                 x-trap.noscroll="showWorkspaces" role="dialog" aria-modal="true" aria-labelledby="ws-modal-title-{{ member.membership.id }}"
                  class="w-full max-w-md rounded-xl shadow-xl p-6"
                  style="background: var(--surface-0);">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-base font-semibold" style="color: var(--text-primary);">
+                    <h3 id="ws-modal-title-{{ member.membership.id }}" class="text-base font-semibold" style="color: var(--text-primary);">
                         Workspaces - {{ member.user.display_name }}
                     </h3>
-                    <button @click="showWorkspaces = false" class="cursor-pointer" style="color: var(--text-tertiary);">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <button type="button" @click="showWorkspaces = false" class="cursor-pointer" style="color: var(--text-tertiary);" aria-label="Close">
+                        <svg aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
                 <div id="ws-modal-content-{{ member.membership.id }}">

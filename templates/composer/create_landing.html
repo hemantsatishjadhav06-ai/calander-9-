@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Create - {{ workspace.name }} - SM Bean{% endblock %}
+{% block title %}Create - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% comment %}Header is rendered inside the content block to avoid overlap with the -m-6 layout{% endcomment %}
 
@@ -86,7 +86,7 @@
         padding: 8px 12px;
         font-size: 13px;
         font-weight: 500;
-        color: #A8A29E;
+        color: #78716C;
         cursor: pointer;
         border-radius: 8px;
         transition: all 150ms ease;
@@ -182,7 +182,7 @@
         background: transparent;
     }
     .idea-modal-body input.idea-title-input::placeholder {
-        color: var(--neutral-300);
+        color: var(--text-ghost);
     }
     .idea-modal-body textarea.idea-desc-input {
         width: 100%;
@@ -197,7 +197,7 @@
         line-height: 1.7;
     }
     .idea-modal-body textarea.idea-desc-input::placeholder {
-        color: var(--neutral-300);
+        color: var(--text-ghost);
     }
     .idea-pill-btn {
         display: inline-flex;
@@ -431,14 +431,12 @@
             {% if active_tag %}
             <div class="tag-chip">
                 {{ active_tag }}
-                <a href="{% url 'composer:create_landing' workspace_id=workspace.id %}">
-                    <button type="button">&times;</button>
-                </a>
+                <a href="{% url 'composer:create_landing' workspace_id=workspace.id %}" aria-label="Clear tag filter">&times;</a>
             </div>
             {% endif %}
 
             <div class="relative" x-show="activeTab === 'ideas'" x-data="{ tagFilterOpen: false, tagFilterSearch: '', showCreateTagModal: false, newTagName: '' }">
-                <button @click="tagFilterOpen = !tagFilterOpen; if(tagFilterOpen) $nextTick(() => $refs.tagFilterSearchInput.focus())"
+                <button aria-haspopup="true" :aria-expanded="tagFilterOpen" @click="tagFilterOpen = !tagFilterOpen; if(tagFilterOpen) $nextTick(() => $refs.tagFilterSearchInput.focus())"
                         class="flex items-center gap-1.5 px-3 py-1.5 mb-2 text-xs font-semibold text-stone-500 border border-stone-200 rounded-lg hover:bg-stone-50 transition-all duration-150 cursor-pointer">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                     Tags
@@ -451,7 +449,7 @@
                     <div class="px-2 py-1.5 border-b border-stone-100">
                         <input type="text" x-ref="tagFilterSearchInput" x-model="tagFilterSearch"
                                class="w-full text-sm px-2.5 py-1.5 rounded-lg border border-stone-200 outline-none focus:border-orange-400 transition-colors"
-                               placeholder="Search tags...">
+                               placeholder="Search tags..." aria-label="Search tags">
                     </div>
                     <!-- Tag list -->
                     <div class="overflow-y-auto flex-1">
@@ -463,10 +461,10 @@
                             </a>
                         </template>
                         <template x-if="!allTags.length && !tagFilterSearch">
-                            <div class="px-3 py-3 text-xs text-stone-400 text-center">No tags yet</div>
+                            <div class="px-3 py-3 text-xs text-stone-500 text-center">No tags yet</div>
                         </template>
                         <template x-if="tagFilterSearch && !allTags.filter(t => t.toLowerCase().includes(tagFilterSearch.toLowerCase())).length">
-                            <div class="px-3 py-2 text-xs text-stone-400 text-center">No matching tags</div>
+                            <div class="px-3 py-2 text-xs text-stone-500 text-center">No matching tags</div>
                         </template>
                     </div>
                     <!-- Create new tag -->
@@ -482,9 +480,10 @@
                 <!-- Create Tag Modal -->
                 <div x-show="showCreateTagModal" x-cloak class="fixed inset-0 z-[200] flex items-center justify-center" @keydown.escape.window="showCreateTagModal = false">
                     <div class="fixed inset-0 bg-black/30" @click="showCreateTagModal = false"></div>
-                    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" @click.stop>
-                        <h3 class="text-base font-semibold text-stone-800 mb-4">Create new tag</h3>
-                        <input type="text" x-ref="newTagNameInput" x-model="newTagName"
+                    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" @click.stop
+                         x-trap.noscroll="showCreateTagModal" role="dialog" aria-modal="true" aria-labelledby="landing-create-tag-title">
+                        <h3 id="landing-create-tag-title" class="text-base font-semibold text-stone-800 mb-4">Create new tag</h3>
+                        <input type="text" x-ref="newTagNameInput" x-model="newTagName" aria-labelledby="landing-create-tag-title"
                                @keydown.enter.prevent="if(newTagName.trim()) { _persistTag(newTagName.trim()); if(!allTags.includes(newTagName.trim())) { allTags.push(newTagName.trim()); allTags.sort(); } showCreateTagModal = false; newTagName = ''; }"
                                class="w-full text-sm px-3 py-2.5 rounded-xl border border-stone-200 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all"
                                placeholder="Tag name...">
@@ -496,7 +495,7 @@
                             <button type="button"
                                     @click="if(newTagName.trim()) { _persistTag(newTagName.trim()); if(!allTags.includes(newTagName.trim())) { allTags.push(newTagName.trim()); allTags.sort(); } showCreateTagModal = false; newTagName = ''; }"
                                     class="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors"
-                                    style="background: var(--primary);"
+                                    style="background: var(--primary-strong);"
                                     :class="newTagName.trim() ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'">
                                 Create
                             </button>
@@ -542,9 +541,10 @@
          class="fixed inset-0 z-[200] flex items-center justify-center"
          @keydown.escape.window="showExploreModal = false">
         <div class="fixed inset-0 bg-black/30" @click="showExploreModal = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[720px] mx-4 max-h-[85vh] overflow-hidden" @click.stop>
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[720px] mx-4 max-h-[85vh] overflow-hidden" @click.stop
+             x-trap.noscroll="showExploreModal" role="dialog" aria-modal="true" aria-label="Explore feeds">
             <!-- Close button -->
-            <button @click="showExploreModal = false"
+            <button @click="showExploreModal = false" aria-label="Close"
                     class="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-all cursor-pointer">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -565,9 +565,10 @@
          class="idea-modal-overlay"
          @click.self="closeCreateModal()"
          @keydown.escape.window="closeCreateModal()">
-        <div class="idea-modal" @click.stop>
+        <div class="idea-modal" @click.stop
+             x-trap.noscroll="showCreateModal" role="dialog" aria-modal="true" aria-labelledby="landing-create-idea-title">
             <!-- Close button -->
-            <button type="button" class="idea-modal-close" @click="closeCreateModal()" title="Close">
+            <button type="button" class="idea-modal-close" @click="closeCreateModal()" title="Close" aria-label="Close">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
             <form action="{% url 'composer:idea_create' workspace_id=workspace.id %}"
@@ -583,11 +584,11 @@
 
                 <!-- Header -->
                 <div class="idea-modal-header">
-                    <h2 class="text-lg font-semibold" style="color: var(--text-primary);">Create Idea</h2>
+                    <h2 id="landing-create-idea-title" class="text-lg font-semibold" style="color: var(--text-primary);">Create Idea</h2>
                     <div class="flex items-center gap-2">
                         <!-- Column selector dropdown -->
                         <div class="relative" @click.away="createGroupDropdownOpen = false">
-                            <button type="button" class="idea-pill-btn" @click="createGroupDropdownOpen = !createGroupDropdownOpen; createTagDropdownOpen = false">
+                            <button aria-haspopup="true" :aria-expanded="createGroupDropdownOpen" type="button" class="idea-pill-btn" @click="createGroupDropdownOpen = !createGroupDropdownOpen; createTagDropdownOpen = false">
                                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                                 <span x-text="createGroupLabel()"></span>
                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
@@ -606,10 +607,10 @@
 
                         <!-- Tags dropdown -->
                         <div class="relative" @click.away="createTagDropdownOpen = false">
-                            <button type="button" class="idea-pill-btn" @click="createTagDropdownOpen = !createTagDropdownOpen; createGroupDropdownOpen = false; if(createTagDropdownOpen) $nextTick(() => $refs.createTagSearchInput.focus())">
+                            <button aria-haspopup="true" :aria-expanded="createTagDropdownOpen" type="button" class="idea-pill-btn" @click="createTagDropdownOpen = !createTagDropdownOpen; createGroupDropdownOpen = false; if(createTagDropdownOpen) $nextTick(() => $refs.createTagSearchInput.focus())">
                                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                                 <span>Tags</span>
-                                <span x-show="createSelectedTags.length" class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-white" style="background: var(--primary);" x-text="createSelectedTags.length"></span>
+                                <span x-show="createSelectedTags.length" class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-white" style="background: var(--primary-strong);" x-text="createSelectedTags.length"></span>
                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
                             </button>
                             <div x-show="createTagDropdownOpen" x-cloak x-transition class="idea-pill-dropdown">
@@ -619,7 +620,7 @@
                                            @keydown.enter.prevent="if (createTagSearch.trim() && !filteredCreateTags.includes(createTagSearch.trim())) { persistAndToggleCreateTag(createTagSearch.trim()); } else if (filteredCreateTags.length === 1) { toggleCreateTag(filteredCreateTags[0]); createTagSearch = ''; }"
                                            class="w-full text-xs px-2 py-1.5 rounded border outline-none"
                                            style="border-color: var(--border);"
-                                           placeholder="Search or create tag...">
+                                           placeholder="Search or create tag..." aria-label="Search or create tag">
                                 </div>
                                 <!-- Filtered tag list -->
                                 <template x-for="tag in filteredCreateTags" :key="tag">
@@ -661,8 +662,8 @@
                         <template x-for="tag in createSelectedTags" :key="tag">
                             <span class="idea-tag-chip">
                                 <span x-text="tag"></span>
-                                <button type="button" @click="toggleCreateTag(tag)">
-                                    <svg width="8" height="8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <button :aria-label="'Remove tag ' + tag" type="button" @click="toggleCreateTag(tag)">
+                                    <svg aria-hidden="true" width="8" height="8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                 </button>
                             </span>
                         </template>
@@ -671,8 +672,8 @@
 
                 <!-- Body -->
                 <div class="idea-modal-body" @click="createGroupDropdownOpen = false; createTagDropdownOpen = false">
-                    <input type="text" name="title" required class="idea-title-input" placeholder="Give your idea a title">
-                    <textarea name="description" class="idea-desc-input" placeholder="Let it flow... or"></textarea>
+                    <input type="text" name="title" required class="idea-title-input" placeholder="Give your idea a title" aria-label="Idea title">
+                    <textarea name="description" class="idea-desc-input" placeholder="Let it flow... or" aria-label="Idea description"></textarea>
                     <input type="file" name="media" x-ref="ideaFileInput" accept="image/*,video/*,.gif" style="display:none" multiple
                            @change="_handleFileSelect($event)">
 
@@ -685,8 +686,8 @@
                                 <template x-if="media.media_type !== 'video'">
                                     <img :src="media.url" alt="Preview">
                                 </template>
-                                <button type="button" class="remove-btn" @click="_removeCreateMedia(index)" title="Remove">
-                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <button aria-label="Remove media" type="button" class="remove-btn" @click="_removeCreateMedia(index)" title="Remove">
+                                    <svg aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                 </button>
                             </div>
                         </template>
@@ -709,8 +710,8 @@
                     <span style="margin-right: auto; display: flex; align-items: center; gap: 8px; color: var(--text-tertiary);">
                         <span style="width: 1px; height: 20px; background: var(--border);"></span>
                         <div class="relative">
-                            <button type="button" @click.stop="emojiPickerOpen = !emojiPickerOpen" class="p-1 rounded hover:bg-stone-100 transition-colors cursor-pointer" title="Emoji" style="color: var(--text-tertiary);">
-                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                            <button aria-label="Insert emoji" aria-haspopup="true" :aria-expanded="emojiPickerOpen" type="button" @click.stop="emojiPickerOpen = !emojiPickerOpen" class="p-1 rounded hover:bg-stone-100 transition-colors cursor-pointer" title="Emoji" style="color: var(--text-tertiary);">
+                                <svg aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
                             </button>
                             <div x-show="emojiPickerOpen" x-cloak @click.away="emojiPickerOpen = false"
                                  x-transition:enter="transition ease-out duration-100"
@@ -718,7 +719,7 @@
                                  x-transition:enter-end="opacity-100 scale-100"
                                  class="emoji-picker-popup">
                                 <div class="emoji-picker-search">
-                                    <input type="text" placeholder="Search emoji..." x-model="_emojiSearch"
+                                    <input type="text" placeholder="Search emoji..." aria-label="Search emoji" x-model="_emojiSearch"
                                            class="w-full px-2 py-1.5 text-xs rounded border outline-none"
                                            style="border-color: var(--border);"
                                            @click.stop>
@@ -761,9 +762,10 @@
          class="idea-modal-overlay"
          @click.self="editingIdea = null"
          @keydown.escape.window="editingIdea = null">
-        <div class="idea-modal" @click.stop>
+        <div class="idea-modal" @click.stop
+             x-trap.noscroll="!!editingIdea" role="dialog" aria-modal="true" aria-labelledby="landing-edit-idea-title">
             <!-- Close button -->
-            <button type="button" class="idea-modal-close" @click="editingIdea = null" title="Close">
+            <button type="button" class="idea-modal-close" @click="editingIdea = null" title="Close" aria-label="Close">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
             <form :action="editingIdea ? `/workspace/{{ workspace.id }}/ideas/${editingIdea.id}/edit/` : ''"
@@ -780,11 +782,11 @@
 
                 <!-- Header -->
                 <div class="idea-modal-header">
-                    <h2 class="text-lg font-semibold" style="color: var(--text-primary);">Edit Idea</h2>
+                    <h2 id="landing-edit-idea-title" class="text-lg font-semibold" style="color: var(--text-primary);">Edit Idea</h2>
                     <div class="flex items-center gap-2">
                         <!-- Column selector dropdown -->
                         <div class="relative" @click.away="editGroupDropdownOpen = false">
-                            <button type="button" class="idea-pill-btn" @click="editGroupDropdownOpen = !editGroupDropdownOpen; editTagDropdownOpen = false">
+                            <button aria-haspopup="true" :aria-expanded="editGroupDropdownOpen" type="button" class="idea-pill-btn" @click="editGroupDropdownOpen = !editGroupDropdownOpen; editTagDropdownOpen = false">
                                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                                 <span x-text="editGroupLabel()"></span>
                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
@@ -803,10 +805,10 @@
 
                         <!-- Tags dropdown -->
                         <div class="relative" @click.away="editTagDropdownOpen = false">
-                            <button type="button" class="idea-pill-btn" @click="editTagDropdownOpen = !editTagDropdownOpen; editGroupDropdownOpen = false; if(editTagDropdownOpen) $nextTick(() => $refs.editTagSearchInput.focus())">
+                            <button aria-haspopup="true" :aria-expanded="editTagDropdownOpen" type="button" class="idea-pill-btn" @click="editTagDropdownOpen = !editTagDropdownOpen; editGroupDropdownOpen = false; if(editTagDropdownOpen) $nextTick(() => $refs.editTagSearchInput.focus())">
                                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                                 <span>Tags</span>
-                                <span x-show="editSelectedTags.length" class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-white" style="background: var(--primary);" x-text="editSelectedTags.length"></span>
+                                <span x-show="editSelectedTags.length" class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-white" style="background: var(--primary-strong);" x-text="editSelectedTags.length"></span>
                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
                             </button>
                             <div x-show="editTagDropdownOpen" x-cloak x-transition class="idea-pill-dropdown">
@@ -816,7 +818,7 @@
                                            @keydown.enter.prevent="if (editTagSearch.trim() && !filteredEditTags.includes(editTagSearch.trim())) { persistAndToggleEditTag(editTagSearch.trim()); } else if (filteredEditTags.length === 1) { toggleEditTag(filteredEditTags[0]); editTagSearch = ''; }"
                                            class="w-full text-xs px-2 py-1.5 rounded border outline-none"
                                            style="border-color: var(--border);"
-                                           placeholder="Search or create tag...">
+                                           placeholder="Search or create tag..." aria-label="Search or create tag">
                                 </div>
                                 <!-- Filtered tag list -->
                                 <template x-for="tag in filteredEditTags" :key="tag">
@@ -858,8 +860,8 @@
                         <template x-for="tag in editSelectedTags" :key="tag">
                             <span class="idea-tag-chip">
                                 <span x-text="tag"></span>
-                                <button type="button" @click="toggleEditTag(tag)">
-                                    <svg width="8" height="8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <button :aria-label="'Remove tag ' + tag" type="button" @click="toggleEditTag(tag)">
+                                    <svg aria-hidden="true" width="8" height="8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                 </button>
                             </span>
                         </template>
@@ -870,8 +872,8 @@
                 <div class="idea-modal-body" @click="editGroupDropdownOpen = false; editTagDropdownOpen = false">
                     <input type="text" name="title" required
                            :value="editingIdea?.title || ''"
-                           class="idea-title-input" placeholder="Give your idea a title">
-                    <textarea name="description" class="idea-desc-input" placeholder="Let it flow... or"
+                           class="idea-title-input" placeholder="Give your idea a title" aria-label="Idea title">
+                    <textarea name="description" class="idea-desc-input" placeholder="Let it flow... or" aria-label="Idea description"
                               x-text="editingIdea?.description || ''"></textarea>
                     <input type="file" name="media" x-ref="editIdeaFileInput" accept="image/*,video/*,.gif" style="display:none" multiple
                            @change="_handleEditFileSelect($event)">
@@ -885,8 +887,8 @@
                                 <template x-if="media.media_type !== 'video'">
                                     <img :src="media.url" alt="Preview">
                                 </template>
-                                <button type="button" class="remove-btn" @click="_removeEditMedia(index)" title="Remove">
-                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <button aria-label="Remove media" type="button" class="remove-btn" @click="_removeEditMedia(index)" title="Remove">
+                                    <svg aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                 </button>
                             </div>
                         </template>
@@ -956,13 +958,14 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100 scale-100"
                  x-transition:leave-end="opacity-0 scale-95"
+                 x-trap="showDeleteIdeaConfirm" role="dialog" aria-modal="true" aria-labelledby="landing-delete-idea-title"
                  @click.stop>
                 <div class="mx-auto mb-3 w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <svg aria-hidden="true" class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                     </svg>
                 </div>
-                <h3 class="text-base font-semibold text-stone-800 mb-1">Delete idea?</h3>
+                <h3 id="landing-delete-idea-title" class="text-base font-semibold text-stone-800 mb-1">Delete idea?</h3>
                 <p class="text-sm text-stone-500 mb-5">This action cannot be undone. The idea and all associated data will be permanently removed.</p>
                 <div class="flex gap-3">
                     <button type="button"
@@ -995,9 +998,10 @@
     <template x-teleport="body">
         <div x-show="showIdeaCreateTagModal" x-cloak class="fixed inset-0 z-[220] flex items-center justify-center" @keydown.escape.window="closeIdeaCreateTagModal()">
             <div class="fixed inset-0 bg-black/30" @click="closeIdeaCreateTagModal()"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" @click.stop>
-                <h3 class="text-base font-semibold text-stone-800 mb-4">Create new tag</h3>
-                <input type="text" x-ref="ideaNewTagNameInput" x-model="newIdeaTagName"
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" @click.stop
+                 x-trap="showIdeaCreateTagModal" role="dialog" aria-modal="true" aria-labelledby="landing-idea-create-tag-title">
+                <h3 id="landing-idea-create-tag-title" class="text-base font-semibold text-stone-800 mb-4">Create new tag</h3>
+                <input type="text" x-ref="ideaNewTagNameInput" x-model="newIdeaTagName" aria-labelledby="landing-idea-create-tag-title"
                        @keydown.enter.prevent="createIdeaTagFromModal()"
                        class="w-full text-sm px-3 py-2.5 rounded-xl border border-stone-200 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all"
                        placeholder="Tag name...">
@@ -1009,7 +1013,7 @@
                     <button type="button"
                             @click="createIdeaTagFromModal()"
                             class="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors"
-                            style="background: var(--primary);"
+                            style="background: var(--primary-strong);"
                             :class="newIdeaTagName.trim() ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'">
                         Create
                     </button>
@@ -1023,9 +1027,10 @@
          class="idea-modal-overlay"
          @click.self="viewingTemplate = null"
          @keydown.escape.window="viewingTemplate = null">
-        <div class="idea-modal" @click.stop style="max-width: 560px;">
+        <div class="idea-modal" @click.stop style="max-width: 560px;"
+             x-trap.noscroll="!!viewingTemplate" role="dialog" aria-modal="true" aria-labelledby="landing-template-detail-title">
             <!-- Close button -->
-            <button type="button" class="idea-modal-close" @click="viewingTemplate = null" title="Close">
+            <button type="button" class="idea-modal-close" @click="viewingTemplate = null" title="Close" aria-label="Close">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
 
@@ -1036,7 +1041,7 @@
                     <span x-text="viewingTemplate?.emoji"></span>
                 </div>
                 <!-- Title -->
-                <h2 class="text-xl font-bold text-stone-900 mb-2" style="letter-spacing: -0.01em;"
+                <h2 id="landing-template-detail-title" class="text-xl font-bold text-stone-900 mb-2" style="letter-spacing: -0.01em;"
                     x-text="viewingTemplate?.title"></h2>
                 <!-- Description -->
                 <p class="text-sm leading-relaxed" style="color: var(--text-tertiary);"
@@ -1050,11 +1055,11 @@
                        x-text="viewingTemplate?.body || viewingTemplate?.description"></p>
                     <!-- Actions -->
                     <div class="flex items-center justify-end gap-2 mt-4 pt-3" style="border-top: 1px solid rgba(0,0,0,0.06);">
-                        <button type="button" @click="copyTemplateBody()"
+                        <button aria-label="Copy to clipboard" type="button" @click="copyTemplateBody()"
                                 class="btn-neutral-100 w-9 h-9 rounded-lg border flex items-center justify-center cursor-pointer"
                                 style="border-color: var(--border); color: var(--text-tertiary);"
                                 title="Copy to clipboard">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                            <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                         </button>
                         <button type="button" @click="useTemplate()"
                                 class="btn-primary-tint inline-flex items-center border gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg cursor-pointer"
@@ -1068,8 +1073,8 @@
 
             <!-- Footer with attribution & tags -->
             <div class="px-6 pb-5 flex items-center gap-3">
-                <span class="text-xs font-medium text-stone-400">By</span>
-                <span class="text-xs font-semibold text-stone-600 underline decoration-stone-300 underline-offset-2">SM Bean</span>
+                <span class="text-xs font-medium text-stone-500">By</span>
+                <span class="text-xs font-semibold text-stone-600 underline decoration-stone-300 underline-offset-2">{{ SITE_NAME }}</span>
                 <template x-if="viewingTemplate?.tags?.length > 0">
                     <span class="text-stone-300 mx-1">&bull;</span>
                 </template>

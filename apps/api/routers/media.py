@@ -24,6 +24,7 @@ from django.shortcuts import get_object_or_404
 from ninja import File, Form, Query, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
+from ninja.responses import Status
 
 from apps.api.limits import enforce_http_rate_limits
 from apps.api.middleware import (
@@ -70,6 +71,16 @@ def _parse_tags_csv(value: str | None) -> list[str]:
 # ---------------------------------------------------------------------------
 # POST /api/v1/media/  (Gap 1)
 # ---------------------------------------------------------------------------
+
+
+def _parse_iso_datetime(value: str, field: str):
+    """An ISO-8601 datetime, or a 422 naming the field — never a 500 from the ORM."""
+    from django.utils.dateparse import parse_datetime
+
+    parsed = parse_datetime(value)
+    if parsed is None:
+        raise HttpError(422, f"{field} must be an ISO-8601 datetime")
+    return parsed
 
 
 @router.post(
@@ -122,7 +133,8 @@ def upload(
     except ValueError as exc:
         raise HttpError(422, str(exc)) from exc
     if disposition == "replay":
-        return replay_status, replay_body
+        assert replay_status is not None and replay_body is not None
+        return Status(replay_status, replay_body)
     if disposition == "in_flight":
         raise HttpError(
             409,
@@ -134,10 +146,11 @@ def upload(
     if folder_id is not None:
         from apps.media_library.models import MediaFolder
 
+        # Scoped to the key's workspace, as the cookie-auth upload view is —
+        # org-wide scoping let a key file an asset into another workspace's
+        # folder tree.
         folder = get_object_or_404(
-            MediaFolder.objects.filter(
-                organization=workspace.organization,
-            ),
+            MediaFolder.objects.filter(workspace=workspace),
             id=folder_id,
         )
 
@@ -182,7 +195,7 @@ def upload(
         status_code=status_code,
         body=body.model_dump(mode="json"),
     )
-    return status_code, body
+    return Status(status_code, body)
 
 
 def _flatten_validation_error(exc: ValidationError) -> str:
@@ -281,9 +294,9 @@ def list_media(
     for tag in _parse_tags_csv(tags):
         qs = qs.filter(tags__contains=[tag])
     if created_after:
-        qs = qs.filter(created_at__gte=created_after)
+        qs = qs.filter(created_at__gte=_parse_iso_datetime(created_after, "created_after"))
     if created_before:
-        qs = qs.filter(created_at__lte=created_before)
+        qs = qs.filter(created_at__lte=_parse_iso_datetime(created_before, "created_before"))
     if q:
         qs = MediaAsset.objects.search(q, queryset=qs)
 

@@ -4,6 +4,14 @@
 @source "../../../templates/**/*.html";
 @source "../../../apps/**/templates/**/*.html";
 
+/* stone-500 is the colour secondary copy uses everywhere. Tailwind's #78716C
+   is 4.44:1 on --surface-page (#F7F6F2), just under WCAG AA's 4.5:1; this
+   visually identical shade is 4.57:1 there and 4.94:1 on white. Same value as
+   --text-ghost below. */
+@theme {
+  --color-stone-500: #766F6A;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    WHITE-LABEL TOKEN ARCHITECTURE
    Layer 1 → Brand Tokens   (swap these to white-label)
@@ -13,7 +21,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Brand Tokens - BrightBean Orange */
+  /* Brand Tokens - Primary (orange) */
   --brand-50:  #FFF7ED;
   --brand-100: #FFEDD5;
   --brand-200: #FED7AA;
@@ -25,8 +33,8 @@
   --brand-800: #9A3412;
   --brand-900: #7C2D12;
 
-  /* Brand Tokens - BrightBean Green (the bean in the logo) — used for
-     selection controls (checkboxes, toggle switches) */
+  /* Brand Tokens - Accent (green) — used for selection controls
+     (checkboxes, toggle switches) */
   --brand-green-100: #EFF2DC;
   --brand-green-200: #DDE4B9;
   --brand-green-500: #94A43F;
@@ -42,6 +50,12 @@
   --primary-soft:  var(--brand-50);
   --primary-muted: var(--brand-100);
   --primary-ring:  var(--brand-200);
+  /* AA-safe fill for WHITE text: brand-500 (#F97316) is only ~2.8:1; brand-700
+     (#C2410C) is ~5.2:1. Use --primary-strong for solid buttons/pills that put
+     white text on the accent; keep --primary for borders, rings, links, and
+     tinted (soft/muted) fills where the accent sits on a light background. */
+  --primary-strong:       var(--brand-700);
+  --primary-strong-hover: var(--brand-800);
 
   /* Neutrals - warm stone */
   --neutral-950: #171412;
@@ -69,7 +83,11 @@
   --text-primary:   var(--neutral-900);
   --text-secondary: var(--neutral-600);
   --text-tertiary:  var(--neutral-500);
-  --text-ghost:     var(--neutral-400);
+  /* Was neutral-400 (#A8A29E, ~2.5:1 on white) - too faint for any text.
+     #766F6A clears WCAG AA 4.5:1 on white, --surface-page and --surface-1/2,
+     so every placeholder, label and caption that uses the ghost token passes.
+     Purely decorative greys (dividers, icon strokes) can use --neutral-400. */
+  --text-ghost:     #766F6A;
   --text-inverse:   #FFFFFF;
 
   /* Illustrations */
@@ -416,13 +434,16 @@ img.sidebar-logo-mark {
   cursor: pointer;
   transition: all var(--dur-base) var(--ease-out);
   letter-spacing: 0.005em;
-  background: var(--primary);
+  /* White text needs a darker fill than --primary (brand-500 #F97316 is only
+     ~2.8:1). brand-700 (#C2410C) is ~5.2:1 → WCAG AA. --primary stays the
+     accent for links/rings where it sits on light backgrounds. */
+  background: var(--brand-700);
   color: var(--text-inverse);
   box-shadow: var(--shadow-primary);
   width: 100%;
 }
 .btn-brand:hover {
-  background: var(--primary-hover);
+  background: var(--brand-800);
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(249,115,22,0.35);
 }

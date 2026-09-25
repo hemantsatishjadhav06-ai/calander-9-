@@ -15,8 +15,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# The lock, not the ranges: every build installs exactly the versions CI
+# tested, each checked against its hash. Regenerate it after editing
+# requirements.txt (see the header of requirements.lock).
+COPY requirements.lock .
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY . .
 
@@ -44,4 +47,19 @@ EXPOSE 8000
 # same request without it returned 200. Uploads here are allowed up to 1 GB, so
 # no fixed timeout makes recycling safe. The RSS ratchet it was guarding against
 # is fixed at the source instead (AWS_S3_MAX_MEMORY_SIZE + streaming reads).
-CMD gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4
+# Exec form, so gunicorn is PID 1 and receives SIGTERM itself. In shell form
+# it ran under `sh -c`, which does not forward the signal: Railway sent
+# SIGTERM, nothing drained, and the container was SIGKILLed mid-request.
+# Run as an unprivileged user. Only the local media directory is handed to it
+# (STORAGE_BACKEND=local writes there); the code and collected static files
+# stay root-owned and read-only to the process. Not `chown -R /app`: that
+# would copy every file into a new layer and roughly double the image.
+RUN useradd --create-home --uid 10001 app && mkdir -p /app/media && chown app:app /app/media
+USER app
+
+# `check --deploy` first: its warnings (DEBUG on, a missing secret, an unset
+# salt, insecure cookies — see apps/common/checks.py) land in the deploy log on
+# every start, and an Error-level check stops the container before it takes
+# traffic. It runs here rather than as a Railway pre-deploy command because the
+# pre-deploy step is shared with the worker service (see railway.toml).
+CMD ["sh", "-c", "python manage.py check --deploy && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4"]

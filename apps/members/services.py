@@ -4,7 +4,10 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
+from django.core.validators import validate_email
+from django.db import transaction
 from django.db.models import F, Q
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -74,6 +77,10 @@ def create_invitation(org, email, org_role, workspace_assignments, invited_by, *
         ValueError: If the email already belongs to a member or has a pending invite.
     """
     email = email.strip().lower()
+    try:
+        validate_email(email)
+    except ValidationError as exc:
+        raise ValueError("Enter a valid email address.") from exc
 
     # Check if already a member
     if OrgMembership.objects.filter(organization=org, user__email=email).exists():
@@ -141,7 +148,7 @@ def create_invitation(org, email, org_role, workspace_assignments, invited_by, *
             f"this organization. Check the address with them directly rather than sending it again."
         )
 
-    _check_org_invite_budget(org)
+    budget_day = _check_org_invite_budget(org)
 
     invitation = Invitation.objects.create(
         organization=org,
@@ -159,6 +166,7 @@ def create_invitation(org, email, org_role, workspace_assignments, invited_by, *
         # caller being told the email went out. ``last_sent_at`` stays null,
         # which is the signal the views use.
         logger.warning("Invitation %s created but the email was not sent", invitation.pk)
+        _release_org_invite_budget(org, budget_day)
 
     return invitation
 
@@ -185,7 +193,7 @@ def _recent_send_count(org, email) -> int:
     )
 
 
-def _check_org_invite_budget(org) -> None:
+def _check_org_invite_budget(org):
     """Stop one organization inviting the world in a day.
 
     A new signup owns an organization one request after registering, with no
@@ -203,6 +211,18 @@ def _check_org_invite_budget(org) -> None:
         raise ValueError(
             f"This organization has sent its {limit} invitation emails for today. You can send more tomorrow."
         )
+    return day_start
+
+
+def _release_org_invite_budget(org, day_start) -> None:
+    """Refund the daily slot when the invitation email did not go out.
+
+    The cap counts emails sent. Charging for a send the mail server refused
+    meant a bad afternoon of SMTP could spend a team's whole day of invites.
+    """
+    from apps.common.mail import release_budget
+
+    release_budget("invite_org_day", str(org.id), day_start)
 
 
 def accept_invitation(invitation, user, *, require_email_match=True):
@@ -229,35 +249,45 @@ def accept_invitation(invitation, user, *, require_email_match=True):
     if require_email_match and user.email.lower() != invitation.email.lower():
         raise ValueError("This invitation was sent to a different email address.")
 
-    # Create org membership (skip if exists, e.g. user was already added)
-    org_membership, created = OrgMembership.objects.get_or_create(
-        user=user,
-        organization=invitation.organization,
-        defaults={"org_role": invitation.org_role},
+    import uuid as uuid_mod
+
+    # Workspaces are hard-deleted, but the invitation's JSON keeps their ids.
+    # Anything that no longer exists in this org is skipped rather than letting
+    # the FK insert raise halfway through: that left the org membership created,
+    # ``accepted_at`` unset, and every retry hitting the same error.
+    live_workspace_ids = set(
+        Workspace.objects.filter(organization=invitation.organization).values_list("id", flat=True)
     )
-
-    # Create workspace memberships
+    assignments = []
     for assignment in invitation.workspace_assignments:
-        import uuid as uuid_mod
-
         ws_id = uuid_mod.UUID(str(assignment["workspace_id"]))
-        role = assignment.get("role", WorkspaceMembership.WorkspaceRole.VIEWER)
-        WorkspaceMembership.objects.get_or_create(
+        if ws_id in live_workspace_ids:
+            assignments.append((ws_id, assignment.get("role", WorkspaceMembership.WorkspaceRole.VIEWER)))
+
+    with transaction.atomic():
+        # Create org membership (skip if exists, e.g. user was already added)
+        org_membership, created = OrgMembership.objects.get_or_create(
             user=user,
-            workspace_id=ws_id,
-            defaults={"workspace_role": role},
+            organization=invitation.organization,
+            defaults={"org_role": invitation.org_role},
         )
 
-    invitation.accepted_at = timezone.now()
-    invitation.save(update_fields=["accepted_at"])
+        for ws_id, role in assignments:
+            WorkspaceMembership.objects.get_or_create(
+                user=user,
+                workspace_id=ws_id,
+                defaults={"workspace_role": role},
+            )
 
-    # Set last workspace for dashboard redirect
-    if invitation.workspace_assignments:
-        import uuid as uuid_mod
+        invitation.accepted_at = timezone.now()
+        invitation.save(update_fields=["accepted_at"])
 
-        first_ws_id = uuid_mod.UUID(str(invitation.workspace_assignments[0]["workspace_id"]))
-        user.last_workspace_id = first_ws_id
-        user.save(update_fields=["last_workspace_id"])
+        # Land the user in the invited workspace. This also makes the org this
+        # request resolves to deterministic for a user who now belongs to two
+        # (see members.middleware: the org owning last_workspace wins).
+        if assignments:
+            user.last_workspace_id = assignments[0][0]
+            user.save(update_fields=["last_workspace_id"])
 
     return org_membership
 
@@ -301,20 +331,27 @@ def resend_invitation(invitation):
     # same daily allowance. Charging only ``create`` would have made the cap a
     # third of what it claims: 25 invitations each resent twice is 75 emails
     # from an organization told it had spent its 25.
-    _check_org_invite_budget(invitation.organization)
+    budget_day = _check_org_invite_budget(invitation.organization)
 
     import secrets
 
+    # The new token is set in memory and only saved once the email carrying it
+    # has gone out. Saving first meant a failed send (mail server down, budget
+    # spent, slot lost to a concurrent click) had already invalidated the link
+    # the invitee was holding from the previous email.
+    previous_token, previous_expiry = invitation.token, invitation.expires_at
     invitation.token = secrets.token_urlsafe(32)
     invitation.expires_at = timezone.now() + timedelta(days=INVITE_EXPIRY_DAYS)
-    invitation.save(update_fields=["token", "expires_at"])
 
     if not _send_invite_email(invitation):
+        invitation.token, invitation.expires_at = previous_token, previous_expiry
+        _release_org_invite_budget(invitation.organization, budget_day)
         # Either a competing request took the slot between the checks above and
         # the atomic reservation, or the send itself was refused. Reporting
         # success would leave someone waiting for an email that is not coming.
         raise ValueError("We could not send that invitation right now. Please try again shortly.")
 
+    invitation.save(update_fields=["token", "expires_at"])
     return invitation
 
 
@@ -339,6 +376,14 @@ def remove_member(org, membership, removed_by):
     """
     if membership.user_id == removed_by.id:
         raise ValueError("You cannot remove yourself from the organization.")
+
+    # Same hierarchy as update_member_org_role: nobody removes someone above
+    # them, and an admin does not remove a fellow admin — only an owner does.
+    caller_level = _inviter_org_level(removed_by, org)
+    existing_level = ORG_ROLE_LEVEL.get(membership.org_role, 0)
+    admin_level = ORG_ROLE_LEVEL[OrgMembership.OrgRole.ADMIN]
+    if caller_level < existing_level or (existing_level >= admin_level and caller_level <= existing_level):
+        raise ValueError("You cannot remove a member whose role is not below your own.")
 
     if membership.org_role == OrgMembership.OrgRole.OWNER:
         owner_count = OrgMembership.objects.filter(organization=org, org_role=OrgMembership.OrgRole.OWNER).count()
@@ -452,13 +497,17 @@ def update_workspace_assignments(org, user, assignments, *, inviter=None):
         if ws_id not in desired:
             m.delete()
 
-    # Create or update
+    # Create or update. Assigning a built-in role replaces a custom role: the
+    # effective permissions come from custom_role when it is set, so leaving it
+    # in place showed "viewer" on the roster while the custom role's grants
+    # still applied.
     for ws_id, role in desired.items():
         if ws_id in current_map:
             m = current_map[ws_id]
-            if m.workspace_role != role:
+            if m.workspace_role != role or m.custom_role_id is not None:
                 m.workspace_role = role
-                m.save(update_fields=["workspace_role"])
+                m.custom_role = None
+                m.save(update_fields=["workspace_role", "custom_role"])
         else:
             WorkspaceMembership.objects.create(
                 user=user,
@@ -527,6 +576,7 @@ def _send_invite_email(invitation) -> bool:
 
     app_url = getattr(settings, "APP_URL", "http://localhost:8000").rstrip("/")
     accept_url = f"{app_url}/members/invite/{invitation.token}/accept/"
+    site_name = getattr(settings, "SITE_NAME", "")
 
     context = {
         "invitation": invitation,
@@ -534,9 +584,16 @@ def _send_invite_email(invitation) -> bool:
         "org_name": invitation.organization.name,
         "invited_by": invitation.invited_by,
         "app_url": app_url,
+        # Emails render outside the request cycle, so context processors don't
+        # run — pass branding explicitly.
+        "SITE_NAME": site_name,
     }
 
-    subject = f"You've been invited to join {invitation.organization.name} on Brightbean"
+    # A deployment may blank SITE_NAME to white-label; drop the suffix rather
+    # than trailing a bare "on".
+    subject = f"You've been invited to join {invitation.organization.name}"
+    if site_name:
+        subject = f"{subject} on {site_name}"
     text_content = render_to_string("members/email/invite.txt", context)
     html_content = render_to_string("members/email/invite.html", context)
 

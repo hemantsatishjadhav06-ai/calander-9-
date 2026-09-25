@@ -21,7 +21,7 @@
         </div>
         <div class="flex-1 min-w-0">
             <div class="text-sm font-semibold text-stone-800">Get started</div>
-            <div class="text-xs text-stone-400">{{ checklist_completed_count }} of {{ checklist_total_count }} complete</div>
+            <div class="text-xs text-stone-500">{{ checklist_completed_count }} of {{ checklist_total_count }} complete</div>
         </div>
         <!-- Progress ring -->
         <div class="relative w-8 h-8 flex-shrink-0">
@@ -55,29 +55,29 @@
                 </div>
                 <div>
                     <div class="text-sm font-semibold text-stone-800">Get started</div>
-                    <div class="text-xs text-stone-400">{{ checklist_completed_count }} of {{ checklist_total_count }} complete</div>
+                    <div class="text-xs text-stone-500">{{ checklist_completed_count }} of {{ checklist_total_count }} complete</div>
                 </div>
             </div>
             <div class="flex items-center gap-1">
                 <!-- Progress bar -->
                 <div class="w-14 h-1 bg-stone-100 rounded-full overflow-hidden mr-1">
-                    <div class="h-full rounded-full transition-all duration-300" style="width: {% widthratio checklist_completed_count checklist_total_count 100 %}%; background: var(--primary);"></div>
+                    <div class="h-full rounded-full transition-all duration-300" style="width: {% widthratio checklist_completed_count checklist_total_count 100 %}%; background: var(--primary-strong);"></div>
                 </div>
                 <!-- Collapse button -->
-                <button @click="open = false"
+                <button aria-label="Minimize checklist" @click="open = false"
                         class="w-6 h-6 flex items-center justify-center rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer"
                         title="Minimize">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"/>
                     </svg>
                 </button>
                 <!-- Dismiss button -->
-                <button hx-post="{% url 'onboarding:dismiss_checklist' workspace_id=request.workspace.id %}"
+                <button aria-label="Dismiss checklist" hx-post="{% url 'onboarding:dismiss_checklist' workspace_id=request.workspace.id %}"
                         hx-target="#onboarding-checklist"
                         hx-swap="outerHTML"
                         class="w-6 h-6 flex items-center justify-center rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer"
                         title="Dismiss checklist">
-                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg aria-hidden="true" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                     </svg>
                 </button>
@@ -101,8 +101,8 @@
             </div>
             {% endif %}
             <div class="flex-1 min-w-0">
-                <div class="text-[13px] font-medium {% if item.completed %}text-stone-400 line-through{% else %}text-stone-700{% endif %}">{{ item.title }}</div>
-                <div class="text-[11px] text-stone-400 leading-tight">{{ item.description }}</div>
+                <div class="text-[13px] font-medium {% if item.completed %}text-stone-500 line-through{% else %}text-stone-700{% endif %}">{{ item.title }}</div>
+                <div class="text-[11px] text-stone-500 leading-tight">{{ item.description }}</div>
             </div>
             {% if not item.completed %}
             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-300 group-hover:text-stone-500 transition-colors flex-shrink-0">

@@ -59,6 +59,7 @@ def check_social_account_health(account_id: str):
     # Platforms whose refresh token outlives the access token are deliberately
     # left out: for them an unknown expiry means nothing needs doing yet.
     needs_expiry_bootstrap = account.platform in EXPIRY_BOOTSTRAP_PLATFORMS and account.token_expires_at is None
+    refreshed_tokens = False
     if (account.is_token_expiring_soon or needs_expiry_bootstrap) and account.oauth_refresh_token:
         try:
             new_tokens = provider.refresh_token(account.oauth_refresh_token)
@@ -69,6 +70,7 @@ def check_social_account_health(account_id: str):
                 account.token_expires_at = timezone.now() + timedelta(seconds=new_tokens.expires_in)
             account.connection_status = SocialAccount.ConnectionStatus.CONNECTED
             account.last_error = ""
+            refreshed_tokens = True
             logger.info("Health check: refreshed token for %s", account)
         except Exception as e:
             logger.warning("Health check: token refresh failed for %s: %s", account, e)
@@ -110,11 +112,13 @@ def check_social_account_health(account_id: str):
         account.last_error = friendly_health_check_error(e)
 
     account.last_health_check_at = timezone.now()
+    # Token columns are written only when this run rotated them. The check
+    # spends seconds on the network, and a reconnect landing in that window
+    # used to be overwritten with the tokens loaded before it.
+    token_fields = ["oauth_access_token", "oauth_refresh_token", "token_expires_at"] if refreshed_tokens else []
     account.save(
         update_fields=[
-            "oauth_access_token",
-            "oauth_refresh_token",
-            "token_expires_at",
+            *token_fields,
             "follower_count",
             "avatar_url",
             "account_name",

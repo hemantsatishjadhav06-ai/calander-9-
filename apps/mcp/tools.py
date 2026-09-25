@@ -51,8 +51,3 @@ def all_tools() -> list[Tool]:
 
 def get_tool(name: str) -> Tool | None:
     return _REGISTRY.get(name)
-
-
-def _reset_registry_for_tests() -> None:  # pragma: no cover
-    """Test-only helper for re-importing handlers without collisions."""
-    _REGISTRY.clear()

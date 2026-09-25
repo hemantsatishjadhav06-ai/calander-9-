@@ -49,7 +49,8 @@ def backwards(apps, schema_editor):
     from apps.composer.status import derive_post_status
 
     Post = apps.get_model("composer", "Post")
-    for post in Post.objects.prefetch_related("platform_posts").iterator():
+    # prefetch_related is silently ignored by iterator() without chunk_size.
+    for post in Post.objects.prefetch_related("platform_posts").iterator(chunk_size=500):
         statuses = [pp.status for pp in post.platform_posts.all()]
         post.status = derive_post_status(statuses)
         post.save(update_fields=["status"])

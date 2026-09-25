@@ -5,12 +5,16 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 
+from apps.common.net import client_ip
+
 # Paths that are rate-limited for unauthenticated POST requests (auth flows)
 AUTH_RATE_LIMITED_PATHS = (
     "/accounts/login/",
     "/accounts/signup/",
     "/accounts/password/reset/",
     "/accounts/password/reset/key/",
+    # The Django admin's own login had no throttle at all.
+    "/admin/login/",
 )
 
 # Rate limit: 10 POST requests per minute per IP for auth endpoints
@@ -22,6 +26,12 @@ EXEMPT_PATH_PREFIXES = (
     "/accounts/logout/",
     "/accounts/google/",
     "/accounts/3rdparty/",
+    # Public policy pages: a not-yet-accepted user must be able to read the
+    # Terms/Privacy linked from the acceptance page without being redirected
+    # back to it.
+    "/terms/",
+    "/privacy/",
+    "/pricing/",
     "/health/",
     "/static/",
     # Uploaded media, served by config/urls.py when SERVE_MEDIA is on. No view
@@ -65,17 +75,27 @@ class AuthRateLimitMiddleware:
             ip = self._get_client_ip(request)
             cache_key = f"auth_ratelimit:{hashlib.md5(ip.encode()).hexdigest()}"
 
-            attempts = cache.get(cache_key, 0)
-            if attempts >= AUTH_RATE_LIMIT:
-                return HttpResponse("Too many requests. Please try again later.", status=429)
-
-            cache.set(cache_key, attempts + 1, AUTH_RATE_WINDOW)
+            # Anchor the window at the first attempt (add seeds the TTL; incr
+            # bumps without touching it) so a steady stream of requests can't
+            # keep pushing the expiry out. cache.add returns False when the key
+            # already exists.
+            if not cache.add(cache_key, 1, AUTH_RATE_WINDOW):
+                try:
+                    attempts = cache.incr(cache_key)
+                except ValueError:
+                    # Key's TTL lapsed between add and incr — re-seed.
+                    cache.set(cache_key, 1, AUTH_RATE_WINDOW)
+                    attempts = 1
+                if attempts > AUTH_RATE_LIMIT:
+                    return HttpResponse("Too many requests. Please try again later.", status=429)
 
         return self.get_response(request)
 
     @staticmethod
     def _get_client_ip(request):
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            return x_forwarded_for.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR", "")
+        """The client IP, trusting X-Forwarded-For only from a proxy we run.
+
+        Shared with ``apps.api.limits`` so the throttle and the audit log can
+        never disagree about who a request came from.
+        """
+        return client_ip(request) or ""
