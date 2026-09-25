@@ -48,6 +48,8 @@ def create_folder(organization, workspace, name, parent_folder=None):
     """Create a new media folder."""
     if parent_folder:
         check_folder_depth(parent_folder)
+    if MediaFolder.objects.filter(workspace=workspace, parent_folder=parent_folder, name=name).exists():
+        raise ValidationError("A folder with this name already exists here.")
     folder = MediaFolder(
         organization=organization,
         workspace=workspace,
@@ -738,11 +740,19 @@ ORPHANED_MEDIA_MIN_AGE_DAYS = 14
 def sweep_orphaned_media(
     *, min_age_days=ORPHANED_MEDIA_MIN_AGE_DAYS, batch_size=100, dry_run=False, log=None, should_continue=None
 ):
-    """Detect and delete media assets not referenced by any post, idea, or template.
+    """Delete composer scratch uploads that never became part of a post.
 
-    Orphans are ``MediaAsset`` rows older than ``min_age_days`` that no foreign
-    key or JSON field points at. Shared by the ``cleanup_orphaned_media``
-    management command and the recurring background task so the two never drift.
+    A candidate is a ``MediaAsset`` older than ``min_age_days`` that no foreign
+    key or JSON field points at **and** that came in through the composer
+    (``source`` set — the composer stamps ``upload``/``unsplash``; the media
+    library's ``create_asset`` leaves it blank). Anything the user put in the
+    library on purpose is never a candidate: library uploads, the org's shared
+    library (no workspace), and anything filed in a folder, starred or tagged.
+    The library is a place to keep things; "not used in a post yet" is not
+    "orphaned" there, and there is no trash to get it back from.
+
+    Shared by the ``cleanup_orphaned_media`` management command and the
+    recurring background task so the two never drift.
 
     Args:
         min_age_days: only consider assets older than this (default 14).
@@ -764,7 +774,17 @@ def sweep_orphaned_media(
     referenced = _fk_referenced_asset_ids() | _json_referenced_asset_ids()
     emit(f"Referenced assets: {len(referenced)}")
 
-    orphaned_qs = MediaAsset.objects.filter(created_at__lt=cutoff).exclude(id__in=referenced)
+    orphaned_qs = (
+        MediaAsset.objects.filter(
+            created_at__lt=cutoff,
+            workspace__isnull=False,
+            folder__isnull=True,
+            is_starred=False,
+            tags=[],
+        )
+        .exclude(source="")
+        .exclude(id__in=referenced)
+    )
     orphaned_ids = list(orphaned_qs.values_list("id", flat=True))
     total = len(orphaned_ids)
     total_bytes = orphaned_qs.aggregate(total=Sum("file_size"))["total"] or 0

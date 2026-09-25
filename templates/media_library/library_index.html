@@ -149,10 +149,7 @@
       <div class="my-3 border-t" style="border-color: var(--surface-2, #F5F5F4);"></div>
 
       <!-- Folder tree -->
-      <div id="folder-tree"
-           hx-get="{% url 'media_library:index' workspace_id=workspace.id %}folders/create/"
-           hx-trigger="folderUpdated from:body"
-           hx-target="#folder-tree">
+      <div id="folder-tree">
         {% include "media_library/_folder_tree.html" %}
       </div>
 

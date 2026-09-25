@@ -14,6 +14,7 @@ from apps.common.validators import normalize_tags
 from apps.members.decorators import require_org_role, require_permission
 
 from .models import MediaAsset, MediaFolder
+from .quotas import StorageQuotaExceededError
 from .services import (
     ProtectedAssetError,
     create_asset,
@@ -38,6 +39,61 @@ def _get_workspace_or_404(request, workspace_id):
 # ──────────────────────────────────────────────────────────────
 
 
+def _quota_message(exc: StorageQuotaExceededError) -> str:
+    from django.template.defaultfilters import filesizeformat
+
+    return (
+        f"Storage quota exceeded: this {filesizeformat(exc.attempted)} file would take the organization past "
+        f"its {filesizeformat(exc.limit)} limit ({filesizeformat(exc.used)} in use). Free up space or raise the plan."
+    )
+
+
+def _uuid_or_none(value):
+    """A UUID query parameter, or None when absent or malformed (never a 500)."""
+    import uuid as uuid_mod
+
+    if not value:
+        return None
+    try:
+        return uuid_mod.UUID(str(value))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _parse_trim_range(start, end, duration):
+    """``(start, end)`` in seconds, or None when the request makes no sense.
+
+    ffmpeg would have failed on ``nan``, a negative start or ``start >= end``
+    anyway — but only in the worker, after a version row marked *Current* had
+    already been created for it.
+    """
+    import math
+
+    try:
+        start_seconds = float(start)
+        end_seconds = float(end)
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(start_seconds) and math.isfinite(end_seconds)):
+        return None
+    if start_seconds < 0 or end_seconds <= start_seconds:
+        return None
+    if duration and end_seconds > float(duration) + 1:
+        return None
+    return start_seconds, end_seconds
+
+
+def _keep_original_version(asset, user):
+    """Before the first edit, record the untouched upload as version 1.
+
+    Edits now replace ``asset.file`` (so what is published is what was edited),
+    which means the original needs a version row of its own to be restorable.
+    """
+    if not asset.versions.exists():
+        create_version(asset=asset, file=asset.file, change_description="Original upload", created_by=user)
+        asset.refresh_from_db(fields=["current_version"])
+
+
 @login_required
 def library_index(request, workspace_id):
     workspace = _get_workspace_or_404(request, workspace_id)
@@ -53,7 +109,7 @@ def library_index(request, workspace_id):
     if file_type and file_type in dict(MediaAsset.MediaType.choices):
         qs = qs.filter(media_type=file_type)
 
-    folder_id = request.GET.get("folder")
+    folder_id = _uuid_or_none(request.GET.get("folder"))
     if folder_id:
         qs = qs.filter(folder_id=folder_id)
     elif request.GET.get("folder") is None and not request.GET.get("q"):
@@ -63,7 +119,7 @@ def library_index(request, workspace_id):
     if starred == "1":
         qs = qs.filter(is_starred=True)
 
-    uploader = request.GET.get("uploader")
+    uploader = _uuid_or_none(request.GET.get("uploader"))
     if uploader:
         qs = qs.filter(uploaded_by_id=uploader)
 
@@ -161,6 +217,8 @@ def upload(request, workspace_id):
             # Enqueue background processing
             process_media_asset(str(asset.id))
             results.append({"id": str(asset.id), "status": "ok"})
+        except StorageQuotaExceededError as e:
+            results.append({"filename": uploaded_file.name, "status": "error", "errors": [_quota_message(e)]})
         except ValidationError as e:
             results.append(
                 {
@@ -321,6 +379,7 @@ def asset_edit(request, workspace_id, asset_id):
                     parts.append(f"Resized to {operations['resize']['width']}x{operations['resize']['height']}")
                 description = ", ".join(parts)
 
+                _keep_original_version(asset, request.user)
                 version = create_version(
                     asset=asset,
                     file=asset.file,
@@ -333,10 +392,13 @@ def asset_edit(request, workspace_id, asset_id):
             start = request.POST.get("trim_start")
             end = request.POST.get("trim_end")
             if start is not None and end is not None:
-                start_seconds = float(start)
-                end_seconds = float(end)
+                trim = _parse_trim_range(start, end, asset.duration)
+                if trim is None:
+                    return JsonResponse({"error": "Invalid trim range"}, status=400)
+                start_seconds, end_seconds = trim
                 description = f"Trimmed to {start_seconds:.1f}s - {end_seconds:.1f}s"
 
+                _keep_original_version(asset, request.user)
                 version = create_version(
                     asset=asset,
                     file=asset.file,
@@ -857,6 +919,8 @@ def shared_upload(request):
             )
             process_media_asset(str(asset.id))
             results.append({"id": str(asset.id), "status": "ok"})
+        except StorageQuotaExceededError as e:
+            results.append({"filename": uploaded_file.name, "status": "error", "errors": [_quota_message(e)]})
         except ValidationError as e:
             results.append(
                 {
@@ -978,6 +1042,7 @@ def shared_asset_edit(request, asset_id):
                     parts.append(f"Resized to {operations['resize']['width']}x{operations['resize']['height']}")
                 description = ", ".join(parts)
 
+                _keep_original_version(asset, request.user)
                 version = create_version(
                     asset=asset,
                     file=asset.file,
@@ -990,10 +1055,13 @@ def shared_asset_edit(request, asset_id):
             start = request.POST.get("trim_start")
             end = request.POST.get("trim_end")
             if start is not None and end is not None:
-                start_seconds = float(start)
-                end_seconds = float(end)
+                trim = _parse_trim_range(start, end, asset.duration)
+                if trim is None:
+                    return JsonResponse({"error": "Invalid trim range"}, status=400)
+                start_seconds, end_seconds = trim
                 description = f"Trimmed to {start_seconds:.1f}s - {end_seconds:.1f}s"
 
+                _keep_original_version(asset, request.user)
                 version = create_version(
                     asset=asset,
                     file=asset.file,

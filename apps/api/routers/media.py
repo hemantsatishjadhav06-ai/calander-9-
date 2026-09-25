@@ -73,6 +73,16 @@ def _parse_tags_csv(value: str | None) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _parse_iso_datetime(value: str, field: str):
+    """An ISO-8601 datetime, or a 422 naming the field — never a 500 from the ORM."""
+    from django.utils.dateparse import parse_datetime
+
+    parsed = parse_datetime(value)
+    if parsed is None:
+        raise HttpError(422, f"{field} must be an ISO-8601 datetime")
+    return parsed
+
+
 @router.post(
     "/",
     response={201: MediaAssetResponse},
@@ -284,9 +294,9 @@ def list_media(
     for tag in _parse_tags_csv(tags):
         qs = qs.filter(tags__contains=[tag])
     if created_after:
-        qs = qs.filter(created_at__gte=created_after)
+        qs = qs.filter(created_at__gte=_parse_iso_datetime(created_after, "created_after"))
     if created_before:
-        qs = qs.filter(created_at__lte=created_before)
+        qs = qs.filter(created_at__lte=_parse_iso_datetime(created_before, "created_before"))
     if q:
         qs = MediaAsset.objects.search(q, queryset=qs)
 

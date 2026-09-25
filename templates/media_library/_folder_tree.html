@@ -17,11 +17,13 @@
     <svg class="w-4 h-4 flex-shrink-0" style="color: var(--text-ghost, #A8A29E);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
     </svg>
-    <span class="truncate flex-1" x-text="'{{ folder.name }}'">{{ folder.name }}</span>
+    <span class="truncate flex-1">{{ folder.name }}</span>
 
     <!-- Folder actions (visible on hover) -->
     <div class="hidden group-hover:flex items-center gap-0.5">
-      <button @click.prevent="folderDeleteName = '{{ folder.name }}'; folderDeleteUrl = '{% url 'media_library:folder_delete' workspace_id=workspace.id folder_id=folder.id %}'; folderToDelete = '{{ folder.id }}'"
+      {# The name goes through data-* attributes, never into an Alpine expression: the browser decodes entities in attribute values before Alpine evaluates them, so a quote in a folder name would otherwise run as script. #}
+      <button data-name="{{ folder.name }}" data-url="{% url 'media_library:folder_delete' workspace_id=workspace.id folder_id=folder.id %}" data-id="{{ folder.id }}"
+              @click.prevent="folderDeleteName = $el.dataset.name; folderDeleteUrl = $el.dataset.url; folderToDelete = $el.dataset.id"
               class="btn-text-hover-primary w-5 h-5 rounded flex items-center justify-center"
               style="color: var(--text-ghost);">
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -40,7 +42,8 @@
       </svg>
       <span class="truncate flex-1">{{ subfolder.name }}</span>
       <div class="hidden group-hover:flex items-center gap-0.5">
-        <button @click.prevent="folderDeleteName = '{{ subfolder.name }}'; folderDeleteUrl = '{% url 'media_library:folder_delete' workspace_id=workspace.id folder_id=subfolder.id %}'; folderToDelete = '{{ subfolder.id }}'"
+        <button data-name="{{ subfolder.name }}" data-url="{% url 'media_library:folder_delete' workspace_id=workspace.id folder_id=subfolder.id %}" data-id="{{ subfolder.id }}"
+                @click.prevent="folderDeleteName = $el.dataset.name; folderDeleteUrl = $el.dataset.url; folderToDelete = $el.dataset.id"
                 class="w-5 h-5 rounded flex items-center justify-center"
                 style="color: var(--text-ghost);">
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

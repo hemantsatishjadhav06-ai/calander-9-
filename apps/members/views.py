@@ -5,6 +5,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.html import escape
 from django.views.decorators.http import require_GET, require_POST
 from django_ratelimit.decorators import ratelimit
 
@@ -159,7 +160,7 @@ def invite_member(request):
         )
     except ValueError as e:
         return HttpResponse(
-            f'<div class="text-red-600 text-sm p-3">{e}</div>',
+            f'<div class="text-red-600 text-sm p-3">{escape(str(e))}</div>',
             status=422,
         )
 
@@ -297,7 +298,7 @@ def update_member_role(request, membership_id):
         services.update_member_org_role(request.org, membership, new_role, caller=request.user)
     except ValueError as e:
         return HttpResponse(
-            f'<div class="text-red-600 text-sm">{e}</div>',
+            f'<div class="text-red-600 text-sm">{escape(str(e))}</div>',
             status=422,
         )
 
@@ -345,7 +346,7 @@ def remove_member(request, membership_id):
         services.remove_member(request.org, membership, request.user)
     except ValueError as e:
         return HttpResponse(
-            f'<div class="text-red-600 text-sm">{e}</div>',
+            f'<div class="text-red-600 text-sm">{escape(str(e))}</div>',
             status=422,
         )
 
