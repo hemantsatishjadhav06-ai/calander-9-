@@ -350,7 +350,12 @@
                         <span class="text-sm font-medium text-stone-700 truncate">{{ account.account_name|default:account.account_handle }}</span>
                     </label>
                     {% empty %}
-                    <span class="text-xs text-stone-400">No accounts connected</span>
+                    {# The one empty state that matters most: with no channel there is nothing to publish to, so say where to fix that. #}
+                    <div class="text-xs text-stone-500 leading-relaxed">
+                        No channels connected yet, so this post can only be saved as a draft.
+                        <a href="{% url 'social_accounts:connect' workspace_id=workspace.id %}" class="font-semibold underline hover:no-underline" style="color: var(--primary-strong);">Connect a channel</a>
+                        to schedule or publish it.
+                    </div>
                     {% endfor %}
                 </div>
 

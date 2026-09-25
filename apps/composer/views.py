@@ -81,6 +81,27 @@ def _is_valid_uuid(value):
     return True
 
 
+def _reject_if_no_channels(request, workspace):
+    """400 when the form names no channel to publish to, else ``None``.
+
+    The message names the real cause: with no connected account the picker is
+    empty and "select a channel" is not an instruction the user can follow.
+    """
+    if _parse_selected_account_ids(request.POST.get("selected_accounts", "")):
+        return None
+    has_any_account = SocialAccount.objects.filter(
+        workspace=workspace, connection_status=SocialAccount.ConnectionStatus.CONNECTED
+    ).exists()
+    if has_any_account:
+        message = "Select at least one channel to publish this post to."
+    else:
+        message = (
+            "No channels are connected to this workspace yet, so there is nowhere to publish to. "
+            "Save it as a draft, or connect a channel from the sidebar first."
+        )
+    return JsonResponse({"errors": {"channels": message}}, status=400)
+
+
 def _require_can_edit_post(request, post):
     """Author, or ``edit_others_posts`` — the rule ``save_post`` enforces.
 
@@ -961,6 +982,18 @@ def save_post(request, workspace_id, post_id=None):
     # which is why we sync those before/after running it.
     pending_target = None  # what to transition existing children to after sync
     initial_status = "draft"  # default status for newly created PlatformPosts
+
+    # A post with no channel selected has nothing to publish to. The composer
+    # disables Schedule / Publish / Queue client-side when nothing is ticked,
+    # but nothing enforced it here, so a direct POST (or a form submit on a
+    # page whose JS had not hydrated) wrote a post that read "scheduled for
+    # <date>" and could never fire — the sync below deletes every deselected
+    # child, so the result was a Post with zero PlatformPost rows. Drafts are
+    # exempt: a caption with no channel yet is a legitimate thing to save.
+    if action in ("schedule", "publish_now", "add_to_queue"):
+        no_channel_error = _reject_if_no_channels(request, workspace)
+        if no_channel_error is not None:
+            return no_channel_error
 
     if action == "schedule":
         aware_dt = _combine_schedule_dt(
@@ -2399,7 +2432,9 @@ def drafts_list(request, workspace_id):
     # Easiest correct query: any post whose only child statuses are "draft".
     drafts = (
         Post.objects.for_workspace(workspace.id)
-        .filter(platform_posts__status="draft")
+        # No channel selected yet is still a draft — before this it was
+        # invisible everywhere, because the join on platform_posts dropped it.
+        .filter(models.Q(platform_posts__status="draft") | models.Q(platform_posts__isnull=True))
         .exclude(
             platform_posts__status__in=[
                 "pending_review",
