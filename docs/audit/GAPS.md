@@ -32,7 +32,6 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | E7 | P3 | Ops | `manage.py check --deploy` is not part of the deploy path. The custom checks in `apps/common/checks.py` only run when someone runs it by hand. | `railway.toml` | Open — add to the pre-deploy command once the live environment is confirmed to pass it (a failing check would block every deploy) |
 | E8 | P3 | Notifications | Turning the **in-app** channel off for an event type still shows those notifications in the bell: the `Notification` row is created for every event (it is what email and webhook deliveries hang off) and the bell lists rows, not in-app deliveries. Fix is to list only notifications with an in-app delivery, which touches five query sites and the existing view tests. | `apps/notifications/views.py`, `engine.notify` | Open |
 | E9 | P3 | Ops | With more than one worker replica, `run_worker`'s boot-time lock release must be disabled (`--keep-locks`). Every shipped target runs one replica; documented in the README. | `apps/common/management/commands/run_worker.py` | Documented |
-| E10 | P3 | Deps | `test_routers.py` still emits 39 django-ninja "Returning tuple" deprecation warnings (removed in ninja 2.0). The source is not a literal `return <status>, <body>` in the routers. | pytest warnings summary | Open — trace and convert to `Status(...)` |
 
 ## Fixed in round 5
 
@@ -42,7 +41,7 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | E2 | P0 | Deps | Django 5.1.15 — 7 findings; 5.2 is the LTS. | 6f4b818 | full suite on 5.2.17 |
 | E3 | P1 | Deps | cryptography 43.0.3 — 10 findings in the library that protects every stored OAuth token. | 6f4b818 | full suite on 49.0.0 |
 | E4 | P3 | Deps | pytest 8.4.2 — 1 finding (dev-only). | 6f4b818 | — |
-| E6 | P3 | API | Two ninja views returned `(status, body)` tuples. | 6f4b818 | — |
+| E6 | P3 | API | Seven ninja views returned `(status, body)` tuples, deprecated in 1.x and removed in 2.0 (48 warnings per test run). | 6f4b818, this round | API suite emits none |
 | W1 | P1 | Worker | **Worker ignored SIGTERM.** django-background-tasks binds SIGTSTP; every platform sends SIGTERM, so each deploy killed the task in flight. | this round | `test_worker_reliability` |
 | W2 | P1 | Worker | **A killed worker left `run_publish_cycle` locked for an hour** (`MAX_RUN_TIME`) — an hour with no publishing after every crash or deploy, nothing in the logs. `run_worker` releases stale locks on boot. | this round | `test_boot_releases_locks_a_dead_worker_left` |
 | W3 | P1 | Worker | **A raising recurring task backed off `attempts**4+5`s and was deleted at 25 attempts**, turning "every 15 seconds" into "never" — silently, until the next release's `migrate`. Every recurring task now runs under `keep_schedule`; the worker re-registers missing schedules on boot. | this round | `KeepScheduleTests`, `test_boot_puts_back_a_schedule_the_library_deleted` |

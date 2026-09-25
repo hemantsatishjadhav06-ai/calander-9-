@@ -175,7 +175,7 @@ def create_reply(request, message_id: uuid.UUID, payload: CreateReplyRequest):
         assert replay_status is not None and replay_body is not None
         if replay_status >= 400:
             raise HttpError(replay_status, replay_body["detail"])
-        return replay_status, replay_body
+        return Status(replay_status, replay_body)
     if disposition == "in_flight":
         raise HttpError(409, "An identical request with this idempotency_key is still in flight; retry shortly.")
 

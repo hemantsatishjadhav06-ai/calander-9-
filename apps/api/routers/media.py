@@ -24,6 +24,7 @@ from django.shortcuts import get_object_or_404
 from ninja import File, Form, Query, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
+from ninja.responses import Status
 
 from apps.api.limits import enforce_http_rate_limits
 from apps.api.middleware import (
@@ -122,7 +123,8 @@ def upload(
     except ValueError as exc:
         raise HttpError(422, str(exc)) from exc
     if disposition == "replay":
-        return replay_status, replay_body
+        assert replay_status is not None and replay_body is not None
+        return Status(replay_status, replay_body)
     if disposition == "in_flight":
         raise HttpError(
             409,
@@ -183,7 +185,7 @@ def upload(
         status_code=status_code,
         body=body.model_dump(mode="json"),
     )
-    return status_code, body
+    return Status(status_code, body)
 
 
 def _flatten_validation_error(exc: ValidationError) -> str:
