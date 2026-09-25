@@ -994,7 +994,14 @@ def save_post(request, workspace_id, post_id=None):
         form = PostForm(request.POST)
 
     if not form.is_valid():
-        return JsonResponse({"errors": form.errors}, status=400)
+        # Labels travel with the errors so the composer can say *which* field
+        # is wrong; a bare "This field is required." told the user nothing.
+        labels = {
+            name: str(form.fields[name].label or name.replace("_", " ").capitalize())
+            for name in form.errors
+            if name in form.fields
+        }
+        return JsonResponse({"errors": form.errors, "error_labels": labels}, status=400)
 
     post = form.save(commit=False)
     post.workspace = workspace
