@@ -51,3 +51,10 @@ def _cached_checklist_items(workspace):
         items = get_checklist_items(workspace)
         cache.set(key, items, CHECKLIST_CACHE_SECONDS)
     return items
+
+
+def invalidate_checklist(workspace_id) -> None:
+    """Drop the cached checklist so the next page shows fresh progress."""
+    from django.core.cache import cache
+
+    cache.delete(f"onboarding_checklist:{workspace_id}")

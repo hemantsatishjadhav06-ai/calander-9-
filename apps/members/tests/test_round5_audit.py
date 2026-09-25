@@ -212,3 +212,34 @@ class OnboardingTests(OrgBase):
         )
         self.assertIn(response.status_code, (200, 302))
         self.assertTrue(ConnectionLink.objects.filter(workspace=self.ws).exists())
+
+
+class ChecklistActivationTests(OrgBase):
+    def test_a_draft_does_not_count_as_scheduling_a_post(self):
+        from apps.composer.models import PlatformPost, Post
+        from apps.social_accounts.models import SocialAccount
+
+        account = SocialAccount.objects.create(
+            workspace=self.ws, platform="bluesky", account_platform_id="d", account_name="a"
+        )
+        post = Post.objects.create(workspace=self.ws, author=self.owner, caption="draft")
+        pp = PlatformPost.objects.create(post=post, social_account=account, status=PlatformPost.Status.DRAFT)
+        item = next(i for i in get_checklist_items(self.ws) if i["key"] == "create_post")
+        self.assertFalse(item["completed"])
+        PlatformPost.objects.filter(pk=pp.pk).update(status=PlatformPost.Status.SCHEDULED)
+        item = next(i for i in get_checklist_items(self.ws) if i["key"] == "create_post")
+        self.assertTrue(item["completed"])
+
+    def test_connecting_a_channel_refreshes_the_cached_checklist(self):
+        from django.core.cache import cache
+
+        from apps.onboarding.context_processors import _cached_checklist_items
+        from apps.social_accounts.models import SocialAccount
+
+        cache.clear()
+        before = next(i for i in _cached_checklist_items(self.ws) if i["key"] == "connect_accounts")
+        self.assertFalse(before["completed"])
+        SocialAccount.objects.create(workspace=self.ws, platform="bluesky", account_platform_id="d", account_name="a")
+        after = next(i for i in _cached_checklist_items(self.ws) if i["key"] == "connect_accounts")
+        self.assertTrue(after["completed"])
+        cache.clear()

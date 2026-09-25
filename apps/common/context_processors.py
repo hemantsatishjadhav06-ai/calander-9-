@@ -18,6 +18,8 @@ def branding(request):
         "LEGAL_TERMS_URL": getattr(settings, "LEGAL_TERMS_URL", "/terms/"),
         "LEGAL_PRIVACY_URL": getattr(settings, "LEGAL_PRIVACY_URL", "/privacy/"),
         "SOURCE_URL": getattr(settings, "SOURCE_URL", ""),
+        # Public CTAs say "Get started" only when anyone can actually sign up.
+        "SIGNUP_OPEN": getattr(settings, "SIGNUP_MODE", "invite_only") == "open",
     }
 
 

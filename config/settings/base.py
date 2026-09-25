@@ -287,7 +287,20 @@ SITE_ID = 1
 # django-allauth
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
-ACCOUNT_EMAIL_VERIFICATION = "none"
+# "none" until SMTP is configured; set ACCOUNT_EMAIL_VERIFICATION=mandatory once
+# mail can actually be delivered, or new users will be locked out waiting for it.
+ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
+
+# Who may create an account.
+#   invite_only (default): only people holding a team invitation link, plus
+#     anyone matching SIGNUP_ALLOWLIST. Strangers posting through this
+#     deployment's own Meta/Google apps can get those apps restricted for every
+#     customer, so an instance is closed until its owner opens it on purpose.
+#   open: anyone can sign up.
+# SIGNUP_ALLOWLIST takes full addresses ("ana@agency.com") and whole domains
+# ("@agency.com"), comma-separated.
+SIGNUP_MODE = env("SIGNUP_MODE", default="invite_only")
+SIGNUP_ALLOWLIST = [entry.strip().lower() for entry in env.list("SIGNUP_ALLOWLIST", default=[]) if entry.strip()]
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 LOGIN_REDIRECT_URL = "/"

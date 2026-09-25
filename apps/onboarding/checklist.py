@@ -37,9 +37,13 @@ def get_checklist_items(workspace):
         },
         {
             "key": "create_post",
-            "title": "Create your first post",
-            "description": "Draft and schedule content for your audience",
-            "completed": Post.objects.for_workspace(workspace_id).exists(),
+            "title": "Schedule your first post",
+            "description": "Put a post on the calendar for one of your channels",
+            # Activation is a post on its way out, not a draft: a lone draft
+            # used to tick this and the checklist declared the team onboarded.
+            "completed": Post.objects.for_workspace(workspace_id)
+            .filter(platform_posts__status__in=["scheduled", "publishing", "published"])
+            .exists(),
             "url": reverse(
                 "composer:compose",
                 kwargs={"workspace_id": workspace_id},

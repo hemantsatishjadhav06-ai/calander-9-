@@ -6,6 +6,8 @@ os.environ.setdefault("ENCRYPTION_KEY_SALT", "test-salt-not-for-production")
 from .base import *  # noqa: F401, F403
 
 DEBUG = False
+# Most tests exercise signup itself; the invite-only rule has its own tests.
+SIGNUP_MODE = "open"
 ALLOWED_HOSTS = ["*"]
 
 # Use faster password hasher in tests

@@ -6,16 +6,16 @@
 {% block auth_content %}
 <style>
   .auth-card .btn-brand {
-    /* Darkened for WCAG AA: white text on #6B7A30 is ~4.7:1 (was #93a240 ~2.7:1). */
-    background-color: #6B7A30;
-    box-shadow: 0 4px 14px rgba(107, 122, 48, 0.28);
+    /* The brand's primary action colour, same as the landing page (WCAG AA with white text). */
+    background-color: var(--primary-strong);
+    box-shadow: 0 4px 14px rgba(194, 65, 12, 0.25);
   }
   .auth-card .btn-brand:hover {
-    background-color: #5C6829;
-    box-shadow: 0 6px 20px rgba(107, 122, 48, 0.35);
+    background-color: var(--brand-800, #9A3412);
+    box-shadow: 0 6px 20px rgba(194, 65, 12, 0.35);
   }
   .auth-card .btn-brand:focus {
-    box-shadow: 0 0 0 3px rgba(107, 122, 48, 0.35);
+    box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.35);
   }
 </style>
 <div class="w-full max-w-md px-4">
@@ -24,7 +24,7 @@
         <div class="inline-flex items-center justify-center w-12 h-12 mb-4">
             <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold tracking-tight" style="background: #C2410C;" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</div>
         </div>
-        <span class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: #6B7A30;">{{ SITE_NAME }}</span>
+        <span class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: var(--primary-strong);">{{ SITE_NAME }}</span>
         <h1 class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">
             Welcome back
         </h1>

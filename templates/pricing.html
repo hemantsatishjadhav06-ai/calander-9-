@@ -70,7 +70,7 @@
       <div class="nav-cta">
         <a class="link" href="/">Features</a>
         <a class="link" href="{% url 'account_login' %}">Sign in</a>
-        <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started</a>
+        <a class="btn btn-primary" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Get started{% else %}Request access{% endif %}</a>
       </div>
     </div>
   </header>
@@ -78,7 +78,7 @@
   <main>
     <div class="head wrap">
       <h1>Free to run yourself. Or let us run it for you.</h1>
-      <p>{{ SITE_NAME }} is open-source (AGPL-3.0). Self-host it for free — every publishing feature, all 11 platforms, and seats, channels and workspaces that are never metered. Or hand the servers to us.</p>
+      <p>{{ SITE_NAME }} is open-source (AGPL-3.0). Self-host it for free — every publishing feature, integrations for all 11 platforms, and seats, channels and workspaces that are never metered. Or hand the servers to us.</p>
     </div>
 
     <div class="wrap">
@@ -90,7 +90,7 @@
           <ul class="feats">
             <li>Every publishing, approval &amp; analytics feature</li>
             <li>Unlimited orgs, workspaces, members &amp; channels — never metered</li>
-            <li>All 11 platform integrations</li>
+            <li>Integrations for all 11 platforms (bring your own developer apps)</li>
             <li>Community support</li>
           </ul>
           <div class="cta"><a class="btn btn-ghost" href="{% if SOURCE_URL %}{{ SOURCE_URL }}{% else %}{% url 'account_signup' %}{% endif %}"{% if SOURCE_URL %} target="_blank" rel="noopener"{% endif %}>Get the source</a></div>
@@ -100,12 +100,11 @@
           <span class="badge">Now in early access</span>
           <h3>Managed Cloud</h3>
           <div class="price">Early access</div>
-          <p class="tag">We run, update, back up and monitor {{ SITE_NAME }} for you — no servers to manage.</p>
+          <p class="tag">We run and update {{ SITE_NAME }} for you — no servers to manage. Free while it's in early access, by invitation.</p>
           <ul class="feats">
-            <li>Fully hosted &amp; auto-updated</li>
-            <li>Managed Postgres, Redis &amp; object storage</li>
-            <li>Daily backups &amp; uptime monitoring</li>
-            <li>Email support</li>
+            <li>Fully hosted &amp; kept up to date</li>
+            <li>Onboarding with the team that builds it</li>
+            <li>Service levels and pricing set before any paid plan starts, with notice</li>
           </ul>
           <div class="cta">
             {% if SUPPORT_EMAIL %}<a class="btn btn-primary" href="mailto:{{ SUPPORT_EMAIL }}?subject=Managed%20Cloud%20early%20access">Request early access</a>
@@ -116,12 +115,11 @@
         <div class="plan">
           <h3>Agency &amp; Enterprise</h3>
           <div class="price">Custom</div>
-          <p class="tag">White-label, onboarding, SLAs and priority support for teams running many clients.</p>
+          <p class="tag">For teams running many clients who want a direct line to the people building it.</p>
           <ul class="feats">
-            <li>White-label branding &amp; custom domain</li>
-            <li>Priority support &amp; SLA</li>
             <li>Migration &amp; onboarding help</li>
-            <li>Volume &amp; reseller terms</li>
+            <li>Roadmap input from day one</li>
+            <li>Volume &amp; reseller terms, when paid plans launch</li>
           </ul>
           <div class="cta">
             {% if SUPPORT_EMAIL %}<a class="btn btn-ghost" href="mailto:{{ SUPPORT_EMAIL }}?subject=Agency%20%2F%20Enterprise%20inquiry">Talk to us</a>
@@ -135,9 +133,9 @@
     <section class="faq wrap">
       <h2>Common questions</h2>
       <div class="qa"><h3>Is it really free?</h3><p>Yes. Self-hosting {{ SITE_NAME }} is free forever, and seats, workspaces and channels are never metered. Publishing, scheduling, approvals, the client portal, inbox and analytics are all included. One optional add-on — AI Intelligence — runs on a paid third-party model and is billed by usage; everything else is free.</p></div>
-      <div class="qa"><h3>How long does it take to connect my accounts?</h3><p>It depends on the platform. Bluesky, Mastodon and DEV.to connect in minutes. Meta (Facebook/Instagram/Threads), TikTok and LinkedIn require you to register your own developer app and pass their review first, which can take days — we document each one step by step.</p></div>
-      <div class="qa"><h3>What am I paying for on Managed Cloud?</h3><p>Convenience: we host, update, back up and monitor the app so you don't run servers. The code stays open-source.</p></div>
-      <div class="qa"><h3>Can I move between self-hosted and managed?</h3><p>Yes. It's the same open-source app — export and move your data whenever you like. No lock-in.</p></div>
+      <div class="qa"><h3>How long does it take to connect my accounts?</h3><p>It depends on the platform. Bluesky, Mastodon and DEV.to connect in minutes. Meta (Facebook/Instagram/Threads), TikTok, LinkedIn and the others need an approved developer app first: self-hosters register their own (we document each step), and on the hosted service they appear as each platform approves ours.</p></div>
+      <div class="qa"><h3>What am I paying for on Managed Cloud?</h3><p>Convenience: we host and update the app so you don't run servers. It's free during early access; we'll publish service levels and pricing, with notice, before anything is charged. The code stays open-source.</p></div>
+      <div class="qa"><h3>Can I move between self-hosted and managed?</h3><p>It's the same open-source app on both, so nothing you rely on is proprietary. Moving an existing workspace between instances is a database migration we'll help with today; a self-serve export is on the roadmap.</p></div>
       <div class="qa"><h3>Which platforms are supported?</h3><p>Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business, Mastodon and DEV.to — via each platform's official API.</p></div>
     </section>
   </main>

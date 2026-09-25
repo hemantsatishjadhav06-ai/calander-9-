@@ -5,12 +5,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ SITE_NAME }} — Open-source social media management</title>
-  <meta name="description" content="{{ SITE_NAME }} is open-source, self-hostable social media management: plan, compose, schedule, approve and publish across 11 platforms from one dashboard. Seats, channels and workspaces are never metered.">
+  <meta name="description" content="{{ SITE_NAME }} is open-source, self-hostable social media management: plan, compose, schedule, approve and publish from one dashboard, with integrations for 11 platforms. Seats, channels and workspaces are never metered.">
   <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ SITE_NAME }}">
   <meta property="og:title" content="{{ SITE_NAME }} — own your social stack">
-  <meta property="og:description" content="Open-source, self-hostable social media management across 11 platforms. Seats, channels and workspaces are never metered.">
+  <meta property="og:description" content="Open-source, self-hostable social media management with integrations for 11 platforms. Seats, channels and workspaces are never metered.">
   <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}/">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
@@ -101,7 +101,7 @@
       <div class="nav-cta">
         <a class="nav-signin" href="{% url 'pricing' %}">Pricing</a>
         <a class="nav-signin" href="{% url 'account_login' %}">Sign in</a>
-        <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started</a>
+        <a class="btn btn-primary" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Get started{% else %}Request access{% endif %}</a>
       </div>
     </div>
   </header>
@@ -111,12 +111,12 @@
       <div class="wrap">
         <span class="pill">Open-source · self-hostable · AGPL-3.0</span>
         <h1>Own your social stack.</h1>
-        <p class="sub">{{ SITE_NAME }} runs the whole content lifecycle for agencies and teams managing many client brands: compose once, route through client approval, publish across 11 platforms. Self-host it and your seats, channels and workspaces are never metered.</p>
+        <p class="sub">{{ SITE_NAME }} runs the whole content lifecycle for agencies and teams managing many client brands: compose once, route through client approval, publish everywhere you've connected (integrations for 11 platforms). Self-host it and your seats, channels and workspaces are never metered.</p>
         <div class="hero-cta">
-          <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started free</a>
+          {% if SIGNUP_OPEN %}<a class="btn btn-primary" href="{% url 'account_signup' %}">Get started free</a>{% else %}<a class="btn btn-primary" href="{% url 'account_signup' %}">Request early access</a>{% endif %}
           <a class="btn btn-ghost" href="{% url 'pricing' %}">See pricing</a>
         </div>
-        <small>Every publishing feature, unlimited seats and channels. Only the optional AI add-on is billed separately.</small>
+        <small>{% if SIGNUP_OPEN %}Every publishing feature, unlimited seats and channels.{% else %}Invite-only while we onboard our first teams. Every publishing feature, unlimited seats and channels.{% endif %}</small>
       </div>
     </section>
 
@@ -158,7 +158,7 @@
           <p>Built for people managing many client accounts who'd rather own their social stack than rent it.</p>
         </div>
         <div class="why-grid">
-          <div class="why-item"><h3>Nothing is metered</h3><p>Add every teammate, client, workspace and channel you want — seats and channels are never counted or charged. Publishing, approvals, inbox and analytics are all included; only the optional AI add-on is billed separately.</p></div>
+          <div class="why-item"><h3>Nothing is metered</h3><p>Add every teammate, client, workspace and channel you want — seats and channels are never counted or charged. Publishing, approvals, inbox and analytics are all included; the optional AI add-on (for self-hosters who enable it) runs on a paid third-party model.</p></div>
           <div class="why-item"><h3>Your data, your infra</h3><p>Deploy on your own VPS or cloud. You connect through your own platform developer apps, so it's your rate limits and your data — with no third party in between.</p></div>
           <div class="why-item"><h3>Open source</h3><p>AGPL-3.0. Read the code, extend it, and never get locked in to a vendor's roadmap.</p></div>
         </div>
@@ -168,8 +168,8 @@
     <section class="final">
       <div class="wrap">
         <h2>Ready to plan your next month of content?</h2>
-        <p>Create your workspace and start drafting straight away. Bluesky, Mastodon and DEV.to connect in minutes; Meta, TikTok and LinkedIn need their own app-review process first — we document every step.</p>
-        <a class="btn btn-primary" href="{% url 'account_signup' %}">Get started free</a>
+        <p>Create your workspace and start drafting straight away. Bluesky, Mastodon and DEV.to connect in minutes. Networks that require an approved developer app (Meta, TikTok, LinkedIn and others) appear as soon as that app is approved{% if not SIGNUP_OPEN %}. Accounts are by invitation for now{% endif %}.</p>
+        {% if SIGNUP_OPEN %}<a class="btn btn-primary" href="{% url 'account_signup' %}">Get started free</a>{% else %}<a class="btn btn-primary" href="{% url 'account_signup' %}">Request early access</a>{% endif %}
       </div>
     </section>
   </main>
