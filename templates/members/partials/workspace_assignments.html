@@ -1,5 +1,5 @@
 <!-- Workspace Assignment Form (loaded via HTMX into modal) -->
-<form hx-post="{% url 'members:manage_workspaces' membership_id=membership.id %}"
+<form hx-post="{% url 'members:manage_workspaces' membership_id=membership.id %}" hx-disabled-elt="find button[type=submit]"
       hx-target="#member-{{ membership.id }}"
       hx-swap="outerHTML">
     {% csrf_token %}

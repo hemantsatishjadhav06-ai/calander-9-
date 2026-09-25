@@ -14,6 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core import signing
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
@@ -854,18 +855,24 @@ def disconnect(request, workspace_id, account_id):
 
     from apps.composer.models import PlatformPost, Post
 
-    orphan_post_ids = list(
-        PlatformPost.objects.filter(social_account=account)
-        .values("post_id")
-        .annotate(total_platforms=Count("post__platform_posts"))
-        .filter(total_platforms=1)
-        .values_list("post_id", flat=True)
-    )
-    if orphan_post_ids:
-        Post.objects.filter(id__in=orphan_post_ids).delete()
+    if PlatformPost.objects.filter(social_account=account, status=PlatformPost.Status.PUBLISHING).exists():
+        messages.error(request, "A post is being published on this account right now. Try again in a minute.")
+        return redirect("social_accounts:list", workspace_id=workspace_id)
 
     account_name = account.account_name or account.account_handle
-    account.delete()
+    # One transaction: the orphaned posts and the account go together or not
+    # at all, rather than a half-applied disconnect on a failure in between.
+    with transaction.atomic():
+        orphan_post_ids = list(
+            PlatformPost.objects.filter(social_account=account)
+            .values("post_id")
+            .annotate(total_platforms=Count("post__platform_posts"))
+            .filter(total_platforms=1)
+            .values_list("post_id", flat=True)
+        )
+        if orphan_post_ids:
+            Post.objects.filter(id__in=orphan_post_ids).delete()
+        account.delete()
 
     messages.success(request, f"Disconnected {account_name}.")
 

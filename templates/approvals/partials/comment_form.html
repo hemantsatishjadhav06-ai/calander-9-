@@ -1,4 +1,4 @@
-<form hx-post="{% url 'approvals:add_comment' workspace_id=workspace.id post_id=post.id %}"
+<form hx-post="{% url 'approvals:add_comment' workspace_id=workspace.id post_id=post.id %}" hx-disabled-elt="find button[type=submit]"
       hx-target="#comment-list-{{ post.id }}"
       hx-swap="outerHTML"
       hx-encoding="multipart/form-data"

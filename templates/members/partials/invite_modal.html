@@ -18,7 +18,7 @@
             </div>
 
             <!-- Form -->
-            <form hx-post="{% url 'members:invite' %}"
+            <form hx-post="{% url 'members:invite' %}" hx-disabled-elt="find button[type=submit]"
                   hx-target="#invitations-list"
                   hx-swap="beforeend"
                   data-inline-error="#invite-error"

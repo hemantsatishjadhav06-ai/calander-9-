@@ -26,7 +26,7 @@ from datetime import timedelta
 from background_task import background
 from django.conf import settings
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -405,6 +405,9 @@ class PublishEngine:
             )
             .annotate(effective_at=Coalesce("scheduled_at", "post__scheduled_at"))
             .filter(effective_at__lte=now)
+            # Defence in depth for the composer's scoping: never publish a post
+            # through a channel that belongs to another workspace.
+            .filter(social_account__workspace_id=F("post__workspace_id"))
             # A row parked on a retry backoff is still SCHEDULED with a
             # scheduled_at in the past, so without this it came straight back on
             # the next 15s tick and the whole backoff schedule was dead code —
@@ -551,7 +554,14 @@ class PublishEngine:
             error_msg = f"Rate limited until {rate_state.window_resets_at}"
             # Our own sentence, not a provider body — but routed through the
             # same parameter so publish_error has exactly one writer.
-            self._schedule_retry(platform_post, error_msg, user_message=PUBLISH_RATE_LIMIT_MESSAGE)
+            # Wait for the window rather than burning the whole retry ladder
+            # inside it and failing the post while the platform is still saying no.
+            self._schedule_retry(
+                platform_post,
+                error_msg,
+                user_message=PUBLISH_RATE_LIMIT_MESSAGE,
+                retry_at=rate_state.window_resets_at,
+            )
             return {"success": False, "error": error_msg}
 
         try:
@@ -1108,7 +1118,10 @@ class PublishEngine:
         # once next_retry_at passes.
         platform_post.status = PlatformPost.Status.SCHEDULED
         platform_post.publish_error = (user_message or PUBLISH_GENERIC_MESSAGE)[:2000]
-        platform_post.save()
+        # update_fields: an UPDATE that matches no row raises instead of
+        # falling back to INSERT, so a child the user deleted mid-publish is
+        # not resurrected as a pending retry.
+        platform_post.save(update_fields=["retry_count", "next_retry_at", "status", "publish_error", "updated_at"])
 
         logger.info(
             "Scheduled retry %d for PlatformPost %s in %d seconds",
@@ -1130,6 +1143,12 @@ class PublishEngine:
                 retry_count__lte=MAX_RETRIES,
                 next_retry_at__lte=now,
             )
+            # A retry is still bound to the post's time: if the user moved the
+            # post to next week during the backoff, the ladder must not fire
+            # it today.
+            .annotate(effective_at=Coalesce("scheduled_at", "post__scheduled_at"))
+            .filter(Q(effective_at__lte=now) | Q(effective_at__isnull=True))
+            .filter(social_account__workspace_id=F("post__workspace_id"))
             .exclude(post__platform_posts__status=PlatformPost.Status.ON_HOLD)
             .select_related("social_account", "post")
         )
@@ -1138,8 +1157,17 @@ class PublishEngine:
             if pp.post.platform_posts.filter(status=PlatformPost.Status.ON_HOLD).exists():
                 continue
             try:
+                # Claim on the row's *current* state, not the state read when
+                # the queryset was built: the previous iteration may have spent
+                # minutes uploading a video, during which this row could have
+                # been unscheduled, held or moved. A blind save would have
+                # overwritten that with ``publishing`` and published it.
+                claimed = PlatformPost.objects.filter(
+                    id=pp.id, status=PlatformPost.Status.SCHEDULED, retry_count=pp.retry_count
+                ).update(status=PlatformPost.Status.PUBLISHING, updated_at=timezone.now())
+                if not claimed:
+                    continue
                 pp.status = PlatformPost.Status.PUBLISHING
-                pp.save(update_fields=["status", "updated_at"])
                 result = self._publish_platform_post(pp)
                 if result.get("async_publish"):
                     # Left in ``publishing`` on purpose — the confirmation sweep
@@ -1330,7 +1358,7 @@ class PublishEngine:
         platform_post.status = PlatformPost.Status.PUBLISHED
         platform_post.published_at = timezone.now()
         platform_post.publish_error = ""
-        platform_post.save()
+        platform_post.save(update_fields=["platform_post_id", "status", "published_at", "publish_error", "updated_at"])
 
         self._drop_queue_entry(platform_post)
         self._sync_parent_published_at(platform_post.post)

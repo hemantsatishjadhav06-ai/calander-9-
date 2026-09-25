@@ -158,6 +158,12 @@ class RecurrenceRule(models.Model):
         blank=True,
         help_text="Timestamp of last recurrence generation run.",
     )
+    # ISO dates (workspace-local) this rule has already produced a post for.
+    # The record of what was generated, independent of the generated posts:
+    # deleting an occurrence to skip a date must not bring it back on the next
+    # run, and matching on caption (the old dedup) broke the moment the source
+    # was edited.
+    generated_dates = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

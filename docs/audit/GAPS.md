@@ -31,6 +31,20 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | E5 | P3 | Deps | No lockfile: `requirements.txt` uses floating ranges, so each deploy resolves whatever is newest inside the range. Reproducibility and the E1–E3 pattern (a range that can never reach the fix) are the same problem. | `requirements.txt` | Open — consider `pip-compile` |
 | E7 | P3 | Ops | `manage.py check --deploy` is not part of the deploy path. The custom checks in `apps/common/checks.py` only run when someone runs it by hand. | `railway.toml` | Open — add to the pre-deploy command once the live environment is confirmed to pass it (a failing check would block every deploy) |
 | E9 | P3 | Ops | With more than one worker replica, `run_worker`'s boot-time lock release must be disabled (`--keep-locks`). Every shipped target runs one replica; documented in the README. | `apps/common/management/commands/run_worker.py` | Documented |
+| F2 | P2 | A11y | Modals have no focus trap, most lack `role="dialog"`, several ignore Escape (invite modals, publish approvals, token reveal, composer ×12, settings, media library). Needs Alpine Focus + `x-trap` + roles across ~20 templates. | audit | Open |
+| F3 | P2 | A11y | Hover-only controls (`opacity-0 group-hover:opacity-100`, `x-show="hovered"`) are invisible to keyboard users at 14 sites. Add `group-focus-within:opacity-100`. | audit | Open |
+| F4 | P2 | A11y | Body copy in `text-stone-400` / `--text-ghost` (≈2.6:1) at ~350 sites and `text-stone-300` at 36; labels and table headers included. Needs a palette pass: reserve those for icons, move copy to `--text-tertiary`. | audit | Open |
+| F6 | P2 | Forms | Composer validation errors lose the field name (`Object.values(errors).flat()`), render in a toast without `role="alert"`, and vanish after 5s. | `compose.html:2722`, `composer/views.py:968` | Open |
+| F7 | P2 | A11y | Inputs with no associated label (event form, categories, idea modal, inbox filter bar, composer ×10, create landing ×8, queues, posting slots, library search). | audit | Open |
+| F8 | P2 | A11y | 63 icon-only buttons with no accessible name; toggles without `aria-expanded`. | audit | Open |
+| F10 | P2 | Forms | Calendar event errors reach the user as raw JSON (`{"error": ...}`) through the global HTMX handler; an end date before the start is silently coerced. | `apps/calendar/views.py` event views | Open |
+| F11 | P3 | Forms | Category create/edit rejects with a bare "Invalid data." | `composer/views.py:3254` | Open |
+| F12 | P2 | Notifications | No unread-notification indicator anywhere: `notificationBell()` in `base.html` is never mounted (and uses the Alpine v2 `__x` API); the drawer partial targets a container no template has. | `base.html:996`, `notifications/partials/drawer.html` | Open — mount a bell in the header |
+| F14 | P3 | UX | Idea modal: Save and Cancel look identical, no initial focus, failure is a `window.alert` that drops the server's reason. | `base.html:635`, `:1196` | Open |
+| C6 | P2 | Concurrency | Web-side status writes (`_transition_or_skip`, chip endpoint, `_sync_platform_posts`, `_bulk_save_platform_posts`, `reschedule_post`) write in-memory state without re-checking the from-status in the WHERE clause; a hold placed while the engine claims the row can be overwritten. The engine's own writes are now guarded, which closes the resurrect-and-republish half of this. | `apps/approvals/services.py:53`, `apps/composer/views.py:1300`, `apps/calendar/views.py:1194` | Open — convert to `filter(id, status=<from>).update()` |
+| C11 | P2 | Product | Disconnecting an account hard-deletes every PlatformPost, PublishLog, analytics snapshot, queue and posting slot on it, and single-target published posts. Now atomic and refused mid-publish, but a soft-disconnect (clear tokens, keep history) is a product decision. | `apps/social_accounts/views.py` `disconnect` | Owner decision |
+| M18 | P3 | Perf | The onboarding checklist runs four existence queries on every authenticated page render. | `apps/onboarding/context_processors.py` | Open — cache per (user, workspace) briefly |
+| M16 | P3 | Members | The org's daily invite budget is charged before the send; a failed send keeps the row and the spent slot. | `apps/members/services.py:144` | Open |
 
 ## Fixed in round 5
 
@@ -67,6 +81,35 @@ Severity: **P0** exploitable or data-losing · **P1** breaks a core flow ·
 | D5 | P3 | Deploy | Dockerfile CMD was shell form, so Gunicorn was not PID 1 and SIGTERM stopped at `sh`. Exec form. | this round | — |
 | D6 | P3 | Data | Migration 0015's reverse used `prefetch_related(...).iterator()` without `chunk_size`, which silently ignores the prefetch: one query per post. | this round | — |
 | D7 | P3 | Docs | README, Procfile, compose, Render and Railway configs all name the worker command consistently (`run_worker`). | this round | — |
+| C1 | P0 | Composer | **Cross-tenant publish.** Autosave bound any account UUID to a post; Schedule then published workspace A's content through workspace B's channel with B's token. Accounts resolved through the workspace; the engine's due and retry queries also refuse a channel from another workspace. | this round | `AutosaveScopingTests`, `TenantGuardTests` |
+| C2 | P1 | Publisher | The retry loop claimed rows on state read minutes earlier and blindly wrote `publishing`, publishing posts the user had unscheduled or held meanwhile. Guarded claim on the row's current state. | this round | `test_a_row_unscheduled_during_the_loop_is_not_published` |
+| C3 | P1 | Publisher | A retry fired on its backoff time even after the post was moved a week out. Retries now also wait for the (new) scheduled time. | this round | `test_a_retry_waits_for_a_later_schedule` |
+| C4 | P1 | Calendar | **Recurrence was dead code**: the composer wrote rules nothing consumed; had it run, dedup by caption would have duplicated posts after any edit, and monthly stepping drifted the 31st to the 28th. Registered hourly under `keep_schedule`; per-rule `generated_dates` ledger; one transaction per occurrence; dates computed from the base; a held source generates nothing. | this round | `RecurrenceTests` |
+| C5 | P1 | Composer | Deleting a child or post mid-publish let the engine's later full-row saves re-insert the deleted row or publish a post the user removed. Delete refuses `publishing`; the engine's retry and confirm writes use `update_fields` (no INSERT fallback). | this round | `DeleteProtectsInFlightTests` |
+| C7 | P2 | Composer | The chip endpoint accepted `published`/`publishing` targets (faking a publish) and moves out of `publishing` (double post). Whitelisted; nothing leaves `publishing` by hand; scheduling a child pins its time so a cancelled sibling cannot strand it. | this round | `TransitionEndpointTests` |
+| C8 | P2 | Composer | Schedule bypassed the approval gate every other path enforces, and the draft hop lifted a client hold. Without `publish_directly`, Schedule is a review request unless the post is approved; `on_hold` never hops through draft. | this round | `ScheduleGateTests` |
+| C9 | P2 | Publisher | A rate-limited publish burned the whole retry ladder inside the window. Retries now wait for `window_resets_at`. | this round | `RateLimitRetryTests` |
+| C10 | P2 | Accounts | Disconnect deleted posts and the account in separate statements outside a transaction, and would delete a row mid-publish. Atomic; refused while a post is publishing. | this round | — |
+| C12 | P2 | Accounts | Two threads refreshing one channel's rotating refresh token: the loser persisted an invalidated token and every scheduled post on the account then failed. Refresh runs under `select_for_update`, adopting a refresh another caller just completed. | this round | full suite |
+| C13 | P3 | Accounts | The health check wrote the token columns back unconditionally, overwriting a reconnect that landed during its network calls. Token fields saved only when the check rotated them. | this round | — |
+| C14 | P3 | Composer | `PostVersion` numbering used `count()+1` (a gap → IntegrityError → 500); now `Max+1`. Deselecting a channel left its queue entry behind; removed with the row. | this round | `VersionNumberingTests` |
+| M1 | P0 | Media | **The orphan sweep deleted library uploads** after 14 days, storage object included, no trash. Restricted to composer scratch uploads. | this round | `OrphanSweepScopeTests` |
+| M2 | P1 | Members | An org admin could remove an owner (with two present) or a fellow admin. | this round | `RemoveMemberHierarchyTests` |
+| M3 | P1 | Media | Stored XSS: a folder name with a quote ran as script in every member's browser (Alpine expression interpolation + `unsafe-eval`). Names via `data-*`. | this round | `FolderNameInjectionTests` |
+| M4 | P1 | Members | A user in two orgs got a random one per request; the org owning the current workspace wins, then the oldest. | this round | `OrgResolutionTests` |
+| M5 | P1 | Media | Image/video edits never reached `asset.file`, so every post published the original. Edits replace the file; the original is kept as version 1. | this round | `EditsReachThePublishedFileTests` |
+| M6 | P1 | Media | Upload over the storage quota was a 500 on the library page. | this round | `test_over_quota_is_reported_not_a_500` |
+| M7 | P2 | Analytics | HTML views ignored `view_analytics`. | this round | `AnalyticsPermissionTests` |
+| M8 | P2 | Members | Accepting an invitation naming a deleted workspace was a 500 with the org membership half-applied. | this round | `test_a_deleted_workspace_in_the_assignments_is_skipped` |
+| M9 | P2 | Members | A failed resend invalidated the link the invitee already had. | this round | `test_a_failed_resend_keeps_the_old_link_valid` |
+| M10 | P2 | Onboarding | "Invite your team" only ticked for a client. | this round | `test_inviting_an_editor_completes_the_team_item` |
+| M11 | P2 | Onboarding | A revoked connection link could page every owner and manager, unlimited. | this round | `test_a_revoked_link_cannot_page_the_team` |
+| M12 | P2 | Members | Assigning a built-in role left a custom role's grants in force. | this round | `CustomRoleTests` |
+| M13–M17, M19, M20 | P3 | Media/Members/Onboarding | Junk `?folder=`/`?uploader=`/API dates 500; nonsense trim ranges; reflected errors unescaped; invitee address unvalidated; junk `expiry_days` 500; dead `hx-get` on the folder tree; duplicate root folder names. | this round | `UploadAndFilterEdgeTests`, `test_a_malformed_address_is_refused`, `test_junk_expiry_days_falls_back` |
+| F1 | P1 | Inbox | Saved replies could not be created or edited from the UI: the New/edit links rendered a page with no form and no list. | this round | `SavedRepliesPageTests` |
+| F5 | P2 | Responsive | Drafts and Sent tables were clipped at 375px with no way to scroll. | this round | — |
+| F9 | P2 | Forms | Double-submit on nine HTMX forms (comments, events, categories, queues, folders, both invite modals, posting slots, workspace assignments). | this round | — |
+| F13, F15, F16 | P3 | UX/A11y | Empty states with no next step; Django messages not announced (`role="status"`/`alert`); client-invite modal's inline error slot never used. | this round | — |
 
 ## Fixed in rounds 1–4 (for the record)
 

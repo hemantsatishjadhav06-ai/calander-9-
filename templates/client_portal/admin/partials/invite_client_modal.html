@@ -18,7 +18,7 @@
             </div>
 
             <!-- Form -->
-            <form hx-post="{% url 'client_portal_admin:invite_client' workspace_id=request.workspace.id %}"
+            <form hx-post="{% url 'client_portal_admin:invite_client' workspace_id=request.workspace.id %}" hx-disabled-elt="find button[type=submit]" data-inline-error="#client-invite-error"
                   hx-target="#pending-invites-section"
                   hx-swap="innerHTML"
                   @htmx:after-request.window="if(event.detail.successful) { showInviteModal = false; document.getElementById('no-invites-placeholder')?.remove(); }"

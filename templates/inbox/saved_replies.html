@@ -24,6 +24,12 @@
         </a>
     </div>
 
+    {% if form %}
+    <div class="mb-6">
+        {% include "inbox/partials/_saved_reply_form.html" %}
+    </div>
+    {% endif %}
+
     <!-- List -->
     {% if saved_replies %}
     <div class="bg-white border border-stone-200 rounded-xl overflow-hidden" style="box-shadow: var(--shadow-xs);">

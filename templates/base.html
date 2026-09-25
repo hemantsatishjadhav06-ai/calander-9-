@@ -961,7 +961,7 @@
                 {% if messages %}
                 <div class="mb-4 space-y-2">
                     {% for message in messages %}
-                    <div class="rounded-md p-4 {% if message.tags == 'error' %}bg-red-50 text-red-800{% elif message.tags == 'success' %}bg-green-50 text-green-800{% else %}bg-blue-50 text-blue-800{% endif %}">
+                    <div role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}" aria-live="{% if message.tags == 'error' %}assertive{% else %}polite{% endif %}" class="rounded-md p-4 {% if message.tags == 'error' %}bg-red-50 text-red-800{% elif message.tags == 'success' %}bg-green-50 text-green-800{% else %}bg-blue-50 text-blue-800{% endif %}">
                         {{ message }}
                     </div>
                     {% endfor %}

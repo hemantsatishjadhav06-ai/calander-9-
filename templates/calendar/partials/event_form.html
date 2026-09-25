@@ -9,6 +9,7 @@
           {% else %}
           hx-post="{% url 'calendar:event_create' workspace_id=workspace.id %}"
           {% endif %}
+          hx-disabled-elt="find button[type=submit]"
           hx-swap="none"
           class="space-y-3">
         {% csrf_token %}

@@ -9,7 +9,7 @@
        @click.stop>
     <h3 class="text-base font-semibold mb-4" style="color: var(--text-primary, #1C1917);">New Folder</h3>
 
-    <form hx-post="{% url 'media_library:folder_create' workspace_id=workspace.id %}"
+    <form hx-post="{% url 'media_library:folder_create' workspace_id=workspace.id %}" hx-disabled-elt="find button[type=submit]"
           hx-target="#folder-tree"
           hx-swap="innerHTML"
           @htmx:after-request="showNewFolder = false">

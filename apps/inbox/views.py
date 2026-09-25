@@ -530,6 +530,8 @@ def saved_reply_create(request, workspace_id):
 
     if request.htmx:
         return render(request, "inbox/partials/_saved_reply_form.html", context)
+    # A plain link lands here: the page needs both the form and the list.
+    context["saved_replies"] = SavedReply.objects.filter(workspace=workspace)
     return render(request, "inbox/saved_replies.html", context)
 
 
@@ -552,6 +554,7 @@ def saved_reply_edit(request, workspace_id, reply_id):
 
     if request.htmx:
         return render(request, "inbox/partials/_saved_reply_form.html", context)
+    context["saved_replies"] = SavedReply.objects.filter(workspace=workspace)
     return render(request, "inbox/saved_replies.html", context)
 
 

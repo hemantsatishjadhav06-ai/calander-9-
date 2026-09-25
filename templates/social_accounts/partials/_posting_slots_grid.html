@@ -100,7 +100,7 @@ Context: account (with prefetched posting_slots), workspace_id.
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                             </button>
                             <form x-show="adding" x-cloak
-                                  hx-post="{% url 'calendar:save_posting_slot' workspace_id=workspace_id %}"
+                                  hx-post="{% url 'calendar:save_posting_slot' workspace_id=workspace_id %}" hx-disabled-elt="find button[type=submit]"
                                   hx-swap="none"
                                   @htmx:after-request="adding = false; newTime = '09:00'"
                                   class="flex items-center justify-center gap-1 mt-1">

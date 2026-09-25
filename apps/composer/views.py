@@ -114,6 +114,13 @@ def _require_can_edit_post(request, post):
         raise PermissionDenied("You do not have permission to change this post.")
 
 
+# Statuses a person may set on a single channel from the composer. The rest
+# (publishing, published) are the publisher's to write.
+USER_TRANSITION_TARGETS = frozenset(
+    {"draft", "pending_review", "pending_client", "approved", "changes_requested", "rejected", "on_hold", "scheduled"}
+)
+
+
 def _parse_selected_account_ids(raw):
     """Split a comma-separated ``selected_accounts`` value into account IDs.
 
@@ -153,7 +160,15 @@ def _remove_deselected_platform_posts(request, post, selected_ids):
     scope = _get_account_scope(request)
     if scope:
         qs = qs.filter(social_account_id=scope)
-    qs.exclude(status__in=PlatformPost.PROTECTED_STATUSES).delete()
+    doomed = qs.exclude(status__in=PlatformPost.PROTECTED_STATUSES)
+    # A queue entry whose channel row is gone would sit on the queue page
+    # forever (the bulk-delete path already does this).
+    from apps.calendar.models import QueueEntry
+
+    QueueEntry.objects.filter(
+        post=post, queue__social_account_id__in=doomed.values_list("social_account_id", flat=True)
+    ).delete()
+    doomed.delete()
 
 
 def _scoped_platform_post_ids(request, post):
@@ -408,7 +423,11 @@ def _validate_pinterest_board_selection(request, post, workspace):
 
 def _save_version(post, user):
     """Create a PostVersion snapshot."""
-    version_number = (post.versions.count()) + 1
+    from django.db.models import Max
+
+    # Max+1 rather than count+1: a gap left by a rolled-back save made count+1
+    # collide with an existing number and 500 the whole save.
+    version_number = (post.versions.aggregate(n=Max("version_number"))["n"] or 0) + 1
     snapshot = {
         "title": post.title,
         "caption": post.caption,
@@ -837,7 +856,16 @@ def _transition_post_children(post, target, *, allow_via_draft=True, only=None):
         try:
             if pp.can_transition_to(target):
                 pp.transition_to(target)
-            elif allow_via_draft and pp.can_transition_to("draft") and target != "draft":
+            elif (
+                allow_via_draft
+                and pp.status != PlatformPost.Status.ON_HOLD
+                and pp.can_transition_to("draft")
+                and target != "draft"
+            ):
+                # on_hold is excluded: a client's brake is lifted only through
+                # resume_hold (to approved), never by a teammate pressing
+                # Schedule — the models module documents that there is no
+                # on_hold → scheduled edge for exactly this reason.
                 pp.transition_to("draft")
                 if pp.can_transition_to(target):
                     pp.transition_to(target)
@@ -995,6 +1023,18 @@ def save_post(request, workspace_id, post_id=None):
         if no_channel_error is not None:
             return no_channel_error
 
+    if action == "schedule":
+        # Same gate as publish_now, the chip menu, drag and the API: only
+        # ``publish_directly`` commits a time. Anyone else's "Schedule" is a
+        # proposal — the post goes to review carrying the chosen time.
+        membership = request.workspace_membership
+        perms = membership.effective_permissions if membership else {}
+        if not perms.get("publish_directly", False):
+            # An approved post is cleared to go out, so its author may put it
+            # on the calendar; anything else needs the reviewers first.
+            statuses = set(post.platform_posts.values_list("status", flat=True)) if post.pk else set()
+            if not statuses or statuses != {PlatformPost.Status.APPROVED}:
+                action = "submit_for_approval"
     if action == "schedule":
         aware_dt = _combine_schedule_dt(
             workspace,
@@ -1283,12 +1323,20 @@ def transition_platform_post(request, workspace_id, post_id, platform_post_id):
     target = (request.POST.get("target_status") or "").strip()
     if not target:
         return JsonResponse({"error": "target_status required"}, status=400)
+    # Editorial targets only. ``publishing`` and ``published`` belong to the
+    # engine: setting them here faked a publish with no platform id, and any
+    # move out of ``publishing`` while an upload is in flight made the row due
+    # again on the next tick — a double post.
+    if target not in USER_TRANSITION_TARGETS:
+        return JsonResponse({"error": f"Cannot set status {target!r} by hand."}, status=400)
+    if pp.status == PlatformPost.Status.PUBLISHING:
+        return JsonResponse({"error": "This post is being published right now."}, status=409)
 
     _require_can_edit_post(request, pp.post)
     membership = request.workspace_membership
     perms = membership.effective_permissions if membership else {}
     approval_states = {"approved", "pending_review", "pending_client", "changes_requested", "rejected"}
-    if target in ("scheduled", "publishing") and not perms.get("publish_directly", False):
+    if target == "scheduled" and not perms.get("publish_directly", False):
         raise PermissionDenied("You do not have permission to schedule this post.")
     if target in approval_states and not perms.get("approve_posts", False) and target != "pending_review":
         raise PermissionDenied("You do not have permission to make approval decisions.")
@@ -1300,7 +1348,14 @@ def transition_platform_post(request, workspace_id, post_id, platform_post_id):
         pp.transition_to(target)
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
-    pp.save(update_fields=[*PlatformPost.TRANSITION_FIELDS, "updated_at"])
+    update_fields = [*PlatformPost.TRANSITION_FIELDS, "updated_at"]
+    if target == "scheduled" and pp.scheduled_at is None and pp.post.scheduled_at is not None:
+        # Pin the time on the child. Relying on the Coalesce fallback alone
+        # stranded this row as "scheduled" with no time once a sibling was
+        # cancelled and sync_post_scheduled_at cleared the parent's.
+        pp.scheduled_at = pp.post.scheduled_at
+        update_fields.append("scheduled_at")
+    pp.save(update_fields=update_fields)
     # Committing a child to publishing obsoletes any draft-stage proposal.
     # Clear it directly rather than via sync_post_scheduled_at: this view sets
     # ``scheduled`` WITHOUT a ``scheduled_at``, and the publisher relies on the
@@ -1382,14 +1437,14 @@ def autosave(request, workspace_id, post_id=None):
                     continue
             del request.session[session_key]
 
-    # Sync platform selections
+    # Sync platform selections. Resolved through the workspace, exactly as
+    # _sync_platform_posts does: a bare ``social_account_id=`` accepted any
+    # UUID, so a crafted autosave could bind another workspace's channel to
+    # this post and a later Schedule would publish through it.
     selected_ids = _parse_selected_account_ids(request.POST.get("selected_accounts", ""))
     _remove_deselected_platform_posts(request, post, selected_ids)
-    for acc_id in selected_ids:
-        PlatformPost.objects.get_or_create(
-            post=post,
-            social_account_id=acc_id,
-        )
+    for account in SocialAccount.objects.filter(id__in=selected_ids, workspace=workspace):
+        PlatformPost.objects.get_or_create(post=post, social_account=account)
 
     # Option A: an autosave that changed an approved post's content reverts it to
     # pending_review so edited content can't publish without a fresh review.
@@ -2481,13 +2536,21 @@ def post_delete(request, workspace_id, post_id):
     _require_can_edit_post(request, post)
 
     account_id = request.GET.get("account") or request.POST.get("account")
+    # Never delete a row the publisher is working on (same rule as bulk delete).
+    # The engine's success and retry writes would re-insert a deleted row —
+    # Django falls back to INSERT when an UPDATE matches nothing — or publish
+    # a post the user believes is gone.
     if account_id:
         pp = get_object_or_404(PlatformPost, post=post, social_account_id=account_id)
+        if pp.status == PlatformPost.Status.PUBLISHING:
+            return HttpResponse("This post is being published right now; wait for it to finish.", status=409)
         pp.delete()
         # If no platform posts remain, clean up the parent post too.
         if not post.platform_posts.exists():
             post.delete()
     else:
+        if post.platform_posts.filter(status=PlatformPost.Status.PUBLISHING).exists():
+            return HttpResponse("This post is being published right now; wait for it to finish.", status=409)
         post.delete()
 
     return HttpResponse(

@@ -26,7 +26,7 @@
         </button>
 
         <form x-show="showForm" x-cloak
-              hx-post="{% url 'composer:category_create' workspace_id=workspace.id %}"
+              hx-post="{% url 'composer:category_create' workspace_id=workspace.id %}" hx-disabled-elt="find button[type=submit]"
               hx-target="body"
               hx-swap="none"
               @htmx:after-request="if(event.detail.successful) { showForm = false; this.reset(); }"

@@ -26,7 +26,7 @@
         </button>
 
         <form x-show="showForm" x-cloak
-              hx-post="{% url 'calendar:queue_create' workspace_id=workspace.id %}"
+              hx-post="{% url 'calendar:queue_create' workspace_id=workspace.id %}" hx-disabled-elt="find button[type=submit]"
               hx-swap="none"
               @htmx:after-request="if(event.detail.successful) { showForm = false; this.reset(); }"
               class="mt-3 p-4 bg-stone-50 rounded-xl border border-stone-200 space-y-3">

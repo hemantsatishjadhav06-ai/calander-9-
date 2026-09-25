@@ -62,6 +62,7 @@
             </div>
             <p class="text-sm font-medium text-stone-700">No templates yet</p>
             <p class="text-xs text-stone-500 mt-1">Save a post as a template from the composer to get started.</p>
+            <a href="{% url 'composer:compose' workspace_id=workspace.id %}" class="inline-block mt-3 text-xs font-semibold" style="color: var(--primary-strong);">Open the composer &rarr;</a>
         </div>
         {% endfor %}
     </div>

@@ -7,7 +7,8 @@ Shows all draft platform posts in a table. Loaded via HTMX into #tab-content.
 
 <div x-data{% if is_htmx %} class="tab-slide-in"{% endif %}>
     {% if platform_posts %}
-    <table class="w-full">
+    <div class="overflow-x-auto -mx-3 sm:mx-0">
+    <table class="w-full min-w-[720px]">
         <thead>
             <tr class="border-b border-stone-200 text-left">
                 <th class="pl-4 w-8"></th>
@@ -86,6 +87,7 @@ Shows all draft platform posts in a table. Loaded via HTMX into #tab-content.
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% else %}
     {% if not has_connected_accounts %}
     {% include "calendar/partials/_no_channels_empty_state.html" %}
