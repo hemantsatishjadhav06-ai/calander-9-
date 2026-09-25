@@ -144,6 +144,17 @@ def is_trusted_proxy(addr: str | None) -> bool:
     return any(ip in network for network in networks)
 
 
+def ratelimit_client_ip(group, request) -> str:
+    """django-ratelimit ``key`` callable: bucket by the real client IP.
+
+    ``key="ip"`` buckets on ``REMOTE_ADDR``, which behind a managed platform's
+    edge is the edge itself — one bucket shared by every caller, so a legitimate
+    sender is throttled by everyone else's traffic and a single abuser can
+    empty it for all of them. See :func:`client_ip` for the trust rules.
+    """
+    return client_ip(request) or ""
+
+
 def client_ip(request) -> str | None:
     """The originating client IP, honouring ``X-Forwarded-For`` only from a proxy we run.
 

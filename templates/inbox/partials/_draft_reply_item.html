@@ -18,6 +18,7 @@
         <button hx-post="{% url 'inbox:send_reply_draft' workspace_id=workspace.id reply_id=draft.id %}"
                 hx-target="#inbox-detail-panel"
                 hx-swap="innerHTML"
+                hx-disabled-elt="this"
                 class="inline-flex items-center gap-1 px-3 py-1 text-[11px] font-semibold text-white rounded-full transition-all"
                 style="background: var(--primary-strong); box-shadow: var(--shadow-primary);">
             {% if draft.status == 'failed' %}Retry send{% else %}Send{% endif %}

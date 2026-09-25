@@ -67,7 +67,17 @@ def resolve_public_ip(url: str) -> str | None:
         addr_infos = socket.getaddrinfo(hostname, port, proto=socket.IPPROTO_TCP)
         for _family, _, _, _, sockaddr in addr_infos:
             ip = ipaddress.ip_address(sockaddr[0])
-            if ip.is_private or ip.is_reserved or ip.is_loopback or ip.is_link_local or ip.is_multicast:
+            # is_global covers the IANA special-purpose ranges the individual
+            # flags miss, notably shared address space 100.64.0.0/10 (CGNAT),
+            # which cloud providers use for internal services.
+            if (
+                ip.is_private
+                or ip.is_reserved
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_multicast
+                or not ip.is_global
+            ):
                 return None
         # Return the first family's IP. Caller will Host-pin against it.
         return str(addr_infos[0][4][0])

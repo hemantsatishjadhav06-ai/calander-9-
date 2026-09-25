@@ -112,6 +112,13 @@ BATCHED_EMAIL_EVENTS = frozenset(BATCH_HEADINGS)
 # The daily digest is not per-event-type, so it has no BATCH_HEADINGS entry.
 DAILY_DIGEST_HEADINGS = ("Your daily digest: {n} notification", "Your daily digest: {n} notifications")
 
+# A user in digest mode has EVERY event type queued. If they switch digest
+# mode off with rows waiting, those rows are flushed per event type — including
+# types that are never batched and so have no BATCH_HEADINGS entry. Without a
+# fallback that was a KeyError, the rows were retried until reaped, and the
+# emails were lost.
+GENERIC_BATCH_HEADINGS = ("{n} new notification", "{n} new notifications")
+
 # Default channel enablement per event type.
 # Key: event_type, Value: dict of channel → default enabled.
 DEFAULT_CHANNELS: dict[str, dict[str, bool]] = {
@@ -168,10 +175,13 @@ def notify(
         logger.warning("Unknown event_type: %s", event_type)
         return None
 
+    # Titles are built from user- and platform-supplied names ("New comment
+    # from <sender>"), and the column is 255 wide: cut here, once, rather than
+    # letting a long display name raise DataError in every caller.
     notification = Notification.objects.create(
         user=user,
         event_type=event_type,
-        title=title,
+        title=title[:255],
         body=body,
         data=data or {},
     )
@@ -393,6 +403,20 @@ def _dispatch_email(delivery: NotificationDelivery) -> None:
     send_or_raise(msg)
 
 
+def _webhook_signing_key() -> bytes:
+    """The HMAC key for outbound webhook signatures.
+
+    ``WEBHOOK_SECRET`` when set. Otherwise a key *derived* from ``SECRET_KEY``
+    rather than ``SECRET_KEY`` itself: signatures are handed to third parties
+    along with the signed payload, and the key that signs sessions and password
+    reset tokens must never be the one an outside party gets to attack offline.
+    """
+    configured = getattr(settings, "WEBHOOK_SECRET", "")
+    if configured:
+        return configured.encode("utf-8")
+    return hashlib.sha256(b"notification-webhook-signing:" + settings.SECRET_KEY.encode("utf-8")).digest()
+
+
 def _dispatch_webhook(delivery: NotificationDelivery) -> None:
     """Send notification via webhook (HTTP POST with HMAC-SHA256 signature).
 
@@ -422,9 +446,8 @@ def _dispatch_webhook(delivery: NotificationDelivery) -> None:
         default=str,
     ).encode("utf-8")
 
-    webhook_secret = getattr(settings, "WEBHOOK_SECRET", settings.SECRET_KEY)
     signature = hmac.new(
-        webhook_secret.encode("utf-8"),
+        _webhook_signing_key(),
         payload,
         hashlib.sha256,
     ).hexdigest()
@@ -506,7 +529,10 @@ def _digest_heading(event_type: str | None, count: int) -> str:
     ``event_type is None`` is the daily digest, which spans every type and so
     has no per-event heading to use.
     """
-    singular, plural = DAILY_DIGEST_HEADINGS if event_type is None else BATCH_HEADINGS[event_type]
+    if event_type is None:
+        singular, plural = DAILY_DIGEST_HEADINGS
+    else:
+        singular, plural = BATCH_HEADINGS.get(event_type, GENERIC_BATCH_HEADINGS)
     return (singular if count == 1 else plural).format(n=count)
 
 

@@ -53,6 +53,7 @@
         <form hx-post="{% url 'inbox:send_reply' workspace_id=workspace.id message_id=message.id %}"
               hx-target="#inbox-thread"
               hx-swap="beforeend"
+              hx-disabled-elt="find button[type=submit]"
               @htmx:after-request="if (!$event.detail.xhr.getResponseHeader('HX-Reply-Failed')) replyText = ''">
             {% csrf_token %}
             <textarea name="body"

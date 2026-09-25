@@ -314,10 +314,19 @@ def send_reply_draft(request, workspace_id, reply_id):
 @require_permission("use_inbox")
 @require_POST
 def discard_reply_draft(request, workspace_id, reply_id):
-    """Delete a draft (or failed) reply."""
+    """Delete a draft (or failed) reply.
+
+    Your own draft, or anyone's if you may send replies: a teammate's unsent
+    words are theirs until someone who could have sent them decides otherwise.
+    """
     workspace = _get_workspace(request, workspace_id)
     reply = _get_workspace_reply(workspace, reply_id)
     message = reply.inbox_message
+
+    membership = request.workspace_membership
+    perms = membership.effective_permissions if membership else {}
+    if reply.author_id != request.user.id and not perms.get("reply_from_inbox", False):
+        return HttpResponse("Only the author or a member who can reply may discard this draft.", status=403)
 
     try:
         inbox_services.discard_reply_draft(reply)
