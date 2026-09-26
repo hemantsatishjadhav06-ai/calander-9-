@@ -1,0 +1,107 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }}</title>
+    <meta name="description" content="{{ meta_description }}">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <meta name="theme-color" content="#FBF9F4">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ site_name }}">
+    <meta property="og:title" content="{{ page_title }}">
+    <meta property="og:description" content="{{ meta_description }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:image" content="{{ site_url }}{% static 'img/brightbean-studio-logo.webp' %}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ page_title }}">
+    <meta name="twitter:description" content="{{ meta_description }}">
+    <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
+    <link rel="icon" type="image/png" sizes="96x96" href="{% static 'favicon/favicon-96x96.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
+    <link rel="manifest" href="{% static 'favicon/site.webmanifest' %}">
+    <link rel="preload" href="{% static 'fonts/instrument-serif-latin-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{% static 'fonts/inter-latin-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="{% static 'css/marketing.css' %}">
+    <script nonce="{{ request.csp_nonce }}">document.documentElement.classList.add("js");</script>
+</head>
+<body class="mk-body">
+<a class="mk-skip" href="#main">Skip to content</a>
+
+<header class="mk-header" data-header>
+    <div class="mk-container mk-header__inner mk-nav-wrap" data-nav>
+        <a class="mk-logo" href="{% url 'marketing:home' %}" aria-label="{{ site_name }} home">
+            <img src="{% static 'img/brightbean-studio-logo.webp' %}" alt="" width="36" height="36">
+            <span>{{ site_name }}<span class="mk-logo__tag"> · Studio</span></span>
+        </a>
+        <nav class="mk-nav" aria-label="Primary">
+            <a href="{% url 'marketing:features' %}" {% if page_key == 'features' %}class="is-active" aria-current="page"{% endif %}>Features</a>
+            <a href="{% url 'marketing:how_it_works' %}" {% if page_key == 'how_it_works' %}class="is-active" aria-current="page"{% endif %}>How it works</a>
+            <a href="{% url 'marketing:platforms' %}" {% if page_key == 'platforms' %}class="is-active" aria-current="page"{% endif %}>Platforms</a>
+            <a href="{% url 'marketing:developers' %}" {% if page_key == 'developers' %}class="is-active" aria-current="page"{% endif %}>Developers</a>
+            <a href="{% url 'marketing:get_started' %}" {% if page_key == 'get_started' %}class="is-active" aria-current="page"{% endif %}>Get started</a>
+            <div class="mk-nav__mobile-cta">
+                <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
+                <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">Create account</a>
+            </div>
+        </nav>
+        <div class="mk-header__actions">
+            <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
+            <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">Create account</a>
+            <button class="mk-nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-label="Toggle navigation"><span></span></button>
+        </div>
+    </div>
+</header>
+
+<main id="main">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="mk-footer">
+    <div class="mk-container">
+        <div class="mk-footer__grid">
+            <div class="mk-footer__brand">
+                <a class="mk-logo" href="{% url 'marketing:home' %}">
+                    <img src="{% static 'img/brightbean-studio-logo.webp' %}" alt="" width="36" height="36">
+                    <span>{{ site_name }}<span class="mk-logo__tag"> · Studio</span></span>
+                </a>
+                <p>Plan, approve, publish and monitor social content for every brand you manage, from one calendar, with your own platform credentials.</p>
+            </div>
+            <div>
+                <h4>Product</h4>
+                <ul>
+                    <li><a href="{% url 'marketing:features' %}">Features</a></li>
+                    <li><a href="{% url 'marketing:how_it_works' %}">How it works</a></li>
+                    <li><a href="{% url 'marketing:platforms' %}">Supported platforms</a></li>
+                    <li><a href="{% url 'marketing:developers' %}">API &amp; MCP</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4>Get going</h4>
+                <ul>
+                    <li><a href="{% url 'account_signup' %}">Create an account</a></li>
+                    <li><a href="{% url 'account_login' %}">Sign in</a></li>
+                    <li><a href="{% url 'marketing:get_started' %}">Self-host it</a></li>
+                    <li><a href="{% url 'marketing:developers' %}#openapi">API reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4>Legal</h4>
+                <ul>
+                    <li><a href="https://brightbean.xyz/terms-of-service/" rel="noopener">Terms of service</a></li>
+                    <li><a href="https://brightbean.xyz/privacy-policy/" rel="noopener">Privacy policy</a></li>
+                    <li><a href="{{ upstream_url }}" rel="noopener">Open-source codebase</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="mk-footer__bottom">
+            <span>&copy; <span data-year>2026</span> {{ site_name }}. All product names and logos belong to their respective owners.</span>
+            <span>Built on <a href="{{ upstream_url }}" rel="noopener">BrightBean Studio</a>, an AGPL-3.0 open-source project.</span>
+        </div>
+    </div>
+</footer>
+
+<script src="{% static 'js/marketing.js' %}" defer></script>
+</body>
+</html>

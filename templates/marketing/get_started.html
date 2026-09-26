@@ -1,0 +1,158 @@
+{% extends "marketing/base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="mk-page-hero mk-page-hero--center">
+    <div class="mk-hero__bg"></div>
+    <div class="mk-container">
+        <div class="mk-page-hero__inner">
+            <span class="mk-eyebrow">Get started</span>
+            <h1 class="mk-h1">Use it here, <em class="mk-accent">or run it yourself.</em></h1>
+            <p class="mk-lead">The hosted app runs exactly the code you can self-host. Pick whichever fits how you like to own your tools.</p>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--flush-top">
+    <div class="mk-container">
+        <div class="mk-grid mk-grid--2">
+            <div class="mk-card mk-card--static reveal" style="padding: 36px;">
+                <span class="mk-badge">Fastest</span>
+                <h2 class="mk-h3" style="font-size: 1.5rem;">Use the hosted app</h2>
+                <p style="margin: 12px 0 22px;">Create an account, make a workspace, connect a channel. Nothing to install and nothing to maintain. Every feature is included.</p>
+                <ul class="mk-bullets" style="margin: 0 0 26px;">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span>Sign up with email or Google</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span>Unlimited workspaces, members and channels</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span>API keys and MCP available from the organisation settings</span></li>
+                </ul>
+                <div class="mk-btn-row">
+                    <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">Create your account {% include "marketing/_icon.html" with name="arrow" %}</a>
+                    <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
+                </div>
+            </div>
+            <div class="mk-card mk-card--static reveal" data-delay="1" style="padding: 36px;">
+                <span class="mk-badge mk-badge--green">Own the stack</span>
+                <h2 class="mk-h3" style="font-size: 1.5rem;">Self-host it</h2>
+                <p style="margin: 12px 0 22px;">Clone the AGPL-3.0 source and run it on a small VPS with Docker Compose, or deploy the included Railway, Render or Heroku configuration. You bring the platform app credentials.</p>
+                <ul class="mk-bullets" style="margin: 0 0 26px;">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span>Five containers: app, worker, PostgreSQL, Caddy with automatic HTTPS, one-shot migrate</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span>Fits a 512 MB instance; scale workers with memory</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span>Local disk or S3-compatible storage for media</span></li>
+                </ul>
+                <div class="mk-btn-row">
+                    <a class="mk-btn mk-btn--dark" href="#docker">Docker Compose guide {% include "marketing/_icon.html" with name="arrow" %}</a>
+                    <a class="mk-btn mk-btn--ghost" href="{{ upstream_url }}" rel="noopener">Source code</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--alt" id="docker">
+    <div class="mk-container">
+        <div class="mk-section-head reveal">
+            <span class="mk-eyebrow">Self-hosting</span>
+            <h2 class="mk-h2">Production on a VPS in <em class="mk-accent">four commands</em></h2>
+            <p class="mk-lead">Docker Compose brings up Gunicorn, the background worker, PostgreSQL and Caddy. Migrations run automatically on start, and Tailwind builds inside the image.</p>
+        </div>
+        <div class="mk-grid mk-grid--2" style="align-items: start;">
+            <div class="reveal">
+                <div class="mk-code"><div class="mk-code__head"><span>On your server</span><button class="mk-copy" type="button" data-copy="code-docker">Copy</button></div><pre id="code-docker">git clone &lt;your-repository-url&gt; sm-bean
+cd sm-bean
+cp .env.example .env
+<span class="c"># edit .env: SECRET_KEY, ALLOWED_HOSTS, APP_URL</span>
+<span class="c"># and DATABASE_URL pointing at the postgres service</span>
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose exec app python manage.py createsuperuser</pre></div>
+                <div class="mk-code" style="margin-top: 16px;"><div class="mk-code__head"><span>To update later</span><button class="mk-copy" type="button" data-copy="code-update">Copy</button></div><pre id="code-update">git pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build</pre></div>
+            </div>
+            <div class="reveal" data-delay="1">
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Point your domain</strong> at the server and set it in the Caddyfile. Caddy fetches the certificate.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Media</strong> is served by Caddy straight from the volume, so large video never occupies an app worker.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Email</strong> for invitations and password resets is any SMTP server; set the EMAIL_* variables.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Platform apps</strong> are registered once per network; the README walks through Meta, LinkedIn, TikTok, Google and Pinterest step by step, including the exact redirect URIs.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Optional extras:</strong> Google SSO, Unsplash search, Sentry, S3-compatible storage.</span></li>
+                </ul>
+                <div class="mk-callout mk-callout--green" style="margin-top: 24px;">
+                    {% include "marketing/_icon.html" with name="info" %}
+                    <p><strong>Ephemeral platforms need object storage.</strong> Railway, Render and Heroku reset their disks on deploy, so set <code>STORAGE_BACKEND=s3</code> with an S3-compatible bucket before uploading media there.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section">
+    <div class="mk-container">
+        <div class="mk-section-head reveal">
+            <span class="mk-eyebrow">Cloud platforms</span>
+            <h2 class="mk-h2">Or let a platform run the containers</h2>
+            <p class="mk-lead">The repository ships a configuration for each of these. All three provision a web process, a worker and PostgreSQL.</p>
+        </div>
+        <div class="mk-deploy">
+            <div class="mk-card reveal">
+                <div class="mk-card__icon mk-card__icon--indigo">{% include "marketing/_icon.html" with name="cloud" %}</div>
+                <h3 class="mk-h3">Railway</h3>
+                <p>Uses <code>railway.toml</code> and the Dockerfile. The web service runs migrations on start, which registers the recurring jobs the worker then picks up. This hosted app runs on Railway.</p>
+                <span class="mk-tag">{% include "marketing/_icon.html" with name="server" %} web · worker · Postgres</span>
+            </div>
+            <div class="mk-card reveal" data-delay="1">
+                <div class="mk-card__icon mk-card__icon--sky">{% include "marketing/_icon.html" with name="cloud" %}</div>
+                <h3 class="mk-h3">Render</h3>
+                <p>A <code>render.yaml</code> blueprint with web, worker and a managed database. Needs a paid instance type so the worker stays up.</p>
+                <span class="mk-tag">{% include "marketing/_icon.html" with name="server" %} Blueprint deploy</span>
+            </div>
+            <div class="mk-card reveal" data-delay="2">
+                <div class="mk-card__icon mk-card__icon--rose">{% include "marketing/_icon.html" with name="cloud" %}</div>
+                <h3 class="mk-h3">Heroku</h3>
+                <p><code>Procfile</code> and <code>app.json</code> for a deploy-button install. Use Basic or larger dynos; Eco dynos sleep and break the worker.</p>
+                <span class="mk-tag">{% include "marketing/_icon.html" with name="server" %} Deploy button ready</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--alt">
+    <div class="mk-container">
+        <div class="mk-grid mk-grid--2" style="align-items: start;">
+            <div class="reveal">
+                <span class="mk-eyebrow">Local development</span>
+                <h2 class="mk-h2" style="margin-bottom: 14px;">Runs on a laptop with SQLite</h2>
+                <p class="mk-lead">No Docker and no database server needed for development. Python 3.12+ and Node 20+ are the only prerequisites.</p>
+                <ul class="mk-bullets" style="margin-top: 22px;">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span>Set <code>DATABASE_URL=sqlite:///db.sqlite3</code> in <code>.env</code></span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span>Three terminals: Tailwind watcher, Django server, background worker</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><code>pytest</code>, <code>ruff</code> and <code>mypy</code> are wired up, with CI running all three</span></li>
+                </ul>
+            </div>
+            <div class="reveal" data-delay="1">
+                <div class="mk-code"><div class="mk-code__head"><span>Local setup</span><button class="mk-copy" type="button" data-copy="code-local">Copy</button></div><pre id="code-local">python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+(cd theme/static_src &amp;&amp; npm install)
+python manage.py migrate
+python manage.py createsuperuser
+
+<span class="c"># three terminals</span>
+(cd theme/static_src &amp;&amp; npm run start)
+python manage.py runserver
+python manage.py process_tasks</pre></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section">
+    <div class="mk-container">
+        <div class="mk-cta reveal">
+            <h2 class="mk-h2">Ready when you are.</h2>
+            <p class="mk-lead">The quickest way to judge it is to schedule one real post.</p>
+            <div class="mk-btn-row">
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:developers' %}">Read the API docs</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

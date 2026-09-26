@@ -1,0 +1,144 @@
+{% extends "marketing/base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="mk-page-hero">
+    <div class="mk-hero__bg"></div>
+    <div class="mk-container">
+        <div class="mk-page-hero__inner">
+            <span class="mk-eyebrow">How it works</span>
+            <h1 class="mk-h1">From connected account to published post, <em class="mk-accent">step by step.</em></h1>
+            <p class="mk-lead">This is the path every piece of content takes through {{ site_name }}, and what the background engine does on your behalf along the way.</p>
+        </div>
+    </div>
+</section>
+
+<!-- The lifecycle -->
+<section class="mk-section mk-section--flush-top">
+    <div class="mk-container mk-container--narrow">
+        <div class="mk-timeline">
+            <div class="mk-tl reveal">
+                <div class="mk-tl__num">1</div>
+                <div class="mk-tl__body">
+                    <h3 class="mk-h3">Create a workspace per brand</h3>
+                    <p>An organisation is your agency or company. Inside it, each brand or client gets a workspace with its own channels, calendar, inbox, media library, approval flow, branding and defaults. Invite teammates with a role, and invite clients with the Client role so they only ever see their own workspace.</p>
+                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="layers" %} Org → workspaces → members</span><span class="mk-tag">{% include "marketing/_icon.html" with name="users" %} Custom roles</span></div>
+                </div>
+            </div>
+            <div class="mk-tl reveal">
+                <div class="mk-tl__num">2</div>
+                <div class="mk-tl__body">
+                    <h3 class="mk-h3">Connect channels with the platform's own login</h3>
+                    <p>Every connector uses the official OAuth flow (or, for Bluesky, Mastodon and DEV.to, an app password, instance URL or API key). Tokens are encrypted before they touch the database and refreshed automatically where the platform issues refresh tokens. Health is checked continuously, and a broken connection shows up in the sidebar before it can fail a post.</p>
+                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="link" %} 13 connectors</span><span class="mk-tag">{% include "marketing/_icon.html" with name="lock" %} Encrypted at rest</span><span class="mk-tag">{% include "marketing/_icon.html" with name="refresh" %} Auto-refresh</span></div>
+                </div>
+            </div>
+            <div class="mk-tl reveal">
+                <div class="mk-tl__num">3</div>
+                <div class="mk-tl__body">
+                    <h3 class="mk-h3">Capture ideas, then compose</h3>
+                    <p>Ideas sit on a Kanban board until they are ready. Promoting one opens the composer with the title, notes and attachments already in place. Select the accounts, write the caption, and adjust anything per platform. The preview on the right shows what each network will render, with its character budget.</p>
+                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="grid" %} Idea board</span><span class="mk-tag">{% include "marketing/_icon.html" with name="edit" %} Per-platform overrides</span><span class="mk-tag">{% include "marketing/_icon.html" with name="image" %} Media variants</span></div>
+                </div>
+            </div>
+            <div class="mk-tl reveal">
+                <div class="mk-tl__num">4</div>
+                <div class="mk-tl__body">
+                    <h3 class="mk-h3">Route it for approval</h3>
+                    <p>If the workspace requires review, the post moves to pending review instead of the queue. Internal reviewers comment and approve; if client review is on, the client gets a magic link to the portal and does the same, without an account. Reminders go out when a decision is overdue. Every action is recorded.</p>
+                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="check" %} None / optional / internal / internal + client</span><span class="mk-tag">{% include "marketing/_icon.html" with name="message" %} Threaded comments</span></div>
+                </div>
+            </div>
+            <div class="mk-tl reveal">
+                <div class="mk-tl__num">5</div>
+                <div class="mk-tl__body">
+                    <h3 class="mk-h3">Schedule into a slot, a queue, or a date</h3>
+                    <p>Pick an exact date and time, drop the post into a queue that owns recurring weekly slots per account, or just hit "next available". Recurring rules can repeat a post daily, weekly or monthly. The calendar shows everything, colour-coded by status, alongside custom events like launches.</p>
+                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="calendar" %} Slots &amp; queues</span><span class="mk-tag">{% include "marketing/_icon.html" with name="clock" %} Workspace time zone</span></div>
+                </div>
+            </div>
+            <div class="mk-tl reveal">
+                <div class="mk-tl__num">6</div>
+                <div class="mk-tl__body">
+                    <h3 class="mk-h3">The engine publishes and confirms</h3>
+                    <p>A background worker picks up due posts, publishes each platform in parallel through its API, and marks per-platform status as it goes. Failures retry with backoff, rate limits are respected per account, the first comment is posted two minutes after the post, and a confirmation sweep makes sure nothing is left in limbo. The details are below.</p>
+                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="zap" %} Parallel dispatch</span><span class="mk-tag">{% include "marketing/_icon.html" with name="refresh" %} Retries 1m · 5m · 30m</span></div>
+                </div>
+            </div>
+            <div class="mk-tl reveal">
+                <div class="mk-tl__num">7</div>
+                <div class="mk-tl__body">
+                    <h3 class="mk-h3">Replies land in the inbox</h3>
+                    <p>Comments, mentions, messages and reviews flow into the unified inbox as they happen. Sentiment is scored, messages can be assigned, and replies go back out through the same API. Historical conversations can be imported with one command.</p>
+                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="inbox" %} Webhooks + polling</span><span class="mk-tag">{% include "marketing/_icon.html" with name="smile" %} Sentiment</span></div>
+                </div>
+            </div>
+            <div class="mk-tl reveal">
+                <div class="mk-tl__num">8</div>
+                <div class="mk-tl__body">
+                    <h3 class="mk-h3">Measure and repeat</h3>
+                    <p>Analytics pull each account's native insights: followers, reach, views, watch time, engagement. Compare 7, 30 and 90-day windows, sort every post by what matters, and feed the winners back into the idea board.</p>
+                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="chart" %} Native insights APIs</span><span class="mk-tag">{% include "marketing/_icon.html" with name="terminal" %} Same data via API</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Engine -->
+<section class="mk-section mk-dark" id="engine">
+    <div class="mk-dark__glow"></div>
+    <div class="mk-container">
+        <div class="mk-section-head reveal">
+            <span class="mk-eyebrow">Under the hood</span>
+            <h2 class="mk-h2">The publishing engine, <em class="mk-accent">honestly described.</em></h2>
+            <p class="mk-lead">A single worker process owns publishing. It polls PostgreSQL rather than a message broker, which keeps deployment to two processes and a database.</p>
+        </div>
+        <div class="mk-pipeline reveal">
+            <div class="mk-pipe"><div class="mk-pipe__k">Every 15 s</div><div class="mk-pipe__t">Poll for due posts</div><div class="mk-pipe__d">Any platform post whose scheduled time has passed and whose status is still "scheduled".</div></div>
+            <div class="mk-pipe"><div class="mk-pipe__k">Claim</div><div class="mk-pipe__t">Mark as publishing</div><div class="mk-pipe__d">The transition is atomic, so two workers can never publish the same post twice.</div></div>
+            <div class="mk-pipe mk-pipe--hot"><div class="mk-pipe__k">Dispatch</div><div class="mk-pipe__t">Publish in parallel</div><div class="mk-pipe__d">Each platform gets its own thread. Media is downloaded once and streamed to the API.</div></div>
+            <div class="mk-pipe"><div class="mk-pipe__k">On failure</div><div class="mk-pipe__t">Back off and retry</div><div class="mk-pipe__d">Rate limits are tracked per account; other errors retry on a schedule before the post is marked failed.<div class="mk-retry"><span>+1 min</span><span>+5 min</span><span>+30 min</span></div></div></div>
+            <div class="mk-pipe"><div class="mk-pipe__k">Afterwards</div><div class="mk-pipe__t">Confirm and comment</div><div class="mk-pipe__d">A sweep confirms every publish actually landed; the first comment posts two minutes later; the attempt is logged for 90 days.</div></div>
+        </div>
+        <div class="mk-grid mk-grid--3" style="margin-top: 40px;">
+            <div class="mk-dark-card reveal"><div class="mk-dark-card__icon">{% include "marketing/_icon.html" with name="globe" %}</div><h3 class="mk-h3">First-party APIs only</h3><p>Facebook Graph, Instagram, LinkedIn, TikTok Content Posting, YouTube Data, Pinterest, Threads, Bluesky AT Protocol, Google Business Profile, Mastodon and DEV.to. Your app credentials, your rate limits, your data.</p></div>
+            <div class="mk-dark-card reveal" data-delay="1"><div class="mk-dark-card__icon mk-dark-card__icon--green">{% include "marketing/_icon.html" with name="inbox" %}</div><h3 class="mk-h3">Inbox sync</h3><p>Meta webhooks deliver Page and Instagram comments, mentions and messages in real time. A five-minute poll covers platforms without webhooks, and a backfill command imports up to 30 days of history after a fix.</p></div>
+            <div class="mk-dark-card reveal" data-delay="2"><div class="mk-dark-card__icon mk-dark-card__icon--sky">{% include "marketing/_icon.html" with name="key" %}</div><h3 class="mk-h3">Credentials</h3><p>Platform app keys come from environment variables or, per organisation, from the admin. Account tokens are stored with field-level encryption. Revoking an API key takes effect immediately.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- Architecture -->
+<section class="mk-section">
+    <div class="mk-container">
+        <div class="mk-section-head reveal">
+            <span class="mk-eyebrow">Architecture</span>
+            <h2 class="mk-h2">Deliberately <em class="mk-accent--green mk-accent">boring</em> technology</h2>
+            <p class="mk-lead">Chosen so a small team can run it for years: a server-rendered Django app, one database, one worker, and no JavaScript build for the application itself.</p>
+        </div>
+        <div class="mk-grid mk-grid--4">
+            <div class="mk-card mk-card--static reveal"><div class="mk-card__icon mk-card__icon--green">{% include "marketing/_icon.html" with name="server" %}</div><h3 class="mk-h3">Django 5</h3><p>Server-rendered templates with HTMX and Alpine.js for interactivity. Tailwind for the app's styling.</p></div>
+            <div class="mk-card mk-card--static reveal" data-delay="1"><div class="mk-card__icon mk-card__icon--sky">{% include "marketing/_icon.html" with name="box" %}</div><h3 class="mk-h3">PostgreSQL</h3><p>The database is also the job queue, via a Postgres-backed task runner. No Redis or Celery to operate. SQLite works for local development.</p></div>
+            <div class="mk-card mk-card--static reveal" data-delay="2"><div class="mk-card__icon mk-card__icon--orange">{% include "marketing/_icon.html" with name="image" %}</div><h3 class="mk-h3">Media pipeline</h3><p>Pillow for images, FFmpeg for video. Local disk by default, or any S3-compatible bucket with streamed uploads and downloads.</p></div>
+            <div class="mk-card mk-card--static reveal" data-delay="3"><div class="mk-card__icon mk-card__icon--indigo">{% include "marketing/_icon.html" with name="cloud" %}</div><h3 class="mk-h3">Deploy anywhere</h3><p>Gunicorn behind Caddy with automatic HTTPS in Docker Compose, or the included Railway, Render and Heroku configurations.</p></div>
+        </div>
+        <div class="mk-btn-row reveal" style="margin-top: 36px;">
+            <a class="mk-link" href="{% url 'marketing:get_started' %}">Deployment options {% include "marketing/_icon.html" with name="arrow" %}</a>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--flush-top">
+    <div class="mk-container">
+        <div class="mk-cta reveal">
+            <h2 class="mk-h2">Try the whole loop with a real account.</h2>
+            <p class="mk-lead">Connect a channel, schedule a post for five minutes from now, and watch it land.</p>
+            <div class="mk-btn-row">
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:features' %}">Browse the features</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
