@@ -1,0 +1,233 @@
+{% extends "marketing/base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="mk-page-hero">
+    <div class="mk-hero__bg"></div>
+    <div class="mk-container">
+        <div class="mk-page-hero__inner">
+            <span class="mk-eyebrow">Features</span>
+            <h1 class="mk-h1">Everything a social team does in a week, <em class="mk-accent">in one tab.</em></h1>
+            <p class="mk-lead">From the first idea to the last reply. Every feature below is available to every user on every workspace. There is no premium tier.</p>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--flush-top">
+    <div class="mk-container">
+
+        <!-- Composer -->
+        <div class="mk-feature reveal" id="composer">
+            <div class="mk-feature__media">
+                <div class="mk-browser">
+                    <div class="mk-browser__bar"><i></i><i></i><i></i><span class="mk-browser__url">create · new post</span></div>
+                    <img src="{% static 'img/marketing/composer.webp' %}" alt="The post composer: selected accounts, title and caption fields, attached media, Pinterest board settings and live previews" width="1283" height="699" loading="lazy" decoding="async">
+                </div>
+            </div>
+            <div class="mk-feature__copy">
+                <span class="mk-eyebrow mk-eyebrow--orange">Content composer</span>
+                <h2 class="mk-h2">Write once, publish natively</h2>
+                <p>Pick the accounts, write the post, and watch a live preview render for each platform with its own character limit. Anything that needs to differ, from the caption to the media to a Pinterest board or YouTube title, is an override on that platform alone.</p>
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Per-platform overrides</strong> for caption, media, first comment and platform-specific settings.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Templates, categories and tags</strong> so recurring formats take seconds and the calendar stays filterable.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Version history</strong> on every post, plus a "next available slot" button that files it into the queue.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Media library and Unsplash search</strong> inside the editor. Drag, drop, reorder.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Calendar -->
+        <div class="mk-feature mk-feature--flip reveal" id="calendar">
+            <div class="mk-feature__media">
+                <div class="mk-browser">
+                    <div class="mk-browser__bar"><i></i><i></i><i></i><span class="mk-browser__url">publish · calendar</span></div>
+                    <img src="{% static 'img/marketing/calendar.webp' %}" alt="Month view of the publishing calendar with colour-coded posts and a status legend" width="1283" height="698" loading="lazy" decoding="async">
+                </div>
+            </div>
+            <div class="mk-feature__copy">
+                <span class="mk-eyebrow mk-eyebrow--orange">Calendar &amp; scheduling</span>
+                <h2 class="mk-h2">A calendar that fills itself</h2>
+                <p>Set recurring weekly posting slots for each account, such as Instagram on Tuesday and Thursday mornings, then add posts to a named queue. Each one takes the next free slot automatically. Prefer to drag things around? The month, week and list views support that too.</p>
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Posting slots and queues</strong> per account, with posts auto-assigned to the next opening.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Recurring posts</strong> on daily, weekly or monthly rules, and custom events like launches or campaigns on the same calendar.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Status at a glance:</strong> draft, pending review, approved, scheduled, publishing, published, partially published or failed.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Filters</strong> by channel, tag and status, in the workspace's own time zone.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Ideas -->
+        <div class="mk-feature reveal" id="ideas">
+            <div class="mk-feature__media">
+                <div class="mk-browser">
+                    <div class="mk-browser__bar"><i></i><i></i><i></i><span class="mk-browser__url">create · ideas</span></div>
+                    <img src="{% static 'img/marketing/ideas.webp' %}" alt="The idea Kanban board with columns of content ideas moving toward drafting" width="1283" height="699" loading="lazy" decoding="async">
+                </div>
+            </div>
+            <div class="mk-feature__copy">
+                <span class="mk-eyebrow mk-eyebrow--orange">Idea board</span>
+                <h2 class="mk-h2">Somewhere for half-formed ideas</h2>
+                <p>A Kanban board for each workspace where ideas, briefs and reference material wait until they are ready. Attach media and tags early, then promote an idea straight into the composer when it is time.</p>
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Drag between columns</strong> to move an idea from backlog to in-progress to done.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Attach media and notes</strong> so the eventual post starts with everything it needs.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>One click to a draft</strong> that keeps the idea's title, description and attachments.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Approvals -->
+        <div class="mk-feature mk-feature--flip reveal" id="approvals">
+            <div class="mk-feature__media">
+                <div class="mo mo-window mo-window--full">
+                    <div class="mo-stages">
+                        <span class="mo-stage is-done"><i>{% include "marketing/_icon.html" with name="check" %}</i>Draft</span>
+                        <span class="mo-stage is-done"><i>{% include "marketing/_icon.html" with name="check" %}</i>Internal review</span>
+                        <span class="mo-stage is-current"><i>{% include "marketing/_icon.html" with name="clock" %}</i>Client review</span>
+                    </div>
+                    <div class="mo-comment">
+                        <span class="mo-avatar mo-avatar--b">JM</span>
+                        <div class="mo-grow"><div class="mo-name">Jordan <span class="mo-meta">· internal · 10:12</span></div><div class="mo-bubble mo-text">Trimmed the caption to fit Threads. Sending to the client.</div></div>
+                    </div>
+                    <div class="mo-comment mo-comment--client">
+                        <span class="mo-avatar mo-avatar--a">AC</span>
+                        <div class="mo-grow"><div class="mo-name">Acme Coffee <span class="mo-meta">· client portal · 14:40</span></div><div class="mo-bubble mo-text">Can we mention the loyalty card? Otherwise approved.</div></div>
+                    </div>
+                    <div class="mo-row"><span class="mo-pill mo-pill--orange"><i></i>Changes requested</span><span class="mo-grow"></span><span class="mo-meta">Reminder scheduled · tomorrow 09:00</span></div>
+                </div>
+            </div>
+            <div class="mk-feature__copy">
+                <span class="mk-eyebrow mk-eyebrow--orange">Approvals &amp; client portal</span>
+                <h2 class="mk-h2">Sign-off without the email chain</h2>
+                <p>Each workspace picks its own flow: no approvals, optional, internal only, or internal followed by client. Internal comments stay internal. Clients get a passwordless 30-day link to a portal where they approve, reject or comment, without creating an account.</p>
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Configurable stages</strong> per workspace, from none to two-step internal plus client.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Threaded comments</strong> with attachments, marked internal or visible to the client.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Reminders and a full audit trail</strong> of who approved what, and when.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Inbox -->
+        <div class="mk-feature reveal" id="inbox">
+            <div class="mk-feature__media">
+                <div class="mo mo-window mo-window--full">
+                    <div class="mo-row"><span class="mo-pill mo-pill--gray">All accounts</span><span class="mo-pill mo-pill--orange">Unassigned · 3</span><span class="mo-grow"></span><span class="mo-meta">Comments · Mentions · DMs · Reviews</span></div>
+                    <div class="mo-row"><span class="mo-platform" style="background:#FFF1F2">{% include "partials/_platform_icon.html" with platform="instagram" %}</span><div class="mo-grow"><div class="mo-name">@maya.runs <span class="mo-meta">· comment on "Spring drop"</span></div><div class="mo-text">Is the espresso blend back in stock?</div></div><span class="mo-pill mo-pill--sky"><i></i>neutral</span><span class="mo-avatar mo-avatar--b" title="Assigned to Jordan">J</span></div>
+                    <div class="mo-row"><span class="mo-platform" style="background:#EFF6FF">{% include "partials/_platform_icon.html" with platform="facebook" %}</span><div class="mo-grow"><div class="mo-name">Priya S. <span class="mo-meta">· message</span></div><div class="mo-text">Best latte in town, thank you!</div></div><span class="mo-pill mo-pill--green"><i></i>positive</span><span class="mo-avatar mo-avatar--c">S</span></div>
+                    <div class="mo-row"><span class="mo-platform" style="background:#F0F9FF">{% include "partials/_platform_icon.html" with platform="google_business" %}</span><div class="mo-grow"><div class="mo-name">Marcus L. <span class="mo-meta">· review · 2 stars</span></div><div class="mo-text">Waited 15 minutes for a cold brew.</div></div><span class="mo-pill mo-pill--rose"><i></i>negative</span><span class="mo-pill mo-pill--gray">unassigned</span></div>
+                    <div class="mo-row"><span class="mo-platform" style="background:#FEF2F2">{% include "partials/_platform_icon.html" with platform="youtube" %}</span><div class="mo-grow"><div class="mo-name">dev_tom <span class="mo-meta">· comment</span></div><div class="mo-text">Audio drops out at 4:20, otherwise great.</div></div><span class="mo-pill mo-pill--sky"><i></i>neutral</span><span class="mo-pill mo-pill--green">replied</span></div>
+                </div>
+            </div>
+            <div class="mk-feature__copy">
+                <span class="mk-eyebrow mk-eyebrow--orange">Unified social inbox</span>
+                <h2 class="mk-h2">Every conversation, one queue</h2>
+                <p>Comments, mentions, direct messages and reviews from every connected platform arrive in a single inbox. Triage by sentiment, assign to a teammate, reply in a thread, and never wonder whether a comment was missed.</p>
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Sentiment analysis and assignments</strong> so the unhappy customer gets a human first.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Threaded replies</strong> sent through the platform's own API, with draft replies you can hand off.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Real-time webhooks</strong> for Facebook, Instagram and Threads, a polling fallback for the rest, and a backfill command to import history.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Analytics -->
+        <div class="mk-feature mk-feature--flip reveal" id="analytics">
+            <div class="mk-feature__media">
+                <div class="mk-browser">
+                    <div class="mk-browser__bar"><i></i><i></i><i></i><span class="mk-browser__url">analytics · youtube</span></div>
+                    <img src="{% static 'img/marketing/analytics.webp' %}" alt="Analytics dashboard with KPI cards for views, watch time and engagement, and a 30-day views trend chart" width="1600" height="878" loading="lazy" decoding="async">
+                </div>
+            </div>
+            <div class="mk-feature__copy">
+                <span class="mk-eyebrow mk-eyebrow--orange">Analytics</span>
+                <h2 class="mk-h2">Reporting straight from the platforms</h2>
+                <p>No estimates, no scraping. Each connected account's native insights API feeds KPI cards and trend charts over 7, 30 or 90 days, and a sortable table shows how every single post performed.</p>
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Channel-level metrics:</strong> followers, reach, views, watch time and engagement rate with period-over-period change.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Per-post metrics</strong> with the platform-specific breakdown behind each number.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Same data over the API</strong> for your own dashboards and reports.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Media library -->
+        <div class="mk-feature reveal" id="media">
+            <div class="mk-feature__media">
+                <div class="mo mo-window mo-window--full">
+                    <div class="mo-folders"><span class="mo-pill mo-pill--gray">Organisation library</span><span class="mo-pill mo-pill--orange">Acme Coffee / Spring 2026</span><span class="mo-pill mo-pill--gray">Reels</span><span class="mo-pill mo-pill--gray">Brand kit</span></div>
+                    <div class="mo-media" aria-hidden="true"><div class="g1" data-label="hero.jpg · 3 variants"></div><div class="g2" data-label="latte.mp4"></div><div class="g3" data-label="menu.png"></div><div class="g4" data-label="story.jpg"></div><div class="g5" data-label="team.jpg"></div><div class="g6" data-label="promo.mp4"></div><div class="g7" data-label="cup.png"></div><div class="g8" data-label="reel.mp4"></div></div>
+                    <div class="mo-row"><span class="mo-meta">hero.jpg</span><span class="mo-grow"></span><span class="mo-pill mo-pill--gray">1080×1350 feed</span><span class="mo-pill mo-pill--gray">1080×1920 story</span><span class="mo-pill mo-pill--gray">1200×627 LinkedIn</span></div>
+                </div>
+            </div>
+            <div class="mk-feature__copy">
+                <span class="mk-eyebrow mk-eyebrow--orange">Media library</span>
+                <h2 class="mk-h2">Upload once, get every size</h2>
+                <p>Organisation-wide and workspace-scoped libraries with nested folders keep client assets apart. Each upload gets platform-optimised variants generated automatically, alt text travels with the asset, and large video is streamed rather than buffered.</p>
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Nested folders and search</strong> across images and video, by name, type and tag.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Local disk or any S3-compatible bucket</strong> (Cloudflare R2, AWS S3, Backblaze B2, MinIO).</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Uploads up to 1 GB</strong> with FFmpeg handling video processing on the server.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Teams -->
+        <div class="mk-feature mk-feature--flip reveal" id="teams">
+            <div class="mk-feature__media">
+                <div class="mo mo-window mo-window--full">
+                    <div class="mo-tree" aria-hidden="true">
+                        <div class="mo-tree__org">{% include "marketing/_icon.html" with name="layers" %} Northwind Agency <small>3 workspaces · 6 members</small></div>
+                        <div class="mo-tree__ws"><span class="mo-avatar mo-avatar--a">AC</span><span class="mo-name">Acme Coffee</span><span class="mo-pill mo-pill--indigo">Client: Dana (portal)</span><span class="mo-stack"><span class="mo-avatar mo-avatar--b">J</span><span class="mo-avatar mo-avatar--c">S</span></span></div>
+                        <div class="mo-tree__ws"><span class="mo-avatar mo-avatar--d">RF</span><span class="mo-name">Riverside Fitness</span><span class="mo-pill mo-pill--green">Editor: Sam</span><span class="mo-stack"><span class="mo-avatar mo-avatar--b">J</span></span></div>
+                        <div class="mo-tree__ws"><span class="mo-avatar mo-avatar--c">BL</span><span class="mo-name">Bloom Florals</span><span class="mo-pill mo-pill--gray">Custom role: Reviewer</span><span class="mo-stack"><span class="mo-avatar mo-avatar--c">S</span><span class="mo-avatar mo-avatar--a">M</span></span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="mk-feature__copy">
+                <span class="mk-eyebrow mk-eyebrow--orange">Multi-workspace &amp; teams</span>
+                <h2 class="mk-h2">Built for many clients under one roof</h2>
+                <p>An organisation holds as many workspaces as you have brands. Each workspace has its own channels, calendar, inbox, library, approval flow, branding and defaults. Members are invited per workspace with exactly the permissions they need.</p>
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Owner, admin, editor, viewer and client roles,</strong> plus custom roles built from granular permissions.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Invitations by email</strong> and Google single sign-on.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Workspace defaults</strong> for hashtags, first comments and posting templates, so new posts start right.</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Smaller features grid -->
+<section class="mk-section mk-section--alt">
+    <div class="mk-container">
+        <div class="mk-section-head reveal">
+            <span class="mk-eyebrow">And the rest</span>
+            <h2 class="mk-h2">The details that make it <em class="mk-accent">daily-driver</em> software</h2>
+        </div>
+        <div class="mk-grid mk-grid--3">
+            <div class="mk-card reveal"><div class="mk-card__icon mk-card__icon--sky">{% include "marketing/_icon.html" with name="bell" %}</div><h3 class="mk-h3">Notifications your way</h3><p>In-app, email and webhook delivery for every event type: approvals, failures, mentions, reminders. Each person tunes their own preferences.</p></div>
+            <div class="mk-card reveal" data-delay="1"><div class="mk-card__icon mk-card__icon--rose">{% include "marketing/_icon.html" with name="palette" %}</div><h3 class="mk-h3">White-label friendly</h3><p>Per-workspace logo and colours so the client portal and emails look like yours. Brand tokens are CSS variables, swappable without a rebuild.</p></div>
+            <div class="mk-card reveal" data-delay="2"><div class="mk-card__icon mk-card__icon--green">{% include "marketing/_icon.html" with name="shield" %}</div><h3 class="mk-h3">Security and operations</h3><p>Encrypted tokens and credentials, Google SSO, Sentry error reporting, rate-limited auth endpoints and a 14-day reversible grace period on organisation deletion.</p></div>
+            <div class="mk-card reveal"><div class="mk-card__icon mk-card__icon--orange">{% include "marketing/_icon.html" with name="zap" %}</div><h3 class="mk-h3">Publishing that self-heals</h3><p>Automatic retries with exponential backoff, per-account rate-limit tracking, delayed first comments and a 90-day publish log for every attempt.</p></div>
+            <div class="mk-card reveal" data-delay="1"><div class="mk-card__icon mk-card__icon--indigo">{% include "marketing/_icon.html" with name="terminal" %}</div><h3 class="mk-h3">API and MCP built in</h3><p>Workspace-scoped keys with fine-grained permissions, rate limits, idempotent writes, OpenAPI docs and an MCP server for AI agents.</p></div>
+            <div class="mk-card reveal" data-delay="2"><div class="mk-card__icon mk-card__icon--amber">{% include "marketing/_icon.html" with name="cloud" %}</div><h3 class="mk-h3">Runs where you want</h3><p>Hosted, or self-hosted with Docker Compose, Railway, Render or Heroku. SQLite for a laptop, PostgreSQL for production, S3 for media.</p></div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section">
+    <div class="mk-container">
+        <div class="mk-cta reveal">
+            <h2 class="mk-h2">See it with your own channels.</h2>
+            <p class="mk-lead">Connecting an account takes a minute. The first scheduled post takes two.</p>
+            <div class="mk-btn-row">
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:platforms' %}">Supported platforms</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

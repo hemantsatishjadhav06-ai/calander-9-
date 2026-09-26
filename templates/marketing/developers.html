@@ -1,0 +1,178 @@
+{% extends "marketing/base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="mk-page-hero">
+    <div class="mk-hero__bg"></div>
+    <div class="mk-container">
+        <div class="mk-page-hero__inner">
+            <span class="mk-eyebrow">Developers &amp; agents</span>
+            <h1 class="mk-h1">A REST API and an MCP server, <em class="mk-accent">one permission model.</em></h1>
+            <p class="mk-lead">Scripts, integrations and AI agents get the same pipeline your team uses: create and schedule posts, upload media, read analytics and work the inbox. Both protocols share keys, permissions, rate limits and the audit log.</p>
+            <div class="mk-btn-row" style="margin-top: 28px;">
+                <a class="mk-btn mk-btn--dark" href="#endpoints">REST endpoints</a>
+                <a class="mk-btn mk-btn--ghost" href="#mcp">MCP tools</a>
+                <a class="mk-btn mk-btn--ghost" href="/api/v1/docs" id="openapi">OpenAPI docs</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--flush-top" id="auth">
+    <div class="mk-container">
+        <div class="mk-grid mk-grid--2" style="align-items: start;">
+            <div class="reveal">
+                <span class="mk-eyebrow">Authentication</span>
+                <h2 class="mk-h2" style="margin-bottom: 14px;">Workspace-scoped keys</h2>
+                <p class="mk-lead">Issue a key from <strong>Organisation → API Keys</strong>. Each key belongs to one workspace, can be allow-listed to specific social accounts, and carries a subset of the issuer's own permissions. Revocation is immediate.</p>
+                <ul class="mk-bullets" style="margin-top: 22px;">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Permissions:</strong> <code>create_posts</code>, <code>publish_directly</code>, <code>upload_media</code>, <code>view_analytics</code>, <code>use_inbox</code>, <code>reply_from_inbox</code>. Missing one returns <code>403</code>.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Idempotency:</strong> post creation, media uploads and inbox replies accept an <code>idempotency_key</code> (or <code>Idempotency-Key</code> header) for safe retries.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Audit:</strong> every call is attributed to the key and the person who issued it.</span></li>
+                </ul>
+            </div>
+            <div class="reveal" data-delay="1">
+                <div class="mk-code"><div class="mk-code__head"><span>Inspect what a key can do</span><button class="mk-copy" type="button" data-copy="code-me">Copy</button></div><pre id="code-me">curl <span class="s">"{{ api_base_url }}/me"</span> \
+  -H <span class="s">"Authorization: Bearer bb_studio_…"</span>
+
+<span class="c"># → workspace, allowed accounts and granted permissions</span></pre></div>
+                <div class="mk-code" style="margin-top: 16px;"><div class="mk-code__head"><span>Create and schedule a post</span><button class="mk-copy" type="button" data-copy="code-post">Copy</button></div><pre id="code-post">curl -X POST <span class="s">"{{ api_base_url }}/posts"</span> \
+  -H <span class="s">"Authorization: Bearer bb_studio_…"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -H <span class="s">"Idempotency-Key: launch-2026-10-01"</span> \
+  -d <span class="s">'{
+    "account_ids": ["<span class="k">…</span>"],
+    "caption": "New single-origin drop, this Thursday.",
+    "media_ids": ["<span class="k">…</span>"],
+    "scheduled_at": "2026-10-01T09:00:00Z"
+  }'</span></pre></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--alt" id="limits">
+    <div class="mk-container">
+        <div class="mk-grid mk-grid--2" style="align-items: start;">
+            <div class="reveal">
+                <span class="mk-eyebrow">Rate limits</span>
+                <h2 class="mk-h2" style="margin-bottom: 14px;">Generous, and always announced</h2>
+                <p class="mk-lead">A <code>429</code> carries <code>Retry-After</code>, <code>X-RateLimit-Limit</code> and <code>X-RateLimit-Remaining</code> headers so clients can back off precisely.</p>
+            </div>
+            <div class="mk-table-wrap reveal" data-delay="1">
+                <table class="mk-table" style="min-width: 0;">
+                    <thead><tr><th>Scope</th><th>Limit</th></tr></thead>
+                    <tbody>
+                        <tr><td>Per key, writes</td><td><strong>120</strong> per minute</td></tr>
+                        <tr><td>Per key, reads</td><td><strong>300</strong> per minute</td></tr>
+                        <tr><td>Per workspace, aggregate</td><td><strong>1,000</strong> per minute</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section" id="endpoints">
+    <div class="mk-container">
+        <div class="mk-section-head reveal">
+            <span class="mk-eyebrow">REST</span>
+            <h2 class="mk-h2">Endpoints</h2>
+            <p class="mk-lead">Base URL <code>{{ api_base_url }}/</code>. Interactive documentation, generated from the same code, lives at <a class="mk-link" href="/api/v1/docs">/api/v1/docs</a>.</p>
+        </div>
+        <div class="mk-table-wrap reveal">
+            <table class="mk-table">
+                <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Permission</th></tr></thead>
+                <tbody>
+                    <tr><td><span class="mk-method mk-method--get">GET</span></td><td><code>/me</code></td><td>Inspect caller scope and workspace permissions</td><td class="mk-dash">—</td></tr>
+                    <tr><td><span class="mk-method mk-method--get">GET</span></td><td><code>/accounts</code></td><td>List connected social accounts</td><td class="mk-dash">—</td></tr>
+                    <tr><td><span class="mk-method mk-method--post">POST</span></td><td><code>/posts</code></td><td>Create a draft or scheduled post</td><td><code>create_posts</code> (+ <code>publish_directly</code> to schedule)</td></tr>
+                    <tr><td><span class="mk-method mk-method--get">GET</span></td><td><code>/posts/{post_id}</code></td><td>Read a single post with per-platform state</td><td class="mk-dash">—</td></tr>
+                    <tr><td><span class="mk-method mk-method--patch">PATCH</span></td><td><code>/posts/{post_id}</code></td><td>Update draft fields</td><td><code>create_posts</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--post">POST</span></td><td><code>/posts/{post_id}/schedule</code></td><td>Schedule a draft</td><td><code>create_posts</code> + <code>publish_directly</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--post">POST</span></td><td><code>/posts/{post_id}/cancel</code></td><td>Revert a scheduled post to draft</td><td><code>create_posts</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--get">GET</span></td><td><code>/analytics/accounts/{account_id}</code></td><td>Channel analytics summary, 7/30/90-day window</td><td><code>view_analytics</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--get">GET</span></td><td><code>/analytics/posts/{post_id}</code></td><td>Post analytics with per-platform metrics</td><td><code>view_analytics</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--post">POST</span></td><td><code>/media</code></td><td>Upload a media file (multipart)</td><td><code>upload_media</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--get">GET</span></td><td><code>/media</code></td><td>List media assets with filters and pagination</td><td class="mk-dash">—</td></tr>
+                    <tr><td><span class="mk-method mk-method--get">GET</span></td><td><code>/media/{media_id}</code></td><td>Retrieve a media asset</td><td class="mk-dash">—</td></tr>
+                    <tr><td><span class="mk-method mk-method--get">GET</span></td><td><code>/inbox</code></td><td>List inbox messages by status, type or account</td><td><code>use_inbox</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--get">GET</span></td><td><code>/inbox/{message_id}</code></td><td>Read one message with its reply thread</td><td><code>use_inbox</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--post">POST</span></td><td><code>/inbox/{message_id}/replies</code></td><td>Draft a reply (<code>send: true</code> delivers it now)</td><td><code>use_inbox</code> (+ <code>reply_from_inbox</code> to send)</td></tr>
+                    <tr><td><span class="mk-method mk-method--patch">PATCH</span></td><td><code>/inbox/replies/{reply_id}</code></td><td>Edit a draft reply</td><td><code>use_inbox</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--post">POST</span></td><td><code>/inbox/replies/{reply_id}/send</code></td><td>Deliver a draft reply to the platform</td><td><code>reply_from_inbox</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--delete">DELETE</span></td><td><code>/inbox/replies/{reply_id}</code></td><td>Discard a draft reply</td><td><code>use_inbox</code></td></tr>
+                    <tr><td><span class="mk-method mk-method--post">POST</span></td><td><code>/mcp</code></td><td>JSON-RPC 2.0 endpoint for MCP clients</td><td class="mk-dash">—</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-dark" id="mcp">
+    <div class="mk-dark__glow"></div>
+    <div class="mk-container">
+        <div class="mk-section-head reveal">
+            <span class="mk-eyebrow">Model Context Protocol</span>
+            <h2 class="mk-h2">Give an agent a seat <em class="mk-accent">at the calendar.</em></h2>
+            <p class="mk-lead">The MCP server speaks JSON-RPC 2.0 over Streamable HTTP at <code>POST {{ api_base_url }}/mcp</code> and implements <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code> and <code>ping</code>. Connect with a bearer key, or let a native connector such as Claude Desktop sign in through the built-in OAuth 2.1 server with dynamic client registration and PKCE.</p>
+        </div>
+        <div class="mk-grid mk-grid--2" style="align-items: start;">
+            <div class="reveal">
+                <div class="mk-code"><div class="mk-code__head"><span>Claude Code</span><button class="mk-copy" type="button" data-copy="code-mcp">Copy</button></div><pre id="code-mcp">claude mcp add --transport http sm-bean \
+  <span class="s">"{{ api_base_url }}/mcp"</span> \
+  --header <span class="s">"Authorization: Bearer bb_studio_…"</span></pre></div>
+                <div class="mk-code" style="margin-top: 16px;"><div class="mk-code__head"><span>Claude Desktop or any OAuth-capable connector</span></div><pre>Add a custom connector with the URL
+<span class="s">{{ api_base_url }}/mcp</span>
+
+The client discovers
+<span class="c">/.well-known/oauth-authorization-server</span>
+<span class="c">/.well-known/oauth-protected-resource</span>
+registers itself, and asks you to sign in.</pre></div>
+            </div>
+            <div class="reveal" data-delay="1">
+                <div class="mk-table-wrap" style="background: rgba(255,255,255,0.03); border-color: var(--mk-dark-line); box-shadow: none;">
+                    <table class="mk-table mk-table--dark" style="min-width: 0; color: var(--mk-dark-ink);">
+                        <thead><tr><th style="background: rgba(255,255,255,0.05); color: var(--mk-dark-ink-2);">Tools</th><th style="background: rgba(255,255,255,0.05); color: var(--mk-dark-ink-2);">Needs</th></tr></thead>
+                        <tbody>
+                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">list_accounts</code></td><td style="border-color: var(--mk-dark-line);" class="mk-dash">—</td></tr>
+                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">create_draft</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">cancel_post</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">create_posts</code></td></tr>
+                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">schedule_post</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">schedule_draft</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">create_posts</code> + <code style="background: rgba(255,255,255,0.08); color: #fff;">publish_directly</code></td></tr>
+                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">get_post</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">list_posts</code></td><td style="border-color: var(--mk-dark-line);" class="mk-dash">—</td></tr>
+                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">search_media</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">get_media</code></td><td style="border-color: var(--mk-dark-line);" class="mk-dash">—</td></tr>
+                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">upload_media</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">request_media_upload</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">finalize_media_upload</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">upload_media</code></td></tr>
+                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">get_account_analytics</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">get_post_analytics</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">view_analytics</code></td></tr>
+                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">list_inbox_messages</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">get_inbox_message</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">create_reply_draft</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">update_reply_draft</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">discard_reply_draft</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">use_inbox</code></td></tr>
+                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">send_reply</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">reply_from_inbox</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="mk-small" style="margin-top: 14px;">Tool descriptions and JSON schemas come back from <code>tools/list</code>, so an agent needs nothing beyond the URL and a key.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section">
+    <div class="mk-container">
+        <div class="mk-grid mk-grid--3">
+            <div class="mk-card reveal"><div class="mk-card__icon mk-card__icon--orange">{% include "marketing/_icon.html" with name="bell" %}</div><h3 class="mk-h3">Outbound webhooks</h3><p>Subscribe a URL to notification events, from post published to approval requested, alongside in-app and email delivery.</p></div>
+            <div class="mk-card reveal" data-delay="1"><div class="mk-card__icon mk-card__icon--green">{% include "marketing/_icon.html" with name="refresh" %}</div><h3 class="mk-h3">Safe retries</h3><p>Replay a create-and-send inbox reply with the same idempotency key and you get the original response back, never a duplicate message.</p></div>
+            <div class="mk-card reveal" data-delay="2"><div class="mk-card__icon mk-card__icon--sky">{% include "marketing/_icon.html" with name="terminal" %}</div><h3 class="mk-h3">Typed schemas</h3><p>Request and response models are Pydantic schemas, so the OpenAPI document is exact and client generation just works.</p></div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--flush-top">
+    <div class="mk-container">
+        <div class="mk-cta reveal">
+            <h2 class="mk-h2">Issue a key and make your first call.</h2>
+            <p class="mk-lead">Keys live under Organisation → API Keys once you have an account.</p>
+            <div class="mk-btn-row">
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="/api/v1/docs">Open the API docs</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
