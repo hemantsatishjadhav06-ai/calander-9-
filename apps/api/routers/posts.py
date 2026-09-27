@@ -24,6 +24,7 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from ninja import Router
 from ninja.errors import HttpError
+from ninja.responses import Status
 
 from apps.api.limits import check_platform_quota, enforce_http_rate_limits
 from apps.api.middleware import (
@@ -208,7 +209,8 @@ def create(request, payload: CreatePostRequest):
     except ValueError as exc:
         raise HttpError(422, str(exc)) from exc
     if disposition == "replay":
-        return replay_status, replay_body
+        assert replay_status is not None and replay_body is not None
+        return Status(replay_status, replay_body)
     if disposition == "in_flight":
         raise HttpError(
             409,
@@ -283,7 +285,7 @@ def create(request, payload: CreatePostRequest):
     except Exception:
         release_idempotent_claim(api_key=request.api_key, idempotency_key=idempotency_key)
         raise
-    return status_code, body
+    return Status(status_code, body)
 
 
 @router.get("/{post_id}", response=PostResponse, summary="Read a single post")

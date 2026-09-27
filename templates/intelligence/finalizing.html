@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block title %}Finalizing… · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Finalizing…{% endblock %}
 {% block content %}
 <div class="max-w-xl mx-auto py-16 px-4 text-center">
@@ -13,7 +14,7 @@
        hx-get="{% url 'intelligence_global:finalizing-status' %}"
        hx-trigger="load, every 2s"
        hx-swap="outerHTML"
-       class="text-xs text-stone-400">
+       class="text-xs text-stone-500">
     Checking…
   </div>
 </div>

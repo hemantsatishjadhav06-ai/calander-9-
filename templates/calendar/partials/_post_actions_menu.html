@@ -9,7 +9,7 @@ Expects context: workspace, post_id, account_id.
      @click.outside="open = false"
      @scroll.window="open = false"
      @keydown.escape.window="open = false">
-    <button @click.stop="
+    <button aria-label="Post actions" aria-haspopup="true" :aria-expanded="open" @click.stop="
         open = !open;
         if (open) {
             const r = $el.getBoundingClientRect();
@@ -17,7 +17,7 @@ Expects context: workspace, post_id, account_id.
         }
     "
             class="p-1.5 rounded-full border border-stone-200 text-stone-400 hover:border-stone-300 hover:text-stone-600 transition-colors cursor-pointer">
-        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="16" r="1.5"/></svg>
+        <svg aria-hidden="true" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="16" r="1.5"/></svg>
     </button>
     <template x-teleport="body">
         <div :style="open ? menuStyle : { display: 'none' }"

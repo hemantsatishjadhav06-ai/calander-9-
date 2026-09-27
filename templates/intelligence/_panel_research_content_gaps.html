@@ -41,7 +41,7 @@
                             {% if is_preview %}
                             <span class="cg-niche-label truncate text-stone-900">{{ preview_inputs.research_content_gaps.niche_name }} ({{ preview_inputs.research_content_gaps.niche_slug }})</span>
                             {% else %}
-                            <span class="cg-niche-label truncate text-stone-400">Choose a niche…</span>
+                            <span class="cg-niche-label truncate text-stone-500">Choose a niche…</span>
                             {% endif %}
                             <svg class="cg-niche-chevron h-4 w-4 flex-shrink-0 text-stone-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
@@ -54,13 +54,13 @@
                                     <svg class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
                                     </svg>
-                                    <input type="text" id="cg-niche-search" placeholder="Search niches…" autocomplete="off"
-                                           class="block w-full rounded-md border-0 bg-stone-50 py-1.5 pl-8 pr-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:bg-white focus:outline-none focus:ring-2"
+                                    <input type="text" id="cg-niche-search" placeholder="Search niches…" aria-label="Search niches" autocomplete="off"
+                                           class="block w-full rounded-md border-0 bg-stone-50 py-1.5 pl-8 pr-2.5 text-sm text-stone-900 placeholder:text-stone-500 focus:bg-white focus:outline-none focus:ring-2"
                                            style="--tw-ring-color: var(--primary-ring, rgba(249,115,22,0.30));">
                                 </div>
                             </div>
                             <ul id="cg-niche-listbox" role="listbox" aria-label="Niches" class="max-h-72 overflow-y-auto py-1"></ul>
-                            <div id="cg-niche-empty" class="hidden px-4 py-6 text-center text-sm text-stone-400">No niches match.</div>
+                            <div id="cg-niche-empty" class="hidden px-4 py-6 text-center text-sm text-stone-500">No niches match.</div>
                             <div id="cg-niche-status" class="border-t border-stone-100 bg-stone-50 px-3 py-1.5 text-[11px] text-stone-500"></div>
                         </div>
                     </div>
@@ -74,7 +74,7 @@
                       slug entry so the form is still usable, the user can type
                       the slug directly.
                     {% endcomment %}
-                    <input type="text" name="niche" id="cg-niche" required
+                    <input type="text" name="niche" id="cg-niche" required aria-label="Niche"
                            placeholder="ai_dev_tools"
                            class="intel-input">
                     <p class="intel-helper">
@@ -239,7 +239,7 @@
                     + ' class="cg-niche-row">'
                     +   '<span class="min-w-0 flex-1">'
                     +     '<span class="block truncate font-medium text-stone-900">' + esc(n.name) + '</span>'
-                    +     '<span class="block truncate font-mono text-[11px] text-stone-400">' + esc(n.slug) + '</span>'
+                    +     '<span class="block truncate font-mono text-[11px] text-stone-500">' + esc(n.slug) + '</span>'
                     +   '</span>'
                     +   '<span class="ml-2 inline-flex flex-shrink-0 items-center rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">' + esc(n.gap_count) + ' gaps</span>'
                     + '</li>';
@@ -288,7 +288,7 @@
         if (!niche) return;
         hidden.value = niche.slug;
         labelEl.textContent = niche.name + " (" + niche.slug + ")";
-        labelEl.classList.remove("text-stone-400");
+        labelEl.classList.remove("text-stone-500");
         labelEl.classList.add("text-stone-900");
         closePanel(true);
     }

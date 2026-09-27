@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Invitation required · {{ SITE_NAME }}{% endblock %}
+
+{% block auth_content %}
+<div class="w-full max-w-md px-4">
+    <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-12 h-12 mb-4">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold tracking-tight" style="background: #C2410C;" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</div>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">{{ SITE_NAME }} is invite-only right now</h1>
+        <p class="text-sm mt-2" style="color: var(--text-secondary);">
+            We're opening accounts by invitation while we work closely with our first teams.
+            If a colleague already uses {{ SITE_NAME }}, ask them to invite you from the Members page.
+        </p>
+    </div>
+    <div class="auth-card text-center">
+        {% if SUPPORT_EMAIL %}
+        <a href="mailto:{{ SUPPORT_EMAIL }}?subject={{ SITE_NAME|urlencode }}%20early%20access" class="btn-brand inline-flex items-center justify-center w-full px-5 py-2.5 text-sm font-semibold rounded-full">Request early access</a>
+        {% endif %}
+        <p class="text-sm mt-4" style="color: var(--text-secondary);">Already have an account? <a href="{% url 'account_login' %}" class="font-semibold hover:underline" style="color: var(--primary-strong);">Sign in</a></p>
+    </div>
+</div>
+{% endblock %}

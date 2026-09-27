@@ -267,7 +267,14 @@ def test_admin_blocked_for_non_superuser_staff(client):
     )
     client.force_login(staff)
     resp = client.get(ADD_URL)
+
+    # Either answer is a refusal — Django's admin redirects to its own login
+    # for a user without the model permission — but the status alone would
+    # also pass if the page rendered and merely redirected afterwards. What
+    # actually matters is that the credential form never reaches a non-
+    # superuser, so assert on the body too.
     assert resp.status_code in (302, 403)
+    assert b'name="credentials"' not in resp.content
 
 
 # ---------------------------------------------------------------------------

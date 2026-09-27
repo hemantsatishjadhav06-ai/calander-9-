@@ -1,0 +1,31 @@
+{% extends "legal/base_legal.html" %}
+{% block legal_title %}Outbound email · {{ SITE_NAME }}{% endblock %}
+{% block legal_body %}
+<h1>Outbound email</h1>
+{% if messages %}{% for m in messages %}<p class="placeholder">{{ m }}</p>{% endfor %}{% endif %}
+<p class="muted">Backend: <strong>{{ backend_type }}</strong> · From: <strong>{{ from_email }}</strong></p>
+
+{% if backend_type == "gmail_api" %}
+<h2>Gmail account</h2>
+{% if env_token %}
+  <p>Using the refresh token from <code>GMAIL_REFRESH_TOKEN</code>.</p>
+{% elif mailbox %}
+  <p>Sending as <strong>{{ mailbox.email }}</strong>, connected {{ mailbox.connected_at|date:"j M Y H:i" }}.</p>
+  <p><a href="{% url 'ops_email_connect' %}">Reconnect</a></p>
+{% else %}
+  <p>No Gmail account connected yet, so no email can be sent.</p>
+  {% if client_configured %}<p><a href="{% url 'ops_email_connect' %}"><strong>Connect Gmail</strong></a></p>
+  {% else %}<p>Set <code>GOOGLE_AUTH_CLIENT_ID</code> / <code>GOOGLE_AUTH_CLIENT_SECRET</code> (or <code>GMAIL_CLIENT_ID</code> / <code>GMAIL_CLIENT_SECRET</code>) first.</p>{% endif %}
+{% endif %}
+<h2>One-time Google Cloud setup</h2>
+<ol>
+  <li>In the Google Cloud project that owns the OAuth client, enable the <strong>Gmail API</strong>.</li>
+  <li>Add this authorized redirect URI to the OAuth client: <code>{{ redirect_uri }}</code></li>
+  <li>On the OAuth consent screen, add the scope <code>gmail.send</code> and set publishing status to <strong>In production</strong> (in "Testing" Google expires the connection after 7 days).</li>
+  <li>Sign in here as the mailbox owner and click Connect Gmail.</li>
+</ol>
+{% endif %}
+
+<h2>Test</h2>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="test"><button type="submit">Send a test email to {{ request.user.email }}</button></form>
+{% endblock %}

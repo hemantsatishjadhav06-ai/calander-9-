@@ -59,4 +59,9 @@ urlpatterns = [
         views.disconnect,
         name="disconnect",
     ),
+    path(
+        "<uuid:workspace_id>/<uuid:account_id>/remove/",
+        views.remove_account,
+        name="remove",
+    ),
 ]

@@ -7,6 +7,8 @@ import logging
 
 from background_task import background
 
+from apps.common.background import keep_schedule
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,6 +24,7 @@ NOTIFICATION_BATCH_INTERVAL_SECONDS = 60
 
 
 @background(schedule=0)
+@keep_schedule
 def retry_failed_deliveries():
     """Retry pending notification deliveries that are past their backoff window.
 

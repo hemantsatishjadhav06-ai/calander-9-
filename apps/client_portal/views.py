@@ -5,6 +5,7 @@ from collections import defaultdict
 from django.db.models import F, Prefetch
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.approvals import services as approval_services
@@ -14,7 +15,7 @@ from apps.composer.models import Post
 from apps.members.models import WorkspaceMembership
 
 from .decorators import portal_auth_required
-from .services import consume_magic_link, create_portal_session, peek_magic_link
+from .services import consume_magic_link, create_portal_session, magic_link_problem, peek_magic_link
 
 
 def _portal_response(post_id, action, *, tone, title, body=""):
@@ -50,13 +51,13 @@ def magic_link_entry(request, token):
     if request.method == "POST":
         user, workspace, is_valid = consume_magic_link(token)
         if not is_valid:
-            return redirect("client_portal:magic_link_expired")
+            return _link_problem_redirect(magic_link_problem(token) or "used")
         create_portal_session(request, user, workspace)
         return redirect("client_portal:dashboard")
 
     magic_token = peek_magic_link(token)
     if magic_token is None:
-        return redirect("client_portal:magic_link_expired")
+        return _link_problem_redirect(magic_link_problem(token) or "invalid")
     return render(
         request,
         "client_portal/magic_link_confirm.html",
@@ -67,9 +68,41 @@ def magic_link_entry(request, token):
     )
 
 
+LINK_PROBLEMS = {
+    "expired": (
+        "This link has expired",
+        "Approval links stay valid for 30 days. Ask your account manager for a fresh one.",
+    ),
+    "used": (
+        "This link has already been used",
+        "Each approval link signs you in once. If that wasn't you, or you've been signed out, ask for a new link.",
+    ),
+    "invalid": (
+        "This link isn't valid",
+        "It may have been cut off when copied. Open the link straight from your most recent approval email.",
+    ),
+    "signed_out": (
+        "Sign in with your approval link",
+        "The client portal has no password. Open the link from your most recent approval email to get in.",
+    ),
+}
+
+
+def _link_problem_redirect(reason):
+    return redirect(f"{reverse('client_portal:magic_link_expired')}?reason={reason}")
+
+
 def magic_link_expired(request):
-    """Show page for expired or invalid magic links."""
-    return render(request, "client_portal/magic_link_expired.html")
+    """Explain why the client can't get into the portal, and what to do next."""
+    reason = request.GET.get("reason", "signed_out")
+    if reason not in LINK_PROBLEMS:
+        reason = "signed_out"
+    title, body = LINK_PROBLEMS[reason]
+    return render(
+        request,
+        "client_portal/magic_link_expired.html",
+        {"reason": reason, "problem_title": title, "problem_body": body},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +167,7 @@ def portal_approval_queue(request):
     # are not the first rows dropped by the [:50] cap — they're exactly the ones a
     # client may still want to hold.
     decided_posts = list(
-        base.filter(platform_posts__status__in=["approved", "on_hold"])
+        base.filter(platform_posts__status__in=["approved", "scheduled", "on_hold"])
         .distinct()
         .order_by(F("scheduled_at").asc(nulls_first=True), "-created_at")[:50]
     )
@@ -170,7 +203,9 @@ def portal_approval_queue(request):
         child_statuses = {pp.status for pp in post.platform_posts.all()}
         post.client_pending = "pending_client" in child_statuses
         post.client_on_hold = "on_hold" in child_statuses
-        post.client_approved = "approved" in child_statuses
+        # "scheduled" counts as approved from the client's side: it is their
+        # approved post, now on the calendar, and still theirs to hold.
+        post.client_approved = "approved" in child_statuses or "scheduled" in child_statuses
 
     return render(
         request,
@@ -250,10 +285,10 @@ def portal_reject(request, post_id):
 @portal_auth_required
 @require_POST
 def portal_request_hold(request, post_id):
-    """Client requests a hold on an already-approved post (before it publishes)."""
+    """Client requests a hold on an approved or scheduled post (before it publishes)."""
     workspace = request.portal_workspace
     post = get_object_or_404(Post, id=post_id, workspace=workspace)
-    if not post.platform_posts.filter(status="approved").exists():
+    if not post.platform_posts.filter(status__in=["approved", "scheduled"]).exists():
         raise Http404
     comment_text = request.POST.get("comment", "")
 

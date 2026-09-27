@@ -8,7 +8,7 @@
         <span class="badge-pill" style="background: var(--surface-2); color: var(--stone-600, #57534e);">Draft</span>
         {% endif %}
         <span class="text-[11px] text-stone-500">{{ draft.author.get_short_name|default:draft.author.email|default:"—" }}</span>
-        <span class="text-[11px] text-stone-400 ml-auto">{{ draft.created_at|timesince }} ago</span>
+        <span class="text-[11px] text-stone-500 ml-auto">{{ draft.created_at|timesince }} ago</span>
     </div>
     <p class="text-[13px] text-stone-700 leading-relaxed whitespace-pre-wrap">{{ draft.body }}</p>
     {% if draft.status == 'failed' and draft.send_error %}
@@ -18,8 +18,9 @@
         <button hx-post="{% url 'inbox:send_reply_draft' workspace_id=workspace.id reply_id=draft.id %}"
                 hx-target="#inbox-detail-panel"
                 hx-swap="innerHTML"
+                hx-disabled-elt="this"
                 class="inline-flex items-center gap-1 px-3 py-1 text-[11px] font-semibold text-white rounded-full transition-all"
-                style="background: var(--primary); box-shadow: var(--shadow-primary);">
+                style="background: var(--primary-strong); box-shadow: var(--shadow-primary);">
             {% if draft.status == 'failed' %}Retry send{% else %}Send{% endif %}
         </button>
         <button hx-post="{% url 'inbox:discard_reply_draft' workspace_id=workspace.id reply_id=draft.id %}"

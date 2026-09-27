@@ -71,19 +71,20 @@
                  style="background: rgba(0,0,0,0.4);">
                 <div @click.outside="showEditModal = false"
                      x-show="showEditModal" x-transition
+                     x-trap.noscroll="showEditModal" role="dialog" aria-modal="true" aria-labelledby="edit-key-title-{{ row.id }}"
                      class="w-full max-w-xl mx-4 rounded-xl flex flex-col"
                      style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.18); max-height: 90vh;">
                     <form method="POST" action="{% url 'api_keys:edit' row.id %}" class="flex flex-col min-h-0">
                         {% csrf_token %}
                         <div class="flex items-start justify-between px-6 pt-6 pb-4 flex-shrink-0">
                             <div>
-                                <h3 class="text-lg font-semibold" style="color: var(--text-primary);">Edit API key</h3>
+                                <h3 id="edit-key-title-{{ row.id }}" class="text-lg font-semibold" style="color: var(--text-primary);">Edit API key</h3>
                                 <p class="text-xs mt-1" style="color: var(--text-tertiary);">
                                     <strong style="color: var(--text-primary);">{{ row.name }}</strong>
                                     · {{ row.workspace_name }} · changes apply on the next API request.
                                 </p>
                             </div>
-                            <button type="button" @click="showEditModal = false"
+                            <button type="button" @click="showEditModal = false" aria-label="Close"
                                     class="text-xl leading-none px-2 cursor-pointer"
                                     style="color: var(--text-tertiary);">&times;</button>
                         </div>
@@ -177,7 +178,7 @@
                             </button>
                             <button type="submit"
                                     class="btn-primary-hover px-5 py-2 text-sm font-medium rounded-full cursor-pointer"
-                                    style="background: var(--primary); color: white;">
+                                    style="background: var(--primary-strong); color: white;">
                                 Save changes
                             </button>
                         </div>
@@ -213,14 +214,15 @@
                  style="background: rgba(0,0,0,0.4);">
                 <div @click.outside="showRevokeModal = false"
                      x-show="showRevokeModal" x-transition
+                     x-trap.noscroll="showRevokeModal" role="dialog" aria-modal="true" aria-labelledby="revoke-key-title-{{ row.id }}"
                      class="w-full max-w-md mx-4 rounded-xl flex flex-col"
                      style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.18);">
                     <div class="flex items-start justify-between px-6 pt-6 pb-4">
                         <div>
-                            <h3 class="text-lg font-semibold" style="color: var(--text-primary);">Revoke API key</h3>
+                            <h3 id="revoke-key-title-{{ row.id }}" class="text-lg font-semibold" style="color: var(--text-primary);">Revoke API key</h3>
                             <p class="text-xs mt-1" style="color: var(--text-tertiary);">This can't be undone.</p>
                         </div>
-                        <button type="button" @click="showRevokeModal = false"
+                        <button type="button" @click="showRevokeModal = false" aria-label="Close"
                                 class="text-xl leading-none px-2 cursor-pointer"
                                 style="color: var(--text-tertiary);">&times;</button>
                     </div>

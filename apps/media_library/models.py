@@ -1,12 +1,39 @@
 """Media Library models (F-6.1) - media asset storage and management."""
 
+import os
 import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from .managers import MediaAssetManager
+
+
+def _unguessable_path(prefix: str, filename: str) -> str:
+    """``<prefix>/YYYY/MM/<random hex><ext>`` for an uploaded file.
+
+    Files under media_library/ are fetched anonymously by the platforms we
+    publish to, so their URLs cannot sit behind a login. Keeping the client's
+    own filename in the URL ("acme-launch-teaser.mp4") made those URLs
+    guessable across tenants; a random 128-bit name makes them capabilities.
+    The original name is kept on ``MediaAsset.filename`` for display.
+    """
+    ext = os.path.splitext(filename)[1].lower()[:10]
+    return f"{prefix}/{timezone.now():%Y/%m}/{uuid.uuid4().hex}{ext}"
+
+
+def asset_upload_to(instance, filename):
+    return _unguessable_path("media_library", filename)
+
+
+def thumbnail_upload_to(instance, filename):
+    return _unguessable_path("media_library/thumbs", filename)
+
+
+def version_upload_to(instance, filename):
+    return _unguessable_path("media_library/versions", filename)
 
 
 class MediaFolder(models.Model):
@@ -39,9 +66,13 @@ class MediaFolder(models.Model):
     class Meta:
         db_table = "media_library_folder"
         constraints = [
+            # nulls_distinct=False: a root folder has parent_folder NULL, and
+            # Postgres treats NULLs as distinct by default, so two root folders
+            # with the same name were allowed.
             models.UniqueConstraint(
                 fields=["workspace", "parent_folder", "name"],
                 name="unique_folder_name_per_parent",
+                nulls_distinct=False,
             ),
         ]
         ordering = ["name"]
@@ -120,7 +151,7 @@ class MediaAsset(models.Model):
     )
 
     # File info
-    file = models.FileField(upload_to="media_library/%Y/%m/")
+    file = models.FileField(upload_to=asset_upload_to, max_length=255)
     filename = models.CharField(max_length=255)
     media_type = models.CharField(max_length=20, choices=MediaType.choices)
     mime_type = models.CharField(max_length=100, blank=True, default="")
@@ -132,7 +163,7 @@ class MediaAsset(models.Model):
     duration = models.FloatField(default=0, help_text="Video duration in seconds.")
 
     # Thumbnail for videos and large images
-    thumbnail = models.ImageField(upload_to="media_library/thumbs/%Y/%m/", blank=True)
+    thumbnail = models.ImageField(upload_to=thumbnail_upload_to, blank=True, max_length=255)
 
     # Metadata
     alt_text = models.TextField(blank=True, default="")
@@ -249,8 +280,8 @@ class MediaAssetVersion(models.Model):
         related_name="versions",
     )
     version_number = models.PositiveIntegerField()
-    file = models.FileField(upload_to="media_library/versions/%Y/%m/")
-    thumbnail = models.ImageField(upload_to="media_library/thumbs/%Y/%m/", blank=True, default="")
+    file = models.FileField(upload_to=version_upload_to, max_length=255)
+    thumbnail = models.ImageField(upload_to=thumbnail_upload_to, blank=True, default="", max_length=255)
     change_description = models.CharField(max_length=500, blank=True, default="")
     file_size = models.PositiveBigIntegerField(default=0)
     width = models.PositiveIntegerField(null=True, blank=True)

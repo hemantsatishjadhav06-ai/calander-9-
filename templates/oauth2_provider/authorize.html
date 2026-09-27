@@ -1,18 +1,18 @@
 {% extends "oauth2_provider/base.html" %}
-{% load i18n static %}
+{% load i18n %}
 
-{% block title %}Authorize {{ application.name|default:"an app" }} · SM Bean{% endblock title %}
+{% block title %}Authorize {{ application.name|default:"an app" }} · {{ SITE_NAME }}{% endblock title %}
 
 {% block content %}
     <div class="bb-head">
-        <img src="{% static 'img/brightbean-studio-logo.webp' %}" alt="SM Bean" class="bb-logo">
-        <span class="bb-eyebrow">SM Bean · Studio</span>
+        <div class="bb-logo" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</div>
+        <span class="bb-eyebrow">{{ SITE_NAME }}</span>
     </div>
 
     <div class="bb-card">
         {% if not error %}
             <h1>{% blocktrans with name=application.name|default:"This application" %}Authorize {{ name }}?{% endblocktrans %}</h1>
-            <p>{% blocktrans with name=application.name|default:"This application" %}{{ name }} wants to connect to your SM Bean workspace with the following permissions:{% endblocktrans %}</p>
+            <p>{% blocktrans with name=application.name|default:"This application" %}{{ name }} wants to connect to your {{ SITE_NAME }} workspace with the following permissions:{% endblocktrans %}</p>
 
             <form id="authorizationForm" method="post">
                 {% csrf_token %}
@@ -42,7 +42,7 @@
                 </div>
             </form>
 
-            <p class="bb-foot">{% trans "You can revoke this access at any time from SM Bean." %}</p>
+            <p class="bb-foot">{% trans "You can revoke this access at any time from {{ SITE_NAME }}." %}</p>
         {% else %}
             <h1>{% trans "Something went wrong" %}</h1>
             <p>{{ error.error }}</p>

@@ -48,9 +48,18 @@ class RBACMiddleware:
         # resolution). Here we only resolve org directly and fall back to
         # last_workspace_id for global pages that have no workspace_id in the URL.
         if hasattr(request, "user") and request.user.is_authenticated:
-            # Resolve org membership.
-            # In v1, each user belongs to exactly one organization.
-            org_membership = OrgMembership.objects.filter(user=request.user).select_related("organization").first()
+            # Resolve org membership. A user normally belongs to one org, but an
+            # existing account that accepts another org's invitation belongs to
+            # two, and ``.first()`` with no ordering picked one by UUID — so the
+            # members page, the shared library and the org-role gates could
+            # silently act on the wrong org from one request to the next. The org
+            # that owns the user's current workspace wins; otherwise the oldest.
+            memberships = OrgMembership.objects.filter(user=request.user).select_related("organization")
+            org_membership = None
+            if request.user.last_workspace_id:
+                org_membership = memberships.filter(organization__workspaces__id=request.user.last_workspace_id).first()
+            if org_membership is None:
+                org_membership = memberships.order_by("invited_at", "id").first()
             if org_membership:
                 request.org = org_membership.organization
                 request.org_membership = org_membership

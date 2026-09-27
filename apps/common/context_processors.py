@@ -1,6 +1,52 @@
 """Context processors for sidebar and global template data."""
 
+from django.conf import settings
 from django.db.models import Count, Q
+
+
+def branding(request):
+    """Site name, support email, and legal URLs for every template.
+
+    SUPPORT_EMAIL is deliberately NOT defaulted to DEFAULT_FROM_EMAIL: that is a
+    no-reply sender, not a support channel, and falling back to it made every
+    ``{% if SUPPORT_EMAIL %}`` guard true while pointing users at a black hole.
+    Unset means unset, so templates can degrade honestly.
+    """
+    return {
+        "SITE_NAME": getattr(settings, "SITE_NAME", "SM Bean"),
+        "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", ""),
+        "LEGAL_TERMS_URL": getattr(settings, "LEGAL_TERMS_URL", "/terms/"),
+        "LEGAL_PRIVACY_URL": getattr(settings, "LEGAL_PRIVACY_URL", "/privacy/"),
+        "SOURCE_URL": getattr(settings, "SOURCE_URL", ""),
+        "LEGAL_ENTITY": getattr(settings, "LEGAL_ENTITY_NAME", "") or getattr(settings, "SITE_NAME", "SM Bean"),
+        "LEGAL_UPDATED": getattr(settings, "LEGAL_UPDATED", ""),
+        "LEGAL_PAGES_REVIEWED": getattr(settings, "LEGAL_PAGES_REVIEWED", False),
+        # Public CTAs say "Get started" only when anyone can actually sign up.
+        "SIGNUP_OPEN": getattr(settings, "SIGNUP_MODE", "invite_only") == "open",
+        **_platform_availability(),
+    }
+
+
+def _platform_availability():
+    """Display names of the platforms that are live, and of those coming soon.
+
+    Instagram (Direct) and the two LinkedIn flavours collapse to one public name
+    each: a visitor picks a network, not an OAuth variant.
+    """
+    from apps.credentials.models import PlatformCredential
+
+    launched = set(getattr(settings, "LAUNCHED_PLATFORMS", []))
+    live, soon = [], []
+    for value, label in PlatformCredential.Platform.choices:
+        name = {"instagram_login": "Instagram", "google_business": "Google Business"}.get(value, label)
+        name = "LinkedIn" if value.startswith("linkedin") else name
+        bucket = live if value in launched else soon
+        if name not in live and name not in soon:
+            bucket.append(name)
+        elif name in soon and bucket is live:
+            soon.remove(name)
+            live.append(name)
+    return {"LIVE_PLATFORM_NAMES": live, "COMING_SOON_PLATFORM_NAMES": soon}
 
 
 def sidebar_context(request):
@@ -64,14 +110,23 @@ def sidebar_context(request):
             .order_by("platform", "account_name")
         )
 
-        # Connectable platforms: not yet connected in this workspace.
-        # Show all known platforms (configured or not) so the sidebar
-        # always surfaces what can be connected. The connect page itself
-        # handles the "not configured" case with an admin prompt, and shares
-        # PlatformVisibility.visible_choices() with us so the two can't disagree.
+        # Connectable platforms: not yet connected in this workspace AND
+        # actually connectable — credentials configured, or a platform that
+        # needs none. This used to list every known platform so the sidebar
+        # "always surfaces what can be connected"; on a fresh install that
+        # meant advertising Instagram, LinkedIn and TikTok, the three whose
+        # connect cards render a dead "Not Configured" pill. Same helper the
+        # connect page uses, so the two cannot disagree.
+        from apps.social_accounts.views import _get_configured_platforms
+
         connected_platforms = {ch.platform for ch in sidebar_channels}
+        configured_platforms = _get_configured_platforms(workspace.organization_id)
         sidebar_connectable_platforms = sorted(
-            ((p, label) for p, label in PlatformVisibility.visible_choices() if p not in connected_platforms),
+            (
+                (p, label)
+                for p, label in PlatformVisibility.visible_choices()
+                if p not in connected_platforms and p in configured_platforms
+            ),
             key=_connect_suggestion_rank,
         )
 

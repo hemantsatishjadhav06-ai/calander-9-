@@ -1,4 +1,4 @@
-# Contributing to Brightbean
+# Contributing to SM Bean
 
 Thanks for your interest in contributing! This guide will help you get started.
 
@@ -121,7 +121,7 @@ Providers live in `providers/` with one file per platform. To add a new one:
 
 ## Reporting Bugs
 
-Use the [bug report template](https://github.com/brightbeanxyz/brightbean-studio/issues/new?template=bug_report.yml) on GitHub. Include:
+Use the [bug report template](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/new?template=bug_report.yml) on GitHub. Include:
 
 - Steps to reproduce
 - Expected vs actual behavior
@@ -129,7 +129,7 @@ Use the [bug report template](https://github.com/brightbeanxyz/brightbean-studio
 
 ## Requesting Features
 
-Use the [feature request template](https://github.com/brightbeanxyz/brightbean-studio/issues/new?template=feature_request.yml) on GitHub.
+Use the [feature request template](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/new?template=feature_request.yml) on GitHub.
 
 ## Security Issues
 

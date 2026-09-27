@@ -112,6 +112,13 @@ BATCHED_EMAIL_EVENTS = frozenset(BATCH_HEADINGS)
 # The daily digest is not per-event-type, so it has no BATCH_HEADINGS entry.
 DAILY_DIGEST_HEADINGS = ("Your daily digest: {n} notification", "Your daily digest: {n} notifications")
 
+# A user in digest mode has EVERY event type queued. If they switch digest
+# mode off with rows waiting, those rows are flushed per event type — including
+# types that are never batched and so have no BATCH_HEADINGS entry. Without a
+# fallback that was a KeyError, the rows were retried until reaped, and the
+# emails were lost.
+GENERIC_BATCH_HEADINGS = ("{n} new notification", "{n} new notifications")
+
 # Default channel enablement per event type.
 # Key: event_type, Value: dict of channel → default enabled.
 DEFAULT_CHANNELS: dict[str, dict[str, bool]] = {
@@ -168,15 +175,19 @@ def notify(
         logger.warning("Unknown event_type: %s", event_type)
         return None
 
+    channels_to_dispatch = _resolve_channels(user, event_type)
+
+    # Titles are built from user- and platform-supplied names ("New comment
+    # from <sender>"), and the column is 255 wide: cut here, once, rather than
+    # letting a long display name raise DataError in every caller.
     notification = Notification.objects.create(
         user=user,
         event_type=event_type,
-        title=title,
+        title=title[:255],
         body=body,
         data=data or {},
+        shown_in_app=Channel.IN_APP in channels_to_dispatch,
     )
-
-    channels_to_dispatch = _resolve_channels(user, event_type)
     digest_mode = _is_digest_mode(user)
 
     if _is_in_quiet_hours(user) and event_type in NON_CRITICAL_EVENTS:
@@ -360,16 +371,27 @@ def _dispatch_email(delivery: NotificationDelivery) -> None:
     notification = delivery.notification
     user = notification.user
 
+    site_name = getattr(settings, "SITE_NAME", "SM Bean")
+    data = notification.data if isinstance(notification.data, dict) else {}
+    workspace_name = data.get("workspace_name") or ""
+
     context = {
         "notification": notification,
         "user": user,
         "app_url": getattr(settings, "APP_URL", "http://localhost:8000"),
+        # Emails render outside the request cycle, so context processors don't
+        # run — pass branding explicitly.
+        "SITE_NAME": site_name,
+        "workspace_name": workspace_name,
     }
 
     text_content = render_to_string("notifications/email/notification.txt", context)
     html_content = render_to_string("notifications/email/notification.html", context)
 
-    subject = notification.title
+    # Titles are short status words ("Approved", "Post rejected"), so a bare
+    # title made the inbox subject a single unattributed word — unsearchable and
+    # indistinguishable from spam. Qualify it with the workspace and the brand.
+    subject = " · ".join(p for p in (notification.title, workspace_name, site_name) if p)
 
     msg = EmailMultiAlternatives(
         subject=subject,
@@ -382,19 +404,29 @@ def _dispatch_email(delivery: NotificationDelivery) -> None:
     send_or_raise(msg)
 
 
+def _webhook_signing_key() -> bytes:
+    """The HMAC key for outbound webhook signatures.
+
+    ``WEBHOOK_SECRET`` when set. Otherwise a key *derived* from ``SECRET_KEY``
+    rather than ``SECRET_KEY`` itself: signatures are handed to third parties
+    along with the signed payload, and the key that signs sessions and password
+    reset tokens must never be the one an outside party gets to attack offline.
+    """
+    configured = getattr(settings, "WEBHOOK_SECRET", "")
+    if configured:
+        return configured.encode("utf-8")
+    return hashlib.sha256(b"notification-webhook-signing:" + settings.SECRET_KEY.encode("utf-8")).digest()
+
+
 def _dispatch_webhook(delivery: NotificationDelivery) -> None:
     """Send notification via webhook (HTTP POST with HMAC-SHA256 signature).
 
-    The webhook URL is re-validated with is_safe_url at dispatch time (not just
-    when stored), and redirects are not followed. This narrows the DNS-rebind
-    window between validation and connection. We still rely on the OS-level DNS
-    cache to resolve consistently within a single dispatch; deployments with
-    aggressive DNS-rebind threat models should additionally enforce egress
-    firewall rules.
+    The webhook URL is resolved to a vetted public IP and the request is
+    pinned to that literal address at dispatch time (see apps.common.net),
+    closing the DNS-rebind TOCTOU. Redirects are never followed, so a
+    302→private-IP bait-and-switch surfaces as a delivery failure.
     """
-    import httpx
-
-    from apps.common.validators import is_safe_url
+    from apps.common.net import UnsafeUrlError, pinned_request
 
     notification = delivery.notification
 
@@ -402,12 +434,6 @@ def _dispatch_webhook(delivery: NotificationDelivery) -> None:
     if not webhook_url:
         logger.info("No webhook_url in notification data, skipping webhook delivery")
         return
-
-    # Re-validate immediately before the request. The single-pass DNS resolve
-    # used by is_safe_url is reused by httpx via the OS resolver cache; this
-    # is the simplest defence that doesn't add an httpx-transport dependency.
-    if not is_safe_url(webhook_url):
-        raise RuntimeError("Webhook URL rejected: must be a public http(s) endpoint")
 
     payload = json.dumps(
         {
@@ -421,9 +447,8 @@ def _dispatch_webhook(delivery: NotificationDelivery) -> None:
         default=str,
     ).encode("utf-8")
 
-    webhook_secret = getattr(settings, "WEBHOOK_SECRET", settings.SECRET_KEY)
     signature = hmac.new(
-        webhook_secret.encode("utf-8"),
+        _webhook_signing_key(),
         payload,
         hashlib.sha256,
     ).hexdigest()
@@ -434,10 +459,14 @@ def _dispatch_webhook(delivery: NotificationDelivery) -> None:
         "X-Event-Type": notification.event_type,
     }
 
-    # follow_redirects=False prevents a 302→private-IP bait-and-switch from a
-    # legitimate-looking endpoint. Any redirect is surfaced as a delivery
-    # failure, not silently followed.
-    response = httpx.post(webhook_url, content=payload, headers=headers, timeout=10.0, follow_redirects=False)
+    # pinned_request resolves the host to a vetted public IP and connects to
+    # that literal address (TLS SNI/Host pinned to the hostname), closing the
+    # DNS-rebinding TOCTOU. It never follows redirects, so a 302→private-IP
+    # bait-and-switch is surfaced as a delivery failure below, not followed.
+    try:
+        response = pinned_request("POST", webhook_url, content=payload, headers=headers, timeout=10.0)
+    except UnsafeUrlError as exc:
+        raise RuntimeError(f"Webhook URL rejected: {exc}") from exc
     if 300 <= response.status_code < 400:
         raise RuntimeError(f"Webhook URL replied with redirect {response.status_code} — refusing to follow.")
     if response.status_code >= 400:
@@ -501,7 +530,10 @@ def _digest_heading(event_type: str | None, count: int) -> str:
     ``event_type is None`` is the daily digest, which spans every type and so
     has no per-event heading to use.
     """
-    singular, plural = DAILY_DIGEST_HEADINGS if event_type is None else BATCH_HEADINGS[event_type]
+    if event_type is None:
+        singular, plural = DAILY_DIGEST_HEADINGS
+    else:
+        singular, plural = BATCH_HEADINGS.get(event_type, GENERIC_BATCH_HEADINGS)
     return (singular if count == 1 else plural).format(n=count)
 
 
@@ -761,6 +793,8 @@ def _send_digest_email(user, event_type: str | None, notifications: list) -> Non
     heading = _digest_heading(event_type, total)
     shown = notifications[:BATCH_MAX_ITEMS]
 
+    site_name = getattr(settings, "SITE_NAME", "")
+
     context = {
         "heading": heading,
         "notifications": shown,
@@ -769,13 +803,20 @@ def _send_digest_email(user, event_type: str | None, notifications: list) -> Non
         "user": user,
         "date": timezone.now(),
         "app_url": getattr(settings, "APP_URL", "http://localhost:8000"),
+        # Emails render outside the request cycle, so context processors don't
+        # run — pass branding explicitly.
+        "SITE_NAME": site_name,
     }
 
     text_content = render_to_string("notifications/email/digest.txt", context)
     html_content = render_to_string("notifications/email/digest.html", context)
 
+    # Headings are bare counts ("3 updates"), which in an inbox is both
+    # unsearchable and indistinguishable from spam. Attribute it to the brand.
+    subject = " · ".join(p for p in (heading, site_name) if p)
+
     msg = EmailMultiAlternatives(
-        subject=heading,
+        subject=subject,
         body=text_content,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@localhost"),
         to=[user.email],

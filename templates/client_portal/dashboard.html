@@ -24,7 +24,7 @@
                     <svg class="w-5 h-5" style="color: var(--primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 {% if pending_count > 0 %}
-                <span class="w-2.5 h-2.5 rounded-full animate-pulse" style="background: var(--primary);"></span>
+                <span class="w-2.5 h-2.5 rounded-full animate-pulse" style="background: var(--primary-strong);"></span>
                 {% endif %}
             </div>
             <p class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">{{ pending_count }}</p>
@@ -64,7 +64,7 @@
             </div>
             <a href="{% url 'client_portal:approval_queue' %}"
                class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full text-white transition-all hover:-translate-y-0.5"
-               style="background: var(--primary); box-shadow: var(--shadow-primary);">
+               style="background: var(--primary-strong); box-shadow: var(--shadow-primary);">
                 Review Now
             </a>
         </div>

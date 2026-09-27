@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accept Terms - SM Bean</title>
+    <title>Accept Terms - {{ SITE_NAME }}</title>
     <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
     <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
     <link rel="icon" type="image/png" sizes="96x96" href="{% static 'favicon/favicon-96x96.png' %}">
@@ -18,7 +18,7 @@
         <!-- Logo & Header -->
         <div class="text-center mb-8">
             <div class="inline-flex items-center justify-center w-12 h-12 mb-4">
-                <img src="{% static 'img/brightbean-studio-logo.webp' %}" alt="SM Bean logo" class="w-12 h-12 object-contain">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold tracking-tight" style="background: #C2410C;" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</div>
             </div>
             <h1 class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">
                 Almost there
@@ -55,9 +55,9 @@
                            style="border-color: var(--border);">
                     <span class="text-sm" style="color: var(--text-primary); line-height: 1.5;">
                         I agree to the
-                        <a href="https://brightbean.xyz/terms-of-service/" target="_blank" rel="noopener" class="font-semibold underline hover:no-underline" style="color: var(--primary);">Terms of Service</a>
+                        <a href="{{ LEGAL_TERMS_URL }}" target="_blank" rel="noopener" class="font-semibold underline hover:no-underline" style="color: var(--primary);">Terms of Service</a>
                         and
-                        <a href="https://brightbean.xyz/privacy-policy/" target="_blank" rel="noopener" class="font-semibold underline hover:no-underline" style="color: var(--primary);">Privacy Policy</a>
+                        <a href="{{ LEGAL_PRIVACY_URL }}" target="_blank" rel="noopener" class="font-semibold underline hover:no-underline" style="color: var(--primary);">Privacy Policy</a>
                     </span>
                 </label>
 
@@ -69,7 +69,10 @@
 
         <!-- Sign out link -->
         <p class="text-center text-sm mt-6" style="color: var(--text-secondary);">
-            <a href="{% url 'accounts:logout' %}" class="font-semibold hover:underline" style="color: var(--primary);">Sign out</a>
+            <form method="post" action="{% url 'accounts:logout' %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="font-semibold hover:underline cursor-pointer bg-transparent border-0 p-0" style="color: var(--primary);">Sign out</button>
+            </form>
         </p>
     </div>
 </main>

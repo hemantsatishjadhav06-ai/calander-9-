@@ -14,6 +14,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core import signing
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
@@ -829,8 +831,17 @@ def _render_account_card(request, account, workspace_id):
 @require_permission("manage_social_accounts")
 @require_POST
 def disconnect(request, workspace_id, account_id):
-    """Disconnect a social account."""
+    """Disconnect a social account, keeping its history."""
+    from apps.calendar.models import QueueEntry
+    from apps.composer.models import PlatformPost
+    from apps.composer.services import sync_post_scheduled_at
+
     account = get_object_or_404(SocialAccount.objects.for_workspace(workspace_id), id=account_id)
+
+    # Checked before anything irreversible (webhook unsubscribe, revoke).
+    if PlatformPost.objects.filter(social_account=account, status=PlatformPost.Status.PUBLISHING).exists():
+        messages.error(request, "A post is being published on this account right now. Try again in a minute.")
+        return redirect("social_accounts:list", workspace_id=workspace_id)
 
     # Stop the platform pushing us this account's activity before we drop the
     # token that would let us unsubscribe.
@@ -848,24 +859,99 @@ def disconnect(request, workspace_id, account_id):
             account,
         )
 
-    # Delete posts that ONLY target this account (will be fully orphaned).
-    # Multi-platform posts keep their other PlatformPost targets via cascade.
+    account_name = account.account_name or account.account_handle
+    # Disconnect keeps the history the confirmation promises ("Historical data
+    # will be preserved"): published posts, publish logs, analytics, queues and
+    # posting slots stay, and reconnecting the same account through OAuth picks
+    # the row back up. It used to delete all of it. Removing the account for
+    # good is the separate ``remove_account`` action.
+    with transaction.atomic():
+        # Work that was going to publish through this channel goes back to
+        # draft instead of failing at publish time on a dead credential.
+        unscheduled = PlatformPost.objects.filter(
+            social_account=account, status=PlatformPost.Status.SCHEDULED
+        ).select_related("post")
+        for pp in unscheduled:
+            pp.transition_to(PlatformPost.Status.DRAFT)
+            pp.scheduled_at = None
+            if pp.save_guarded([*PlatformPost.TRANSITION_FIELDS, "scheduled_at", "updated_at"]):
+                sync_post_scheduled_at(pp.post)
+        QueueEntry.objects.filter(queue__social_account=account).delete()
+
+        account.oauth_access_token = ""
+        account.oauth_refresh_token = ""
+        account.token_expires_at = None
+        account.connection_status = SocialAccount.ConnectionStatus.DISCONNECTED
+        account.last_error = f"Disconnected by {request.user.name or request.user.email}. Reconnect to publish again."
+        account.save(
+            update_fields=[
+                "oauth_access_token",
+                "oauth_refresh_token",
+                "token_expires_at",
+                "connection_status",
+                "last_error",
+                "updated_at",
+            ]
+        )
+
+    messages.success(request, f"Disconnected {account_name}. Its history is kept; reconnect it any time.")
+
+    if request.headers.get("HX-Request"):
+        # Re-render the list so the card shows its Disconnected state.
+        return HttpResponse(status=204, headers={"HX-Refresh": "true"})
+    return redirect("social_accounts:list", workspace_id=workspace_id)
+
+
+@login_required
+@require_permission("manage_social_accounts")
+@require_POST
+def remove_account(request, workspace_id, account_id):
+    """Delete a disconnected account and everything recorded against it."""
     from django.db.models import Count
 
     from apps.composer.models import PlatformPost, Post
 
-    orphan_post_ids = list(
-        PlatformPost.objects.filter(social_account=account)
-        .values("post_id")
-        .annotate(total_platforms=Count("post__platform_posts"))
-        .filter(total_platforms=1)
-        .values_list("post_id", flat=True)
-    )
-    if orphan_post_ids:
-        Post.objects.filter(id__in=orphan_post_ids).delete()
+    account = get_object_or_404(SocialAccount.objects.for_workspace(workspace_id), id=account_id)
+    if account.connection_status != SocialAccount.ConnectionStatus.DISCONNECTED:
+        messages.error(request, "Disconnect the account before removing it.")
+        return redirect("social_accounts:list", workspace_id=workspace_id)
+    if PlatformPost.objects.filter(social_account=account, status=PlatformPost.Status.PUBLISHING).exists():
+        messages.error(request, "A post is being published on this account right now. Try again in a minute.")
+        return redirect("social_accounts:list", workspace_id=workspace_id)
 
     account_name = account.account_name or account.account_handle
-    account.delete()
+    with transaction.atomic():
+        # Posts that only targeted this account would be left with no channel.
+        orphan_post_ids = list(
+            PlatformPost.objects.filter(social_account=account)
+            .values("post_id")
+            .annotate(total_platforms=Count("post__platform_posts"))
+            .filter(total_platforms=1)
+            .values_list("post_id", flat=True)
+        )
+        if orphan_post_ids:
+            Post.objects.filter(id__in=orphan_post_ids).delete()
+        account.delete()
+
+    messages.success(request, f"Removed {account_name} and its history.")
+    if request.headers.get("HX-Request"):
+        return render(request, "social_accounts/partials/_empty.html")
+    return redirect("social_accounts:list", workspace_id=workspace_id)
+
+    account_name = account.account_name or account.account_handle
+    # One transaction: the orphaned posts and the account go together or not
+    # at all, rather than a half-applied disconnect on a failure in between.
+    with transaction.atomic():
+        orphan_post_ids = list(
+            PlatformPost.objects.filter(social_account=account)
+            .values("post_id")
+            .annotate(total_platforms=Count("post__platform_posts"))
+            .filter(total_platforms=1)
+            .values_list("post_id", flat=True)
+        )
+        if orphan_post_ids:
+            Post.objects.filter(id__in=orphan_post_ids).delete()
+        account.delete()
 
     messages.success(request, f"Disconnected {account_name}.")
 

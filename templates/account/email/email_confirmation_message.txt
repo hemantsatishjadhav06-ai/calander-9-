@@ -1,10 +1,10 @@
 {% load account %}{% autoescape off %}{% user_display user as user_display %}Hi {{ user_display }},
 
-Please confirm this email address for your SM Bean account by clicking the link below:
+Please confirm this email address for your {{ current_site.name }} account by clicking the link below:
 
 {{ activate_url }}
 
 If you didn't add this email, you can safely ignore this message.
 
-- The SM Bean team
+- The {{ current_site.name }} team
 {% endautoescape %}

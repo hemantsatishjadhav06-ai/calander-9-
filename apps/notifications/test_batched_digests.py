@@ -11,6 +11,7 @@ import datetime
 from unittest.mock import patch
 
 import pytest
+from django.conf import settings
 from django.core import mail
 from django.urls import reverse
 from django.utils import timezone
@@ -57,7 +58,10 @@ def test_a_storm_of_failures_becomes_one_email(user):
 
     assert send_batched_email_digests() == 1
     assert len(mail.outbox) == 1
-    assert mail.outbox[0].subject == "300 posts failed to publish"
+    # The heading leads; the brand is appended so the subject is attributable
+    # in an inbox (see _send_digest_email).
+    assert mail.outbox[0].subject.startswith("300 posts failed to publish")
+    assert settings.SITE_NAME in mail.outbox[0].subject
     assert mail.outbox[0].to == [user.email]
 
     assert NotificationDelivery.objects.filter(channel=Channel.EMAIL, status=DeliveryStatus.DELIVERED).count() == 300
@@ -68,7 +72,7 @@ def test_one_failure_says_post_not_posts(user):
     fail(user, 1)
     age_the_queue(BATCH_WINDOW_MINUTES + 1)
     send_batched_email_digests()
-    assert mail.outbox[0].subject == "1 post failed to publish"
+    assert mail.outbox[0].subject.startswith("1 post failed to publish")
 
 
 @pytest.mark.django_db

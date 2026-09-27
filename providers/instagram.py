@@ -251,7 +251,7 @@ class InstagramProvider(SocialProvider):
         """Fetch linked Instagram Business accounts for Facebook-login OAuth.
 
         The user authenticates through Facebook, but the connected account in
-        Brightbean should be the Instagram Business account selected from the
+        The connected account should be the Instagram Business account selected from the
         Facebook Pages the user manages.
         """
         raw_pages = fetch_me_accounts(

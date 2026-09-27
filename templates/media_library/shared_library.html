@@ -23,7 +23,7 @@
     cursor: pointer; transition: all 150ms ease;
   }
   .ml-filter-pill:hover { border-color: var(--border-hover); }
-  .ml-filter-pill.active { background: var(--primary); color: var(--text-inverse); border-color: var(--primary); }
+  .ml-filter-pill.active { background: var(--primary-strong); color: var(--text-inverse); border-color: var(--primary); }
   .ml-type-badge {
     font-size: 9px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.06em; padding: 2px 6px; border-radius: var(--radius-sm);
@@ -49,7 +49,7 @@
       <p class="text-sm" style="color: var(--text-secondary);">Organization-wide assets available to all workspaces.</p>
     </div>
     {% if is_admin %}
-    <label class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 hover:border-orange-300 active:bg-orange-100 transition-all duration-150 cursor-pointer">
+    <label class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 hover:border-orange-300 active:bg-orange-100 transition-all duration-150 cursor-pointer">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       Upload to Shared
       <input id="shared-upload-input" type="file" multiple accept="{{ accepted_file_types }}" class="hidden">
@@ -57,11 +57,18 @@
     {% endif %}
   </div>
 
+  <!-- Rejected uploads -->
+  <div id="shared-upload-errors" hidden role="alert" class="mb-4 rounded-xl border px-4 py-3"
+       style="border-color: var(--error-200, #FECACA); background: var(--error-50, #FEF2F2); color: var(--error-700, #B91C1C);">
+    <p class="text-xs font-semibold"></p>
+    <ul class="mt-1 space-y-0.5"></ul>
+  </div>
+
   <!-- Filters -->
   <div class="flex items-center gap-3 mb-4">
     <div class="relative flex-1 max-w-sm">
       <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--text-ghost);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-      <input type="search" name="q" value="{{ query }}" placeholder="Search shared assets..."
+      <input type="search" name="q" value="{{ query }}" placeholder="Search shared assets..." aria-label="Search shared assets"
              class="ml-search-input w-full pl-9 pr-4 py-2 text-sm border rounded-lg outline-none"
              hx-get="{% url 'media_library_org:shared_index' %}"
              hx-trigger="keyup changed delay:400ms"
@@ -84,18 +91,53 @@
 
 {% if is_admin %}
 <script nonce="{{ request.csp_nonce }}">
+function showSharedUploadErrors(failed) {
+  const box = document.getElementById('shared-upload-errors');
+  const list = box.querySelector('ul');
+  list.replaceChildren();
+  failed.forEach(r => {
+    const li = document.createElement('li');
+    li.className = 'text-xs break-words';
+    const name = document.createElement('span');
+    name.className = 'font-medium';
+    name.textContent = r.filename || 'File';
+    li.append(name, ': ' + (r.error || (r.errors || []).join(' ') || 'Upload rejected'));
+    list.appendChild(li);
+  });
+  box.querySelector('p').textContent = failed.length === 1
+    ? '1 file was not uploaded' : failed.length + ' files were not uploaded';
+  box.hidden = failed.length === 0;
+}
+
 function uploadShared(files) {
   if (!files || files.length === 0) return;
   const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
   const formData = new FormData();
   Array.from(files).forEach(f => formData.append('files', f));
+  showSharedUploadErrors([]);
 
   fetch('{% url "media_library_org:shared_upload" %}', {
     method: 'POST',
     headers: { 'X-CSRFToken': csrfToken },
     body: formData,
-  }).then(() => {
-    htmx.trigger('#shared-grid', 'uploadsComplete');
+  }).then(async (resp) => {
+    // A rejected file makes the response a 400 listing every file's result;
+    // a request-level problem is a 400 with a bare {"error": ...}.
+    let data = {};
+    try { data = await resp.json(); } catch (e) { /* non-JSON error page */ }
+    const results = data.results || [];
+    const failed = results.filter(r => r.status === 'error');
+    if (!resp.ok && !failed.length) {
+      failed.push({ filename: 'Upload', error: data.error || (resp.status === 413 ? 'File too large' : 'Upload failed') });
+    }
+    showSharedUploadErrors(failed);
+    if (results.some(r => r.status === 'ok')) {
+      htmx.ajax('GET', '{% url "media_library_org:shared_index" %}', { target: '#shared-grid', swap: 'innerHTML' });
+    }
+  }).catch(() => {
+    showSharedUploadErrors([{ filename: 'Upload', error: 'Network error' }]);
+  }).finally(() => {
+    document.getElementById('shared-upload-input').value = '';
   });
 }
 

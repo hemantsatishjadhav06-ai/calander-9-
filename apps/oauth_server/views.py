@@ -6,7 +6,7 @@ adds the two pieces it does not ship:
   - RFC 8414 / RFC 9728 discovery metadata documents
 
 DCR is intentionally open — any MCP client may register. A registered client
-still cannot obtain a token without a BrightBean Studio user completing login
+still cannot obtain a token without an SM Bean user completing login
 and consent, so the exposure is bounded; registration is rate-limited only to
 blunt row-spam abuse.
 """

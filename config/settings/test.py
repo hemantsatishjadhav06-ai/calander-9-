@@ -6,6 +6,8 @@ os.environ.setdefault("ENCRYPTION_KEY_SALT", "test-salt-not-for-production")
 from .base import *  # noqa: F401, F403
 
 DEBUG = False
+# Most tests exercise signup itself; the invite-only rule has its own tests.
+SIGNUP_MODE = "open"
 ALLOWED_HOSTS = ["*"]
 
 # Use faster password hasher in tests
@@ -51,7 +53,7 @@ STORAGES["staticfiles"] = {  # noqa: F405
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "brightbean_test",
+        "NAME": env("DB_NAME", default="brightbean_test"),  # noqa: F405
         "USER": env("DB_USER", default="postgres"),  # noqa: F405
         "PASSWORD": env("DB_PASSWORD", default="postgres"),  # noqa: F405
         "HOST": env("DB_HOST", default="localhost"),  # noqa: F405

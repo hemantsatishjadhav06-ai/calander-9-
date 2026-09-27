@@ -4,6 +4,8 @@ import logging
 
 from background_task import background
 
+from apps.common.background import keep_schedule
+
 logger = logging.getLogger(__name__)
 
 # Both tasks are registered on these intervals by apps.publisher.apps.
@@ -15,6 +17,7 @@ PUBLISH_CONFIRM_INTERVAL_SECONDS = 60
 
 
 @background(schedule=0)
+@keep_schedule
 def run_publish_cycle():
     """Poll for due posts and publish them.
 
@@ -31,6 +34,7 @@ def run_publish_cycle():
 
 
 @background(schedule=0)
+@keep_schedule
 def confirm_pending_publishes():
     """Settle posts left in ``publishing``.
 

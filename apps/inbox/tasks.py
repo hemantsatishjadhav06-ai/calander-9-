@@ -6,8 +6,10 @@ from datetime import timedelta
 from typing import Any
 
 from background_task import background
+from django.db.models import F
 from django.utils import timezone
 
+from apps.common.background import keep_schedule
 from apps.members.models import WorkspaceMembership
 from apps.notifications.engine import notify
 from apps.notifications.models import EventType
@@ -278,16 +280,27 @@ class InboxSyncEngine:
         return messages
 
     def _upsert_message(self, account, msg, notify=True, related_post_id=None):
-        """Create or update an inbox message, deduplicating by platform_message_id."""
+        """Create or update an inbox message, deduplicating by platform_message_id.
+
+        Provider strings are cut to the column widths: a display name over 255
+        characters is a ``DataError`` on Postgres, which used to abort the
+        whole account's poll. An over-long avatar URL is dropped rather than
+        cut, because a truncated URL is a broken image.
+
+        ``extra`` is merged, not replaced. The provider's fields refresh on
+        every poll, but keys this app writes into it — ``sla_notified`` — must
+        survive, or the SLA sweep re-alerts every overdue message on every
+        cycle.
+        """
+        avatar = msg.extra.get("sender_avatar_url", "") or ""
         defaults = {
             "workspace": account.workspace,
-            "sender_name": msg.sender_name,
-            "sender_handle": msg.extra.get("sender_handle", msg.sender_id),
-            "sender_avatar_url": msg.extra.get("sender_avatar_url", ""),
+            "sender_name": (msg.sender_name or "")[:255],
+            "sender_handle": (msg.extra.get("sender_handle", msg.sender_id) or "")[:255],
+            "sender_avatar_url": avatar if len(avatar) <= 500 else "",
             "body": msg.text,
             "message_type": msg.message_type,
             "received_at": msg.timestamp,
-            "extra": msg.extra,
         }
         if related_post_id:
             defaults["related_post_id"] = related_post_id
@@ -296,12 +309,19 @@ class InboxSyncEngine:
             social_account=account,
             platform_message_id=msg.platform_message_id,
             defaults=defaults,
+            create_defaults={**defaults, "extra": dict(msg.extra)},
         )
         if created:
             obj.sentiment = analyze_sentiment(obj.body)
             obj.save(update_fields=["sentiment"])
             if notify:
                 self._notify_new_message(obj)
+            return
+
+        merged = {**(obj.extra or {}), **msg.extra}
+        if merged != obj.extra:
+            obj.extra = merged
+            obj.save(update_fields=["extra"])
 
     def _notify_new_message(self, message):
         """Send notification for a new inbox message."""
@@ -327,23 +347,53 @@ class InboxSyncEngine:
             )
 
     def check_sla(self):
-        """Check for SLA-overdue messages and send notifications."""
-        from datetime import timedelta
+        """Check for SLA-overdue messages and send notifications.
 
+        Each message is alerted once (``extra["sla_notified"]``). A message that
+        was *already* past the target when this app first saw it — the backlog
+        an account brings with it on its first sync, or after a long outage —
+        is flagged silently: nobody could have answered it in time, and one
+        alert per backlog message to every owner and manager is a storm, not a
+        signal. The poll interval is added as grace so a target shorter than
+        the polling cadence still alerts.
+
+        One message's failure (a notification that will not render, a user
+        row in a bad state) is logged and skipped rather than aborting the
+        sweep for every other workspace.
+        """
         configs = InboxSLAConfig.objects.filter(is_active=True).select_related("workspace")
 
         for config in configs:
-            threshold = timezone.now() - timedelta(minutes=config.target_response_minutes)
+            target = timedelta(minutes=config.target_response_minutes)
+            threshold = timezone.now() - target
             overdue_messages = InboxMessage.objects.filter(
                 workspace=config.workspace,
                 status__in=[InboxMessage.Status.UNREAD, InboxMessage.Status.OPEN],
                 received_at__lte=threshold,
             ).exclude(extra__has_key="sla_notified")
 
+            grace = target + timedelta(seconds=INBOX_SYNC_INTERVAL_SECONDS)
+            backlog = overdue_messages.filter(created_at__gt=F("received_at") + grace)
+            backlog_ids = set(backlog.values_list("id", flat=True))
+
             for message in overdue_messages:
-                self._notify_sla_overdue(message, config)
+                if message.id in backlog_ids:
+                    message.extra["sla_notified"] = "backlog"
+                    message.save(update_fields=["extra"])
+                    continue
+                try:
+                    self._notify_sla_overdue(message, config)
+                except Exception:
+                    logger.exception("SLA alert failed for inbox message %s; will retry next cycle", message.id)
+                    continue
                 message.extra["sla_notified"] = True
                 message.save(update_fields=["extra"])
+            if backlog_ids:
+                logger.info(
+                    "Skipped SLA alerts for %d backlog message(s) in workspace %s",
+                    len(backlog_ids),
+                    config.workspace_id,
+                )
 
     def _notify_sla_overdue(self, message, config):
         """Notify about an SLA-overdue message."""
@@ -376,6 +426,7 @@ INBOX_SYNC_INTERVAL_SECONDS = 5 * 60  # every 5 minutes
 
 
 @background(schedule=0)
+@keep_schedule
 def run_inbox_sync_cycle():
     """Run one inbox cycle on the shared ``process_tasks`` worker (every deploy target).
 

@@ -28,14 +28,14 @@ JS body can't see the parent scope.
         <button type="button"
                 @click="{% if multiple %}{{ model }} = []{% else %}{{ model }} = ''; open = false{% endif %}; {{ onchange }}"
                 class="w-full text-left px-3 py-1.5 text-xs font-semibold hover:bg-stone-50 border-b border-stone-100"
-                :class="{% if multiple %}!{{ model }}.length{% else %}!{{ model }}{% endif %} ? 'text-orange-600' : 'text-stone-500'">
+                :class="{% if multiple %}!{{ model }}.length{% else %}!{{ model }}{% endif %} ? 'text-orange-700' : 'text-stone-500'">
             {{ placeholder }} — all
         </button>
         {% for opt in options %}
         {% if multiple %}
         <label class="flex items-center gap-2 px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50 cursor-pointer">
             <input type="checkbox" value="{{ opt.value }}" x-model="{{ model }}" @change="{{ onchange }}"
-                   class="rounded border-stone-300 text-orange-500 focus:ring-orange-400">
+                   class="rounded border-stone-300 text-orange-700 focus:ring-orange-400">
             {% if opt.icon %}<span class="w-4 h-4 rounded flex items-center justify-center pi-{{ opt.icon }} flex-shrink-0 text-white">{% include "social_accounts/partials/_platform_icon.html" with platform=opt.icon size="3" %}</span>{% endif %}
             <span class="truncate">{{ opt.label }}</span>
         </label>

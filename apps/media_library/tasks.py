@@ -6,6 +6,8 @@ import tempfile
 from background_task import background
 from django.core.files.base import File
 
+from apps.common.background import keep_schedule
+
 from .models import MediaAsset, MediaAssetVersion
 from .services import (
     ImageTooLargeError,
@@ -123,11 +125,16 @@ def process_image_edit(version_id, operations):
             version.thumbnail.save(f"thumb_v{version.id}.jpg", thumbnail, save=False)
             version.save(update_fields=["thumbnail"])
 
+        # The asset's own file is what the composer, the publisher and the API
+        # read; the version row alone was only ever shown as a thumbnail, so
+        # the crop looked done and the original went out on every post.
         asset = version.media_asset
+        asset.file = version.file
+        asset.file_size = version.file_size
         asset.width = width
         asset.height = height
         asset.thumbnail = version.thumbnail
-        asset.save(update_fields=["width", "height", "thumbnail", "updated_at"])
+        asset.save(update_fields=["file", "file_size", "width", "height", "thumbnail", "updated_at"])
 
     except ImageTooLargeError as exc:
         # The version row exists only to hold the edit result — ``create_version``
@@ -203,9 +210,13 @@ def process_video_trim(version_id, start_seconds, end_seconds):
                 version.thumbnail.save(f"thumb_v{version.id}.jpg", thumbnail, save=False)
                 version.save(update_fields=["thumbnail"])
 
+            asset.file = version.file
+            asset.file_size = version.file_size
             asset.duration = version.duration
+            asset.width = version.width
+            asset.height = version.height
             asset.thumbnail = version.thumbnail
-            asset.save(update_fields=["duration", "thumbnail", "updated_at"])
+            asset.save(update_fields=["file", "file_size", "duration", "width", "height", "thumbnail", "updated_at"])
 
         finally:
             import os
@@ -215,7 +226,25 @@ def process_video_trim(version_id, start_seconds, end_seconds):
                 os.unlink(output_path)
 
     except Exception:
+        # Same reasoning as the image path: the version row only exists to hold
+        # the result, so on failure it must not stay marked "current" while
+        # still pointing at the untrimmed source.
         logger.exception("Failed to process video trim for version %s", version_id)
+        _discard_failed_version(version)
+
+
+def _discard_failed_version(version):
+    """Drop a version whose processing failed and rewind the asset's pointer."""
+    asset = version.media_asset
+    source_name = asset.file.name
+    if version.thumbnail:
+        version.thumbnail.delete(save=False)
+    if version.file and version.file.name != source_name:
+        version.file.delete(save=False)
+    previous = asset.versions.exclude(pk=version.pk).order_by("-version_number").first()
+    version.delete()
+    asset.current_version = previous
+    asset.save(update_fields=["current_version", "updated_at"])
 
 
 # How often the recurring pending-upload sweep runs; registered on a repeating
@@ -224,6 +253,7 @@ PENDING_UPLOAD_SWEEP_INTERVAL_SECONDS = 60 * 60  # hourly
 
 
 @background(schedule=0)
+@keep_schedule
 def sweep_pending_uploads():
     """Delete expired, never-finalized presigned uploads and their objects.
 
@@ -253,6 +283,7 @@ ORPHANED_MEDIA_SWEEP_INTERVAL_SECONDS = 24 * 60 * 60  # daily
 
 
 @background(schedule=0)
+@keep_schedule
 def run_orphaned_media_sweep():
     """Delete media assets no longer referenced by any post, idea, or template.
 

@@ -5,6 +5,8 @@ import logging
 from background_task import background
 from django.core.management import call_command
 
+from apps.common.background import keep_schedule
+
 logger = logging.getLogger(__name__)
 
 # How often the recurring expired-session purge runs; registered on a repeating
@@ -14,6 +16,7 @@ SESSION_CLEANUP_INTERVAL_SECONDS = 24 * 60 * 60  # daily
 
 
 @background(schedule=0)
+@keep_schedule
 def clear_expired_sessions():
     """Delete expired Django sessions (wraps the ``clearsessions`` command)."""
     call_command("clearsessions")

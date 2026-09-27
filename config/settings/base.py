@@ -21,12 +21,38 @@ environ.Env.read_env(BASE_DIR / ".env", overwrite=False)
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+# Railway's deploy health check (railway.toml ``healthcheckPath``) calls /health/
+# with this Host; without it Django answers 400 and every deploy is rolled back.
+_ON_RAILWAY = any(
+    env(name, default="") for name in ("RAILWAY_ENVIRONMENT", "RAILWAY_ENVIRONMENT_NAME", "RAILWAY_ENVIRONMENT_ID")
+)
+if _ON_RAILWAY and "healthcheck.railway.app" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS = [*ALLOWED_HOSTS, "healthcheck.railway.app"]
 # Trusted origins for CSRF (scheme + host, e.g. https://app.example.com). Behind
 # a TLS-terminating proxy (Railway), a login POST is rejected 403 unless the
 # browser's Origin is trusted here, so read it from the environment in every
 # settings module rather than only in development.
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 APP_URL = env("APP_URL")
+
+# Branding / legal / support — surfaced in templates via the ``branding``
+# context processor. Legal URLs default to the in-app placeholder pages
+# (/terms/, /privacy/) so nothing points at an external domain out of the box;
+# override with your hosted policy URLs. SUPPORT_EMAIL falls back to
+# DEFAULT_FROM_EMAIL in the context processor when left blank.
+SITE_NAME = env("SITE_NAME", default="SM Bean")
+SUPPORT_EMAIL = env("SUPPORT_EMAIL", default="")
+# Who the Terms and Privacy pages name as the operator, when they were last
+# changed, and whether counsel has signed them off (hides the "Draft" notice).
+LEGAL_ENTITY_NAME = env("LEGAL_ENTITY_NAME", default="")
+LEGAL_UPDATED = env("LEGAL_UPDATED", default="27 September 2026")
+LEGAL_PAGES_REVIEWED = env.bool("LEGAL_PAGES_REVIEWED", default=False)
+LEGAL_TERMS_URL = env("LEGAL_TERMS_URL", default="/terms/")
+LEGAL_PRIVACY_URL = env("LEGAL_PRIVACY_URL", default="/privacy/")
+# AGPL-3.0 §13: network users must be offered the Corresponding Source of this
+# (modified) version. Surfaced as a visible "Source code" link. Point this at
+# YOUR public repository of the deployed code and keep it accurate/public.
+SOURCE_URL = env("SOURCE_URL", default="https://github.com/hemantsatishjadhav06-ai/calander-9-")
 
 # Application definition
 
@@ -90,12 +116,14 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.common.middleware.PermissionsPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "apps.accounts.middleware.AdminIPAllowlistMiddleware",
     "apps.accounts.middleware.AuthRateLimitMiddleware",
     "apps.accounts.middleware.TosAcceptanceMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -120,6 +148,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "apps.notifications.context_processors.unread_notification_count",
                 "apps.common.context_processors.sidebar_context",
+                "apps.common.context_processors.branding",
                 "apps.onboarding.context_processors.onboarding_checklist",
                 "apps.intelligence.context_processors.intelligence_flag",
             ],
@@ -174,6 +203,13 @@ else:
 DATABASES = {
     "default": env.db("DATABASE_URL", default="postgres://postgres:postgres@localhost:5432/brightbean"),
 }
+# Reuse connections across requests instead of a TCP + TLS + auth handshake per
+# request (CONN_MAX_AGE defaults to 0). Health checks drop a connection the
+# server closed (a Postgres restart, an idle timeout) instead of failing the
+# next request on it. Gunicorn runs 4 threads and the worker one, so this is
+# at most five persistent connections per container.
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 
 # Custom user model
 AUTH_USER_MODEL = "accounts.User"
@@ -229,6 +265,9 @@ if STORAGE_BACKEND.lower() == "s3":
     AWS_STORAGE_BUCKET_NAME = env("S3_BUCKET_NAME", default="")
     AWS_S3_CUSTOM_DOMAIN = env("S3_CUSTOM_DOMAIN", default="")
     AWS_S3_REGION_NAME = env("S3_REGION_NAME", default="auto")
+    # "virtual" (bucket.host, Railway buckets and AWS) or "path" (host/bucket,
+    # older S3-compatibles). Empty leaves boto3 to guess.
+    AWS_S3_ADDRESSING_STYLE = env("S3_ADDRESSING_STYLE", default="") or None
     AWS_S3_FILE_OVERWRITE = False
     AWS_DEFAULT_ACL = "private"
     AWS_QUERYSTRING_AUTH = True
@@ -262,11 +301,51 @@ SITE_ID = 1
 # django-allauth
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
-ACCOUNT_EMAIL_VERIFICATION = "none"
+# "none" until SMTP is configured; set ACCOUNT_EMAIL_VERIFICATION=mandatory once
+# mail can actually be delivered, or new users will be locked out waiting for it.
+ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
+
+# Who may create an account.
+#   invite_only (default): only people holding a team invitation link, plus
+#     anyone matching SIGNUP_ALLOWLIST. Strangers posting through this
+#     deployment's own Meta/Google apps can get those apps restricted for every
+#     customer, so an instance is closed until its owner opens it on purpose.
+#   open: anyone can sign up.
+# SIGNUP_ALLOWLIST takes full addresses ("ana@agency.com") and whole domains
+# ("@agency.com"), comma-separated.
+SIGNUP_MODE = env("SIGNUP_MODE", default="invite_only")
+
+# Platforms the public pages may call "live". Every integration ships in the
+# code, but one only works for outside users once its developer app has passed
+# the platform's review, so the landing, pricing and signup copy lists these
+# as available and everything else as "coming soon".
+LAUNCHED_PLATFORMS = env.list("LAUNCHED_PLATFORMS", default=["bluesky", "mastodon", "devto"])
+
+# Django admin. ADMIN_URL moves it off the well-known /admin/ path, and
+# ADMIN_ALLOWED_IPS (addresses or CIDR ranges) 404s it for everyone else.
+ADMIN_URL = env("ADMIN_URL", default="admin/").strip("/") + "/"
+ADMIN_ALLOWED_IPS = env.list("ADMIN_ALLOWED_IPS", default=[])
+SIGNUP_ALLOWLIST = [entry.strip().lower() for entry in env.list("SIGNUP_ALLOWLIST", default=[]) if entry.strip()]
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 LOGIN_REDIRECT_URL = "/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/accounts/login/"
+
+# Defense-in-depth rate limits (allauth derives the client IP from REMOTE_ADDR,
+# not a spoofable header). These back up apps.accounts.middleware.AuthRateLimit
+# so brute-force and password-reset email-bombing are capped even if the
+# middleware is bypassed or reordered. Format: "<count>/<period>/<scope>".
+ACCOUNT_RATE_LIMITS = {
+    # Keep a per-key (per-account/email) clause alongside the per-IP one so a
+    # distributed botnet can't brute-force or reset-bomb a single account by
+    # rotating source IPs — the /key clause is what allauth's defaults carry.
+    "login_failed": "10/5m/ip,5/5m/key",
+    "login": "30/5m/ip",
+    "signup": "20/h/ip",
+    "reset_password": "5/h/ip,5/h/key",
+    "reset_password_from_key": "5/h/ip,5/h/key",
+    "confirm_email": "10/h/ip",
+}
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
@@ -316,13 +395,26 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@localhost")
 # its own — so this is the only point where a runaway loop can be stopped.
 EMAIL_BACKEND = "apps.common.mail.BudgetedEmailBackend"
 
-if EMAIL_BACKEND_TYPE == "smtp":
+# Gmail API over HTTPS, for hosts that block outbound SMTP (Railway Hobby).
+# Connect the sending mailbox once at /ops/email/. The OAuth client defaults to
+# the Google sign-in client; its Google Cloud project needs the Gmail API
+# enabled and <APP_URL>/ops/email/callback/ as an authorized redirect URI.
+GMAIL_CLIENT_ID = env("GMAIL_CLIENT_ID", default="")
+GMAIL_CLIENT_SECRET = env("GMAIL_CLIENT_SECRET", default="")
+GMAIL_REFRESH_TOKEN = env("GMAIL_REFRESH_TOKEN", default="")
+
+if EMAIL_BACKEND_TYPE == "gmail_api":
+    EMAIL_INNER_BACKEND = "apps.common.gmail.GmailAPIEmailBackend"
+elif EMAIL_BACKEND_TYPE == "smtp":
     EMAIL_INNER_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = env("EMAIL_HOST", default="localhost")
     EMAIL_PORT = env.int("EMAIL_PORT", default=587)
     EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
     EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
     EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+    # Without a timeout a hung SMTP server holds the request (password reset,
+    # invite) or the worker's digest sweep open indefinitely.
+    EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 else:
     EMAIL_INNER_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
@@ -332,6 +424,10 @@ else:
 # way, because the count is what tells us where the limit belongs.
 # EMAIL_SENDING_ENABLED=false is the blunt lever, and needs a config change
 # rather than a deploy.
+# Signs outbound notification webhooks (X-Signature-256). Share this value
+# with whoever receives them so they can verify deliveries; unset, deliveries
+# are signed with a key derived from SECRET_KEY that no receiver can check.
+WEBHOOK_SECRET = env("WEBHOOK_SECRET", default="")
 EMAIL_SENDING_ENABLED = env.bool("EMAIL_SENDING_ENABLED", default=True)
 EMAIL_DAILY_SEND_LIMIT = env.int("EMAIL_DAILY_SEND_LIMIT", default=2000)
 EMAIL_RECIPIENT_HOURLY_LIMIT = env.int("EMAIL_RECIPIENT_HOURLY_LIMIT", default=6)
@@ -379,7 +475,12 @@ if STORAGE_BACKEND.lower() == "s3":
         if not _storage_origin.startswith("https://"):
             _storage_origin = f"https://{_storage_origin}"
         _parsed = urlparse(_storage_origin)
-        _storage_origin = f"{_parsed.scheme}://{_parsed.hostname}"
+        _storage_host = _parsed.hostname
+        # Virtual-hosted presigned URLs put the bucket in the hostname, so the
+        # CSP has to allow bucket.host, not the bare endpoint.
+        if not AWS_S3_CUSTOM_DOMAIN and AWS_S3_ADDRESSING_STYLE == "virtual" and AWS_STORAGE_BUCKET_NAME:
+            _storage_host = f"{AWS_STORAGE_BUCKET_NAME}.{_storage_host}"
+        _storage_origin = f"{_parsed.scheme}://{_storage_host}"
         CSP_MEDIA_SRC = (*CSP_MEDIA_SRC, _storage_origin)  # type: ignore[assignment]
         CSP_IMG_SRC = (*CSP_IMG_SRC, _storage_origin)  # type: ignore[assignment]
 
@@ -438,6 +539,9 @@ if SENTRY_DSN:
     # it on deliberately when you are actually chasing a regression.
     sentry_sdk.init(
         dsn=SENTRY_DSN,
+        environment=env("SENTRY_ENVIRONMENT", default=env("RAILWAY_ENVIRONMENT_NAME", default="production")),
+        release=env("RAILWAY_GIT_COMMIT_SHA", default="") or None,
+        send_default_pii=False,
         traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
         profiles_sample_rate=env.float("SENTRY_PROFILES_SAMPLE_RATE", default=0.0),
     )
@@ -598,7 +702,7 @@ MCP_PUBLIC_BASE_URL = env("MCP_PUBLIC_BASE_URL", default=APP_URL).rstrip("/")
 MCP_OAUTH_ISSUER_URL = env("MCP_OAUTH_ISSUER_URL", default=APP_URL).rstrip("/")
 
 OAUTH2_PROVIDER = {
-    "SCOPES": {"mcp": "Call BrightBean Studio MCP tools on your behalf"},
+    "SCOPES": {"mcp": "Call SM Bean MCP tools on your behalf"},
     "DEFAULT_SCOPES": ["mcp"],
     "PKCE_REQUIRED": True,
     # Restrict ``code_challenge_method`` to ``S256``. django-oauth-toolkit
@@ -614,6 +718,38 @@ OAUTH2_PROVIDER = {
     "REQUEST_APPROVAL_PROMPT": "auto",
     # Claude's OAuth callback is always https; reject non-TLS redirect URIs.
     "ALLOWED_REDIRECT_URI_SCHEMES": ["https"],
+    # RFC 9700 (OAuth 2.0 Security BCP). django-oauth-toolkit ships these off
+    # for backward compatibility and flips them in 4.0; ``check --deploy``
+    # warns about each one until then. Every flag below is a no-op for the one
+    # flow this server actually serves — MCP clients registering through DCR
+    # and using authorization_code + PKCE — and removes attack surface we were
+    # carrying for nothing:
+    #   IMPLICIT/PASSWORD_GRANT   grants no client here uses, and that RFC 9700
+    #                             §2.1.2/§2.4 say not to offer at all.
+    #   PKCE_METHOD               rejects ``plain``. Already enforced ahead of
+    #                             the Grant row by S256OnlyOAuth2Validator; this
+    #                             makes the library agree rather than relying on
+    #                             our override alone.
+    #   ACCESS_TOKEN_TRANSPORT    stops accepting a bearer token in the query
+    #                             string, where it lands in access logs,
+    #                             Referer headers and browser history.
+    #   AUTHZ_RESPONSE_ISS        adds RFC 9207 ``iss`` to the authorize
+    #                             response, which is what lets a client detect a
+    #                             mix-up attack. Unknown params are ignored by
+    #                             clients that don't read it.
+    "COMPLIANT_BCP_RFC9700_IMPLICIT_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PASSWORD_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PKCE_METHOD": True,
+    "COMPLIANT_BCP_RFC9700_ACCESS_TOKEN_TRANSPORT": True,
+    "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS": True,
+    # Replaying a rotated refresh token means it leaked; revoke the whole
+    # family rather than issuing from it. ROTATE_REFRESH_TOKEN above is what
+    # makes a replay detectable in the first place.
+    "REFRESH_TOKEN_REUSE_PROTECTION": True,
+    # NOT enabled: COMPLIANT_BCP_RFC9700_TOKEN_STORAGE. It hashes tokens at
+    # rest, which is the right end state, but it cannot read the tokens already
+    # stored — every live MCP connection would break and have to reconnect. It
+    # belongs in a deliberate migration, not in a deploy.
 }
 
 

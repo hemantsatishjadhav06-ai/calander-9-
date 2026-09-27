@@ -118,7 +118,10 @@ def _check_rate_limit(token):
 @require_POST
 def create_link(request, workspace_id):
     """Create a new connection link for a workspace."""
-    expiry_days = int(request.POST.get("expiry_days", 7))
+    try:
+        expiry_days = int(request.POST.get("expiry_days", 7))
+    except (TypeError, ValueError):
+        expiry_days = 7
     expiry_days = max(1, min(expiry_days, 90))  # clamp 1-90 days
 
     link = ConnectionLink.objects.create(
@@ -545,8 +548,12 @@ def connection_oauth_callback(request, platform):
 def connection_done(request, token):
     """Client clicks 'Done' - notify workspace managers."""
     link = _get_connection_link_or_none(token)
-    if not link:
+    if not link or not link.is_active:
         return render(request, "onboarding/connection_expired.html", status=404)
+    # Same per-token limit as the OAuth start: this fans out a notification to
+    # every owner and manager, and the link is unauthenticated.
+    if not _check_rate_limit(token):
+        return HttpResponse("Too many requests. Please try again later.", status=429)
 
     # Count connected accounts via this link
     connected_count = ConnectionLinkUsage.objects.filter(connection_link=link).count()

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join {{ invitation.organization.name }} - SM Bean</title>
+    <title>Join {{ invitation.organization.name }} - {{ SITE_NAME }}</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -35,7 +35,7 @@
             padding: 16px;
             margin-bottom: 24px;
         }
-        .info-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #A8A29E; margin-bottom: 8px; }
+        .info-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #78716C; margin-bottom: 8px; }
         .info-value { font-size: 14px; color: #1C1917; }
         .workspace-list { list-style: none; }
         .workspace-list li {
@@ -72,18 +72,18 @@
         .or-divider {
             text-align: center;
             font-size: 13px;
-            color: #A8A29E;
+            color: #78716C;
             margin: 12px 0;
         }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="logo">SM Bean</div>
+        <div class="logo">{{ SITE_NAME }}</div>
 
         <h1>Join {{ invitation.organization.name }}</h1>
         <p class="subtitle">
-            {{ invitation.invited_by.display_name }} invited you to join their team on SM Bean.
+            {{ invitation.invited_by.display_name }} invited you to join their team on {{ SITE_NAME }}.
         </p>
 
         {% if error %}

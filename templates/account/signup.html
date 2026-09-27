@@ -1,34 +1,35 @@
 {% extends "base.html" %}
-{% load static i18n allauth account socialaccount %}
+{% load i18n allauth account socialaccount %}
 
-{% block title %}Sign up · SM Bean{% endblock %}
+{% block title %}Sign up · {{ SITE_NAME }}{% endblock %}
 
 {% block auth_content %}
 <style>
   .auth-card .btn-brand {
-    background-color: #93a240;
-    box-shadow: 0 4px 14px rgba(147, 162, 64, 0.28);
+    /* The brand's primary action colour, same as the landing page (WCAG AA with white text). */
+    background-color: var(--primary-strong);
+    box-shadow: 0 4px 14px rgba(194, 65, 12, 0.25);
   }
   .auth-card .btn-brand:hover {
-    background-color: #849139;
-    box-shadow: 0 6px 20px rgba(147, 162, 64, 0.35);
+    background-color: var(--brand-800, #9A3412);
+    box-shadow: 0 6px 20px rgba(194, 65, 12, 0.35);
   }
   .auth-card .btn-brand:focus {
-    box-shadow: 0 0 0 3px rgba(147, 162, 64, 0.35);
+    box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.35);
   }
 </style>
 <div class="w-full max-w-md px-4">
     <!-- Logo & Header -->
     <div class="text-center mb-8">
         <div class="inline-flex items-center justify-center w-12 h-12 mb-4">
-            <img src="{% static 'img/brightbean-studio-logo.webp' %}" alt="SM Bean logo" class="w-12 h-12 object-contain">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold tracking-tight" style="background: #C2410C;" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</div>
         </div>
-        <span class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: #93a240;">SM Bean · Studio</span>
+        <span class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: var(--primary-strong);">{{ SITE_NAME }}</span>
         <h1 class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">
             Create your account
         </h1>
         <p class="text-sm mt-1" style="color: var(--text-secondary);">
-            Sign up for SM Bean | Schedule posts and run approvals across 10+ platforms.
+            Sign up for {{ SITE_NAME }} | Schedule posts and run client approvals across your social channels.
         </p>
     </div>
 
@@ -116,9 +117,9 @@
 
         <p class="text-xs text-center mt-5" style="color: var(--text-tertiary); line-height: 1.5;">
             By signing up, you agree to our
-            <a href="https://brightbean.xyz/terms-of-service/" class="underline hover:no-underline" style="color: var(--text-secondary);">Terms of Service</a>
+            <a href="{{ LEGAL_TERMS_URL }}" class="underline hover:no-underline" style="color: var(--text-secondary);">Terms of Service</a>
             and
-            <a href="https://brightbean.xyz/privacy-policy/" class="underline hover:no-underline" style="color: var(--text-secondary);">Privacy Policy</a>.
+            <a href="{{ LEGAL_PRIVACY_URL }}" class="underline hover:no-underline" style="color: var(--text-secondary);">Privacy Policy</a>.
         </p>
     </div>
 

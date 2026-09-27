@@ -8,11 +8,11 @@
     <div class="mk-hero__grid"></div>
     <div class="mk-container">
         <div class="mk-hero__inner">
-            <span class="mk-eyebrow mk-eyebrow--pill"><span class="mk-dot"></span> Open source · self-hostable · 11 networks, one calendar</span>
+            <span class="mk-eyebrow mk-eyebrow--pill"><span class="mk-dot"></span> Open source · self-hostable · live on {{ LIVE_PLATFORM_NAMES|join:", " }}</span>
             <h1 class="mk-display">One calendar for every brand you run. <em class="mk-accent">Publish everywhere.</em></h1>
-            <p class="mk-lead">{{ site_name }} is a social media management studio for creators, agencies and small teams. Compose once, schedule to Facebook, Instagram, LinkedIn, TikTok, YouTube and six more, run client approvals, answer every comment from a single inbox, and see what actually worked.</p>
+            <p class="mk-lead">{{ site_name }} is a social media management studio for creators, agencies and small teams. Compose once, publish to {{ LIVE_PLATFORM_NAMES|join:", " }} today (with {{ COMING_SOON_PLATFORM_NAMES|join:", " }} coming as each approves our app), run client approvals, answer every comment from a single inbox, and see what actually worked.</p>
             <div class="mk-hero__actions">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account {% include "marketing/_icon.html" with name="arrow" %}</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %} {% include "marketing/_icon.html" with name="arrow" %}</a>
                 <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:how_it_works' %}">See how it works</a>
             </div>
             <ul class="mk-hero__trust">
@@ -222,7 +222,7 @@
             <p class="mk-lead">Every integration talks to the platform's own API with your developer credentials. There is no aggregator in the middle, no vendor holding your tokens, and no surprise when a network changes its rules.</p>
         </div>
         <div class="mk-grid mk-grid--3" style="margin-bottom: 40px;">
-            <div class="reveal"><div class="mk-stat">13<small>connectors across 11 networks, all first-party APIs</small></div></div>
+            <div class="reveal"><div class="mk-stat">{{ LIVE_PLATFORM_NAMES|length }}<small>networks live today; {{ COMING_SOON_PLATFORM_NAMES|length }} more built and awaiting platform review, all first-party APIs</small></div></div>
             <div class="reveal" data-delay="1"><div class="mk-stat">1 · 5 · 30<small>minutes between automatic retries when a platform hiccups</small></div></div>
             <div class="reveal" data-delay="2"><div class="mk-stat">90 days<small>of publish audit log for every account</small></div></div>
         </div>
@@ -303,7 +303,7 @@ curl -X POST <span class="s">"$APP_URL/api/v1/posts"</span> \
             <h2 class="mk-h2">Bring every brand into one studio.</h2>
             <p class="mk-lead">Create an account and connect your first channel in minutes, or clone the code and run it on your own server.</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
                 <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:get_started' %}">Self-host it</a>
             </div>
         </div>

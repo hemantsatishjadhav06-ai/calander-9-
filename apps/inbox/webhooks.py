@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
+from apps.common.net import ratelimit_client_ip
 from apps.common.validators import safe_xml_fromstring
 from apps.credentials.models import resolve_app_secret, resolve_app_secrets
 from apps.social_accounts.models import SocialAccount
@@ -39,7 +40,9 @@ def _meta_verify(request, configured_token: str):
         logger.error("Webhook verify token not configured. Rejecting verification.")
         return HttpResponseForbidden("Webhook verify token not configured.")
 
-    if mode == "subscribe" and token == configured_token:
+    # Compare on bytes: hmac.compare_digest raises TypeError on non-ASCII str,
+    # which an attacker could trigger via ?hub.verify_token=<unicode> → 500.
+    if mode == "subscribe" and token is not None and hmac.compare_digest(token.encode(), configured_token.encode()):
         return HttpResponse(challenge, content_type="text/plain")
     return HttpResponseForbidden("Verification failed.")
 
@@ -58,7 +61,9 @@ def _verify_meta_signature(body: bytes, signature_header: str, app_secret: str) 
             hashlib.sha256,
         ).hexdigest()
     )
-    return hmac.compare_digest(expected, signature_header)
+    # Bytes, not str: compare_digest raises TypeError on a non-ASCII str, and
+    # the header is attacker-controlled — a 500 on demand otherwise.
+    return hmac.compare_digest(expected.encode(), signature_header.encode())
 
 
 def _meta_receive(request, platforms: list[str]):
@@ -82,8 +87,16 @@ def _meta_receive(request, platforms: list[str]):
     except json.JSONDecodeError:
         logger.warning("Invalid JSON in Meta webhook payload.")
         return HttpResponse("Bad request", status=400)
+    if not isinstance(payload, dict):
+        logger.warning("Meta webhook payload is not an object.")
+        return HttpResponse("Bad request", status=400)
 
-    _process_meta_events(payload, platforms, valid_secrets)
+    try:
+        _process_meta_events(payload, platforms, valid_secrets)
+    except Exception:
+        # A malformed-but-signed body must not 500: Meta retries non-2xx
+        # deliveries with backoff and eventually disables the subscription.
+        logger.exception("Error processing Meta webhook events.")
     return HttpResponse("OK", status=200)
 
 
@@ -95,7 +108,12 @@ def _process_meta_events(payload: dict, platforms: list[str], valid_secrets: set
     `valid_secrets`). This binds each event to the org that owns the signing app,
     preventing one org's secret from forging events into another org's accounts.
     """
-    for entry in payload.get("entry", []):
+    entries = payload.get("entry") or []
+    if not isinstance(entries, list):
+        return
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
         page_id = entry.get("id")
         if not page_id:
             continue
@@ -125,8 +143,12 @@ def _process_meta_events(payload: dict, platforms: list[str], valid_secrets: set
 # --- Webhook entry points ---
 
 
+# Rate limits are keyed on the client IP behind our trusted proxy, not the
+# socket peer: on a managed platform every delivery arrives from the edge's
+# address, so a peer-keyed bucket was one shared 60/minute for Meta, YouTube
+# and anyone who felt like filling it.
 @csrf_exempt
-@ratelimit(key="ip", rate="60/m", block=True)
+@ratelimit(key=ratelimit_client_ip, rate="60/m", block=True)
 @require_http_methods(["GET", "POST"])
 def facebook_webhook(request):
     """Facebook & Instagram (Facebook Login) webhook endpoint.
@@ -141,7 +163,7 @@ def facebook_webhook(request):
 
 
 @csrf_exempt
-@ratelimit(key="ip", rate="60/m", block=True)
+@ratelimit(key=ratelimit_client_ip, rate="60/m", block=True)
 @require_http_methods(["GET", "POST"])
 def instagram_login_webhook(request):
     """Instagram (Direct, via Instagram Login) webhook endpoint.
@@ -465,15 +487,20 @@ def _create_if_new(
 
 
 @csrf_exempt
-@ratelimit(key="ip", rate="60/m", block=True)
+@ratelimit(key=ratelimit_client_ip, rate="60/m", block=True)
 @require_http_methods(["GET", "POST"])
 def youtube_webhook(request):
     """YouTube PubSubHubbub webhook endpoint.
 
-    GET:  Subscription verification (echo hub.challenge).
-    POST: Atom XML notification for new comments/activity.
+    GET:  Subscription intent verification (echo hub.challenge).
+    POST: Atom XML notification of channel activity.
     """
     if request.method == "GET":
+        # Only confirm *subscribe* intents. The hub verifies an unsubscribe the
+        # same way, so echoing every challenge let anyone who could reach the
+        # hub cancel our subscription and we would confirm it for them.
+        if request.GET.get("hub.mode") != "subscribe":
+            return HttpResponseForbidden("Unsupported hub.mode.")
         challenge = request.GET.get("hub.challenge", "")
         return HttpResponse(challenge, content_type="text/plain")
 
@@ -492,7 +519,7 @@ def youtube_webhook(request):
             hashlib.sha1,
         ).hexdigest()
     )
-    if not hmac.compare_digest(expected, signature):
+    if not hmac.compare_digest(expected.encode(), signature.encode()):
         logger.warning("Invalid YouTube webhook signature.")
         return HttpResponseForbidden("Invalid signature.")
 
@@ -505,7 +532,15 @@ def youtube_webhook(request):
 
 
 def _process_youtube_notification(body: bytes):
-    """Parse Atom XML notification from YouTube and upsert messages."""
+    """Parse a YouTube Atom notification and log the activity.
+
+    The PubSubHubbub feed announces the channel's *own uploads and edits*, not
+    comments. These used to be filed as inbox comments from a sender called
+    "YouTube", so every video the team published came straight back as an
+    unread comment on itself and notified every owner and manager. Comments
+    arrive through the regular poll (``InboxSyncEngine``); the notification is
+    acknowledged here so the hub keeps the subscription alive.
+    """
     root = safe_xml_fromstring(body)
     if root is None:
         logger.warning("Invalid or unsafe XML in YouTube webhook payload.")
@@ -519,25 +554,6 @@ def _process_youtube_notification(body: bytes):
     for entry in root.findall("atom:entry", ns):
         video_id = entry.findtext("yt:videoId", default="", namespaces=ns)
         channel_id = entry.findtext("yt:channelId", default="", namespaces=ns)
-        title = entry.findtext("atom:title", default="", namespaces=ns)
-        entry_id = entry.findtext("atom:id", default="", namespaces=ns)
-
-        if not channel_id or not entry_id:
+        if not channel_id:
             continue
-
-        accounts = SocialAccount.objects.filter(
-            account_platform_id=channel_id,
-            platform="youtube",
-            connection_status=SocialAccount.ConnectionStatus.CONNECTED,
-        ).select_related("workspace__organization")
-
-        for account in accounts:
-            _create_if_new(
-                account=account,
-                platform_message_id=entry_id,
-                message_type=InboxMessage.MessageType.COMMENT,
-                sender_name="YouTube",
-                sender_id=channel_id,
-                body=title,
-                extra={"video_id": video_id, "entry_id": entry_id},
-            )
+        logger.info("YouTube activity notification for channel %s (video %s)", channel_id, video_id or "?")

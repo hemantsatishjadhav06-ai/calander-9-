@@ -135,7 +135,7 @@
             <h2 class="mk-h2">Try the whole loop with a real account.</h2>
             <p class="mk-lead">Connect a channel, schedule a post for five minutes from now, and watch it land.</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
                 <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:features' %}">Browse the features</a>
             </div>
         </div>

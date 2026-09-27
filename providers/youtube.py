@@ -10,11 +10,19 @@ from urllib.parse import urlencode
 import httpx
 
 from .base import SocialProvider
-from .exceptions import OAuthError, ProviderError, PublishError, QuotaExceededError, TokenExpiredError
+from .exceptions import (
+    APIError,
+    OAuthError,
+    ProviderError,
+    PublishError,
+    QuotaExceededError,
+    TokenExpiredError,
+)
 from .google_errors import (
     AUTH_REASONS,
     QUOTA_REASONS,
     THROTTLE_REASONS,
+    google_error_message,
     google_error_reasons,
     next_google_quota_reset,
 )
@@ -533,6 +541,25 @@ class YouTubeProvider(SocialProvider):
                 raw_response=body,
             )
 
+        # The base class falls back to ``response.text``, which for Google is a
+        # JSON envelope with an <a href> inside it — that markup reaches the
+        # account's error banner verbatim. Google already states the reason in
+        # plain words, so surface that when it is there. 429 keeps the base
+        # path: the contract in ``_error_for_response`` routes retries on it.
+        message = google_error_message(body)
+        if message and response.status_code != 429:
+            # The reason codes ride along rather than being dropped with the
+            # rest of the envelope: ``apps.analytics.tasks._is_insufficient_scope``
+            # sniffs this string, and for some 403s only the reason
+            # ("insufficientPermissions") names the problem — the message does
+            # not. Losing them would stop flagging those accounts for reconnect.
+            detail = f"{message} (reason: {', '.join(sorted(reasons))})" if reasons else message
+            return APIError(
+                f"{self.platform_name} API error {response.status_code}: {detail}",
+                status_code=response.status_code,
+                platform=self.platform_name,
+                raw_response=body,
+            )
         return super()._error_for_response(response)
 
     # ------------------------------------------------------------------

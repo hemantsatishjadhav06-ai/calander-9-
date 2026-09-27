@@ -10,13 +10,13 @@
         <p class="text-xs text-stone-500 line-clamp-1">{{ tpl.description }}</p>
         {% endif %}
         {% if tpl.template_data.caption %}
-        <p class="text-xs text-stone-400 mt-1 line-clamp-1 font-mono">{{ tpl.template_data.caption|truncatechars:80 }}</p>
+        <p class="text-xs text-stone-500 mt-1 line-clamp-1 font-mono">{{ tpl.template_data.caption|truncatechars:80 }}</p>
         {% endif %}
     </a>
     {% empty %}
     <div class="text-center py-8">
         <p class="text-sm text-stone-500">No templates yet.</p>
-        <p class="text-xs text-stone-400 mt-1">Save a post as a template to see it here.</p>
+        <p class="text-xs text-stone-500 mt-1">Save a post as a template to see it here.</p>
     </div>
     {% endfor %}
 </div>

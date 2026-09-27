@@ -32,7 +32,20 @@
         # behind. Pointing the root at an empty (or absent) directory makes
         # file_server 404 everything.
         root * {$CADDY_MEDIA_ROOT:/app/media}
-        file_server
+
+        # Only the public subtrees. MEDIA_ROOT also holds private uploads
+        # (comment_attachments/, csv_imports/, ...) that Django serves solely
+        # through auth-checked views; a bare file_server here would hand them
+        # to anyone with the URL. Keep in step with PUBLIC_MEDIA_PREFIXES in
+        # config/urls.py. handle_path has already stripped /media, so these
+        # paths are relative to MEDIA_ROOT.
+        @public_media path /media_library/* /avatars/* /workspaces/icons/*
+        handle @public_media {
+            file_server
+        }
+        handle {
+            respond 404
+        }
     }
 
     handle {

@@ -3,6 +3,7 @@
 import functools
 
 from django.shortcuts import redirect
+from django.urls import reverse
 
 from apps.members.models import WorkspaceMembership
 from apps.workspaces.models import Workspace
@@ -15,22 +16,25 @@ def portal_auth_required(view_func):
     and resolves the portal workspace onto the request.
     """
 
+    def _signed_out():
+        return redirect(f"{reverse('client_portal:magic_link_expired')}?reason=signed_out")
+
     @functools.wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect("client_portal:magic_link_expired")
+            return _signed_out()
 
         if not request.session.get("is_portal_session"):
-            return redirect("client_portal:magic_link_expired")
+            return _signed_out()
 
         workspace_id = request.session.get("portal_workspace_id")
         if not workspace_id:
-            return redirect("client_portal:magic_link_expired")
+            return _signed_out()
 
         try:
             workspace = Workspace.objects.get(id=workspace_id)
         except Workspace.DoesNotExist:
-            return redirect("client_portal:magic_link_expired")
+            return _signed_out()
 
         # Verify user has client membership in this workspace
         membership = (
@@ -43,7 +47,7 @@ def portal_auth_required(view_func):
         )
 
         if not membership:
-            return redirect("client_portal:magic_link_expired")
+            return _signed_out()
 
         request.portal_workspace = workspace
         request.portal_membership = membership

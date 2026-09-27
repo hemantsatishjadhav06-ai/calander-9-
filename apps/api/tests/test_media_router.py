@@ -141,6 +141,21 @@ class TestUpload:
         r = c.post("/api/v1/media/", data={"file": _png()})
         assert r.status_code == 401
 
+    def test_folder_in_another_workspace_of_the_same_org_is_refused(
+        self, client_with_token, organization, other_workspace
+    ):
+        """The lookup was org-scoped, so a key could file an asset into a
+        sibling workspace's folder tree. The cookie-auth upload view has
+        always scoped to the workspace; the API now matches it."""
+        from apps.media_library.models import MediaAsset, MediaFolder
+
+        foreign_folder = MediaFolder.objects.create(
+            organization=organization, workspace=other_workspace, name="Not yours"
+        )
+        r = client_with_token.post("/api/v1/media/", data={"file": _png(), "folder_id": str(foreign_folder.id)})
+        assert r.status_code == 404, r.content
+        assert MediaAsset.objects.count() == 0
+
     def test_without_upload_media_permission_returns_403(self, db, user, owner_memberships, workspace, social_account):
         perms = [p for p in PERMISSION_KEYS if p != "upload_media"]
         key = services.issue_api_key(

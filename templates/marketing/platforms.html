@@ -7,8 +7,8 @@
     <div class="mk-container">
         <div class="mk-page-hero__inner">
             <span class="mk-eyebrow">Supported platforms</span>
-            <h1 class="mk-h1">Eleven networks, thirteen connectors, <em class="mk-accent">zero middlemen.</em></h1>
-            <p class="mk-lead">Every integration talks directly to the platform's official API using your own developer credentials. What each one can do is listed honestly below.</p>
+            <h1 class="mk-h1">Official APIs only, <em class="mk-accent">zero middlemen.</em></h1>
+            <p class="mk-lead">Every integration talks directly to the platform's official API using your own developer credentials. What each one can do is listed honestly below, including which are live on the hosted app today and which are waiting on the platform to approve our app.</p>
         </div>
     </div>
 </section>
@@ -18,12 +18,13 @@
         <div class="mk-table-wrap reveal">
             <table class="mk-table">
                 <thead>
-                    <tr><th>Platform</th><th class="center">Publish</th><th class="center">Comments</th><th class="center">Direct messages</th><th class="center">Insights</th></tr>
+                    <tr><th>Platform</th><th class="center">Hosted app</th><th class="center">Publish</th><th class="center">Comments</th><th class="center">Direct messages</th><th class="center">Insights</th></tr>
                 </thead>
                 <tbody>
                     {% for p in platforms %}
                     <tr>
                         <td><span class="mk-platform-cell">{% include "partials/_platform_icon.html" with platform=p.icon size="md" %}<span><strong>{{ p.name }}</strong><small>{{ p.scope }}</small></span></span></td>
+                        <td class="center">{% if p.live %}<strong>Live</strong>{% else %}<span class="mk-muted">Coming soon</span>{% endif %}</td>
                         <td class="center">{% if p.publish %}<span class="mk-check">{% include "marketing/_icon.html" with name="check" %}</span>{% else %}<span class="mk-dash">—</span>{% endif %}</td>
                         <td class="center">{% if p.comments %}<span class="mk-check">{% include "marketing/_icon.html" with name="check" %}</span>{% else %}<span class="mk-dash">—</span>{% endif %}</td>
                         <td class="center">{% if p.dms %}<span class="mk-check">{% include "marketing/_icon.html" with name="check" %}</span>{% else %}<span class="mk-dash">—</span>{% endif %}</td>
@@ -95,7 +96,7 @@
             <h2 class="mk-h2">Connect your first channel today.</h2>
             <p class="mk-lead">Self-hosting? The setup guide walks through registering each platform app.</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
                 <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:get_started' %}">Self-host it</a>
             </div>
         </div>

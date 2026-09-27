@@ -1,0 +1,39 @@
+{% extends "legal/base_legal.html" %}
+{% block legal_title %}Terms of Service · {{ SITE_NAME }}{% endblock %}
+{% block legal_body %}
+<h1>Terms of Service</h1>
+<p class="muted">Last updated {{ LEGAL_UPDATED }}. These terms are an agreement between you and {{ LEGAL_ENTITY }} for the use of {{ SITE_NAME }}.</p>
+
+<h2>1. Acceptance</h2>
+<p>By creating an account or using {{ SITE_NAME }} you agree to these terms and to our <a href="{{ LEGAL_PRIVACY_URL }}">Privacy Policy</a>. If you use {{ SITE_NAME }} for an organisation, you confirm you may bind it to these terms.</p>
+
+<h2>2. Early access</h2>
+<p>{{ SITE_NAME }} is in invite-only early access. Features may change, and some integrations become available only after the platform concerned approves our app. Early access is free; we will give at least 30 days' notice before any paid plan applies to you.</p>
+
+<h2>3. Your account</h2>
+<p>Keep your credentials secure and tell us promptly about any unauthorised use. You are responsible for what happens under your account and for the people you invite to your organisation, including clients using the approval portal.</p>
+
+<h2>4. Connected platforms</h2>
+<p>You may only connect social accounts you are authorised to manage. Publishing through {{ SITE_NAME }} is subject to each platform's own terms, which you agree to follow. Platforms can change or withdraw their APIs; we are not responsible for a platform refusing, delaying or removing a post.</p>
+
+<h2>5. Acceptable use</h2>
+<p>Do not use {{ SITE_NAME }} to publish unlawful, infringing, deceptive or harassing content, to send spam, to scrape or overload the service, or to try to access data that is not yours.</p>
+
+<h2>6. Your content</h2>
+<p>You keep all rights to your content. You give us a limited licence to host, copy, process and transmit it only to run the service for you, including delivering it to the platforms you choose.</p>
+
+<h2>7. Availability</h2>
+<p>We aim for high availability but provide the service "as is" and "as available" during early access, without warranties to the extent the law allows. Always keep your own copies of important content.</p>
+
+<h2>8. Liability</h2>
+<p>To the extent the law allows, we are not liable for indirect or consequential losses, lost profits or lost data, and our total liability is limited to the amount you paid us in the 12 months before the claim (or INR 5,000 if you paid nothing). Nothing here limits liability that cannot be limited by law.</p>
+
+<h2>9. Ending the agreement</h2>
+<p>You can stop using {{ SITE_NAME }} and delete your organisation at any time. We may suspend or close accounts that breach these terms, with notice where practical.</p>
+
+<h2>10. Law and disputes</h2>
+<p>These terms are governed by the laws of India, and the courts at the operator's registered office have jurisdiction, without taking away any protection your local consumer law gives you.</p>
+
+<h2>11. Contact</h2>
+<p>Questions about these terms: {% if SUPPORT_EMAIL %}<a href="mailto:{{ SUPPORT_EMAIL }}">{{ SUPPORT_EMAIL }}</a>{% else %}the administrator of this instance{% endif %}.</p>
+{% endblock %}

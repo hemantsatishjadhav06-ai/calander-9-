@@ -29,6 +29,7 @@ from django_ratelimit.core import is_ratelimited
 from ninja.errors import HttpError
 
 from apps.api_keys.models import ApiKey
+from apps.common.net import client_ip
 from apps.composer.models import PlatformPost
 from apps.social_accounts.models import SocialAccount
 
@@ -336,32 +337,10 @@ def record_failed_auth(request: HttpRequest) -> None:
 
 
 def _client_ip(request: HttpRequest) -> str | None:
-    """Return the originating client IP, honouring proxies safely.
+    """The originating client IP, honouring proxies safely.
 
-    Codex review flagged: the previous version unconditionally trusted
-    the leftmost ``X-Forwarded-For`` value, which a remote client can
-    set to any string. That defeats the failed-auth IP throttle (rotate
-    XFF per request to escape the per-IP bucket) and lets the attacker
-    pin audit-log rows to a victim's IP.
-
-    Hardening: only honour ``X-Forwarded-For`` when the direct
-    ``REMOTE_ADDR`` is in ``settings.BB_TRUSTED_PROXIES``. On platforms
-    that terminate TLS at a proxy you actually run (Cloudflare, ALB,
-    nginx, …), set that list in env config. Otherwise fall back to the
-    socket peer — which is the only IP we can vouch for ourselves.
+    Thin alias over ``apps.common.net.client_ip`` — the throttle here and the
+    auth middleware must bucket a request under the same address, so the rule
+    lives in one place.
     """
-    trusted = set(getattr(settings, "BB_TRUSTED_PROXIES", ()) or ())
-    remote = request.META.get("REMOTE_ADDR")
-    if trusted and remote in trusted:
-        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-        if forwarded:
-            # Per RFC 7239 the rightmost value is the closest proxy to
-            # us; we want the originating client, which is the leftmost
-            # value that wasn't itself a trusted proxy. Cheapest safe
-            # heuristic: take the leftmost untrusted hop.
-            hops = [h.strip() for h in forwarded.split(",") if h.strip()]
-            for hop in hops:
-                if hop not in trusted:
-                    return hop
-            # Every hop was a trusted proxy — fall back to remote.
-    return remote
+    return client_ip(request)

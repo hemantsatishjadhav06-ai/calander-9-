@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Inbox - {{ workspace.name }} - SM Bean{% endblock %}
+{% block title %}Inbox - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -48,7 +48,7 @@
     .inbox-row.is-unread .inbox-row-preview { color: var(--text-primary); }
     .inbox-row.is-unread::before {
         content: ''; position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
-        width: 6px; height: 6px; border-radius: 50%; background: var(--primary);
+        width: 6px; height: 6px; border-radius: 50%; background: var(--primary-strong);
     }
 
     /* Badges */
@@ -188,8 +188,8 @@
                 <button @click="bulkAction('mark_read')">Mark Read</button>
                 <button @click="bulkAction('resolve')">Resolve</button>
                 <button @click="bulkAction('archive')">Archive</button>
-                <button @click="closeBulk()" class="ml-auto" style="border: none;">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button aria-label="Clear selection" @click="closeBulk()" class="ml-auto" style="border: none;">
+                    <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
         </div>

@@ -195,7 +195,7 @@ def _client_ip(request: HttpRequest) -> str | None:
 # ---------------------------------------------------------------------------
 #
 # The /api/v1/mcp endpoint accepts a second credential type beyond the
-# bb_studio_ key: an OAuth 2.1 access token issued by the BrightBean Studio
+# bb_studio_ key: an OAuth 2.1 access token issued by the SM Bean
 # Authorization Server (apps.oauth_server), which is what Claude Desktop's
 # native connector flow obtains. OAuth authenticates a *person* rather than a
 # minted credential, so we map the token's user to their active workspace and
@@ -332,7 +332,7 @@ class McpAuth(ApiKeyAuth):
 
     A ``bb_studio_`` token reuses the parent ``ApiKeyAuth`` path verbatim —
     same IP throttle, HTTPS guard, permission intersection, and audit. Any
-    other bearer is resolved as an OAuth access token issued by the BrightBean
+    other bearer is resolved as an OAuth access token issued by the SM Bean
     Studio Authorization Server (apps.oauth_server) and mapped to the user's
     active workspace via an ``OAuthMcpActor`` shim.
     """

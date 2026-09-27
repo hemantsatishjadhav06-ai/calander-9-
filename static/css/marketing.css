@@ -192,7 +192,7 @@ code, kbd, pre { font-family: var(--mk-mono); }
 .mk-lead { font-size: clamp(1.0625rem, 1.4vw, 1.25rem); line-height: 1.6; color: var(--mk-ink-2); text-wrap: pretty; }
 .mk-muted { color: var(--mk-ink-3); }
 .mk-small { font-size: 0.875rem; }
-.mk-accent { font-style: italic; color: var(--mk-orange-600); }
+.mk-accent { font-style: italic; color: var(--mk-orange-700); }
 .mk-accent--green { color: var(--mk-green-600); }
 .mk-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
@@ -223,8 +223,8 @@ code, kbd, pre { font-family: var(--mk-mono); }
   transition: transform 180ms var(--mk-ease), box-shadow 180ms var(--mk-ease), background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 .mk-btn svg { width: 16px; height: 16px; flex: none; }
-.mk-btn--primary { background: var(--mk-orange); color: #fff; box-shadow: var(--mk-shadow-orange); }
-.mk-btn--primary:hover { background: var(--mk-orange-600); transform: translateY(-1px); box-shadow: 0 12px 28px -8px rgba(249, 115, 22, 0.55); }
+.mk-btn--primary { background: var(--mk-orange-700); color: #fff; box-shadow: var(--mk-shadow-orange); }
+.mk-btn--primary:hover { background: #9A3412; transform: translateY(-1px); box-shadow: 0 12px 28px -8px rgba(249, 115, 22, 0.55); }
 .mk-btn--ghost { background: var(--mk-surface); color: var(--mk-ink); border-color: var(--mk-line-2); }
 .mk-btn--ghost:hover { border-color: var(--mk-ink-4); transform: translateY(-1px); box-shadow: var(--mk-shadow-md); }
 .mk-btn--dark { background: var(--mk-ink); color: #fff; }

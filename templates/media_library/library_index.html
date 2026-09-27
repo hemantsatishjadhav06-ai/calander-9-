@@ -99,10 +99,11 @@
 {% block page_title %}Media Library{% endblock %}
 
 {% block content %}
-<div x-data="{ ...mediaLibrary(), folderSidebarOpen: false }" class="flex flex-1 min-h-0 -m-3 sm:-m-4 lg:-m-6 -mb-3 sm:-mb-4 lg:-mb-6">
+{% comment %}No negative margins to bleed into <main>'s padding: base.html wraps content in an overflow-x-hidden box, which clipped the sidebar ("OLDERS") and the Upload button.{% endcomment %}
+<div x-data="{ ...mediaLibrary(), folderSidebarOpen: false }" class="flex flex-1 min-h-0 min-w-0">
 
   <!-- Mobile folder sidebar toggle -->
-  <button @click="folderSidebarOpen = !folderSidebarOpen"
+  <button :aria-expanded="folderSidebarOpen" @click="folderSidebarOpen = !folderSidebarOpen"
           class="lg:hidden fixed bottom-4 left-4 z-40 flex items-center gap-2 px-3 py-2.5 bg-white border border-stone-200 rounded-xl shadow-lg text-sm font-medium text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer"
           x-show="!detailOpen">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6a2 2 0 012-2h2l2 2h6a2 2 0 012 2v2M4 6v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2H4z"/></svg>
@@ -124,11 +125,11 @@
     <div class="p-4">
       <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--text-tertiary, #78716C);">Folders</span>
-        <button @click="showNewFolder = true"
+        <button aria-label="New folder" @click="showNewFolder = true"
                 class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-stone-100 cursor-pointer transition-colors"
                 style="color: var(--text-tertiary, #78716C);"
                 title="New folder">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         </button>
       </div>
 
@@ -149,10 +150,7 @@
       <div class="my-3 border-t" style="border-color: var(--surface-2, #F5F5F4);"></div>
 
       <!-- Folder tree -->
-      <div id="folder-tree"
-           hx-get="{% url 'media_library:index' workspace_id=workspace.id %}folders/create/"
-           hx-trigger="folderUpdated from:body"
-           hx-target="#folder-tree">
+      <div id="folder-tree">
         {% include "media_library/_folder_tree.html" %}
       </div>
 
@@ -164,16 +162,17 @@
   </div>
 
   <!-- ═══════ MAIN CONTENT ═══════ -->
-  <div class="flex-1 flex flex-col overflow-hidden">
+  <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
 
     <!-- ── Toolbar ── -->
     <div class="flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 py-3 border-b rounded-tr-xl" style="border-color: var(--border, #E7E5E4); background: var(--surface-0, #FFF);">
 
       <!-- Search -->
       <div class="relative flex-1 min-w-[160px] sm:max-w-sm">
-        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--text-ghost, #A8A29E);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--text-ghost, #766F6A);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         <input type="search"
                name="q"
+               aria-label="Search media"
                value="{{ query }}"
                placeholder="Search media..."
                class="input-focus w-full pl-9 pr-4 py-2 text-sm border rounded-lg outline-none"
@@ -185,7 +184,7 @@
       </div>
 
       <!-- Type filters -->
-      <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap">
+      <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap min-w-0 max-w-full">
         <a href="{% url 'media_library:index' workspace_id=workspace.id %}{% if current_folder %}?folder={{ current_folder }}{% endif %}"
            class="ml-filter-pill {% if not current_type %}active{% endif %}">All</a>
         {% for type_val, type_label in file_types %}
@@ -197,7 +196,7 @@
       <div class="flex-1"></div>
 
       <!-- Sort -->
-      <select name="sort"
+      <select name="sort" aria-label="Sort media"
               class="text-xs border rounded-lg pl-3 pr-7 py-2 outline-none cursor-pointer appearance-none"
               style="border-color: var(--border, #E7E5E4); color: var(--text-secondary, #57534E); background-image: url(&quot;data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2378716C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;); background-repeat: no-repeat; background-position: right 8px center;"
               hx-get="{% url 'media_library:index' workspace_id=workspace.id %}{% if current_folder %}?folder={{ current_folder }}{% endif %}"
@@ -214,21 +213,21 @@
 
       <!-- View toggle -->
       <div class="flex border rounded-lg overflow-hidden" style="border-color: var(--border, #E7E5E4);">
-        <button @click="viewMode = 'grid'"
+        <button aria-label="Grid view" :aria-pressed="viewMode === 'grid'" @click="viewMode = 'grid'"
                 :class="viewMode === 'grid' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:text-stone-600'"
                 class="p-2 transition-colors">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+          <svg aria-hidden="true" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
         </button>
-        <button @click="viewMode = 'list'"
+        <button aria-label="List view" :aria-pressed="viewMode === 'list'" @click="viewMode = 'list'"
                 :class="viewMode === 'list' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:text-stone-600'"
                 class="p-2 transition-colors">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+          <svg aria-hidden="true" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
         </button>
       </div>
 
       <!-- Upload button -->
       <button @click="$refs.fileInput.click()"
-              class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 hover:border-orange-300 active:bg-orange-100 transition-all duration-150 cursor-pointer">
+              class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 hover:border-orange-300 active:bg-orange-100 transition-all duration-150 cursor-pointer">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         Upload
       </button>
@@ -251,9 +250,9 @@
            @keydown.space.prevent="if (!uploading) $refs.fileInput.click()">
         <template x-if="!uploading">
           <div>
-            <svg class="w-10 h-10 mx-auto mb-3" style="color: var(--text-ghost, #A8A29E);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <svg class="w-10 h-10 mx-auto mb-3" style="color: var(--text-ghost, #766F6A);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
             <p class="text-sm font-medium" style="color: var(--text-secondary, #57534E);">Drop files here to upload</p>
-            <p class="text-xs mt-1" style="color: var(--text-ghost, #A8A29E);">Images up to 20MB, videos up to 1GB</p>
+            <p class="text-xs mt-1" style="color: var(--text-ghost, #766F6A);">Images up to 20MB, videos up to 1GB</p>
           </div>
         </template>
         <template x-if="uploading">
@@ -271,11 +270,35 @@
                   </div>
                 </div>
                 <span x-show="file.status === 'complete'" class="text-xs font-semibold" style="color: var(--success-500, #22C55E);">Done</span>
-                <span x-show="file.status === 'error'" class="text-xs font-semibold" style="color: var(--error-500, #EF4444);" x-text="file.error || 'Failed'"></span>
+                <span x-show="file.status === 'error'" class="text-xs font-semibold max-w-[50%] text-right break-words" style="color: var(--error-500, #EF4444);" x-text="file.error || 'Failed'"></span>
               </div>
             </template>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- ── Rejected uploads (kept until dismissed) ── -->
+    <div x-show="uploadErrors.length && !uploading" x-cloak role="alert"
+         class="mx-3 sm:mx-4 lg:mx-6 mt-4 rounded-xl border px-4 py-3"
+         style="border-color: var(--error-200, #FECACA); background: var(--error-50, #FEF2F2);">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-xs font-semibold" style="color: var(--error-700, #B91C1C);"
+             x-text="uploadErrors.length === 1 ? '1 file was not uploaded' : uploadErrors.length + ' files were not uploaded'"></p>
+          <ul class="mt-1 space-y-0.5">
+            <template x-for="(err, i) in uploadErrors" :key="i">
+              <li class="text-xs break-words" style="color: var(--error-700, #B91C1C);">
+                <span class="font-medium" x-text="err.name"></span>: <span x-text="err.error"></span>
+              </li>
+            </template>
+          </ul>
+        </div>
+        <button type="button" aria-label="Dismiss upload errors" @click="uploadErrors = []"
+                class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md cursor-pointer"
+                style="color: var(--error-700, #B91C1C);">
+          <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
       </div>
     </div>
 
@@ -286,7 +309,7 @@
          @drop.prevent="handleDrop($event)">
 
       <!-- Asset Grid -->
-      <div id="asset-grid">
+      <div id="asset-grid" data-refresh-url="{% url 'media_library:index' workspace_id=workspace.id %}{% if current_folder %}?folder={{ current_folder }}{% endif %}">
         {% include "media_library/_asset_grid.html" %}
       </div>
     </div>
@@ -304,7 +327,7 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"></div>
-    <div class="relative w-full sm:max-w-lg bg-white shadow-xl overflow-y-auto"
+    <div class="relative w-full max-w-[100vw] sm:max-w-lg bg-white shadow-xl overflow-y-auto overflow-x-hidden"
          x-show="detailOpen"
          x-transition:enter="transition ease-out duration-250"
          x-transition:enter-start="translate-x-full"
@@ -312,6 +335,7 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
+         x-trap.noscroll="detailOpen" role="dialog" aria-modal="true" aria-label="Asset details" tabindex="-1"
          id="detail-panel">
       <!-- Content loaded via HTMX -->
     </div>
@@ -322,12 +346,26 @@
 {% block extra_js %}
 <script src="{% static 'js/media-library.js' %}"></script>
 <script nonce="{{ request.csp_nonce }}">
+// The upload endpoint answers a rejected file with 400 and
+// {"results": [{filename, status: "error", error, errors}]}; show that reason
+// rather than a generic failure.
+function uploadErrorMessage(responseText, status) {
+  try {
+    const data = JSON.parse(responseText);
+    const failed = (data.results || []).find(r => r.status === 'error');
+    if (failed) return failed.error || (failed.errors || []).join(' ') || 'Upload rejected';
+    if (data.error) return data.error;
+  } catch (e) { /* not JSON: fall through */ }
+  return status === 413 ? 'File too large' : 'Upload failed';
+}
+
 function mediaLibrary() {
   return {
     viewMode: 'grid',
     dragOver: false,
     uploading: false,
     uploadQueue: [],
+    uploadErrors: [],
     detailOpen: false,
     showNewFolder: false,
     currentFolder: '{{ current_folder|default:"" }}',
@@ -363,8 +401,23 @@ function mediaLibrary() {
       }));
 
       let completed = 0;
+      let succeeded = 0;
       const total = this.uploadQueue.length;
       const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      this.uploadErrors = [];
+
+      const finish = () => {
+        // Rejected files stay listed with their reason until dismissed; the
+        // grid only refreshes when something actually landed.
+        this.uploadErrors = this.uploadQueue
+          .filter(item => item.status === 'error')
+          .map(item => ({ name: item.name, error: item.error }));
+        setTimeout(() => {
+          this.uploading = false;
+          this.uploadQueue = [];
+          if (succeeded > 0) htmx.trigger('#asset-grid', 'uploadsComplete');
+        }, 800);
+      };
 
       this.uploadQueue.forEach((item, index) => {
         const formData = new FormData();
@@ -383,31 +436,21 @@ function mediaLibrary() {
         xhr.addEventListener('load', () => {
           completed++;
           if (xhr.status >= 200 && xhr.status < 300) {
+            succeeded++;
             this.uploadQueue[index].status = 'complete';
             this.uploadQueue[index].progress = 100;
           } else {
             this.uploadQueue[index].status = 'error';
-            this.uploadQueue[index].error = 'Upload failed';
+            this.uploadQueue[index].error = uploadErrorMessage(xhr.responseText, xhr.status);
           }
-          if (completed === total) {
-            setTimeout(() => {
-              this.uploading = false;
-              this.uploadQueue = [];
-              htmx.trigger('#asset-grid', 'uploadsComplete');
-            }, 800);
-          }
+          if (completed === total) finish();
         });
 
         xhr.addEventListener('error', () => {
           completed++;
           this.uploadQueue[index].status = 'error';
           this.uploadQueue[index].error = 'Network error';
-          if (completed === total) {
-            setTimeout(() => {
-              this.uploading = false;
-              htmx.trigger('#asset-grid', 'uploadsComplete');
-            }, 800);
-          }
+          if (completed === total) finish();
         });
 
         xhr.open('POST', '{% url "media_library:upload" workspace_id=workspace.id %}');

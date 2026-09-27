@@ -3,6 +3,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 
 from apps.common.managers import WorkspaceScopedManager
@@ -232,7 +233,8 @@ class InboxSLAConfig(models.Model):
         on_delete=models.CASCADE,
         related_name="inbox_sla_config",
     )
-    target_response_minutes = models.PositiveIntegerField(default=120)
+    # Zero would flag every message as overdue the moment it arrived.
+    target_response_minutes = models.PositiveIntegerField(default=120, validators=[MinValueValidator(1)])
     is_active = models.BooleanField(default=False)
     auto_resolve_on_reply = models.BooleanField(
         default=True,

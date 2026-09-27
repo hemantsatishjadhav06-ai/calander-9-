@@ -1,4 +1,4 @@
-# Pre-commit hooks for BrightBean Studio.
+# Pre-commit hooks for SM Bean.
 # Install: pip install pre-commit && pre-commit install
 # Run on all files: pre-commit run --all-files
 # Reference: https://pre-commit.com

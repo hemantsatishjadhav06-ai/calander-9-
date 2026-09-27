@@ -2,7 +2,7 @@
 <div class="space-y-6">
     <div class="bg-white rounded-xl border border-stone-200 p-6">
         <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background: var(--primary);">3</div>
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background: var(--primary-strong);">3</div>
             <h2 class="text-sm font-semibold text-stone-800">Validation Results</h2>
         </div>
 
@@ -18,7 +18,7 @@
                 <span class="text-sm font-semibold text-red-800">{{ errors|length }}{% if has_more_errors %}+{% endif %} error{{ errors|length|pluralize }}</span>
             </div>
             {% endif %}
-            <span class="text-xs text-stone-400">{{ total_rows }} total rows</span>
+            <span class="text-xs text-stone-500">{{ total_rows }} total rows</span>
         </div>
 
         <!-- Errors list -->

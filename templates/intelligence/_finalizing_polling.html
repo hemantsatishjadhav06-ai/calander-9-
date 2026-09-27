@@ -2,6 +2,6 @@
      hx-get="{% url 'intelligence_global:finalizing-status' %}"
      hx-trigger="load delay:2s"
      hx-swap="outerHTML"
-     class="text-xs text-stone-400">
+     class="text-xs text-stone-500">
   Status: {{ pending.get_status_display }} (attempt {{ pending.attempts }})
 </div>

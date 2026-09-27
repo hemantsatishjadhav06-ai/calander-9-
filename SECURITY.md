@@ -8,11 +8,12 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Brightbean, please report it responsibly.
+If you discover a security vulnerability in SM Bean, please report it responsibly.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Instead, please email **security@brightbean.xyz** with:
+Instead, please report it privately via GitHub Security Advisories
+(repository → **Security** → **Report a vulnerability**), including:
 
 - A description of the vulnerability
 - Steps to reproduce

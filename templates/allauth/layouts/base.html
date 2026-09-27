@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block html_style %}{% endblock %}
-{% block title %}{% block head_title %}{% endblock %} - SM Bean{% endblock %}
+{% block title %}{% block head_title %}{% endblock %} - {{ SITE_NAME }}{% endblock %}
 {% block auth_content %}
 <div class="auth-card">
     {% if messages %}

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block title %}Workspaces · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Workspaces{% endblock %}
 {% block content %}
 <div style="max-width: 720px;">
@@ -61,6 +62,7 @@
                 <input
                     type="text"
                     name="name"
+                    aria-label="Workspace name"
                     placeholder="Workspace name"
                     required
                     class="form-input-styled"

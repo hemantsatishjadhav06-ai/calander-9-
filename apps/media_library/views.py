@@ -14,6 +14,7 @@ from apps.common.validators import normalize_tags
 from apps.members.decorators import require_org_role, require_permission
 
 from .models import MediaAsset, MediaFolder
+from .quotas import StorageQuotaExceededError
 from .services import (
     ProtectedAssetError,
     create_asset,
@@ -21,6 +22,7 @@ from .services import (
     create_version,
     delete_asset,
     restore_version,
+    upload_rejection_message,
 )
 from .tasks import process_image_edit, process_media_asset, process_video_trim
 from .validators import get_accepted_file_types
@@ -38,6 +40,80 @@ def _get_workspace_or_404(request, workspace_id):
 # ──────────────────────────────────────────────────────────────
 
 
+def _store_uploads(files, *, organization, workspace, user, folder=None):
+    """Run each file through ``create_asset`` and queue its processing.
+
+    Returns one result dict per file, in order. A rejected file (bad type, too
+    big, over quota) gets ``status: "error"`` plus the reason, both as the
+    ``errors`` list and as a single ``error`` string for the uploader UI.
+    """
+    results = []
+    for uploaded_file in files:
+        try:
+            asset = create_asset(
+                organization=organization,
+                workspace=workspace,
+                uploaded_file=uploaded_file,
+                uploaded_by=user,
+                folder=folder,
+            )
+        except (StorageQuotaExceededError, ValidationError) as e:
+            message = upload_rejection_message(e)
+            errors = e.messages if isinstance(e, ValidationError) else [message]
+            results.append({"filename": uploaded_file.name, "status": "error", "error": message, "errors": errors})
+            continue
+        # Enqueue background processing (metadata + thumbnail)
+        process_media_asset(str(asset.id))
+        results.append({"id": str(asset.id), "filename": asset.filename, "status": "ok"})
+    return results
+
+
+def _uuid_or_none(value):
+    """A UUID query parameter, or None when absent or malformed (never a 500)."""
+    import uuid as uuid_mod
+
+    if not value:
+        return None
+    try:
+        return uuid_mod.UUID(str(value))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _parse_trim_range(start, end, duration):
+    """``(start, end)`` in seconds, or None when the request makes no sense.
+
+    ffmpeg would have failed on ``nan``, a negative start or ``start >= end``
+    anyway — but only in the worker, after a version row marked *Current* had
+    already been created for it.
+    """
+    import math
+
+    try:
+        start_seconds = float(start)
+        end_seconds = float(end)
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(start_seconds) and math.isfinite(end_seconds)):
+        return None
+    if start_seconds < 0 or end_seconds <= start_seconds:
+        return None
+    if duration and end_seconds > float(duration) + 1:
+        return None
+    return start_seconds, end_seconds
+
+
+def _keep_original_version(asset, user):
+    """Before the first edit, record the untouched upload as version 1.
+
+    Edits now replace ``asset.file`` (so what is published is what was edited),
+    which means the original needs a version row of its own to be restorable.
+    """
+    if not asset.versions.exists():
+        create_version(asset=asset, file=asset.file, change_description="Original upload", created_by=user)
+        asset.refresh_from_db(fields=["current_version"])
+
+
 @login_required
 def library_index(request, workspace_id):
     workspace = _get_workspace_or_404(request, workspace_id)
@@ -53,7 +129,7 @@ def library_index(request, workspace_id):
     if file_type and file_type in dict(MediaAsset.MediaType.choices):
         qs = qs.filter(media_type=file_type)
 
-    folder_id = request.GET.get("folder")
+    folder_id = _uuid_or_none(request.GET.get("folder"))
     if folder_id:
         qs = qs.filter(folder_id=folder_id)
     elif request.GET.get("folder") is None and not request.GET.get("q"):
@@ -63,7 +139,7 @@ def library_index(request, workspace_id):
     if starred == "1":
         qs = qs.filter(is_starred=True)
 
-    uploader = request.GET.get("uploader")
+    uploader = _uuid_or_none(request.GET.get("uploader"))
     if uploader:
         qs = qs.filter(uploaded_by_id=uploader)
 
@@ -148,31 +224,19 @@ def upload(request, workspace_id):
     if folder_id:
         folder = get_object_or_404(MediaFolder, pk=folder_id, workspace=workspace)
 
-    results = []
-    for uploaded_file in files:
-        try:
-            asset = create_asset(
-                organization=workspace.organization,
-                workspace=workspace,
-                uploaded_file=uploaded_file,
-                uploaded_by=request.user,
-                folder=folder,
-            )
-            # Enqueue background processing
-            process_media_asset(str(asset.id))
-            results.append({"id": str(asset.id), "status": "ok"})
-        except ValidationError as e:
-            results.append(
-                {
-                    "filename": uploaded_file.name,
-                    "status": "error",
-                    "errors": e.messages if hasattr(e, "messages") else [str(e)],
-                }
-            )
+    results = _store_uploads(
+        files, organization=workspace.organization, workspace=workspace, user=request.user, folder=folder
+    )
+
+    # Any rejected file makes the whole response a 400 carrying every result,
+    # so the uploader can say *why* per file (and which ones did land) instead
+    # of a 200 with an empty body that looked like success.
+    if any(r["status"] == "error" for r in results):
+        return JsonResponse({"results": results}, status=400)
 
     # If HTMX request, return the new asset cards
     if request.htmx:
-        assets = MediaAsset.objects.filter(id__in=[r["id"] for r in results if r["status"] == "ok"])
+        assets = MediaAsset.objects.filter(id__in=[r["id"] for r in results])
         return render(
             request,
             "media_library/_asset_grid_items.html",
@@ -321,6 +385,7 @@ def asset_edit(request, workspace_id, asset_id):
                     parts.append(f"Resized to {operations['resize']['width']}x{operations['resize']['height']}")
                 description = ", ".join(parts)
 
+                _keep_original_version(asset, request.user)
                 version = create_version(
                     asset=asset,
                     file=asset.file,
@@ -333,10 +398,13 @@ def asset_edit(request, workspace_id, asset_id):
             start = request.POST.get("trim_start")
             end = request.POST.get("trim_end")
             if start is not None and end is not None:
-                start_seconds = float(start)
-                end_seconds = float(end)
+                trim = _parse_trim_range(start, end, asset.duration)
+                if trim is None:
+                    return JsonResponse({"error": "Invalid trim range"}, status=400)
+                start_seconds, end_seconds = trim
                 description = f"Trimmed to {start_seconds:.1f}s - {end_seconds:.1f}s"
 
+                _keep_original_version(asset, request.user)
                 version = create_version(
                     asset=asset,
                     file=asset.file,
@@ -744,8 +812,11 @@ def processing_status(request, workspace_id, asset_id):
         pk=asset_id,
     )
 
-    if request.htmx and asset.processing_status == MediaAsset.ProcessingStatus.COMPLETED:
-        # Return the completed asset card to replace the placeholder
+    if request.htmx:
+        # The card polls with hx-swap="outerHTML", so whatever comes back
+        # replaces it: always answer with the card. It keeps polling while
+        # pending/processing and shows a failed badge (and stops) otherwise —
+        # a JSON body here used to land in the grid as raw text.
         return render(
             request,
             "media_library/_asset_card.html",
@@ -846,28 +917,14 @@ def shared_upload(request):
     if len(files) > max_bulk:
         return JsonResponse({"error": f"Maximum {max_bulk} files per upload"}, status=400)
 
-    results = []
-    for uploaded_file in files:
-        try:
-            asset = create_asset(
-                organization=org,
-                workspace=None,  # Shared = no workspace
-                uploaded_file=uploaded_file,
-                uploaded_by=request.user,
-            )
-            process_media_asset(str(asset.id))
-            results.append({"id": str(asset.id), "status": "ok"})
-        except ValidationError as e:
-            results.append(
-                {
-                    "filename": uploaded_file.name,
-                    "status": "error",
-                    "errors": e.messages if hasattr(e, "messages") else [str(e)],
-                }
-            )
+    # Shared = no workspace
+    results = _store_uploads(files, organization=org, workspace=None, user=request.user)
+
+    if any(r["status"] == "error" for r in results):
+        return JsonResponse({"results": results}, status=400)
 
     if request.htmx:
-        assets = MediaAsset.objects.filter(id__in=[r["id"] for r in results if r["status"] == "ok"])
+        assets = MediaAsset.objects.filter(id__in=[r["id"] for r in results])
         return render(
             request,
             "media_library/_shared_asset_grid_items.html",
@@ -978,6 +1035,7 @@ def shared_asset_edit(request, asset_id):
                     parts.append(f"Resized to {operations['resize']['width']}x{operations['resize']['height']}")
                 description = ", ".join(parts)
 
+                _keep_original_version(asset, request.user)
                 version = create_version(
                     asset=asset,
                     file=asset.file,
@@ -990,10 +1048,13 @@ def shared_asset_edit(request, asset_id):
             start = request.POST.get("trim_start")
             end = request.POST.get("trim_end")
             if start is not None and end is not None:
-                start_seconds = float(start)
-                end_seconds = float(end)
+                trim = _parse_trim_range(start, end, asset.duration)
+                if trim is None:
+                    return JsonResponse({"error": "Invalid trim range"}, status=400)
+                start_seconds, end_seconds = trim
                 description = f"Trimmed to {start_seconds:.1f}s - {end_seconds:.1f}s"
 
+                _keep_original_version(asset, request.user)
                 version = create_version(
                     asset=asset,
                     file=asset.file,

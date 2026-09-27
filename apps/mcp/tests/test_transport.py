@@ -184,7 +184,7 @@ class TestMcpUrlVariants:
             content_type="application/json",
         )
         assert r.status_code == 200
-        assert r.json()["result"]["serverInfo"]["name"] == "brightbean-studio"
+        assert r.json()["result"]["serverInfo"]["name"] == "sm-bean"
 
     def test_get_returns_405_on_both_variants(self, client_with_token):
         # Streamable HTTP permits a plain 405 for GET (we offer no SSE
@@ -208,7 +208,7 @@ class TestProtocolMechanics:
         )
         assert status == 200
         result = body["result"]
-        assert result["serverInfo"]["name"] == "brightbean-studio"
+        assert result["serverInfo"]["name"] == "sm-bean"
         assert "protocolVersion" in result
         assert "tools" in result["capabilities"]
 

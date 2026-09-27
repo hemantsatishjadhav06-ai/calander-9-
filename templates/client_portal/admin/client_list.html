@@ -1,5 +1,5 @@
 {% extends "layouts/workspace_settings.html" %}
-{% block title %}Client Portal - {{ request.workspace.name }} - SM Bean{% endblock %}
+{% block title %}Client Portal - {{ request.workspace.name }} - {{ SITE_NAME }}{% endblock %}
 {% block content %}
 <div x-data="{ showInviteModal: false }">
     <!-- Header -->
@@ -12,7 +12,7 @@
         </div>
         <button @click="showInviteModal = true"
                 class="btn-opacity px-5 py-2 text-sm font-medium rounded-full cursor-pointer transition-colors"
-                style="background: var(--primary); color: white;">
+                style="background: var(--primary-strong); color: white;">
             Invite Client
         </button>
     </div>

@@ -30,7 +30,7 @@
                     {% if request.org and request.org.logo_url %}
                     <img src="{{ request.org.logo_url }}" alt="" class="h-7 w-auto">
                     {% else %}
-                    <div class="w-7 h-7 rounded-md flex items-center justify-center text-white text-[11px] font-bold" style="background: var(--primary);">
+                    <div class="w-7 h-7 rounded-md flex items-center justify-center text-white text-[11px] font-bold" style="background: var(--primary-strong);">
                         {{ workspace.name|make_list|first|upper }}
                     </div>
                     {% endif %}
@@ -42,30 +42,33 @@
                     <nav class="hidden sm:flex items-center gap-0.5 mr-3">
                         <a href="{% url 'client_portal:dashboard' %}"
                            class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'dashboard' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'dashboard' %}style="background: var(--primary); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                           {% if request.resolver_match.url_name == 'dashboard' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
                             Home
                         </a>
                         <a href="{% url 'client_portal:approval_queue' %}"
                            class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'approval_queue' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'approval_queue' %}style="background: var(--primary); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                           {% if request.resolver_match.url_name == 'approval_queue' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
                             Approvals
                         </a>
                         <a href="{% url 'client_portal:published' %}"
                            class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'published' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'published' %}style="background: var(--primary); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                           {% if request.resolver_match.url_name == 'published' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
                             Published
                         </a>
                         <a href="{% url 'client_portal:activity' %}"
                            class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'activity' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'activity' %}style="background: var(--primary); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                           {% if request.resolver_match.url_name == 'activity' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
                             Activity
                         </a>
                     </nav>
-                    <a href="{% url 'accounts:logout' %}"
-                       class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors hover:bg-black/[0.04]"
-                       style="color: var(--text-tertiary);">
-                        Log out
-                    </a>
+                    <form method="post" action="{% url 'accounts:logout' %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors hover:bg-black/[0.04] cursor-pointer"
+                                style="color: var(--text-tertiary);">
+                            Log out
+                        </button>
+                    </form>
                 </div>
             </div>
 
@@ -73,22 +76,22 @@
             <nav class="flex sm:hidden items-center gap-1 pb-2 -mx-1 overflow-x-auto">
                 <a href="{% url 'client_portal:dashboard' %}"
                    class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'dashboard' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'dashboard' %}style="background: var(--primary);"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                   {% if request.resolver_match.url_name == 'dashboard' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
                     Home
                 </a>
                 <a href="{% url 'client_portal:approval_queue' %}"
                    class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'approval_queue' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'approval_queue' %}style="background: var(--primary);"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                   {% if request.resolver_match.url_name == 'approval_queue' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
                     Approvals
                 </a>
                 <a href="{% url 'client_portal:published' %}"
                    class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'published' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'published' %}style="background: var(--primary);"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                   {% if request.resolver_match.url_name == 'published' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
                     Published
                 </a>
                 <a href="{% url 'client_portal:activity' %}"
                    class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'activity' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'activity' %}style="background: var(--primary);"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                   {% if request.resolver_match.url_name == 'activity' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
                     Activity
                 </a>
             </nav>
@@ -104,6 +107,7 @@
     {% include "approvals/partials/_toasts.html" %}
 
     <script src="{% static 'js/htmx.min.js' %}"></script>
+    <script src="{% static 'js/vendor/alpine-focus.min.js' %}" defer></script>
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
     {% block extra_js %}{% endblock %}
 </body>

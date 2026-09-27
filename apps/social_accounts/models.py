@@ -168,15 +168,9 @@ class SocialAccount(models.Model):
         """
         from datetime import timedelta
 
+        from django.db import transaction
         from django.utils import timezone
 
-        new_tokens = provider.refresh_token(self.oauth_refresh_token)
-        self.oauth_access_token = new_tokens.access_token
-        if new_tokens.refresh_token:
-            self.oauth_refresh_token = new_tokens.refresh_token
-        if new_tokens.expires_in:
-            self.token_expires_at = timezone.now() + timedelta(seconds=new_tokens.expires_in)
-        self.connection_status = self.ConnectionStatus.CONNECTED
         update_fields = [
             "oauth_access_token",
             "oauth_refresh_token",
@@ -184,18 +178,38 @@ class SocialAccount(models.Model):
             "connection_status",
             "updated_at",
         ]
-        if enqueue_backfill:
-            self.save(update_fields=update_fields)
-        else:
-            # post_save signals do not receive caller-local keyword arguments.
-            # A short-lived instance flag keeps the token in the normal
-            # update_fields path while telling analytics.signals that this save
-            # is already part of the analytics pass.
-            self._skip_analytics_backfill = True
-            try:
+        # Serialise refreshes on the account row. Two due posts on one channel
+        # run in different threads with separate instances; both refreshing
+        # from the same refresh token means the loser persists a token the
+        # platform has already rotated out (TikTok, Bluesky), the next refresh
+        # fails, and every scheduled post on the account fails with it. Under
+        # the lock, a refresh another caller just completed is simply adopted.
+        with transaction.atomic():
+            fresh = type(self).objects.select_for_update().get(pk=self.pk)
+            if fresh.oauth_access_token != self.oauth_access_token and not fresh.is_token_expiring_soon:
+                for field in ("oauth_access_token", "oauth_refresh_token", "token_expires_at", "connection_status"):
+                    setattr(self, field, getattr(fresh, field))
+                return self.oauth_access_token
+
+            new_tokens = provider.refresh_token(fresh.oauth_refresh_token)
+            self.oauth_access_token = new_tokens.access_token
+            if new_tokens.refresh_token:
+                self.oauth_refresh_token = new_tokens.refresh_token
+            if new_tokens.expires_in:
+                self.token_expires_at = timezone.now() + timedelta(seconds=new_tokens.expires_in)
+            self.connection_status = self.ConnectionStatus.CONNECTED
+            if enqueue_backfill:
                 self.save(update_fields=update_fields)
-            finally:
-                del self._skip_analytics_backfill
+            else:
+                # post_save signals do not receive caller-local keyword arguments.
+                # A short-lived instance flag keeps the token in the normal
+                # update_fields path while telling analytics.signals that this save
+                # is already part of the analytics pass.
+                self._skip_analytics_backfill = True
+                try:
+                    self.save(update_fields=update_fields)
+                finally:
+                    del self._skip_analytics_backfill
         return new_tokens.access_token
 
     # Platform character limits

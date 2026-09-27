@@ -366,6 +366,24 @@ class SocialProvider(ABC):
         if headers:
             req_headers.update(headers)
 
+        # SSRF pinning for providers whose host is user-controlled (Mastodon
+        # instance_url, Bluesky pds_url): resolve to a vetted public IP and
+        # connect to that literal address, so a rebinding DNS answer can't swap
+        # in a private/link-local address between validation and connect. Fixed
+        # first-party hosts (Meta, Google, …) skip this (PIN_DNS = False).
+        extensions: dict = {}
+        if getattr(self, "PIN_DNS", False):
+            from apps.common.net import UnsafeUrlError, pin_url
+
+            try:
+                url, req_headers, extensions = pin_url(url, req_headers)
+            except UnsafeUrlError as exc:
+                raise ProviderError(
+                    f"Refusing to connect to non-public host: {exc}",
+                    platform=getattr(self, "platform", ""),
+                    retryable=False,
+                ) from exc
+
         with httpx.Client(timeout=timeout) as client:
             # httpx uses `content` for a request body, `data` for form mappings.
             # A file object or byte iterator goes to `content` too, and httpx
@@ -384,7 +402,7 @@ class SocialProvider(ABC):
                 request_kwargs["data"] = data
             else:
                 request_kwargs["content"] = data
-            response = client.request(method, url, **request_kwargs)
+            response = client.request(method, url, extensions=extensions, **request_kwargs)
 
         if response.status_code >= 400:
             raise self._error_for_response(response)

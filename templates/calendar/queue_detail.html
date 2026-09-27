@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}{{ queue.name }} - {{ workspace.name }} - SM Bean{% endblock %}
+{% block title %}{{ queue.name }} - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block page_header %}
 <div class="flex items-center justify-between mb-6">
     <div class="flex items-center gap-3">
-        <a href="{% url 'calendar:queue_list' workspace_id=workspace.id %}" class="text-stone-400 hover:text-stone-600 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <a aria-label="Back to queues" href="{% url 'calendar:queue_list' workspace_id=workspace.id %}" class="text-stone-400 hover:text-stone-600 transition-colors">
+            <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </a>
         <div>
             <h1 class="text-base font-semibold text-stone-900" style="letter-spacing: -0.01em;">{{ queue.name }}</h1>
@@ -84,7 +84,7 @@
                         {{ entry.post.get_status_display }}
                     </span>
                     {% if entry.post.author %}
-                    <span class="text-[10px] text-stone-400">{{ entry.post.author.name|default:entry.post.author.email }}</span>
+                    <span class="text-[10px] text-stone-500">{{ entry.post.author.name|default:entry.post.author.email }}</span>
                     {% endif %}
                 </div>
             </div>
@@ -93,21 +93,21 @@
             <div class="text-right flex-shrink-0">
                 {% if entry.assigned_slot_datetime %}
                 <span class="text-xs font-medium text-stone-700">{{ entry.assigned_slot_datetime|date:"M d" }}</span>
-                <span class="text-[10px] text-stone-400 block">{{ entry.assigned_slot_datetime|time:"H:i" }}</span>
+                <span class="text-[10px] text-stone-500 block">{{ entry.assigned_slot_datetime|time:"H:i" }}</span>
                 {% else %}
-                <span class="text-xs text-stone-400">No slot</span>
+                <span class="text-xs text-stone-500">No slot</span>
                 {% endif %}
             </div>
 
             <!-- Remove from queue (leaves a gap; the slot frees up) -->
-            <button type="button"
-                    class="text-stone-300 hover:text-red-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+            <button aria-label="Remove from queue" type="button"
+                    class="text-stone-300 hover:text-red-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
                     hx-post="{% url 'calendar:queue_entry_remove' workspace_id=workspace.id queue_id=queue.id entry_id=entry.id %}"
                     hx-confirm="Remove this post from the queue? Its slot will free up."
                     @click.stop
                     @dragstart.stop
                     title="Remove from queue">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
         {% empty %}

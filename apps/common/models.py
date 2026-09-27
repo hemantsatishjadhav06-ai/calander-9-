@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from django.db import models
 
+from .encryption import EncryptedTextField
+
 
 class EmailSendCounter(models.Model):
     """One counted bucket of outbound email.
@@ -75,3 +77,25 @@ class EmailSuppression(models.Model):
 
     def __str__(self) -> str:
         return f"{self.address} ({self.reason})"
+
+
+class OutboundMailbox(models.Model):
+    """The Gmail account the instance sends through, when EMAIL_BACKEND_TYPE=gmail_api.
+
+    A single row. The refresh token comes from the one-time "Connect Gmail"
+    flow at /ops/email/ and is encrypted at rest; GMAIL_REFRESH_TOKEN in the
+    environment overrides it for deployments that prefer config to state.
+    """
+
+    email = models.EmailField()
+    refresh_token = EncryptedTextField()
+    connected_at = models.DateTimeField(auto_now=True)
+    connected_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    class Meta:
+        db_table = "common_outbound_mailbox"
+
+    def __str__(self) -> str:
+        return self.email

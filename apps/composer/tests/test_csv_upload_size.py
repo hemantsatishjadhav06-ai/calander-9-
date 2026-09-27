@@ -50,3 +50,29 @@ class CSVUploadSizeCapTests(TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.content.decode("utf-8")
         self.assertNotIn("too large", body)
+
+
+class CSVPreviewTests(CSVUploadSizeCapTests):
+    """QA round 1 BUG-16: Validate & Preview crashed (500) on every file."""
+
+    def _upload(self, body: bytes):
+        upload = SimpleUploadedFile("plan.csv", body, content_type="text/csv")
+        self.client.post(self.url, data={"csv_file": upload})
+        return self.client.post(
+            reverse("composer:csv_preview", kwargs={"workspace_id": self.workspace.id}),
+            data={"map_date": "0", "map_platforms": "1", "map_caption": "2"},
+        )
+
+    def test_clean_row_previews_without_crashing(self):
+        response = self._upload(b"date,platform,caption\n2026-05-01,bluesky,Hello\n")
+        self.assertEqual(response.status_code, 200)
+        # Bluesky is a known platform, just not connected in this workspace.
+        self.assertContains(response, "not connected")
+        self.assertNotContains(response, "Unknown platform")
+
+    def test_bad_rows_get_row_level_errors(self):
+        response = self._upload(b"date,platform,caption\nnot-a-date,myspace,\n")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Invalid date format")
+        self.assertContains(response, "Unknown platform")
+        self.assertContains(response, "Caption is empty")

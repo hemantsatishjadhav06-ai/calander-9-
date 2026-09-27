@@ -6,6 +6,7 @@ from datetime import timedelta
 from background_task import background
 from django.utils import timezone
 
+from apps.common.background import keep_schedule
 from apps.composer.models import Post
 from apps.members.models import WorkspaceMembership
 from apps.notifications.engine import notify
@@ -174,6 +175,7 @@ APPROVAL_REMINDER_INTERVAL_SECONDS = 60 * 60  # hourly
 
 
 @background(schedule=0)
+@keep_schedule
 def run_approval_reminders_cycle():
     """Send reminders/escalations for stalled approvals (registered hourly).
 

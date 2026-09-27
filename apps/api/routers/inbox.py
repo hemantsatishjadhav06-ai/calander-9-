@@ -20,6 +20,7 @@ from django.http import Http404, HttpRequest
 from django.shortcuts import get_object_or_404
 from ninja import Query, Router
 from ninja.errors import HttpError
+from ninja.responses import Status
 
 from apps.api.limits import enforce_http_rate_limits
 from apps.api.middleware import (
@@ -174,7 +175,7 @@ def create_reply(request, message_id: uuid.UUID, payload: CreateReplyRequest):
         assert replay_status is not None and replay_body is not None
         if replay_status >= 400:
             raise HttpError(replay_status, replay_body["detail"])
-        return replay_status, replay_body
+        return Status(replay_status, replay_body)
     if disposition == "in_flight":
         raise HttpError(409, "An identical request with this idempotency_key is still in flight; retry shortly.")
 
@@ -210,7 +211,7 @@ def create_reply(request, message_id: uuid.UUID, payload: CreateReplyRequest):
             status_code=201,
             body=body.model_dump(mode="json"),
         )
-        return 201, body
+        return Status(201, body)
     except HttpError as exc:
         finalize_idempotent_response(
             api_key=request.api_key,
@@ -261,4 +262,4 @@ def delete_reply(request, reply_id: uuid.UUID):
     except ReplyStateError as exc:
         raise HttpError(409, str(exc)) from exc
     log_audit_entry(request, action="inbox.reply.discard", target_id=reply_id, status_code=204)
-    return 204, None
+    return Status(204, None)

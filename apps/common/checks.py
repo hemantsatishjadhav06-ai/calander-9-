@@ -1,0 +1,157 @@
+"""Deployment-config system checks.
+
+These surface the "silent" production misconfigurations that made the live
+deployment appear healthy while core features were broken — the app boots
+green, then publishing/connect/email fail at request time. They are registered
+as *deploy* checks, so they only run under ``python manage.py check --deploy``
+(and never during normal dev/test ``check`` or ``runserver``), and each is
+gated on ``not DEBUG`` so ``--deploy`` in a dev shell stays quiet.
+
+Run before/after shipping:  python manage.py check --deploy
+"""
+
+from django.conf import settings
+from django.core.checks import Tags, register
+from django.core.checks import Warning as CheckWarning
+
+
+@register(Tags.security, deploy=True)
+def check_production_config(app_configs, **kwargs):
+    if settings.DEBUG:
+        return []
+
+    errors = []
+    app_url = (getattr(settings, "APP_URL", "") or "").lower()
+    if "localhost" in app_url or "127.0.0.1" in app_url or not app_url:
+        errors.append(
+            CheckWarning(
+                "APP_URL is unset or still points at localhost.",
+                hint=(
+                    "Absolute URLs (email/invite/portal links, the media URLs handed to "
+                    "Instagram/Facebook/Threads/Pinterest/Google, OAuth issuer) are built "
+                    "from APP_URL. Set APP_URL to your public https origin."
+                ),
+                id="smbean.W001",
+            )
+        )
+
+    if not getattr(settings, "ENCRYPTION_KEY_SALT", None):
+        errors.append(
+            CheckWarning(
+                "ENCRYPTION_KEY_SALT is not set.",
+                hint=(
+                    "Connecting a social account (token encryption) and minting an API key "
+                    "raise ValueError without it — every connect/API-key request will 500. "
+                    "Set a random value BEFORE any account is connected and never change it."
+                ),
+                id="smbean.W002",
+            )
+        )
+
+    if str(getattr(settings, "STORAGE_BACKEND", "local")).lower() != "s3":
+        errors.append(
+            CheckWarning(
+                "STORAGE_BACKEND is 'local' in production.",
+                hint=(
+                    "Uploaded media lives on the container's ephemeral disk (lost on every "
+                    "redeploy) and localhost media URLs are unfetchable by the social "
+                    "platforms. Set STORAGE_BACKEND=s3 with the S3_* variables."
+                ),
+                id="smbean.W003",
+            )
+        )
+
+    if getattr(settings, "EMAIL_BACKEND_TYPE", "") == "console":
+        errors.append(
+            CheckWarning(
+                "EMAIL_BACKEND_TYPE is 'console': email is printed to the log, never sent.",
+                hint="Use gmail_api (works where outbound SMTP is blocked, e.g. Railway Hobby) or smtp.",
+                id="smbean.W011",
+            )
+        )
+    if getattr(settings, "EMAIL_BACKEND_TYPE", "") == "smtp" and getattr(settings, "EMAIL_HOST", "") in (
+        "",
+        "localhost",
+        "127.0.0.1",
+    ):
+        errors.append(
+            CheckWarning(
+                "EMAIL_HOST is localhost while EMAIL_BACKEND_TYPE=smtp.",
+                hint=(
+                    "Team invites, client-portal magic links, password resets and "
+                    "notification emails will silently fail. Configure a transactional "
+                    "email provider (EMAIL_HOST/PORT/USER/PASSWORD, DEFAULT_FROM_EMAIL)."
+                ),
+                id="smbean.W004",
+            )
+        )
+
+    if not getattr(settings, "SENTRY_DSN", ""):
+        errors.append(
+            CheckWarning(
+                "SENTRY_DSN is not set: no error monitoring in production.",
+                hint="Set SENTRY_DSN to capture runtime errors.",
+                id="smbean.W005",
+            )
+        )
+
+    # Behind a TLS-terminating proxy (SECURE_PROXY_SSL_HEADER is set), every
+    # request's REMOTE_ADDR is the proxy's IP unless BB_TRUSTED_PROXIES lists it.
+    # With it empty, all clients share one rate-limit bucket → 10 bad logins from
+    # anyone 429s everyone (self-inflicted auth DoS), and X-Forwarded-For is
+    # ignored so throttling/audit IPs are all the proxy's.
+    if getattr(settings, "SECURE_PROXY_SSL_HEADER", None) and not getattr(settings, "BB_TRUSTED_PROXIES", ()):
+        errors.append(
+            CheckWarning(
+                "SECURE_PROXY_SSL_HEADER is set but BB_TRUSTED_PROXIES is empty.",
+                hint=(
+                    "Behind a proxy, set BB_TRUSTED_PROXIES to the proxy IP(s) or CIDR "
+                    "range(s) so the auth rate-limiter derives the real client IP from "
+                    "X-Forwarded-For. Otherwise every client shares the proxy's IP and "
+                    "one user's failed logins rate-limit everyone. On a managed platform "
+                    "whose edge address is not stable per deploy, use the range it "
+                    "forwards from (Railway: 100.64.0.0/10)."
+                ),
+                id="smbean.W006",
+            )
+        )
+
+    # QA round 1 found both of these unset on the live deploy.
+    if not getattr(settings, "WEBHOOK_SECRET", ""):
+        errors.append(
+            CheckWarning(
+                "WEBHOOK_SECRET is not set.",
+                hint="Inbound webhooks cannot be authenticated. Set it to a long random value.",
+                id="smbean.W007",
+            )
+        )
+    if not getattr(settings, "SUPPORT_EMAIL", ""):
+        errors.append(
+            CheckWarning(
+                "SUPPORT_EMAIL is not set.",
+                hint="/support/, the legal pages and the client portal have no contact address to offer.",
+                id="smbean.W008",
+            )
+        )
+    if getattr(settings, "ACCOUNT_EMAIL_VERIFICATION", "none") == "none":
+        errors.append(
+            CheckWarning(
+                "ACCOUNT_EMAIL_VERIFICATION is 'none'.",
+                hint=(
+                    "Anyone admitted to sign up can claim an address they don't own, and a later "
+                    "Google sign-in with that address joins their account. Once email works, "
+                    "set ACCOUNT_EMAIL_VERIFICATION=mandatory."
+                ),
+                id="smbean.W009",
+            )
+        )
+    if not getattr(settings, "ADMIN_ALLOWED_IPS", []):
+        errors.append(
+            CheckWarning(
+                "The Django admin is reachable from any address.",
+                hint="Set ADMIN_ALLOWED_IPS (addresses or CIDR ranges) and consider a non-default ADMIN_URL.",
+                id="smbean.W010",
+            )
+        )
+
+    return errors

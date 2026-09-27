@@ -7,7 +7,7 @@ per-workspace and don't need database storage.
 from urllib.parse import urlsplit
 
 FEED_CATEGORIES = [
-    {"slug": "brightbean-favorites", "label": "Brightbean Favorites"},
+    {"slug": "brightbean-favorites", "label": "SM Bean Favorites"},
     {"slug": "tech", "label": "Tech"},
     {"slug": "news", "label": "News"},
     {"slug": "business", "label": "Business"},
