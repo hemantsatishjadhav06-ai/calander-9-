@@ -94,7 +94,7 @@ class MagicLinkEntryViewTests(MagicLinkTestBase):
         self.token.is_consumed = True
         self.token.save(update_fields=["is_consumed"])
         response = self.client.get(self._entry_url())
-        self.assertRedirects(response, reverse("client_portal:magic_link_expired"))
+        self.assertRedirects(response, reverse("client_portal:magic_link_expired") + "?reason=used")
 
     def test_post_consumes_token_and_starts_session(self):
         response = self.client.post(self._entry_url())
@@ -112,5 +112,19 @@ class MagicLinkEntryViewTests(MagicLinkTestBase):
         # A fresh client simulates the link being replayed by someone else.
         replay = Client()
         response = replay.post(self._entry_url())
-        self.assertRedirects(response, reverse("client_portal:magic_link_expired"))
+        self.assertRedirects(response, reverse("client_portal:magic_link_expired") + "?reason=used")
         self.assertIsNone(replay.session.get("is_portal_session"))
+
+
+class LinkProblemCopyTests(TestCase):
+    """QA round 1 BUG-24: every portal failure used to say the link had expired."""
+
+    def test_portal_without_a_link_asks_for_the_email_link(self):
+        response = self.client.get(reverse("client_portal:dashboard"), follow=True)
+        self.assertContains(response, "Sign in with your approval link")
+        self.assertNotContains(response, "expired")
+
+    def test_unknown_token_is_invalid_not_expired(self):
+        response = self.client.get("/portal/not-a-real-token/", follow=True)
+        self.assertContains(response, "This link isn")
+        self.assertNotContains(response, "has expired")

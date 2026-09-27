@@ -26,7 +26,7 @@ def get_checklist_items(workspace):
         {
             "key": "connect_accounts",
             "title": "Connect social accounts",
-            "description": "Link your Instagram, LinkedIn, or other platforms",
+            "description": "Link the social accounts you publish to",
             "completed": SocialAccount.objects.for_workspace(workspace_id).exists(),
             "url": reverse(
                 "social_accounts:connect",

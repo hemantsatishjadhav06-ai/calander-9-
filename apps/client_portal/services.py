@@ -128,6 +128,23 @@ def peek_magic_link(token_string):
     return token
 
 
+def magic_link_problem(token_string):
+    """Why *token_string* can't be used: "invalid", "used" or "expired" (None if usable).
+
+    The portal used to call every failure "expired", which told a client who
+    had pasted a truncated link, or opened the portal with no link at all, that
+    they had missed a deadline.
+    """
+    token = MagicLinkToken.objects.filter(token=token_string).first()
+    if token is None:
+        return "invalid"
+    if token.is_consumed:
+        return "used"
+    if token.is_expired:
+        return "expired"
+    return None
+
+
 def consume_magic_link(token_string):
     """Validate and atomically consume a magic link token (single-use).
 

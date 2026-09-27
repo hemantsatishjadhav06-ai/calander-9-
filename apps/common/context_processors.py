@@ -18,9 +18,35 @@ def branding(request):
         "LEGAL_TERMS_URL": getattr(settings, "LEGAL_TERMS_URL", "/terms/"),
         "LEGAL_PRIVACY_URL": getattr(settings, "LEGAL_PRIVACY_URL", "/privacy/"),
         "SOURCE_URL": getattr(settings, "SOURCE_URL", ""),
+        "LEGAL_ENTITY": getattr(settings, "LEGAL_ENTITY_NAME", "") or getattr(settings, "SITE_NAME", "SM Bean"),
+        "LEGAL_UPDATED": getattr(settings, "LEGAL_UPDATED", ""),
+        "LEGAL_PAGES_REVIEWED": getattr(settings, "LEGAL_PAGES_REVIEWED", False),
         # Public CTAs say "Get started" only when anyone can actually sign up.
         "SIGNUP_OPEN": getattr(settings, "SIGNUP_MODE", "invite_only") == "open",
+        **_platform_availability(),
     }
+
+
+def _platform_availability():
+    """Display names of the platforms that are live, and of those coming soon.
+
+    Instagram (Direct) and the two LinkedIn flavours collapse to one public name
+    each: a visitor picks a network, not an OAuth variant.
+    """
+    from apps.credentials.models import PlatformCredential
+
+    launched = set(getattr(settings, "LAUNCHED_PLATFORMS", []))
+    live, soon = [], []
+    for value, label in PlatformCredential.Platform.choices:
+        name = {"instagram_login": "Instagram", "google_business": "Google Business"}.get(value, label)
+        name = "LinkedIn" if value.startswith("linkedin") else name
+        bucket = live if value in launched else soon
+        if name not in live and name not in soon:
+            bucket.append(name)
+        elif name in soon and bucket is live:
+            soon.remove(name)
+            live.append(name)
+    return {"LIVE_PLATFORM_NAMES": live, "COMING_SOON_PLATFORM_NAMES": soon}
 
 
 def sidebar_context(request):

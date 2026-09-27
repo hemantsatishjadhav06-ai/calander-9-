@@ -11,6 +11,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone as django_tz
 from django.views.decorators.http import require_http_methods
 
+from apps.common.timezones import LEGACY_ZONE_NAMES, canonical_timezone
 from apps.common.validators import clean_display_name
 from apps.composer.models import PlatformPost, Post, Tag
 from apps.members.decorators import require_org_role
@@ -72,7 +73,7 @@ def settings_view(request):
         "settings_active": "general",
         "is_owner": is_owner,
         "common_timezones": COMMON_TIMEZONES,
-        "all_timezones": sorted(available_timezones()),
+        "all_timezones": sorted(tz for tz in available_timezones() if tz not in LEGACY_ZONE_NAMES),
     }
     return render(request, "organizations/settings.html", context)
 
@@ -139,7 +140,7 @@ def _handle_tz_update(request, org):
         messages.error(request, "Invalid timezone.")
         return
 
-    org.default_timezone = tz
+    org.default_timezone = canonical_timezone(tz)
     org.save(update_fields=["default_timezone"])
     messages.success(request, "Default timezone updated.")
 

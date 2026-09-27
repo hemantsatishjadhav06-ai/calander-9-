@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Link Expired</title>
+    <title>{{ problem_title }} · {{ SITE_NAME }}</title>
+    <meta name="robots" content="noindex">
     <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
     <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
     <link rel="icon" type="image/png" sizes="96x96" href="{% static 'favicon/favicon-96x96.png' %}">
@@ -20,11 +21,11 @@
                 <svg class="w-7 h-7" style="color: var(--warning-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
 
-            <h1 class="text-lg font-bold tracking-tight mb-2" style="color: var(--text-primary); font-family: var(--font-display);">
-                This link has expired
+            <h1 class="text-lg font-bold tracking-tight mb-2" style="color: var(--text-primary);">
+                {{ problem_title }}
             </h1>
             <p class="text-sm leading-relaxed mb-6" style="color: var(--text-secondary);">
-                Magic links are valid for 30 days. Please contact your account manager to receive a new link.
+                {{ problem_body }}
             </p>
 
             <div class="rounded-xl p-4 mb-4" style="background: var(--surface-1); border: 1px solid var(--border);">
@@ -32,7 +33,11 @@
                 <p class="text-[0.75rem] mt-1" style="color: var(--text-tertiary);">
                     Ask your team to send you a fresh access link from the workspace settings.
                 </p>
+                {% if SUPPORT_EMAIL %}
+                <a href="mailto:{{ SUPPORT_EMAIL }}?subject=New%20approval%20link" class="inline-block mt-3 text-[0.8125rem] font-semibold underline" style="color: var(--primary-strong);">Request a new link</a>
+                {% endif %}
             </div>
+            <p class="text-[0.75rem]" style="color: var(--text-tertiary);">{{ SITE_NAME }}</p>
         </div>
     </div>
 </body>

@@ -5,12 +5,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ SITE_NAME }} — Open-source social media management</title>
-  <meta name="description" content="{{ SITE_NAME }} is open-source, self-hostable social media management: plan, compose, schedule, approve and publish from one dashboard, with integrations for 11 platforms. Seats, channels and workspaces are never metered.">
+  <meta name="description" content="{{ SITE_NAME }} is open-source, self-hostable social media management: plan, compose, schedule, approve and publish from one dashboard. Live today on {{ LIVE_PLATFORM_NAMES|join:", " }}. Seats, channels and workspaces are never metered.">
   <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ SITE_NAME }}">
   <meta property="og:title" content="{{ SITE_NAME }} — own your social stack">
-  <meta property="og:description" content="Open-source, self-hostable social media management with integrations for 11 platforms. Seats, channels and workspaces are never metered.">
+  <meta property="og:description" content="Open-source, self-hostable social media management. Live today on {{ LIVE_PLATFORM_NAMES|join:", " }}. Seats, channels and workspaces are never metered.">
   <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}/">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
@@ -111,7 +111,7 @@
       <div class="wrap">
         <span class="pill">Open-source · self-hostable · AGPL-3.0</span>
         <h1>Own your social stack.</h1>
-        <p class="sub">{{ SITE_NAME }} runs the whole content lifecycle for agencies and teams managing many client brands: compose once, route through client approval, publish everywhere you've connected (integrations for 11 platforms). Self-host it and your seats, channels and workspaces are never metered.</p>
+        <p class="sub">{{ SITE_NAME }} runs the whole content lifecycle for agencies and teams managing many client brands: compose once, route through client approval, publish everywhere you've connected (live today on {{ LIVE_PLATFORM_NAMES|join:", " }}; more networks as each passes platform review). Self-host it and your seats, channels and workspaces are never metered.</p>
         <div class="hero-cta">
           {% if SIGNUP_OPEN %}<a class="btn btn-primary" href="{% url 'account_signup' %}">Get started free</a>{% else %}<a class="btn btn-primary" href="{% url 'account_signup' %}">Request early access</a>{% endif %}
           <a class="btn btn-ghost" href="{% url 'pricing' %}">See pricing</a>
@@ -124,10 +124,11 @@
       <div class="wrap">
         <div class="lbl">Connected straight to each platform's official API — no reseller in between</div>
         <div class="plat-row">
-          <span>Facebook</span><span>Instagram</span><span>LinkedIn</span><span>TikTok</span>
-          <span>YouTube</span><span>Pinterest</span><span>Threads</span><span>Bluesky</span>
-          <span>Google Business</span><span>Mastodon</span><span>DEV.to</span>
+          {% for name in LIVE_PLATFORM_NAMES %}<span>{{ name }}</span>{% endfor %}
         </div>
+        {% if COMING_SOON_PLATFORM_NAMES %}
+        <div class="lbl" style="margin-top:16px;margin-bottom:0;">Coming soon: {{ COMING_SOON_PLATFORM_NAMES|join:" · " }}</div>
+        {% endif %}
       </div>
     </div>
 
