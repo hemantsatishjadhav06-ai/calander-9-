@@ -17,6 +17,8 @@ from apps.accounts.models import User
 from apps.common import gmail
 from apps.common.models import OutboundMailbox
 
+REPO_ROOT = __import__("pathlib").Path(__file__).resolve().parents[3]
+
 
 class _Resp:
     def __init__(self, status, payload=None, content=b""):
@@ -161,3 +163,47 @@ def test_backup_database_writes_every_table_and_a_manifest(tmp_path, settings):
         users_csv = tar.extractfile("accounts_user.csv").read()
     assert manifest["tables"]["accounts_user"] == 1
     assert b"kept@example.com" in users_csv
+
+
+@pytest.mark.django_db
+def test_release_backs_up_then_migrates_then_imports(tmp_path, settings):
+    settings.MEDIA_ROOT = str(tmp_path)
+    calls = []
+    with mock.patch(
+        "apps.common.management.commands.release.call_command",
+        side_effect=lambda name, **kw: calls.append((name, kw.get("required"), kw.get("source_url"))),
+    ):
+        call_command("release", legacy_media_url="https://old.example.com/media/")
+    assert [c[0] for c in calls] == ["backup_database", "migrate", "import_legacy_media"]
+    assert calls[0][1] is True and calls[2][2] == "https://old.example.com/media/"
+
+
+@pytest.mark.django_db
+def test_release_stops_before_migrate_when_the_backup_fails():
+    from django.core.management.base import CommandError
+
+    calls = []
+
+    def fake(name, **kw):
+        calls.append(name)
+        if name == "backup_database":
+            raise CommandError("no storage")
+
+    with (
+        mock.patch("apps.common.management.commands.release.call_command", side_effect=fake),
+        pytest.raises(CommandError),
+    ):
+        call_command("release")
+    assert calls == ["backup_database"]
+
+
+def test_gunicorn_config_logs_to_stdout_without_opening_a_file():
+    import logging.config
+    import runpy
+
+    cfg = runpy.run_path(str(REPO_ROOT / "gunicorn.conf.py"))["logconfig_dict"]
+    logging.config.dictConfig(cfg)  # must not raise
+    handler = logging.getLogger("gunicorn.error").handlers[0]
+    import sys
+
+    assert handler.stream is sys.stdout
