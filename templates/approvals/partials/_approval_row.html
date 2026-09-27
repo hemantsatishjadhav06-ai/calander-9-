@@ -36,7 +36,7 @@ can_approve, display_timezone, and the parent Alpine scope (selectedPosts, diffO
                 <span class="text-[0.75rem] text-stone-500 inline-flex items-center gap-1 ml-auto tabular-nums flex-shrink-0">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     {% if post.scheduled_at %}{% timezone display_timezone %}{{ post.scheduled_at|date:"M j, g:i A" }}{% endtimezone %}
-                    {% elif post.proposed_publish_at %}<span class="text-orange-500">Proposed {% timezone display_timezone %}{{ post.proposed_publish_at|date:"M j, g:i A" }}{% endtimezone %}</span>{% endif %}
+                    {% elif post.proposed_publish_at %}<span class="text-orange-700">Proposed {% timezone display_timezone %}{{ post.proposed_publish_at|date:"M j, g:i A" }}{% endtimezone %}</span>{% endif %}
                 </span>
             </div>
 

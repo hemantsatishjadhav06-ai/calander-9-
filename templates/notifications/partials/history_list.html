@@ -17,7 +17,7 @@
             </div>
             {% elif n.event_type == "post_published" %}
             <div class="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center ring-1 ring-orange-100">
-                <svg class="w-[18px] h-[18px] text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                <svg class="w-[18px] h-[18px] text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
             </div>
             {% elif n.event_type == "new_inbox_message" %}
             <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center ring-1 ring-blue-100">
@@ -69,7 +69,7 @@
                     hx-post="{% url 'notifications:mark_as_read' n.id %}"
                     hx-target="closest div.group"
                     hx-swap="outerHTML"
-                    class="text-[11px] font-semibold text-orange-600 hover:text-orange-700 ml-auto opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 cursor-pointer"
+                    class="text-[11px] font-semibold text-orange-700 hover:text-orange-800 ml-auto opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 cursor-pointer"
                 >
                     Mark read
                 </button>

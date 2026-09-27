@@ -50,7 +50,7 @@ Context: account (with prefetched posting_slots), workspace_id.
                                 <!-- Display mode -->
                                 <div x-show="!editing" class="flex items-center gap-0.5">
                                     <button type="button" @click="editing = true"
-                                            class="text-xs tabular-nums cursor-pointer hover:text-orange-600 transition-colors {% if not day.is_active %}text-stone-300 line-through{% else %}text-stone-700{% endif %}"
+                                            class="text-xs tabular-nums cursor-pointer hover:text-orange-800 transition-colors {% if not day.is_active %}text-stone-300 line-through{% else %}text-stone-700{% endif %}"
                                             title="Click to edit">
                                         {{ slot.time|time:"g:i A" }}
                                     </button>

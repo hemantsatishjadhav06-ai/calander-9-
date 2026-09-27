@@ -45,8 +45,13 @@
   --brand-font-mono: ui-monospace, SFMono-Regular, 'Cascadia Code', 'Consolas', monospace;
 
   /* Semantic Tokens */
-  --primary:       var(--brand-500);
-  --primary-hover: var(--brand-600);
+  /* --primary is text-safe: links, text buttons and white-on-accent fills all
+     read at >=4.5:1 on brand-700 (QA round 1, BUG-19). The bright brand-500
+     stays available as --primary-bright for decorative fills and highlights
+     that never carry text. */
+  --primary:       var(--brand-700);
+  --primary-hover: var(--brand-800);
+  --primary-bright: var(--brand-500);
   --primary-soft:  var(--brand-50);
   --primary-muted: var(--brand-100);
   --primary-ring:  var(--brand-200);
@@ -745,16 +750,16 @@ span.flatpickr-weekday {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   FORM SELECTION CONTROLS — bean-green accents
-   Native checkboxes pick up the brand green via accent-color (the
+   FORM SELECTION CONTROLS — primary accents
+   Native checkboxes pick up the primary via accent-color (the
    Tailwind forms plugin isn't installed, so text-* utilities don't
    restyle them and browsers fall back to their default blue).
    ═══════════════════════════════════════════════════════════════ */
 .bb-checkbox {
-  accent-color: var(--brand-green-500);
+  accent-color: var(--primary);
 }
 .bb-checkbox:focus-visible {
-  outline: 2px solid var(--brand-green-200);
+  outline: 2px solid var(--primary-ring);
   outline-offset: 1px;
 }
 
@@ -806,13 +811,13 @@ span.flatpickr-weekday {
   transition: transform 0.15s ease;
 }
 .bb-toggle input:checked + .bb-toggle-track {
-  background: var(--brand-green-500);
+  background: var(--primary);
 }
 .bb-toggle input:checked + .bb-toggle-track::after {
   transform: translateX(16px);
 }
 .bb-toggle input:focus-visible + .bb-toggle-track {
-  outline: 2px solid var(--brand-green-200);
+  outline: 2px solid var(--primary-ring);
   outline-offset: 1px;
 }
 .bb-toggle input:disabled + .bb-toggle-track {

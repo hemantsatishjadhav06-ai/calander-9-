@@ -14,8 +14,8 @@ module.exports = {
         // real theme tokens (styles.css :root) — the old --brand-primary vars
         // were never defined, so these fell back to off-brand indigo.
         brand: {
-          primary: 'var(--primary, #F97316)',
-          'primary-hover': 'var(--primary-hover, #EA580C)',
+          primary: 'var(--primary, #C2410C)',
+          'primary-hover': 'var(--primary-hover, #9A3412)',
           secondary: 'var(--brand-green-500, #94A43F)',
         },
       },

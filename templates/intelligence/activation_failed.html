@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block title %}Activation failed · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Activation failed{% endblock %}
 
 {% block extra_head %}
@@ -42,7 +43,7 @@
   <p class="text-xs text-stone-500 mt-8">
     If Stripe charged you and you don't see your subscription, contact
     <a href="mailto:{{ SUPPORT_EMAIL }}"
-       class="text-orange-600 hover:text-orange-700 cursor-pointer">{{ SUPPORT_EMAIL }}</a>.
+       class="text-orange-700 hover:text-orange-800 cursor-pointer">{{ SUPPORT_EMAIL }}</a>.
   </p>
 </div>
 {% endblock %}
