@@ -54,8 +54,8 @@ Context: posts, workspace.
     </table>
     {% else %}
     {% if not has_connected_accounts %}
-    {% include "calendar/partials/_no_channels_empty_state.html" %}
-    {% else %}
+    {% include "calendar/partials/_no_channels_banner.html" %}
+    {% endif %}
     <!-- Empty state -->
     <div class="text-center py-20 px-6">
         <div class="w-16 h-16 mx-auto rounded-2xl bg-stone-100 flex items-center justify-center mb-4">
@@ -64,11 +64,10 @@ Context: posts, workspace.
         <p class="text-sm font-medium text-stone-500 mb-1">No content scheduled yet</p>
         <p class="text-xs text-stone-500 mb-5 max-w-[240px] mx-auto">Create your first post to see it on the calendar</p>
         <a href="{% url 'composer:compose' workspace_id=workspace.id %}"
-           class="inline-flex items-center gap-1.5 px-5 py-1.5 text-sm font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 hover:border-orange-300 active:bg-orange-100 transition-all duration-150">
+           class="inline-flex items-center gap-1.5 px-5 py-1.5 text-sm font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 hover:border-orange-300 active:bg-orange-100 transition-all duration-150">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Create Post
         </a>
     </div>
-    {% endif %}
     {% endif %}
 </div>

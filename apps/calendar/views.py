@@ -14,6 +14,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from apps.common.timezones import canonical_timezone
 from apps.common.validators import is_valid_hex_color
 from apps.composer.models import ContentCategory, PlatformPost, Post
 from apps.members.decorators import require_permission
@@ -383,7 +384,7 @@ def _publish_tab_counts(workspace, request):
 
     return {
         "queue_count": _pp(status="scheduled"),
-        "drafts_count": _pp(status="draft"),
+        "drafts_count": _pp(status="draft") + _channelless_drafts(workspace, request).count(),
         "approvals_count": approvals.distinct().count(),
         "sent_count": _pp(status__in=["published", "failed"]),
     }
@@ -423,7 +424,7 @@ def _get_publish_context(workspace, request):
     tz_options = [
         {
             "value": tz,
-            "label": tz.split("/")[-1] + (" (workspace)" if tz == ws_tz else ""),
+            "label": canonical_timezone(tz).split("/")[-1].replace("_", " ") + (" (workspace)" if tz == ws_tz else ""),
         }
         for tz in tz_list
     ]
@@ -437,6 +438,22 @@ def _get_publish_context(workspace, request):
         "workspace_timezone": ws_tz,
         **_publish_tab_counts(workspace, request),
     }
+
+
+def _channelless_drafts(workspace, request):
+    """Posts saved with no channel yet — drafts with no PlatformPost row.
+
+    The Drafts tab lists PlatformPost rows, so these were invisible there (and
+    in its badge) although Save Draft accepts them. They can't match a channel
+    filter; the tag filter is Post-level and applies as usual.
+    """
+    qs = Post.objects.for_workspace(workspace.id).filter(platform_posts__isnull=True)
+    if _get_channel_filters(request):
+        return qs.none()
+    tag = request.GET.get("tag")
+    if tag:
+        qs = qs.filter(tags__contains=[tag])
+    return qs
 
 
 def _apply_pp_publish_filters(qs, request):
@@ -525,7 +542,17 @@ def _get_tab_context(request, workspace, tab: str) -> dict:
             .order_by("-post__updated_at")
         )
         platform_posts = _apply_pp_publish_filters(platform_posts, request)
-        return {**base_ctx, "platform_posts": platform_posts[:200]}
+        channelless_drafts = (
+            _channelless_drafts(workspace, request)
+            .select_related("author")
+            .prefetch_related("media_attachments__media_asset")
+            .order_by("-updated_at")
+        )
+        return {
+            **base_ctx,
+            "platform_posts": platform_posts[:200],
+            "channelless_drafts": channelless_drafts[:200],
+        }
 
     if tab == "sent":
         platform_posts = (

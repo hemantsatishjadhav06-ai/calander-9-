@@ -8,7 +8,7 @@ Context: day_slots, target_date, workspace.
     <div class="flex border-b border-stone-100 min-h-[64px] cal-add-cell {% if cell.posts or cell.slots %}has-posts{% endif %} {% if is_today and cell.hour == current_hour %}bg-orange-50/50{% endif %}">
         <!-- Time label -->
         <div class="w-20 flex-shrink-0 border-r border-stone-200 px-3 py-2 text-right">
-            <span class="text-xs font-medium tabular-nums {% if is_today and cell.hour == current_hour %}text-orange-600 font-semibold{% else %}text-stone-500{% endif %}">
+            <span class="text-xs font-medium tabular-nums {% if is_today and cell.hour == current_hour %}text-orange-700 font-semibold{% else %}text-stone-500{% endif %}">
                 {% if cell.hour < 10 %}0{% endif %}{{ cell.hour }}:00
             </span>
         </div>

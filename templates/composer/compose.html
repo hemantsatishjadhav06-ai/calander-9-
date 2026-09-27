@@ -536,7 +536,7 @@
                                  @drop.prevent="handleFileDrop($event); $el.classList.remove('dragover')"
                                  @click="$refs.fileInput.click()">
                                 <svg class="w-6 h-6 text-stone-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                <span class="text-[11px] text-stone-500 leading-tight">Drag & drop or <span class="text-orange-500 font-medium">select files</span></span>
+                                <span class="text-[11px] text-stone-500 leading-tight">Drag & drop or <span class="text-orange-700 font-medium">select files</span></span>
                             </div>
                             {% if unsplash_enabled %}
                             <button aria-label="Search Unsplash" type="button" class="media-unsplash-btn" title="Search Unsplash"
@@ -557,7 +557,7 @@
                         <!-- Bottom bar: media library + char counter -->
                         <div class="flex items-center justify-between px-4 py-2 border-t border-stone-100">
                             <button type="button" @click="showMediaPicker = true"
-                                    class="text-xs font-medium text-stone-500 hover:text-orange-600 transition-colors flex items-center gap-1.5 cursor-pointer">
+                                    class="text-xs font-medium text-stone-500 hover:text-orange-800 transition-colors flex items-center gap-1.5 cursor-pointer">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                                 Media Library
                             </button>
@@ -678,7 +678,7 @@
                                            :name="'pin_allow_comments_' + accId"
                                            value="true"
                                            :checked="platformExtras[accId]?.allow_comments !== false"
-                                           class="w-4 h-4 mt-0.5 rounded border-stone-300 text-orange-500 focus:ring-orange-200">
+                                           class="w-4 h-4 mt-0.5 rounded border-stone-300 text-orange-700 focus:ring-orange-200">
                                     <span class="text-sm text-stone-700">Allow people to comment</span>
                                 </label>
                                 <!-- Show Similar Products -->
@@ -687,7 +687,7 @@
                                            :name="'pin_show_similar_' + accId"
                                            value="true"
                                            :checked="platformExtras[accId]?.show_similar_products !== false"
-                                           class="w-4 h-4 mt-0.5 rounded border-stone-300 text-orange-500 focus:ring-orange-200">
+                                           class="w-4 h-4 mt-0.5 rounded border-stone-300 text-orange-700 focus:ring-orange-200">
                                     <span class="text-sm text-stone-700">Show similar products</span>
                                 </label>
                                 <!-- Alt Text -->
@@ -714,13 +714,13 @@
                                             </template>
                                             <button type="button"
                                                     @click="openThumbnailPicker(accId)"
-                                                    class="text-xs font-medium px-3 py-1.5 rounded-lg border border-stone-200 text-stone-700 hover:border-orange-400 hover:text-orange-600 transition-all cursor-pointer">
+                                                    class="text-xs font-medium px-3 py-1.5 rounded-lg border border-stone-200 text-stone-700 hover:border-orange-400 hover:text-orange-800 transition-all cursor-pointer">
                                                 <span x-text="platformExtras[accId]?.cover_image_asset_id ? 'Change' : 'Pick from Library'"></span>
                                             </button>
                                             <button type="button"
                                                     @click="triggerThumbnailUpload(accId)"
                                                     :disabled="thumbnailUploading[accId]"
-                                                    class="text-xs font-medium px-3 py-1.5 rounded-lg border border-stone-200 text-stone-700 hover:border-orange-400 hover:text-orange-600 transition-all disabled:opacity-50 cursor-pointer">
+                                                    class="text-xs font-medium px-3 py-1.5 rounded-lg border border-stone-200 text-stone-700 hover:border-orange-400 hover:text-orange-800 transition-all disabled:opacity-50 cursor-pointer">
                                                 <span x-text="thumbnailUploading[accId] ? 'Uploading…' : 'Upload'"></span>
                                             </button>
                                             <input type="file"
@@ -787,7 +787,7 @@
                                    class="hidden thumb-upload-input"
                                    @change="uploadThumbnail(accId, $event)">
                             <button type="button" @click="openThumbnailPicker(accId)"
-                                    class="mt-2 text-xs font-medium text-stone-500 hover:text-orange-600 transition-colors flex items-center gap-1.5 cursor-pointer">
+                                    class="mt-2 text-xs font-medium text-stone-500 hover:text-orange-800 transition-colors flex items-center gap-1.5 cursor-pointer">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                                 Media Library
                             </button>
@@ -821,7 +821,7 @@
                                            :name="'yt_made_for_kids_' + accId"
                                            value="true"
                                            :checked="platformExtras[accId]?.self_declared_made_for_kids"
-                                           class="w-4 h-4 mt-0.5 rounded border-stone-300 text-orange-500 focus:ring-orange-200">
+                                           class="w-4 h-4 mt-0.5 rounded border-stone-300 text-orange-700 focus:ring-orange-200">
                                     <span class="text-sm text-stone-700">
                                         Made for Kids
                                         <span class="block text-[11px] text-stone-500 font-normal">Required by COPPA - mark if this video is directed at children under 13</span>
@@ -979,7 +979,7 @@
                                                     class="w-full text-left text-sm px-3 py-2 flex items-center justify-between gap-2 transition-colors"
                                                     :class="(ttBrandContent && lvl === 'SELF_ONLY') ? 'opacity-40 cursor-not-allowed' : 'hover:bg-stone-50 cursor-pointer'">
                                                 <span x-text="ttLabel(lvl)"></span>
-                                                <svg x-show="ttPrivacy === lvl" class="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                                <svg x-show="ttPrivacy === lvl" class="w-4 h-4 text-orange-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                             </button>
                                             <!-- Required hover prompt for the disabled private option (mouse); the
                                                  always-visible note below the dropdown covers keyboard/SR users. -->
@@ -1310,7 +1310,7 @@
                         <template x-if="tagSearch.trim() && !filteredTags.length">
                             <button type="button" @click="createTag()"
                                     class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50 rounded-md mx-1">
-                                <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                <svg class="w-3.5 h-3.5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                 Create "<span x-text="tagSearch.trim()" class="font-semibold"></span>"
                             </button>
                         </template>
@@ -1318,7 +1318,7 @@
                             <div class="border-t border-stone-100 mt-1 pt-1">
                                 <button type="button" @click="createTag()"
                                         class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50 rounded-md mx-1">
-                                    <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                    <svg class="w-3.5 h-3.5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                     Create "<span x-text="tagSearch.trim()" class="font-semibold"></span>"
                                 </button>
                             </div>
@@ -1330,7 +1330,7 @@
                         <div class="border-t border-stone-100 px-1 py-1">
                             <button type="button" @click="tagDropdownOpen = false; showCreateTagModal = true; newTagName = tagSearch; tagSearch = ''; $nextTick(() => $refs.newTagNameInput.focus())"
                                     class="flex items-center gap-2 w-full px-2.5 py-1.5 text-sm text-stone-600 hover:bg-stone-50 rounded-md cursor-pointer transition-colors">
-                                <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                <svg class="w-3.5 h-3.5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                 Create new tag
                             </button>
                         </div>
@@ -1411,7 +1411,7 @@
                 <button type="submit" name="action" value="submit_for_approval"
                         :disabled="selectedAccounts.length === 0"
                         :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
-                        class="inline-flex items-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold text-orange-600 hover:text-orange-700 rounded-lg hover:bg-orange-50 transition-all duration-150 cursor-pointer flex-shrink-0">
+                        class="inline-flex items-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold text-orange-700 hover:text-orange-800 rounded-lg hover:bg-orange-50 transition-all duration-150 cursor-pointer flex-shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span class="hidden sm:inline">Submit for Approval</span>
                     <span class="sm:hidden">For Approval</span>
@@ -1422,7 +1422,7 @@
                 <button type="submit" name="action" value="resubmit_for_approval"
                         :disabled="selectedAccounts.length === 0"
                         :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
-                        class="inline-flex items-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold text-orange-600 hover:text-orange-700 rounded-lg hover:bg-orange-50 transition-all duration-150 cursor-pointer flex-shrink-0">
+                        class="inline-flex items-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold text-orange-700 hover:text-orange-800 rounded-lg hover:bg-orange-50 transition-all duration-150 cursor-pointer flex-shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
                     <span class="hidden sm:inline">Resubmit</span>
                 </button>
@@ -1444,7 +1444,7 @@
                     <button type="submit" id="publish-action-btn" name="action" value="add_to_queue"
                             :disabled="selectedAccounts.length === 0"
                             :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
-                            class="inline-flex items-center gap-1.5 pl-3 sm:pl-4 pr-3 sm:pr-5 py-2 text-sm font-semibold text-white bg-orange-500 rounded-r-lg hover:bg-orange-600 border border-orange-500 hover:border-orange-600 shadow-sm transition-all duration-150 cursor-pointer">
+                            class="inline-flex items-center gap-1.5 pl-3 sm:pl-4 pr-3 sm:pr-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-r-lg hover:bg-orange-800 border border-orange-500 hover:border-orange-600 shadow-sm transition-all duration-150 cursor-pointer">
                         <span id="publish-action-label">Add to Queue</span>
                     </button>
 
@@ -1538,7 +1538,7 @@
                                 </p>
                                 {% endif %}
 
-                                <button type="button" id="publish-schedule-confirm" class="mt-4 w-full py-2 text-sm font-semibold text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors cursor-pointer">
+                                <button type="button" id="publish-schedule-confirm" class="mt-4 w-full py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 transition-colors cursor-pointer">
                                     Set Schedule
                                 </button>
                             </div>
@@ -1558,7 +1558,7 @@
             <!-- Status banner -->
             {% if post.status == 'pending_review' %}
             <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50 border border-orange-100 mb-3">
-                <svg class="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg class="w-4 h-4 text-orange-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="text-sm font-medium text-orange-700">Awaiting internal review</span>
             </div>
             {% elif post.status == 'pending_client' %}
@@ -1568,7 +1568,7 @@
             </div>
             {% elif post.status == 'changes_requested' %}
             <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50 border border-orange-100 mb-3">
-                <svg class="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+                <svg class="w-4 h-4 text-orange-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
                 <span class="text-sm font-medium text-orange-700">Changes requested - edit and resubmit</span>
             </div>
             {% elif post.status == 'rejected' %}
@@ -1809,7 +1809,7 @@
                            placeholder="Search free high-resolution photos…"
                            class="flex-1 text-sm bg-transparent outline-none border-none placeholder-stone-500 text-stone-900">
                     <button type="button" @click="unsplashActiveChip = ''; searchUnsplash()"
-                            class="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors cursor-pointer flex-shrink-0">Search</button>
+                            class="px-4 py-2 rounded-lg bg-orange-700 hover:bg-orange-800 text-white text-sm font-semibold transition-colors cursor-pointer flex-shrink-0">Search</button>
                 </div>
                 <div class="flex flex-wrap gap-1.5">
                     <template x-for="chip in unsplashChips" :key="chip">
@@ -1854,7 +1854,7 @@
                     <button type="button"
                             :disabled="!unsplashSelectedCount || unsplashImporting"
                             @click="importUnsplashPhotos()"
-                            class="px-5 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="px-5 py-2 rounded-lg bg-orange-700 hover:bg-orange-800 text-white text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             x-text="unsplashImporting ? 'Adding…' : (unsplashSelectedCount > 1 ? 'Add ' + unsplashSelectedCount + ' images' : 'Add images')"></button>
                 </div>
             </div>
@@ -1931,7 +1931,7 @@
                     <button type="button"
                             :disabled="frameCapturing"
                             @click="captureFrame()"
-                            class="px-5 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+                            class="px-5 py-2 rounded-lg bg-orange-700 hover:bg-orange-800 text-white text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
                         <svg x-show="!frameCapturing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                         <span x-text="frameCapturing ? 'Saving…' : 'Use this frame'"></span>
                     </button>
@@ -1950,7 +1950,7 @@
          x-transition:leave-end="opacity-0 translate-y-4">
         <span class="flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            Post saved
+            <span x-text="saveToastText">Post saved</span>
         </span>
     </div>
 
@@ -2064,6 +2064,7 @@ function composerApp() {
         thumbnailUploading: {},
         showPreviewPanel: false,
         showSaveToast: false,
+        saveToastText: 'Post saved',
         formError: '',
         lastSaved: null,
         previewTimer: null,
@@ -2224,25 +2225,7 @@ function composerApp() {
             // This prevents duplicate drafts by reusing the same post on subsequent autosaves
             document.body.addEventListener('autosaved', (e) => {
                 const detail = e.detail || {};
-                if (detail.postId && detail.isNew) {
-                    this.autosavedPostId = detail.postId;
-                    // Update the autosave trigger URL to use the edit endpoint
-                    const trigger = document.getElementById('autosave-trigger');
-                    if (trigger) {
-                        const editUrl = `/workspace/{{ workspace.id }}/compose/${detail.postId}/autosave/`;
-                        trigger.setAttribute('hx-post', editUrl);
-                        htmx.process(trigger);
-                    }
-                    // Also update the main form's action URL
-                    const form = document.getElementById('composer-form');
-                    if (form) {
-                        const editSaveUrl = `/workspace/{{ workspace.id }}/compose/${detail.postId}/save/`;
-                        form.setAttribute('hx-post', editSaveUrl);
-                        htmx.process(form);
-                    }
-                    // Update upload URL to attach media to the post directly
-                    this.uploadUrl = `/workspace/{{ workspace.id }}/compose/${detail.postId}/upload-media/`;
-                }
+                if (detail.postId && detail.isNew) this.adoptPostId(detail.postId);
             });
 
             // Track whether a video is attached (enables "Choose from video").
@@ -2711,6 +2694,30 @@ function composerApp() {
             actionInput.remove();
         },
 
+        // Point every save endpoint at an existing post once the first save
+        // (autosave or Save Draft) has created it, so later saves update it
+        // instead of creating another.
+        adoptPostId(postId) {
+            if (!postId || this.autosavedPostId === postId) return;
+            this.autosavedPostId = postId;
+            // Update the autosave trigger URL to use the edit endpoint
+            const trigger = document.getElementById('autosave-trigger');
+            if (trigger) {
+                const editUrl = `/workspace/{{ workspace.id }}/compose/${postId}/autosave/`;
+                trigger.setAttribute('hx-post', editUrl);
+                htmx.process(trigger);
+            }
+            // Also update the main form's action URL
+            const form = document.getElementById('composer-form');
+            if (form) {
+                const editSaveUrl = `/workspace/{{ workspace.id }}/compose/${postId}/save/`;
+                form.setAttribute('hx-post', editSaveUrl);
+                htmx.process(form);
+            }
+            // Update upload URL to attach media to the post directly
+            this.uploadUrl = `/workspace/{{ workspace.id }}/compose/${postId}/upload-media/`;
+        },
+
         onFormSaved(event) {
             // Only react to the form's own submit, not htmx requests bubbling from
             // child elements (e.g. the pending-media remove button).
@@ -2718,12 +2725,29 @@ function composerApp() {
             const xhr = event.detail.xhr;
             if (event.detail.successful) {
                 this.formError = '';
-                const action = document.getElementById('publish-action-btn')?.value;
+                // The action is whatever this request actually sent (the
+                // clicked button, or saveDraft()'s hidden input) — not the
+                // publish button's value, which always holds the publish mode
+                // and sent a successful Save Draft off to the calendar.
+                const cfg = event.detail.requestConfig || {};
+                let action = cfg.formData ? cfg.formData.get('action') : (cfg.parameters || {}).action;
+                if (!action) action = 'save_draft';
                 if (action === 'schedule' || action === 'publish_now' || action === 'add_to_queue' || action === 'add_to_queue_priority') {
                     // Redirect to calendar after scheduling/publishing/queuing
                     window.location.href = '{% url "calendar:calendar" workspace_id=workspace.id %}';
                     return;
                 }
+                // Stay on the composer; a first save moves it to the post's
+                // edit URL so a reload or the next save reuses the same post.
+                const editUrl = xhr && xhr.getResponseHeader('X-Post-Edit-Url');
+                if (editUrl) {
+                    const match = editUrl.match(/compose\/([0-9a-f-]{36})\//);
+                    if (match) this.adoptPostId(match[1]);
+                    if (window.location.pathname !== editUrl) {
+                        history.replaceState(history.state, '', editUrl + window.location.search);
+                    }
+                }
+                this.saveToastText = action === 'save_draft' ? 'Draft saved' : 'Post saved';
                 this.showSaveToast = true;
                 const now = new Date();
                 this.lastSaved = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -2878,7 +2902,13 @@ function composerApp() {
                     }
                     document.body.dispatchEvent(new CustomEvent('previewUpdate'));
                 } else {
-                    self._showUploadError(thumb, file);
+                    // A 400 is the server rejecting this file (type, size,
+                    // quota) with {"error": "..."}: say why, and don't offer
+                    // a retry that would only be rejected again.
+                    let message = '';
+                    try { message = JSON.parse(xhr.responseText).error || ''; } catch (e) { /* not JSON */ }
+                    if (!message && xhr.status === 413) message = 'File too large.';
+                    self._showUploadError(thumb, file, message, xhr.status !== 400);
                 }
                 self._processQueue();
             });
@@ -2894,22 +2924,37 @@ function composerApp() {
             xhr.send(formData);
         },
 
-        _showUploadError(thumb, file) {
+        _showUploadError(thumb, file, message, retryable = true) {
             const self = this;
             thumb.classList.add('upload-failed');
             const overlay = thumb.querySelector('.upload-overlay');
             if (overlay) overlay.remove();
-            thumb.insertAdjacentHTML('beforeend', `
-                <button type="button" class="retry-btn">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    Retry
-                </button>`);
-            const retryBtn = thumb.querySelector('.retry-btn');
-            retryBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                thumb.remove();
-                self.uploadFile(file);
-            });
+            if (message) {
+                // The thumb is too small for a sentence: keep the reason on
+                // hover and surface it in the form's error banner as well.
+                thumb.title = `${file.name}: ${message}`;
+                this.formError = `${file.name} was not uploaded: ${message}`;
+                setTimeout(() => { if (this.formError.startsWith(file.name)) this.formError = ''; }, 6000);
+            }
+            if (retryable) {
+                thumb.insertAdjacentHTML('beforeend', `
+                    <button type="button" class="retry-btn">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Retry
+                    </button>`);
+                const retryBtn = thumb.querySelector('.retry-btn');
+                retryBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    thumb.remove();
+                    self.uploadFile(file);
+                });
+            } else {
+                const reason = document.createElement('span');
+                reason.className = 'retry-btn';
+                reason.style.cursor = 'default';
+                reason.textContent = 'Rejected';
+                thumb.appendChild(reason);
+            }
             // Add remove button
             thumb.insertAdjacentHTML('beforeend', `
                 <button aria-label="Remove media" type="button" class="remove-btn" style="z-index:4;">

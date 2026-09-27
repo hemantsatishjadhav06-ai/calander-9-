@@ -55,15 +55,15 @@ Toolbar: nav arrows + period + Today + view dropdown | right: filter dropdowns.
                  x-transition:enter-end="opacity-100 translate-y-0"
                  class="absolute left-0 top-full mt-1 bg-white rounded-lg shadow-lg ring-1 ring-stone-200 py-1 z-50 min-w-[100px]">
                 <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=month&date={{ target_date|date:'Y-m-d' }}"
-                   class="block w-full text-left px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors no-underline {% if view_type == 'month' %}text-orange-600 bg-orange-50{% endif %}">
+                   class="block w-full text-left px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors no-underline {% if view_type == 'month' %}text-orange-700 bg-orange-50{% endif %}">
                     Month
                 </a>
                 <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=week&date={{ target_date|date:'Y-m-d' }}"
-                   class="block w-full text-left px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors no-underline {% if view_type == 'week' %}text-orange-600 bg-orange-50{% endif %}">
+                   class="block w-full text-left px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors no-underline {% if view_type == 'week' %}text-orange-700 bg-orange-50{% endif %}">
                     Week
                 </a>
                 <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=day&date={{ target_date|date:'Y-m-d' }}"
-                   class="block w-full text-left px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors no-underline {% if view_type == 'day' %}text-orange-600 bg-orange-50{% endif %}">
+                   class="block w-full text-left px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors no-underline {% if view_type == 'day' %}text-orange-700 bg-orange-50{% endif %}">
                     Day
                 </a>
             </div>

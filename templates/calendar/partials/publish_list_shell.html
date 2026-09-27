@@ -5,10 +5,12 @@ Tab switching is HTMX partial swaps only - no full page reload.
 {% endcomment %}
 
 <div x-data="publishList()" class="flex-1 flex flex-col min-h-0">
+    {% if not has_connected_accounts %}{% include "calendar/partials/_no_channels_banner.html" %}{% endif %}
     <!-- Tabs + Filters row -->
     <div class="flex flex-wrap items-center justify-between border-b border-stone-200 pb-0 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 gap-y-2">
         <!-- Left: tabs -->
-        <div class="flex items-center gap-1 -mb-px overflow-x-auto flex-nowrap">
+        {# overflow-y-hidden + no scrollbar: the tabs' -mb-px overlap made the strip 1px taller than its box, so a tiny vertical scrollbar appeared beside "Sent". #}
+        <div class="publish-tab-strip flex items-center gap-1 -mb-px overflow-x-auto overflow-y-hidden flex-nowrap">
             <button class="publish-tab" :class="activeTab === 'queue' && 'active'"
                     @click="switchTab('queue')">
                 Queue <span id="tabcount-queue">{% include "calendar/partials/_tab_count_badge.html" with count=queue_count %}</span>

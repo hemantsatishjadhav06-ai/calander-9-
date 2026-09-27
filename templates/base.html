@@ -5,16 +5,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
-    <meta name="description" content="{% block meta_description %}{{ SITE_NAME }} — plan, schedule, approve and publish social media across 10+ platforms from one dashboard.{% endblock %}">
+    {# On Back/Forward past htmx's history cache, reload the page instead of asking the view for a bare partial (views answer HX requests with fragments). #}
+    <meta name="htmx-config" content='{"refreshOnHistoryMiss": true}'>
+    <meta name="description" content="{% block meta_description %}{{ SITE_NAME }} — plan, schedule, approve and publish social media for your clients from one calendar.{% endblock %}">
     <link rel="canonical" href="{{ request.build_absolute_uri }}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{ SITE_NAME }}">
     <meta property="og:title" content="{% block og_title %}{{ SITE_NAME }}{% endblock %}">
-    <meta property="og:description" content="Plan, schedule, approve and publish social media across 10+ platforms from one dashboard.">
+    <meta property="og:description" content="Plan, schedule, approve and publish social media for your clients from one calendar.">
     <meta property="og:url" content="{{ request.build_absolute_uri }}">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="{{ SITE_NAME }}">
-    <meta name="twitter:description" content="Plan, schedule, approve and publish social media across 10+ platforms from one dashboard.">
+    <meta name="twitter:description" content="Plan, schedule, approve and publish social media for your clients from one calendar.">
     <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
     <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
     <link rel="icon" type="image/png" sizes="96x96" href="{% static 'favicon/favicon-96x96.png' %}">
@@ -541,7 +543,7 @@
                                                 <div class="border-t border-stone-100 px-1 py-1">
                                                     <button type="button" @click="createTagDropdownOpen = false; showCreateTagModal = true; newTagName = createTagSearch; createTagSearch = ''; $nextTick(() => $refs.sidebarNewTagNameInput.focus())"
                                                             class="flex items-center gap-2 w-full px-2.5 py-1.5 text-sm text-stone-600 hover:bg-stone-50 rounded-md cursor-pointer transition-colors">
-                                                        <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                                        <svg class="w-3.5 h-3.5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                                         Create new tag
                                                     </button>
                                                 </div>
@@ -683,7 +685,7 @@
                     <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     <span class="sidebar-nav-label">Publish</span>
                 </a>
-                <a href="{% url 'composer:create_landing' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'create_landing' or request.resolver_match.url_name == 'compose' %}active{% endif %}">
+                <a href="{% url 'composer:create_landing' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'create_landing' %}active{% endif %}">
                     <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 00-4 12.73V16a1 1 0 001 1h6a1 1 0 001-1v-1.27A7 7 0 0012 2z"/><path d="M9 18h6"/><path d="M10 22h4"/><path d="M10 8.5c0 1.5 2 2.5 2 4"/><path d="M14 8.5c0 1.5-2 2.5-2 4"/></svg>
                     <span class="sidebar-nav-label">Create Idea</span>
                 </a>                
@@ -692,7 +694,7 @@
                     <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     <span class="sidebar-nav-label">Drafts</span>
                 </a>
-                <a href="{% url 'calendar:queue_list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name in 'queue_list,queue_detail' %}active{% endif %}">
+                <a href="{% url 'calendar:queue_list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'queue_list' or request.resolver_match.url_name == 'queue_detail' %}active{% endif %}">
                     <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                     <span class="sidebar-nav-label">Queues</span>
                 </a>
@@ -1218,7 +1220,14 @@
                     body: formData,
                 })
                     .then(function(response) {
-                        if (!response.ok) throw new Error('upload_failed');
+                        if (!response.ok) {
+                            // A 400 names why the file was refused (wrong type, too large, quota).
+                            return response.json().catch(function() { return {}; }).then(function(data) {
+                                var err = new Error('upload_failed');
+                                err.userMessage = data && data.error;
+                                throw err;
+                            });
+                        }
                         return response.json();
                     })
                     .then((data) => {
@@ -1439,8 +1448,8 @@
                                 this._appendUploadedMedia(data, uploadedFile);
                             }
                         )
-                        .catch(() => {
-                            window.alert('One of the files failed to upload. Please try again.');
+                        .catch((err) => {
+                            window.alert((err && err.userMessage) || 'One of the files failed to upload. Please try again.');
                         })
                         .finally(() => {
                             this.createMediaUploadCount = Math.max(0, this.createMediaUploadCount - 1);
