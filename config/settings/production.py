@@ -18,15 +18,15 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {module} {message}",
-            "style": "{",
-        },
+        # JSON on stdout so Railway files each line under its real level
+        # instead of tagging every stderr line "error" (QA round 1, BUG-04).
+        "json": {"()": "apps.common.logging.JSONFormatter"},
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
+            "stream": "ext://sys.stdout",
+            "formatter": "json",
         },
     },
     "root": {

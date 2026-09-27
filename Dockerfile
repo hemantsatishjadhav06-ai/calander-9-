@@ -1,8 +1,12 @@
 FROM python:3.12-slim AS base
 
+# Production settings unless the platform says otherwise: manage.py falls back
+# to development settings, so a worker service started without the variable
+# ran with DEBUG on and logged in the wrong format.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8000
+    PORT=8000 \
+    DJANGO_SETTINGS_MODULE=config.settings.production
 
 WORKDIR /app
 
@@ -62,4 +66,6 @@ USER app
 # every start, and an Error-level check stops the container before it takes
 # traffic. It runs here rather than as a Railway pre-deploy command because the
 # pre-deploy step is shared with the worker service (see railway.toml).
-CMD ["sh", "-c", "python manage.py check --deploy && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4"]
+# `--error-logfile /dev/stdout` sends gunicorn's own boot/worker lines to stdout: on
+# stderr Railway files every one of them as an error.
+CMD ["sh", "-c", "python manage.py check --deploy && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4 --error-logfile /dev/stdout --capture-output"]

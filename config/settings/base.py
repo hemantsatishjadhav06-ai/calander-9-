@@ -42,6 +42,11 @@ APP_URL = env("APP_URL")
 # DEFAULT_FROM_EMAIL in the context processor when left blank.
 SITE_NAME = env("SITE_NAME", default="SM Bean")
 SUPPORT_EMAIL = env("SUPPORT_EMAIL", default="")
+# Who the Terms and Privacy pages name as the operator, when they were last
+# changed, and whether counsel has signed them off (hides the "Draft" notice).
+LEGAL_ENTITY_NAME = env("LEGAL_ENTITY_NAME", default="")
+LEGAL_UPDATED = env("LEGAL_UPDATED", default="27 September 2026")
+LEGAL_PAGES_REVIEWED = env.bool("LEGAL_PAGES_REVIEWED", default=False)
 LEGAL_TERMS_URL = env("LEGAL_TERMS_URL", default="/terms/")
 LEGAL_PRIVACY_URL = env("LEGAL_PRIVACY_URL", default="/privacy/")
 # AGPL-3.0 §13: network users must be offered the Corresponding Source of this
@@ -110,12 +115,14 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.common.middleware.PermissionsPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "apps.accounts.middleware.AdminIPAllowlistMiddleware",
     "apps.accounts.middleware.AuthRateLimitMiddleware",
     "apps.accounts.middleware.TosAcceptanceMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -303,6 +310,17 @@ ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
 # SIGNUP_ALLOWLIST takes full addresses ("ana@agency.com") and whole domains
 # ("@agency.com"), comma-separated.
 SIGNUP_MODE = env("SIGNUP_MODE", default="invite_only")
+
+# Platforms the public pages may call "live". Every integration ships in the
+# code, but one only works for outside users once its developer app has passed
+# the platform's review, so the landing, pricing and signup copy lists these
+# as available and everything else as "coming soon".
+LAUNCHED_PLATFORMS = env.list("LAUNCHED_PLATFORMS", default=["bluesky", "mastodon", "devto"])
+
+# Django admin. ADMIN_URL moves it off the well-known /admin/ path, and
+# ADMIN_ALLOWED_IPS (addresses or CIDR ranges) 404s it for everyone else.
+ADMIN_URL = env("ADMIN_URL", default="admin/").strip("/") + "/"
+ADMIN_ALLOWED_IPS = env.list("ADMIN_ALLOWED_IPS", default=[])
 SIGNUP_ALLOWLIST = [entry.strip().lower() for entry in env.list("SIGNUP_ALLOWLIST", default=[]) if entry.strip()]
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
@@ -502,6 +520,9 @@ if SENTRY_DSN:
     # it on deliberately when you are actually chasing a regression.
     sentry_sdk.init(
         dsn=SENTRY_DSN,
+        environment=env("SENTRY_ENVIRONMENT", default=env("RAILWAY_ENVIRONMENT_NAME", default="production")),
+        release=env("RAILWAY_GIT_COMMIT_SHA", default="") or None,
+        send_default_pii=False,
         traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
         profiles_sample_rate=env.float("SENTRY_PROFILES_SAMPLE_RATE", default=0.0),
     )

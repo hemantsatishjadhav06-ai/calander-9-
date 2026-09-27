@@ -1,7 +1,9 @@
 import hashlib
+import ipaddress
 
+from django.conf import settings
 from django.core.cache import cache
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -14,7 +16,7 @@ AUTH_RATE_LIMITED_PATHS = (
     "/accounts/password/reset/",
     "/accounts/password/reset/key/",
     # The Django admin's own login had no throttle at all.
-    "/admin/login/",
+    "/" + getattr(settings, "ADMIN_URL", "admin/").lstrip("/") + "login/",
 )
 
 # Rate limit: 10 POST requests per minute per IP for auth endpoints
@@ -32,6 +34,7 @@ EXEMPT_PATH_PREFIXES = (
     "/terms/",
     "/privacy/",
     "/pricing/",
+    "/support/",
     "/health/",
     "/static/",
     # Uploaded media, served by config/urls.py when SERVE_MEDIA is on. No view
@@ -39,7 +42,7 @@ EXEMPT_PATH_PREFIXES = (
     # the accept-terms page into a 302 — and the platforms that fetch
     # attachment URLs server-side (see config/urls.py) are anonymous anyway.
     "/media/",
-    "/admin/",
+    "/" + getattr(settings, "ADMIN_URL", "admin/").lstrip("/"),
 )
 
 
@@ -99,3 +102,36 @@ class AuthRateLimitMiddleware:
         never disagree about who a request came from.
         """
         return client_ip(request) or ""
+
+
+class AdminIPAllowlistMiddleware:
+    """Hide the Django admin from every address outside ``ADMIN_ALLOWED_IPS``.
+
+    The admin login is public by default and is the one form on the site that
+    grants superuser. When the setting holds addresses or CIDR ranges, anyone
+    else gets a plain 404 there, so the page is not even discoverable. Empty
+    keeps the admin reachable (throttled by AuthRateLimitMiddleware) for
+    self-hosters who never set it.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.networks = []
+        for entry in getattr(settings, "ADMIN_ALLOWED_IPS", []) or []:
+            try:
+                self.networks.append(ipaddress.ip_network(entry.strip(), strict=False))
+            except ValueError:
+                continue
+        self.prefix = "/" + getattr(settings, "ADMIN_URL", "admin/").lstrip("/")
+
+    def __call__(self, request):
+        if self.networks and request.path.startswith(self.prefix) and not self._allowed(request):
+            raise Http404
+        return self.get_response(request)
+
+    def _allowed(self, request) -> bool:
+        try:
+            ip = ipaddress.ip_address(client_ip(request) or "")
+        except ValueError:
+            return False
+        return any(ip in network for network in self.networks)

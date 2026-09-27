@@ -50,6 +50,27 @@ class InviteOnlyTests(TestCase):
         user = User.objects.get(email="new@example.com")
         self.assertTrue(OrgMembership.objects.filter(user=user, organization=org).exists())
 
+    def test_an_invitation_admits_only_the_address_it_was_sent_to(self):
+        owner = User.objects.create_user(
+            email="owner@example.com", password="pw", name="O", tos_accepted_at=timezone.now()
+        )
+        org = Organization.objects.create(name="Agency")
+        invitation = Invitation.objects.create(
+            organization=org,
+            email="invited@example.com",
+            org_role="member",
+            workspace_assignments=[],
+            invited_by=owner,
+            expires_at=timezone.now() + timezone.timedelta(days=7),
+        )
+        session = self.client.session
+        session["pending_invite_token"] = invitation.token
+        session.save()
+
+        _signup(self.client, "someone-else@example.com")
+
+        self.assertFalse(User.objects.filter(email="someone-else@example.com").exists())
+
     def test_an_expired_invitation_does_not(self):
         owner = User.objects.create_user(
             email="owner@example.com", password="pw", name="O", tos_accepted_at=timezone.now()

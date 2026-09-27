@@ -62,6 +62,9 @@ def _set_org_timezone_from_browser(request, user):
     browser_tz = unquote(browser_tz)
     if len(browser_tz) > 64 or browser_tz not in available_timezones():
         return
+    from apps.common.timezones import canonical_timezone
+
+    browser_tz = canonical_timezone(browser_tz)
     membership = OrgMembership.objects.filter(user=user).select_related("organization").first()
     if membership and membership.organization.default_timezone == "UTC":
         membership.organization.default_timezone = browser_tz

@@ -108,4 +108,42 @@ def check_production_config(app_configs, **kwargs):
             )
         )
 
+    # QA round 1 found both of these unset on the live deploy.
+    if not getattr(settings, "WEBHOOK_SECRET", ""):
+        errors.append(
+            CheckWarning(
+                "WEBHOOK_SECRET is not set.",
+                hint="Inbound webhooks cannot be authenticated. Set it to a long random value.",
+                id="smbean.W007",
+            )
+        )
+    if not getattr(settings, "SUPPORT_EMAIL", ""):
+        errors.append(
+            CheckWarning(
+                "SUPPORT_EMAIL is not set.",
+                hint="/support/, the legal pages and the client portal have no contact address to offer.",
+                id="smbean.W008",
+            )
+        )
+    if getattr(settings, "ACCOUNT_EMAIL_VERIFICATION", "none") == "none":
+        errors.append(
+            CheckWarning(
+                "ACCOUNT_EMAIL_VERIFICATION is 'none'.",
+                hint=(
+                    "Anyone admitted to sign up can claim an address they don't own, and a later "
+                    "Google sign-in with that address joins their account. Once email works, "
+                    "set ACCOUNT_EMAIL_VERIFICATION=mandatory."
+                ),
+                id="smbean.W009",
+            )
+        )
+    if not getattr(settings, "ADMIN_ALLOWED_IPS", []):
+        errors.append(
+            CheckWarning(
+                "The Django admin is reachable from any address.",
+                hint="Set ADMIN_ALLOWED_IPS (addresses or CIDR ranges) and consider a non-default ADMIN_URL.",
+                id="smbean.W010",
+            )
+        )
+
     return errors

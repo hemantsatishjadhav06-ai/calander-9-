@@ -45,14 +45,14 @@ def sitemap_xml(request):
     add an app, a template loader path and a Site lookup to emit the same
     nine lines.
     """
-    paths = ["/", "/pricing/", "/terms/", "/privacy/"]
+    paths = ["/", "/pricing/", "/terms/", "/privacy/", "/support/"]
     urls = "".join(f"<url><loc>{escape(request.build_absolute_uri(p))}</loc></url>" for p in paths)
     body = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
     return HttpResponse(body, content_type="application/xml")
 
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     path("health/", health_check, name="health_check"),
     path("accounts/", include("apps.accounts.urls")),
     path("accounts/", include("allauth.urls")),
@@ -114,6 +114,7 @@ urlpatterns = [
     # LEGAL_PRIVACY_URL to point at your hosted policies).
     path("terms/", TemplateView.as_view(template_name="legal/terms.html"), name="terms"),
     path("privacy/", TemplateView.as_view(template_name="legal/privacy.html"), name="privacy"),
+    path("support/", TemplateView.as_view(template_name="legal/support.html"), name="support"),
     path("pricing/", TemplateView.as_view(template_name="pricing.html"), name="pricing"),
     # Silence the two probes seen 404ing in production and give crawlers a robots.
     path("robots.txt", robots_txt, name="robots_txt"),
