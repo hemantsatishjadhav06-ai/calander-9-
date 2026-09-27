@@ -1,0 +1,104 @@
+{% extends "marketing/base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="mk-page-hero mk-page-hero--center">
+    <div class="mk-hero__bg"></div>
+    <div class="mk-container">
+        <div class="mk-page-hero__inner">
+            <span class="mk-eyebrow">Supported platforms</span>
+            <h1 class="mk-h1">Eleven networks, thirteen connectors, <em class="mk-accent">zero middlemen.</em></h1>
+            <p class="mk-lead">Every integration talks directly to the platform's official API using your own developer credentials. What each one can do is listed honestly below.</p>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--flush-top">
+    <div class="mk-container">
+        <div class="mk-table-wrap reveal">
+            <table class="mk-table">
+                <thead>
+                    <tr><th>Platform</th><th class="center">Publish</th><th class="center">Comments</th><th class="center">Direct messages</th><th class="center">Insights</th></tr>
+                </thead>
+                <tbody>
+                    {% for p in platforms %}
+                    <tr>
+                        <td><span class="mk-platform-cell">{% include "partials/_platform_icon.html" with platform=p.icon size="md" %}<span><strong>{{ p.name }}</strong><small>{{ p.scope }}</small></span></span></td>
+                        <td class="center">{% if p.publish %}<span class="mk-check">{% include "marketing/_icon.html" with name="check" %}</span>{% else %}<span class="mk-dash">—</span>{% endif %}</td>
+                        <td class="center">{% if p.comments %}<span class="mk-check">{% include "marketing/_icon.html" with name="check" %}</span>{% else %}<span class="mk-dash">—</span>{% endif %}</td>
+                        <td class="center">{% if p.dms %}<span class="mk-check">{% include "marketing/_icon.html" with name="check" %}</span>{% else %}<span class="mk-dash">—</span>{% endif %}</td>
+                        <td class="center">{% if p.insights %}<span class="mk-check">{% include "marketing/_icon.html" with name="check" %}</span>{% else %}<span class="mk-dash">—</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="mk-small mk-muted reveal" style="margin-top: 14px;">"Comments" covers reading and replying to comments and mentions in the unified inbox. "Insights" means channel and post analytics from that platform's native analytics API.</p>
+    </div>
+</section>
+
+<section class="mk-section mk-section--alt">
+    <div class="mk-container">
+        <div class="mk-section-head reveal">
+            <span class="mk-eyebrow">How connections work</span>
+            <h2 class="mk-h2">Three ways in, <em class="mk-accent">all of them yours</em></h2>
+        </div>
+        <div class="mk-grid mk-grid--3">
+            <div class="mk-card reveal">
+                <div class="mk-card__icon mk-card__icon--orange">{% include "marketing/_icon.html" with name="key" %}</div>
+                <h3 class="mk-h3">Your developer app, OAuth login</h3>
+                <p>Facebook, Instagram, Threads, LinkedIn, TikTok, YouTube, Pinterest and Google Business Profile use an app you register with the platform. Paste its keys into the environment or the admin, and users connect with the familiar "Continue with…" flow.</p>
+            </div>
+            <div class="mk-card reveal" data-delay="1">
+                <div class="mk-card__icon mk-card__icon--green">{% include "marketing/_icon.html" with name="lock" %}</div>
+                <h3 class="mk-h3">App password or API key</h3>
+                <p>Bluesky connects with a handle and an app password; DEV.to with a personal API key. No developer registration, and both can be revoked from the platform at any time.</p>
+            </div>
+            <div class="mk-card reveal" data-delay="2">
+                <div class="mk-card__icon mk-card__icon--indigo">{% include "marketing/_icon.html" with name="globe" %}</div>
+                <h3 class="mk-h3">Any Mastodon instance</h3>
+                <p>Type the instance URL. {{ site_name }} registers its own OAuth application on that server automatically, so the Fediverse works without configuration.</p>
+            </div>
+        </div>
+        <div class="mk-callout reveal" style="margin-top: 28px;">
+            {% include "marketing/_icon.html" with name="info" %}
+            <p><strong>Instagram, two ways.</strong> Connect through a linked Facebook Page (Business and Creator accounts), or directly with Instagram Login for professional accounts that have no Facebook Page at all. Personal Instagram accounts have no public API since Meta retired the Basic Display API; switching to a professional account is free and takes a minute in the Instagram app.</p>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section">
+    <div class="mk-container">
+        <div class="mk-grid mk-grid--2">
+            <div class="reveal">
+                <span class="mk-eyebrow">Per-platform details</span>
+                <h2 class="mk-h2" style="margin-bottom: 16px;">The parts people usually ask about</h2>
+                <p class="mk-lead">The connect flow explains each platform's requirements as you go. A few worth knowing up front:</p>
+            </div>
+            <div class="reveal" data-delay="1">
+                <ul class="mk-bullets">
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>LinkedIn</strong> supports personal profiles with any developer app, and company pages once LinkedIn approves the Community Management API. Company credentials cover both.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>TikTok</strong> publishes video through the Content Posting API and reports insights; comments and DMs are not exposed by TikTok's API.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>YouTube and Google Business Profile</strong> share one Google Cloud project. YouTube uploads videos and Shorts and reads comments and analytics.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Pinterest</strong> publishes pins to a board you choose per post, with a destination link.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Facebook and Instagram inbox</strong> use Meta webhooks for instant delivery, with a five-minute poll as the fallback.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>DEV.to</strong> publishes a title and Markdown body as an article, which makes it a good home for long-form companions to a social post.</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--flush-top">
+    <div class="mk-container">
+        <div class="mk-cta reveal">
+            <h2 class="mk-h2">Connect your first channel today.</h2>
+            <p class="mk-lead">Self-hosting? The setup guide walks through registering each platform app.</p>
+            <div class="mk-btn-row">
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:get_started' %}">Self-host it</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -130,6 +130,11 @@ urlpatterns = [
         name="favicon",
     ),
     path("organizations/media/", include("apps.media_library.urls_org")),
+    # Public marketing pages. The marketing ``home`` view owns "/" for
+    # anonymous visitors and hands signed-in users to the accounts dashboard,
+    # so the ``dashboard`` URL name below still resolves to "/" and keeps
+    # working for every ``redirect("dashboard")`` in the app.
+    path("", include("apps.marketing.urls")),
     path("", include("apps.accounts.urls_root")),
 ]
 
