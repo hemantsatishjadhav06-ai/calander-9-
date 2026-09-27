@@ -337,13 +337,17 @@ brightbean-studio/
 │   ├── members/               # RBAC, invitations, middleware, decorators
 │   ├── settings_manager/      # Configurable defaults with cascade logic
 │   ├── credentials/           # Platform API credential storage (encrypted)
-│   └── common/                # Shared: encrypted fields, scoped model managers
+│   ├── common/                # Shared: encrypted fields, scoped model managers
+│   └── marketing/             # Public pages: /, /features/, /how-it-works/, /platforms/, /developers/, /get-started/
 ├── providers/                 # Social platform API modules (one file per platform)
 ├── templates/                 # Django templates
 │   ├── base.html              # Layout with sidebar + nav
+│   ├── marketing/             # Public marketing site (own layout, no app shell)
 │   └── components/            # Reusable HTMX partials
 ├── static/
-│   └── js/                    # Vendored HTMX + Alpine.js
+│   ├── css/marketing.css      # Hand-written stylesheet for the public pages
+│   ├── fonts/                 # Self-hosted web fonts for the public pages (OFL)
+│   └── js/                    # Vendored HTMX + Alpine.js, marketing.js
 ├── theme/                     # django-tailwind theme app
 │   └── static_src/
 │       ├── src/styles.css     # Tailwind directives
