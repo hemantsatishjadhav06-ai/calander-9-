@@ -169,7 +169,7 @@ registers itself, and asks you to sign in.</pre></div>
             <h2 class="mk-h2">Issue a key and make your first call.</h2>
             <p class="mk-lead">Keys live under Organisation → API Keys once you have an account.</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
                 <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="/api/v1/docs">Open the API docs</a>
             </div>
         </div>

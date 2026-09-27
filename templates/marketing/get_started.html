@@ -26,7 +26,7 @@
                     <li>{% include "marketing/_icon.html" with name="check" %}<span>API keys and MCP available from the organisation settings</span></li>
                 </ul>
                 <div class="mk-btn-row">
-                    <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">Create your account {% include "marketing/_icon.html" with name="arrow" %}</a>
+                    <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %} {% include "marketing/_icon.html" with name="arrow" %}</a>
                     <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
                 </div>
             </div>
@@ -149,7 +149,7 @@ python manage.py process_tasks</pre></div>
             <h2 class="mk-h2">Ready when you are.</h2>
             <p class="mk-lead">The quickest way to judge it is to schedule one real post.</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
                 <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:developers' %}">Read the API docs</a>
             </div>
         </div>

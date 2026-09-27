@@ -58,7 +58,9 @@ def home(request):
     """
     if request.user.is_authenticated:
         return dashboard(request)
-    return render(request, "landing.html")
+    # The marketing site (apps.marketing) owns "/" for anonymous visitors and
+    # is routed first; this is only reached if it is ever unmounted.
+    return redirect("account_login")
 
 
 @login_required

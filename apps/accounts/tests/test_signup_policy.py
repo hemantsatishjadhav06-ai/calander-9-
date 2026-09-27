@@ -105,7 +105,7 @@ class InviteOnlyTests(TestCase):
     def test_public_ctas_ask_for_access_instead_of_signup(self):
         landing = self.client.get("/")
         self.assertContains(landing, "Request early access")
-        self.assertNotContains(landing, "Get started free")
+        self.assertNotContains(landing, "Create your account")
         self.assertContains(self.client.get(reverse("pricing")), "Request access")
 
 
@@ -115,7 +115,7 @@ class OpenSignupTests(TestCase):
         _signup(self.client, "anyone@example.com")
         self.assertTrue(User.objects.filter(email="anyone@example.com").exists())
         self.client.logout()
-        self.assertContains(self.client.get("/"), "Get started free")
+        self.assertContains(self.client.get("/"), "Create your account")
 
 
 class PublicClaimsTests(TestCase):

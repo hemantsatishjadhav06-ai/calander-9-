@@ -224,7 +224,7 @@
             <h2 class="mk-h2">See it with your own channels.</h2>
             <p class="mk-lead">Connecting an account takes a minute. The first scheduled post takes two.</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">Create your account</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
                 <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:platforms' %}">Supported platforms</a>
             </div>
         </div>

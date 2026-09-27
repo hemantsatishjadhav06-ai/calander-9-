@@ -18,8 +18,6 @@ from django.views.decorators.http import require_GET
 
 from apps.accounts.views import dashboard
 
-SITE_NAME = "SM Bean"
-
 # The open-source codebase this product is built on. Shown in the footer
 # because the AGPL-3.0 licence asks derived works to keep that notice visible.
 UPSTREAM_URL = "https://github.com/brightbeanxyz/brightbean-studio"
@@ -163,8 +161,9 @@ NETWORKS = [
 
 
 def _page(request: HttpRequest, template: str, *, key: str, title: str, description: str, **extra) -> HttpResponse:
+    launched = set(getattr(settings, "LAUNCHED_PLATFORMS", []))
     context = {
-        "site_name": SITE_NAME,
+        "site_name": getattr(settings, "SITE_NAME", "SM Bean"),
         "upstream_url": UPSTREAM_URL,
         "page_key": key,
         "page_title": title,
@@ -172,7 +171,9 @@ def _page(request: HttpRequest, template: str, *, key: str, title: str, descript
         "site_url": settings.APP_URL.rstrip("/"),
         "canonical_url": settings.APP_URL.rstrip("/") + request.path,
         "networks": NETWORKS,
-        "platforms": PLATFORMS,
+        # "live" = usable on the hosted app today; the rest ship in the code but
+        # wait on the platform approving our developer app (QA round 1, BUG-22).
+        "platforms": [{**p, "live": p["icon"] in launched} for p in PLATFORMS],
         **extra,
     }
     return render(request, template, context)
@@ -189,8 +190,8 @@ def home(request: HttpRequest) -> HttpResponse:
         title="SM Bean · Plan, approve and publish social content from one calendar",
         description=(
             "SM Bean is a social media management studio for creators, agencies and small teams. "
-            "Compose once, schedule to 11 networks, run client approvals, answer every comment from one "
-            "inbox and measure what worked."
+            "Compose once, schedule to every channel you connect, run client approvals, answer comments "
+            "from one inbox and measure what worked."
         ),
     )
 
@@ -231,8 +232,8 @@ def platforms(request: HttpRequest) -> HttpResponse:
         key="platforms",
         title="Supported platforms · SM Bean",
         description=(
-            "Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business "
-            "Profile, Mastodon and DEV.to, each through its official first-party API."
+            "Which networks SM Bean publishes to today, which are coming as each platform approves our app, "
+            "and what every integration can do through its official first-party API."
         ),
     )
 
