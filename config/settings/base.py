@@ -264,6 +264,9 @@ if STORAGE_BACKEND.lower() == "s3":
     AWS_STORAGE_BUCKET_NAME = env("S3_BUCKET_NAME", default="")
     AWS_S3_CUSTOM_DOMAIN = env("S3_CUSTOM_DOMAIN", default="")
     AWS_S3_REGION_NAME = env("S3_REGION_NAME", default="auto")
+    # "virtual" (bucket.host, Railway buckets and AWS) or "path" (host/bucket,
+    # older S3-compatibles). Empty leaves boto3 to guess.
+    AWS_S3_ADDRESSING_STYLE = env("S3_ADDRESSING_STYLE", default="") or None
     AWS_S3_FILE_OVERWRITE = False
     AWS_DEFAULT_ACL = "private"
     AWS_QUERYSTRING_AUTH = True
@@ -391,7 +394,17 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@localhost")
 # its own — so this is the only point where a runaway loop can be stopped.
 EMAIL_BACKEND = "apps.common.mail.BudgetedEmailBackend"
 
-if EMAIL_BACKEND_TYPE == "smtp":
+# Gmail API over HTTPS, for hosts that block outbound SMTP (Railway Hobby).
+# Connect the sending mailbox once at /ops/email/. The OAuth client defaults to
+# the Google sign-in client; its Google Cloud project needs the Gmail API
+# enabled and <APP_URL>/ops/email/callback/ as an authorized redirect URI.
+GMAIL_CLIENT_ID = env("GMAIL_CLIENT_ID", default="")
+GMAIL_CLIENT_SECRET = env("GMAIL_CLIENT_SECRET", default="")
+GMAIL_REFRESH_TOKEN = env("GMAIL_REFRESH_TOKEN", default="")
+
+if EMAIL_BACKEND_TYPE == "gmail_api":
+    EMAIL_INNER_BACKEND = "apps.common.gmail.GmailAPIEmailBackend"
+elif EMAIL_BACKEND_TYPE == "smtp":
     EMAIL_INNER_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = env("EMAIL_HOST", default="localhost")
     EMAIL_PORT = env.int("EMAIL_PORT", default=587)
@@ -461,7 +474,12 @@ if STORAGE_BACKEND.lower() == "s3":
         if not _storage_origin.startswith("https://"):
             _storage_origin = f"https://{_storage_origin}"
         _parsed = urlparse(_storage_origin)
-        _storage_origin = f"{_parsed.scheme}://{_parsed.hostname}"
+        _storage_host = _parsed.hostname
+        # Virtual-hosted presigned URLs put the bucket in the hostname, so the
+        # CSP has to allow bucket.host, not the bare endpoint.
+        if not AWS_S3_CUSTOM_DOMAIN and AWS_S3_ADDRESSING_STYLE == "virtual" and AWS_STORAGE_BUCKET_NAME:
+            _storage_host = f"{AWS_STORAGE_BUCKET_NAME}.{_storage_host}"
+        _storage_origin = f"{_parsed.scheme}://{_storage_host}"
         CSP_MEDIA_SRC = (*CSP_MEDIA_SRC, _storage_origin)  # type: ignore[assignment]
         CSP_IMG_SRC = (*CSP_IMG_SRC, _storage_origin)  # type: ignore[assignment]
 

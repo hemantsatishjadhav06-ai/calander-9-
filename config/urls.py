@@ -13,6 +13,7 @@ from django.views.static import serve
 
 from apps.accounts.views import health_check
 from apps.api.api import api as agent_api
+from apps.common import views_mail as mail_views
 from apps.oauth_server import views as oauth_views
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ def robots_txt(request):
         "Disallow: /oauth/",
         "Disallow: /admin/",
         "Disallow: /portal/",
+        "Disallow: /ops/",
         "Allow: /$",
         "",
         f"Sitemap: {request.build_absolute_uri('/sitemap.xml')}",
@@ -114,6 +116,9 @@ urlpatterns = [
     # LEGAL_PRIVACY_URL to point at your hosted policies).
     path("terms/", TemplateView.as_view(template_name="legal/terms.html"), name="terms"),
     path("privacy/", TemplateView.as_view(template_name="legal/privacy.html"), name="privacy"),
+    path("ops/email/", mail_views.email_settings, name="ops_email"),
+    path("ops/email/connect/", mail_views.gmail_connect, name="ops_email_connect"),
+    path("ops/email/callback/", mail_views.gmail_callback, name="ops_email_callback"),
     path("support/", TemplateView.as_view(template_name="legal/support.html"), name="support"),
     path("pricing/", TemplateView.as_view(template_name="pricing.html"), name="pricing"),
     # Silence the two probes seen 404ing in production and give crawlers a robots.

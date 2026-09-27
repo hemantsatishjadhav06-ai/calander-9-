@@ -77,3 +77,26 @@ still missing (smbean.W003–W010).
   managed in the composer.
 - Files uploaded before this release keep their guessable names until they
   are moved to the private bucket.
+
+## Update: Hobby-plan cut-over (27 Sep, later)
+
+Railway's Hobby plan blocks outbound SMTP and includes no Postgres backups, so:
+
+- **Email goes through the Gmail API over HTTPS** (`EMAIL_BACKEND_TYPE=gmail_api`),
+  sending as neopolisinfrallp3@gmail.com. A superuser connects the mailbox once at
+  `/ops/email/` and can send a test from there. One-time Google Cloud setup, in
+  the project that owns `GOOGLE_AUTH_CLIENT_ID`:
+  1. Enable the **Gmail API**.
+  2. Add `https://sm-bean-production-eb50.up.railway.app/ops/email/callback/` as an
+     authorised redirect URI on that OAuth client.
+  3. Add the `gmail.send` scope to the consent screen, and set it to **In production**.
+     In Testing mode, Google drops the connection after 7 days.
+- **Media lives in the Railway bucket `sm-bean-media`**: private, with presigned URLs.
+- **Every deploy backs up the database first.** The `sm-bean` pre-deploy command is
+  `backup_database --required && migrate && import_legacy_media`:
+  - `backup_database` writes a CSV-per-table archive to `backups/` in the bucket.
+    If it fails, the deploy stops.
+  - `restore_database <archive> --yes-wipe-data` loads an archive back into a
+    migrated database. The backup/restore round trip was tested locally.
+  - `import_legacy_media` copies files from the old deployment's `/media/` into
+    the bucket while the old deployment is still serving.

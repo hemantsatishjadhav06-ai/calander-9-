@@ -61,6 +61,14 @@ def check_production_config(app_configs, **kwargs):
             )
         )
 
+    if getattr(settings, "EMAIL_BACKEND_TYPE", "") == "console":
+        errors.append(
+            CheckWarning(
+                "EMAIL_BACKEND_TYPE is 'console': email is printed to the log, never sent.",
+                hint="Use gmail_api (works where outbound SMTP is blocked, e.g. Railway Hobby) or smtp.",
+                id="smbean.W011",
+            )
+        )
     if getattr(settings, "EMAIL_BACKEND_TYPE", "") == "smtp" and getattr(settings, "EMAIL_HOST", "") in (
         "",
         "localhost",
