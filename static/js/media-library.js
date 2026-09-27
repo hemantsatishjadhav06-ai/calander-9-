@@ -11,17 +11,17 @@
   'use strict';
 
   // ── HTMX event: refresh grid after uploads complete ──
+  // Only fired when at least one file was stored. A non-empty grid refreshes
+  // itself (its hx-trigger listens for uploadsComplete); the empty state has
+  // no such listener, so fetch the grid here. Never reload the page: that
+  // would wipe the per-file rejection messages the uploader is showing.
   document.body.addEventListener('uploadsComplete', function () {
     var grid = document.getElementById('asset-grid');
-    if (grid) {
-      // Trigger a page reload of the grid via HTMX
-      var url = grid.getAttribute('data-refresh-url');
-      if (url) {
-        htmx.ajax('GET', url, { target: '#asset-grid', swap: 'innerHTML' });
-      } else {
-        // Fallback: reload the page
-        window.location.reload();
-      }
+    if (!grid) return;
+    if (grid.querySelector('[hx-trigger*="uploadsComplete"]')) return;
+    var url = grid.getAttribute('data-refresh-url');
+    if (url) {
+      htmx.ajax('GET', url, { target: '#asset-grid', swap: 'innerHTML' });
     }
   });
 

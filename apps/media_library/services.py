@@ -71,6 +71,7 @@ def create_asset(
     alt_text: str = "",
     title: str = "",
     tags: list[str] | None = None,
+    source: str = "",
 ):
     """Create a new media asset from an uploaded file.
 
@@ -90,6 +91,9 @@ def create_asset(
     Enforces the org-level storage quota before persisting; raises
     ``StorageQuotaExceededError`` (mapped to HTTP 413 by the API layer) when
     the upload would push usage over the cap.
+
+    ``source`` is left blank for library uploads; the composer passes
+    ``"upload"``, which is what marks its scratch uploads for the orphan sweep.
     """
     from .quotas import enforce_storage_quota
     from .validators import (  # local import to avoid validator import cycle on the test path
@@ -122,9 +126,31 @@ def create_asset(
         alt_text=alt_text or "",
         title=title or "",
         tags=list(tags) if tags else [],
+        source=source or "",
     )
     asset.save()
     return asset
+
+
+def upload_rejection_message(exc) -> str:
+    """One human-readable reason for a ``create_asset`` rejection.
+
+    Covers the two exceptions ``create_asset`` raises for a bad upload —
+    ``ValidationError`` and ``StorageQuotaExceededError`` — so every upload
+    surface (library, shared library, composer, ideas) words them the same.
+    """
+    from django.template.defaultfilters import filesizeformat
+
+    from .quotas import StorageQuotaExceededError
+
+    if isinstance(exc, StorageQuotaExceededError):
+        return (
+            f"Storage quota exceeded: this {filesizeformat(exc.attempted)} file would take the organization past "
+            f"its {filesizeformat(exc.limit)} limit ({filesizeformat(exc.used)} in use). "
+            "Free up space or raise the plan."
+        )
+    messages = getattr(exc, "messages", None) or [str(exc)]
+    return " ".join(messages)
 
 
 def create_pending_upload(

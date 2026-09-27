@@ -113,7 +113,7 @@ class UploadAndFilterEdgeTests(MediaBase):
             side_effect=StorageQuotaExceededError(used=900, limit=1000, attempted=200),
         ):
             response = self.client.post(url, {"files": SimpleUploadedFile("a.jpg", b"\xff\xd8\xff", "image/jpeg")})
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["results"][0]["status"], "error")
         self.assertIn("quota", response.json()["results"][0]["errors"][0].lower())
 

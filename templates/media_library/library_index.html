@@ -99,7 +99,8 @@
 {% block page_title %}Media Library{% endblock %}
 
 {% block content %}
-<div x-data="{ ...mediaLibrary(), folderSidebarOpen: false }" class="flex flex-1 min-h-0 -m-3 sm:-m-4 lg:-m-6 -mb-3 sm:-mb-4 lg:-mb-6">
+{% comment %}No negative margins to bleed into <main>'s padding: base.html wraps content in an overflow-x-hidden box, which clipped the sidebar ("OLDERS") and the Upload button.{% endcomment %}
+<div x-data="{ ...mediaLibrary(), folderSidebarOpen: false }" class="flex flex-1 min-h-0 min-w-0">
 
   <!-- Mobile folder sidebar toggle -->
   <button :aria-expanded="folderSidebarOpen" @click="folderSidebarOpen = !folderSidebarOpen"
@@ -161,7 +162,7 @@
   </div>
 
   <!-- ═══════ MAIN CONTENT ═══════ -->
-  <div class="flex-1 flex flex-col overflow-hidden">
+  <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
 
     <!-- ── Toolbar ── -->
     <div class="flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 py-3 border-b rounded-tr-xl" style="border-color: var(--border, #E7E5E4); background: var(--surface-0, #FFF);">
@@ -183,7 +184,7 @@
       </div>
 
       <!-- Type filters -->
-      <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap">
+      <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap min-w-0 max-w-full">
         <a href="{% url 'media_library:index' workspace_id=workspace.id %}{% if current_folder %}?folder={{ current_folder }}{% endif %}"
            class="ml-filter-pill {% if not current_type %}active{% endif %}">All</a>
         {% for type_val, type_label in file_types %}
@@ -226,7 +227,7 @@
 
       <!-- Upload button -->
       <button @click="$refs.fileInput.click()"
-              class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 hover:border-orange-300 active:bg-orange-100 transition-all duration-150 cursor-pointer">
+              class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 hover:border-orange-300 active:bg-orange-100 transition-all duration-150 cursor-pointer">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         Upload
       </button>
@@ -269,11 +270,35 @@
                   </div>
                 </div>
                 <span x-show="file.status === 'complete'" class="text-xs font-semibold" style="color: var(--success-500, #22C55E);">Done</span>
-                <span x-show="file.status === 'error'" class="text-xs font-semibold" style="color: var(--error-500, #EF4444);" x-text="file.error || 'Failed'"></span>
+                <span x-show="file.status === 'error'" class="text-xs font-semibold max-w-[50%] text-right break-words" style="color: var(--error-500, #EF4444);" x-text="file.error || 'Failed'"></span>
               </div>
             </template>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- ── Rejected uploads (kept until dismissed) ── -->
+    <div x-show="uploadErrors.length && !uploading" x-cloak role="alert"
+         class="mx-3 sm:mx-4 lg:mx-6 mt-4 rounded-xl border px-4 py-3"
+         style="border-color: var(--error-200, #FECACA); background: var(--error-50, #FEF2F2);">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-xs font-semibold" style="color: var(--error-700, #B91C1C);"
+             x-text="uploadErrors.length === 1 ? '1 file was not uploaded' : uploadErrors.length + ' files were not uploaded'"></p>
+          <ul class="mt-1 space-y-0.5">
+            <template x-for="(err, i) in uploadErrors" :key="i">
+              <li class="text-xs break-words" style="color: var(--error-700, #B91C1C);">
+                <span class="font-medium" x-text="err.name"></span>: <span x-text="err.error"></span>
+              </li>
+            </template>
+          </ul>
+        </div>
+        <button type="button" aria-label="Dismiss upload errors" @click="uploadErrors = []"
+                class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md cursor-pointer"
+                style="color: var(--error-700, #B91C1C);">
+          <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
       </div>
     </div>
 
@@ -284,7 +309,7 @@
          @drop.prevent="handleDrop($event)">
 
       <!-- Asset Grid -->
-      <div id="asset-grid">
+      <div id="asset-grid" data-refresh-url="{% url 'media_library:index' workspace_id=workspace.id %}{% if current_folder %}?folder={{ current_folder }}{% endif %}">
         {% include "media_library/_asset_grid.html" %}
       </div>
     </div>
@@ -302,7 +327,7 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"></div>
-    <div class="relative w-full sm:max-w-lg bg-white shadow-xl overflow-y-auto"
+    <div class="relative w-full max-w-[100vw] sm:max-w-lg bg-white shadow-xl overflow-y-auto overflow-x-hidden"
          x-show="detailOpen"
          x-transition:enter="transition ease-out duration-250"
          x-transition:enter-start="translate-x-full"
@@ -321,12 +346,26 @@
 {% block extra_js %}
 <script src="{% static 'js/media-library.js' %}"></script>
 <script nonce="{{ request.csp_nonce }}">
+// The upload endpoint answers a rejected file with 400 and
+// {"results": [{filename, status: "error", error, errors}]}; show that reason
+// rather than a generic failure.
+function uploadErrorMessage(responseText, status) {
+  try {
+    const data = JSON.parse(responseText);
+    const failed = (data.results || []).find(r => r.status === 'error');
+    if (failed) return failed.error || (failed.errors || []).join(' ') || 'Upload rejected';
+    if (data.error) return data.error;
+  } catch (e) { /* not JSON: fall through */ }
+  return status === 413 ? 'File too large' : 'Upload failed';
+}
+
 function mediaLibrary() {
   return {
     viewMode: 'grid',
     dragOver: false,
     uploading: false,
     uploadQueue: [],
+    uploadErrors: [],
     detailOpen: false,
     showNewFolder: false,
     currentFolder: '{{ current_folder|default:"" }}',
@@ -362,8 +401,23 @@ function mediaLibrary() {
       }));
 
       let completed = 0;
+      let succeeded = 0;
       const total = this.uploadQueue.length;
       const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      this.uploadErrors = [];
+
+      const finish = () => {
+        // Rejected files stay listed with their reason until dismissed; the
+        // grid only refreshes when something actually landed.
+        this.uploadErrors = this.uploadQueue
+          .filter(item => item.status === 'error')
+          .map(item => ({ name: item.name, error: item.error }));
+        setTimeout(() => {
+          this.uploading = false;
+          this.uploadQueue = [];
+          if (succeeded > 0) htmx.trigger('#asset-grid', 'uploadsComplete');
+        }, 800);
+      };
 
       this.uploadQueue.forEach((item, index) => {
         const formData = new FormData();
@@ -382,31 +436,21 @@ function mediaLibrary() {
         xhr.addEventListener('load', () => {
           completed++;
           if (xhr.status >= 200 && xhr.status < 300) {
+            succeeded++;
             this.uploadQueue[index].status = 'complete';
             this.uploadQueue[index].progress = 100;
           } else {
             this.uploadQueue[index].status = 'error';
-            this.uploadQueue[index].error = 'Upload failed';
+            this.uploadQueue[index].error = uploadErrorMessage(xhr.responseText, xhr.status);
           }
-          if (completed === total) {
-            setTimeout(() => {
-              this.uploading = false;
-              this.uploadQueue = [];
-              htmx.trigger('#asset-grid', 'uploadsComplete');
-            }, 800);
-          }
+          if (completed === total) finish();
         });
 
         xhr.addEventListener('error', () => {
           completed++;
           this.uploadQueue[index].status = 'error';
           this.uploadQueue[index].error = 'Network error';
-          if (completed === total) {
-            setTimeout(() => {
-              this.uploading = false;
-              htmx.trigger('#asset-grid', 'uploadsComplete');
-            }, 800);
-          }
+          if (completed === total) finish();
         });
 
         xhr.open('POST', '{% url "media_library:upload" workspace_id=workspace.id %}');

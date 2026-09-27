@@ -22,6 +22,7 @@ from .services import (
     create_version,
     delete_asset,
     restore_version,
+    upload_rejection_message,
 )
 from .tasks import process_image_edit, process_media_asset, process_video_trim
 from .validators import get_accepted_file_types
@@ -39,13 +40,32 @@ def _get_workspace_or_404(request, workspace_id):
 # ──────────────────────────────────────────────────────────────
 
 
-def _quota_message(exc: StorageQuotaExceededError) -> str:
-    from django.template.defaultfilters import filesizeformat
+def _store_uploads(files, *, organization, workspace, user, folder=None):
+    """Run each file through ``create_asset`` and queue its processing.
 
-    return (
-        f"Storage quota exceeded: this {filesizeformat(exc.attempted)} file would take the organization past "
-        f"its {filesizeformat(exc.limit)} limit ({filesizeformat(exc.used)} in use). Free up space or raise the plan."
-    )
+    Returns one result dict per file, in order. A rejected file (bad type, too
+    big, over quota) gets ``status: "error"`` plus the reason, both as the
+    ``errors`` list and as a single ``error`` string for the uploader UI.
+    """
+    results = []
+    for uploaded_file in files:
+        try:
+            asset = create_asset(
+                organization=organization,
+                workspace=workspace,
+                uploaded_file=uploaded_file,
+                uploaded_by=user,
+                folder=folder,
+            )
+        except (StorageQuotaExceededError, ValidationError) as e:
+            message = upload_rejection_message(e)
+            errors = e.messages if isinstance(e, ValidationError) else [message]
+            results.append({"filename": uploaded_file.name, "status": "error", "error": message, "errors": errors})
+            continue
+        # Enqueue background processing (metadata + thumbnail)
+        process_media_asset(str(asset.id))
+        results.append({"id": str(asset.id), "filename": asset.filename, "status": "ok"})
+    return results
 
 
 def _uuid_or_none(value):
@@ -204,33 +224,19 @@ def upload(request, workspace_id):
     if folder_id:
         folder = get_object_or_404(MediaFolder, pk=folder_id, workspace=workspace)
 
-    results = []
-    for uploaded_file in files:
-        try:
-            asset = create_asset(
-                organization=workspace.organization,
-                workspace=workspace,
-                uploaded_file=uploaded_file,
-                uploaded_by=request.user,
-                folder=folder,
-            )
-            # Enqueue background processing
-            process_media_asset(str(asset.id))
-            results.append({"id": str(asset.id), "status": "ok"})
-        except StorageQuotaExceededError as e:
-            results.append({"filename": uploaded_file.name, "status": "error", "errors": [_quota_message(e)]})
-        except ValidationError as e:
-            results.append(
-                {
-                    "filename": uploaded_file.name,
-                    "status": "error",
-                    "errors": e.messages if hasattr(e, "messages") else [str(e)],
-                }
-            )
+    results = _store_uploads(
+        files, organization=workspace.organization, workspace=workspace, user=request.user, folder=folder
+    )
+
+    # Any rejected file makes the whole response a 400 carrying every result,
+    # so the uploader can say *why* per file (and which ones did land) instead
+    # of a 200 with an empty body that looked like success.
+    if any(r["status"] == "error" for r in results):
+        return JsonResponse({"results": results}, status=400)
 
     # If HTMX request, return the new asset cards
     if request.htmx:
-        assets = MediaAsset.objects.filter(id__in=[r["id"] for r in results if r["status"] == "ok"])
+        assets = MediaAsset.objects.filter(id__in=[r["id"] for r in results])
         return render(
             request,
             "media_library/_asset_grid_items.html",
@@ -806,8 +812,11 @@ def processing_status(request, workspace_id, asset_id):
         pk=asset_id,
     )
 
-    if request.htmx and asset.processing_status == MediaAsset.ProcessingStatus.COMPLETED:
-        # Return the completed asset card to replace the placeholder
+    if request.htmx:
+        # The card polls with hx-swap="outerHTML", so whatever comes back
+        # replaces it: always answer with the card. It keeps polling while
+        # pending/processing and shows a failed badge (and stops) otherwise —
+        # a JSON body here used to land in the grid as raw text.
         return render(
             request,
             "media_library/_asset_card.html",
@@ -908,30 +917,14 @@ def shared_upload(request):
     if len(files) > max_bulk:
         return JsonResponse({"error": f"Maximum {max_bulk} files per upload"}, status=400)
 
-    results = []
-    for uploaded_file in files:
-        try:
-            asset = create_asset(
-                organization=org,
-                workspace=None,  # Shared = no workspace
-                uploaded_file=uploaded_file,
-                uploaded_by=request.user,
-            )
-            process_media_asset(str(asset.id))
-            results.append({"id": str(asset.id), "status": "ok"})
-        except StorageQuotaExceededError as e:
-            results.append({"filename": uploaded_file.name, "status": "error", "errors": [_quota_message(e)]})
-        except ValidationError as e:
-            results.append(
-                {
-                    "filename": uploaded_file.name,
-                    "status": "error",
-                    "errors": e.messages if hasattr(e, "messages") else [str(e)],
-                }
-            )
+    # Shared = no workspace
+    results = _store_uploads(files, organization=org, workspace=None, user=request.user)
+
+    if any(r["status"] == "error" for r in results):
+        return JsonResponse({"results": results}, status=400)
 
     if request.htmx:
-        assets = MediaAsset.objects.filter(id__in=[r["id"] for r in results if r["status"] == "ok"])
+        assets = MediaAsset.objects.filter(id__in=[r["id"] for r in results])
         return render(
             request,
             "media_library/_shared_asset_grid_items.html",

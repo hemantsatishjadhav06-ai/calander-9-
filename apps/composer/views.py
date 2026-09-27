@@ -1318,6 +1318,8 @@ def save_post(request, workspace_id, post_id=None):
 
     # Return appropriate response
     if request.htmx:
+        from django.urls import reverse
+
         return HttpResponse(
             status=204,
             headers={
@@ -1330,6 +1332,12 @@ def save_post(request, workspace_id, post_id=None):
                     }
                 ),
                 "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
+                # A first Save Draft stays on the composer, so it needs the
+                # edit URL to switch to — otherwise the next save makes a
+                # second post.
+                "X-Post-Edit-Url": reverse(
+                    "composer:compose_edit", kwargs={"workspace_id": workspace.id, "post_id": post.id}
+                ),
             },
         )
 
@@ -1647,23 +1655,30 @@ def thumbnail_upload(request, workspace_id):
     if not uploaded_file:
         return JsonResponse({"error": "No file provided"}, status=400)
 
-    content_type = uploaded_file.content_type or ""
-    if not content_type.startswith("image/"):
+    from apps.media_library.models import MediaAsset
+    from apps.media_library.quotas import StorageQuotaExceededError
+    from apps.media_library.services import create_asset, upload_rejection_message
+    from apps.media_library.tasks import process_media_asset
+    from apps.media_library.validators import determine_file_type, sniff_mime
+
+    # Image-only, judged by the bytes: the client's Content-Type is whatever
+    # the client chose to say.
+    if determine_file_type(sniff_mime(uploaded_file)) not in (MediaAsset.MediaType.IMAGE, MediaAsset.MediaType.GIF):
         return JsonResponse({"error": "Only image files are allowed"}, status=400)
 
-    from apps.media_library.models import MediaAsset
-
-    asset = MediaAsset.objects.create(
-        organization=workspace.organization,
-        workspace=workspace,
-        uploaded_by=request.user,
-        file=uploaded_file,
-        filename=uploaded_file.name,
-        media_type=MediaAsset.MediaType.IMAGE,
-        mime_type=content_type,
-        file_size=uploaded_file.size,
-        source="upload",
-    )
+    # Same chokepoint as the library: magic-byte MIME, canonical extension on
+    # disk, size/pixel caps and the org storage quota.
+    try:
+        asset = create_asset(
+            organization=workspace.organization,
+            workspace=workspace,
+            uploaded_file=uploaded_file,
+            uploaded_by=request.user,
+            source="upload",
+        )
+    except (ValidationError, StorageQuotaExceededError) as e:
+        return JsonResponse({"error": upload_rejection_message(e)}, status=400)
+    process_media_asset(str(asset.id))
 
     url = ""
     if asset.thumbnail:
@@ -2396,34 +2411,34 @@ def upload_media(request, workspace_id, post_id=None):
     if not uploaded_file:
         return JsonResponse({"error": "No file provided"}, status=400)
 
-    from apps.media_library.models import MediaAsset
+    from apps.media_library.quotas import StorageQuotaExceededError
+    from apps.media_library.services import create_asset, upload_rejection_message
+    from apps.media_library.tasks import process_media_asset
 
-    # Determine media type
-    content_type = uploaded_file.content_type or ""
-    if content_type.startswith("image/"):
-        media_type = MediaAsset.MediaType.IMAGE
-    elif content_type.startswith("video/"):
-        media_type = MediaAsset.MediaType.VIDEO
-    elif content_type == "image/gif":
-        media_type = MediaAsset.MediaType.GIF
-    else:
-        media_type = MediaAsset.MediaType.DOCUMENT
-
-    asset = MediaAsset.objects.create(
-        organization=workspace.organization,
-        workspace=workspace,
-        uploaded_by=request.user,
-        file=uploaded_file,
-        filename=uploaded_file.name,
-        media_type=media_type,
-        mime_type=content_type,
-        file_size=uploaded_file.size,
-        source="upload",
-    )
-
+    post = None
     if post_id:
+        # Before storing anything: a refused edit shouldn't leave a file behind.
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
         _require_can_edit_post(request, post)
+
+    # Same chokepoint as the media library: the stored MIME comes from a
+    # magic-byte sniff and the on-disk name gets the extension those bytes
+    # justify, so an SVG or HTML payload labelled image/png can't be served
+    # back same-origin as script. Also enforces size caps and the org quota.
+    try:
+        asset = create_asset(
+            organization=workspace.organization,
+            workspace=workspace,
+            uploaded_file=uploaded_file,
+            uploaded_by=request.user,
+            source="upload",
+        )
+    except (ValidationError, StorageQuotaExceededError) as e:
+        return JsonResponse({"error": upload_rejection_message(e)}, status=400)
+    # Metadata + thumbnail (a video's poster frame), as for library uploads.
+    process_media_asset(str(asset.id))
+
+    if post is not None:
         attachment = _attach_asset_for_composer(request, workspace, asset, post)
         # Option A: changing media on an approved post sends it back for re-approval.
         _revert_approved_to_review(post)
@@ -2851,31 +2866,37 @@ def _sync_idea_media_attachments(idea, workspace, ordered_asset_ids):
         idea.save(update_fields=["media_asset", "updated_at"])
 
 
+def _store_idea_upload(workspace, user, uploaded_file):
+    """The stored asset, or a 400 naming why the file was refused."""
+    from apps.media_library.quotas import StorageQuotaExceededError
+    from apps.media_library.services import upload_rejection_message
+
+    try:
+        return _create_idea_media_asset(workspace, user, uploaded_file)
+    except (ValidationError, StorageQuotaExceededError) as e:
+        return HttpResponse(upload_rejection_message(e), status=400)
+
+
 def _create_idea_media_asset(workspace, user, uploaded_file):
-    """Create a MediaAsset from an uploaded file for Idea create/edit flows."""
-    from apps.media_library.models import MediaAsset
+    """Create a MediaAsset from an uploaded file for Idea create/edit flows.
 
-    content_type = uploaded_file.content_type or ""
-    if content_type == "image/gif":
-        media_type = MediaAsset.MediaType.GIF
-    elif content_type.startswith("image/"):
-        media_type = MediaAsset.MediaType.IMAGE
-    elif content_type.startswith("video/"):
-        media_type = MediaAsset.MediaType.VIDEO
-    else:
-        media_type = MediaAsset.MediaType.DOCUMENT
+    Goes through ``create_asset`` like every other upload (magic-byte MIME,
+    canonical extension, size caps, storage quota) and queues thumbnail
+    processing. Raises ``ValidationError`` / ``StorageQuotaExceededError`` for a
+    rejected file; ``upload_rejection_message`` words either for the user.
+    """
+    from apps.media_library.services import create_asset
+    from apps.media_library.tasks import process_media_asset
 
-    return MediaAsset.objects.create(
+    asset = create_asset(
         organization=workspace.organization,
         workspace=workspace,
+        uploaded_file=uploaded_file,
         uploaded_by=user,
-        file=uploaded_file,
-        filename=uploaded_file.name,
-        media_type=media_type,
-        mime_type=content_type,
-        file_size=uploaded_file.size,
         source="upload",
     )
+    process_media_asset(str(asset.id))
+    return asset
 
 
 @login_required
@@ -2920,7 +2941,13 @@ def idea_upload_media(request, workspace_id):
     if not uploaded_file:
         return JsonResponse({"error": "No file provided"}, status=400)
 
-    asset = _create_idea_media_asset(workspace, request.user, uploaded_file)
+    from apps.media_library.quotas import StorageQuotaExceededError
+    from apps.media_library.services import upload_rejection_message
+
+    try:
+        asset = _create_idea_media_asset(workspace, request.user, uploaded_file)
+    except (ValidationError, StorageQuotaExceededError) as e:
+        return JsonResponse({"error": upload_rejection_message(e)}, status=400)
     return JsonResponse(
         {
             "asset_id": str(asset.id),
@@ -2960,8 +2987,10 @@ def idea_create(request, workspace_id):
     uploaded_file = request.FILES.get("media") or request.FILES.get("file")
     media_asset_id = request.POST.get("media_asset_id", "").strip()
     if uploaded_file:
-        uploaded_asset = _create_idea_media_asset(workspace, request.user, uploaded_file)
-        media_asset_ids.append(str(uploaded_asset.id))
+        rejected = _store_idea_upload(workspace, request.user, uploaded_file)
+        if isinstance(rejected, HttpResponse):
+            return rejected
+        media_asset_ids.append(str(rejected.id))
     elif not media_asset_ids and media_asset_id:
         from apps.media_library.models import MediaAsset
 
@@ -3039,7 +3068,9 @@ def idea_edit(request, workspace_id, idea_id):
     uploaded_file = request.FILES.get("media") or request.FILES.get("file")
     uploaded_asset = None
     if uploaded_file:
-        uploaded_asset = _create_idea_media_asset(workspace, request.user, uploaded_file)
+        uploaded_asset = _store_idea_upload(workspace, request.user, uploaded_file)
+        if isinstance(uploaded_asset, HttpResponse):
+            return uploaded_asset
         media_asset_ids.append(str(uploaded_asset.id))
     media_asset_ids = _normalize_media_asset_ids(media_asset_ids)
 
@@ -3133,7 +3164,10 @@ def idea_create_post(request, workspace_id, idea_id):
             workspace=workspace,
             author=request.user,
             title=idea.title or "",
-            caption=idea.description or "",
+            # The composer only shows the title field for YouTube/Pinterest, so
+            # a title-only idea opened as an apparently blank post. Seed the
+            # caption with the title so the idea's text is in front of the user.
+            caption=idea.description or idea.title or "",
             tags=tags,
         )
 
@@ -3622,9 +3656,10 @@ def csv_preview(request, workspace_id):
     errors = []
     valid_count = 0
 
+    from apps.credentials.models import PlatformCredential
     from apps.social_accounts.models import SocialAccount
 
-    valid_platforms = {p[0].lower() for p in SocialAccount.Platform.choices}
+    valid_platforms = {value.lower() for value, _label in PlatformCredential.Platform.choices}
     connected_accounts = set(
         SocialAccount.objects.for_workspace(workspace.id)
         .filter(connection_status=SocialAccount.ConnectionStatus.CONNECTED)

@@ -18,6 +18,11 @@
       <img src="{{ asset.file.url }}" alt="{{ asset.original_filename }}"
            class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
            loading="lazy">
+    {% elif asset.file_type == 'video' and asset.processing_status != 'pending' and asset.processing_status != 'processing' %}
+      {% comment %}No poster frame (ffmpeg missing or failed): let the browser draw the first frame itself. The stream view answers Range requests, so preload="metadata" fetches only the head of the file.{% endcomment %}
+      <video src="{% url 'composer:media_stream' workspace_id=workspace.id asset_id=asset.id %}#t=0.1"
+             preload="metadata" muted playsinline aria-hidden="true" tabindex="-1"
+             class="w-full h-full object-cover pointer-events-none"></video>
     {% elif asset.processing_status == 'pending' or asset.processing_status == 'processing' %}
       <div class="w-full h-full ml-shimmer flex items-center justify-center">
         <svg class="w-6 h-6 animate-spin" style="color: var(--text-ghost, #766F6A);" fill="none" viewBox="0 0 24 24">
@@ -44,7 +49,12 @@
       {{ asset.file_type|upper }}
     </span>
 
-    {% if asset.is_shared %}
+    {% if asset.processing_status == 'failed' %}
+    <span class="ml-type-badge absolute top-2 right-2" title="Processing failed: no thumbnail or metadata could be extracted"
+          style="background: rgba(239,68,68,0.9); color: white;">
+      FAILED
+    </span>
+    {% elif asset.is_shared %}
     <span class="ml-type-badge absolute top-2 right-2"
           style="background: rgba(20,184,166,0.9); color: white;">
       SHARED
