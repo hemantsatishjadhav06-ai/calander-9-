@@ -68,9 +68,12 @@ class MediaFolder(models.Model):
         constraints = [
             # nulls_distinct=False: a root folder has parent_folder NULL, and
             # Postgres treats NULLs as distinct by default, so two root folders
-            # with the same name were allowed.
+            # with the same name were allowed. The organisation is part of the
+            # key because organisation-wide folders have workspace NULL, which
+            # NULLS NOT DISTINCT would otherwise treat as one shared scope
+            # across every tenant.
             models.UniqueConstraint(
-                fields=["workspace", "parent_folder", "name"],
+                fields=["organization", "workspace", "parent_folder", "name"],
                 name="unique_folder_name_per_parent",
                 nulls_distinct=False,
             ),

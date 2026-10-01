@@ -87,6 +87,14 @@ def _generate_for_rule(rule, now) -> int:
             continue
         scheduled_dt = datetime.combine(d, base_time).replace(tzinfo=ws_tz)
         with transaction.atomic():
+            # Re-read the ledger under a row lock: during a deploy the outgoing
+            # and incoming workers can run this cycle at once (the new one
+            # clears the old one's task locks on boot), and each would clone
+            # the same dates from its own stale copy of the ledger.
+            locked = RecurrenceRule.objects.select_for_update().only("generated_dates").get(pk=rule.pk)
+            already = set(locked.generated_dates or [])
+            if key in already:
+                continue
             _clone_occurrence(source, scheduled_dt)
             already.add(key)
             RecurrenceRule.objects.filter(pk=rule.pk).update(generated_dates=sorted(already), last_generated_at=now)

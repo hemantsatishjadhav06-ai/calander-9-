@@ -2,34 +2,48 @@
 
 from django.db import migrations, models
 
+NAME_MAX = 255
 
-def rename_duplicate_root_folders(apps, schema_editor):
-    """Suffix duplicate top-level folder names so the new constraint can be built.
 
-    Root folders (no parent) with the same name in one workspace were allowed
-    before; nulls_distinct=False forbids them, and adding the constraint over
-    existing duplicates would fail the deploy.
+def _free_name(base, taken):
+    """``base (2)``, ``base (3)``... the first one not in *taken*, kept within the column width."""
+    index = 2
+    while True:
+        suffix = f" ({index})"
+        candidate = f"{base[: NAME_MAX - len(suffix)]}{suffix}"
+        if candidate not in taken:
+            return candidate
+        index += 1
+
+
+def rename_duplicate_folder_names(apps, schema_editor):
+    """Give every duplicate folder name a free ``(N)`` suffix so the new constraint can be built.
+
+    The new constraint treats NULL as equal (nulls_distinct=False), so it now
+    covers rows the old one never did: root folders (parent NULL) and
+    organisation-wide folders (workspace NULL). Any duplicates among them would
+    fail the index build and abort the deploy. Grouping includes the
+    organisation, so one tenant's folder is never renamed because of another's,
+    and each new name is checked against every name already in that scope.
+    The oldest folder in a group keeps its name.
     """
     from django.db.models import Count
 
     MediaFolder = apps.get_model("media_library", "MediaFolder")
-    dupes = (
-        MediaFolder.objects.filter(parent_folder__isnull=True)
-        .values("workspace_id", "name")
-        .annotate(n=Count("id"))
-        .filter(n__gt=1)
+    scope = ("organization_id", "workspace_id", "parent_folder_id")
+    groups = (
+        MediaFolder.objects.values(*scope, "name").annotate(n=Count("id")).filter(n__gt=1).order_by(*scope, "name")
     )
-    for group in dupes:
-        folders = MediaFolder.objects.filter(
-            workspace_id=group["workspace_id"], parent_folder__isnull=True, name=group["name"]
-        ).order_by("created_at", "id")
-        for index, folder in enumerate(folders[1:], start=2):
-            folder.name = f"{group['name'][:240]} ({index})"
+    for group in groups:
+        in_scope = MediaFolder.objects.filter(**{field: group[field] for field in scope})
+        taken = set(in_scope.values_list("name", flat=True))
+        for folder in in_scope.filter(name=group["name"]).order_by("created_at", "id")[1:]:
+            folder.name = _free_name(group["name"], taken)
+            taken.add(folder.name)
             folder.save(update_fields=["name"])
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("media_library", "0003_pendingupload"),
         ("organizations", "0002_organization_billing_email"),
@@ -37,7 +51,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(rename_duplicate_root_folders, migrations.RunPython.noop),
+        migrations.RunPython(rename_duplicate_folder_names, migrations.RunPython.noop),
+        # The renames queue deferred FK trigger events on the table, and
+        # Postgres refuses to ALTER a table with pending trigger events
+        # (see apps/inbox/tests/test_reply_lifecycle_migrations.py). Fire them now.
+        migrations.RunSQL("SET CONSTRAINTS ALL IMMEDIATE", migrations.RunSQL.noop),
         migrations.RemoveConstraint(
             model_name="mediafolder",
             name="unique_folder_name_per_parent",
@@ -45,7 +63,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="mediafolder",
             constraint=models.UniqueConstraint(
-                fields=("workspace", "parent_folder", "name"),
+                fields=("organization", "workspace", "parent_folder", "name"),
                 name="unique_folder_name_per_parent",
                 nulls_distinct=False,
             ),

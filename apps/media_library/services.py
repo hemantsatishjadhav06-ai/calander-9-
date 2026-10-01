@@ -44,11 +44,35 @@ def check_folder_depth(parent_folder):
     return depth
 
 
+def free_folder_name(organization, workspace, parent_folder, name):
+    """*name*, or ``name (2)``, ``name (3)``... whichever is free at that level.
+
+    Used when a folder has to move to a level that may already hold its name,
+    e.g. subfolders promoted when their parent is deleted.
+    """
+    taken = set(
+        MediaFolder.objects.filter(
+            organization=organization, workspace=workspace, parent_folder=parent_folder
+        ).values_list("name", flat=True)
+    )
+    if name not in taken:
+        return name
+    index = 2
+    while True:
+        suffix = f" ({index})"
+        candidate = f"{name[: 255 - len(suffix)]}{suffix}"
+        if candidate not in taken:
+            return candidate
+        index += 1
+
+
 def create_folder(organization, workspace, name, parent_folder=None):
     """Create a new media folder."""
     if parent_folder:
         check_folder_depth(parent_folder)
-    if MediaFolder.objects.filter(workspace=workspace, parent_folder=parent_folder, name=name).exists():
+    if MediaFolder.objects.filter(
+        organization=organization, workspace=workspace, parent_folder=parent_folder, name=name
+    ).exists():
         raise ValidationError("A folder with this name already exists here.")
     folder = MediaFolder(
         organization=organization,

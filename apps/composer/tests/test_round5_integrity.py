@@ -197,6 +197,21 @@ class RecurrenceTests(ComposerBase):
         rule.refresh_from_db()
         self.assertEqual(len(rule.generated_dates), first_count)
 
+    def test_a_worker_with_a_stale_ledger_does_not_clone_dates_twice(self):
+        """Deploy overlap: the outgoing and incoming workers both run the cycle,
+        each holding its own copy of the rule. The second must re-read the
+        ledger, not trust the copy it loaded before the first one finished."""
+        from apps.calendar.tasks import _generate_for_rule
+
+        post, _ = self._post(when=timezone.now() + timedelta(days=1))
+        RecurrenceRule.objects.create(post=post, frequency="weekly", interval=1)
+        stale = RecurrenceRule.objects.select_related("post__workspace").get(post=post)
+
+        first = generate_recurring_posts()
+        self.assertGreater(first, 0)
+        self.assertEqual(_generate_for_rule(stale, timezone.now()), 0)
+        self.assertEqual(Post.objects.exclude(pk=post.pk).count(), first)
+
     def test_a_held_source_generates_nothing(self):
         post, _ = self._post(status=PlatformPost.Status.ON_HOLD, when=timezone.now() + timedelta(days=1))
         RecurrenceRule.objects.create(post=post, frequency="daily", interval=1)

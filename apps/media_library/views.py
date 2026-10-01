@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -21,6 +22,7 @@ from .services import (
     create_folder,
     create_version,
     delete_asset,
+    free_folder_name,
     restore_version,
     upload_rejection_message,
 )
@@ -681,13 +683,24 @@ def folder_delete(request, workspace_id, folder_id):
     workspace = _get_workspace_or_404(request, workspace_id)
     folder = get_object_or_404(MediaFolder, pk=folder_id, workspace=workspace)
 
-    # Move assets to parent folder (or root)
-    MediaAsset.objects.filter(folder=folder).update(folder=folder.parent_folder)
+    # One transaction: a failure part-way used to leave the assets moved but
+    # the folder still there.
+    with transaction.atomic():
+        # Move assets to parent folder (or root)
+        MediaAsset.objects.filter(folder=folder).update(folder=folder.parent_folder)
 
-    # Move subfolders to parent
-    MediaFolder.objects.filter(parent_folder=folder).update(parent_folder=folder.parent_folder)
+        # Move subfolders up a level. Folder names are unique per level, so a
+        # subfolder whose name is already taken there gets a "(2)" suffix
+        # instead of failing the whole delete with an IntegrityError. The
+        # doomed folder steps out of the way first, so a child sharing its
+        # name ("Brand/Brand") keeps it.
+        MediaFolder.objects.filter(pk=folder.pk).update(name=str(folder.pk))
+        for sub in MediaFolder.objects.filter(parent_folder=folder).order_by("created_at", "id"):
+            sub.name = free_folder_name(folder.organization, folder.workspace, folder.parent_folder, sub.name)
+            sub.parent_folder = folder.parent_folder
+            sub.save(update_fields=["name", "parent_folder", "updated_at"])
 
-    folder.delete()
+        folder.delete()
 
     if request.htmx:
         folders = MediaFolder.objects.filter(
