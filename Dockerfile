@@ -66,6 +66,5 @@ USER app
 # every start, and an Error-level check stops the container before it takes
 # traffic. It runs here rather than as a Railway pre-deploy command because the
 # pre-deploy step is shared with the worker service (see railway.toml).
-# `--error-logfile /dev/stdout` sends gunicorn's own boot/worker lines to stdout: on
-# stderr Railway files every one of them as an error.
-CMD ["sh", "-c", "python manage.py check --deploy && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4 --error-logfile /dev/stdout --capture-output"]
+# Gunicorn's own log lines go to stdout via gunicorn.conf.py (logconfig_dict).
+CMD ["sh", "-c", "python manage.py check --deploy && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4"]

@@ -6,12 +6,14 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.common.validators import normalize_tags
 from apps.members.decorators import require_org_role, require_permission
+from apps.workspaces.models import Workspace
 
 from .models import MediaAsset, MediaFolder
 from .quotas import StorageQuotaExceededError
@@ -21,6 +23,7 @@ from .services import (
     create_folder,
     create_version,
     delete_asset,
+    promote_subfolders,
     restore_version,
     upload_rejection_message,
 )
@@ -596,6 +599,8 @@ def folder_create(request, workspace_id):
     name = request.POST.get("name", "").strip()
     if not name:
         return JsonResponse({"error": "Folder name is required"}, status=400)
+    if "\x00" in name:
+        return JsonResponse({"error": "Folder name contains an invalid character"}, status=400)
 
     parent_id = request.POST.get("parent_folder_id")
     parent = None
@@ -638,6 +643,8 @@ def folder_rename(request, workspace_id, folder_id):
     name = request.POST.get("name", "").strip()
     if not name:
         return JsonResponse({"error": "Folder name is required"}, status=400)
+    if "\x00" in name:
+        return JsonResponse({"error": "Folder name contains an invalid character"}, status=400)
 
     # Check for duplicate sibling name before saving
     duplicate = (
@@ -656,7 +663,12 @@ def folder_rename(request, workspace_id, folder_id):
         )
 
     folder.name = name
-    folder.save(update_fields=["name", "updated_at"])
+    try:
+        with transaction.atomic():
+            folder.save(update_fields=["name", "updated_at"])
+    except IntegrityError:
+        # Another request took the name between the check above and this save.
+        return JsonResponse({"error": f"A folder named '{name}' already exists in this location."}, status=400)
 
     if request.htmx:
         folders = MediaFolder.objects.filter(
@@ -681,13 +693,19 @@ def folder_delete(request, workspace_id, folder_id):
     workspace = _get_workspace_or_404(request, workspace_id)
     folder = get_object_or_404(MediaFolder, pk=folder_id, workspace=workspace)
 
-    # Move assets to parent folder (or root)
-    MediaAsset.objects.filter(folder=folder).update(folder=folder.parent_folder)
+    # One transaction: a failure part-way used to leave the assets moved but
+    # the folder still there. The workspace row lock serialises folder
+    # deletes in this workspace: two at once could otherwise pick the same
+    # free name for promoted subfolders, or deadlock on each other's rows.
+    with transaction.atomic():
+        Workspace.objects.select_for_update().filter(pk=workspace.pk).first()
+        folder = get_object_or_404(MediaFolder, pk=folder_id, workspace=workspace)
 
-    # Move subfolders to parent
-    MediaFolder.objects.filter(parent_folder=folder).update(parent_folder=folder.parent_folder)
-
-    folder.delete()
+        # Move assets to parent folder (or root)
+        MediaAsset.objects.filter(folder=folder).update(folder=folder.parent_folder)
+        # Subfolders move up a level; only names that clash there get a suffix.
+        promote_subfolders(folder)
+        folder.delete()
 
     if request.htmx:
         folders = MediaFolder.objects.filter(
