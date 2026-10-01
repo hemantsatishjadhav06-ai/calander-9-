@@ -1,6 +1,6 @@
 # QA round 1 retest — engineering report (27 Sep 2026)
 
-**Summary: NO-GO until PR #4 is deployed. After that, every code bug is fixed.**
+**Summary (updated 1 Oct): PR #4 is live in production. Every code bug is deployed; what remains is owner configuration and a signed-in QA pass. See the production check at the end.**
 
 QA's 2 PM retest ran against production. The release (#3, `226ed66`) never went
 live on the web service, so QA was still testing the old build (`21052a5`).
@@ -77,3 +77,48 @@ nothing, so the user may not remember setting it. No accounts are connected,
 so nothing would publish, but the calendar would fill. After the deploy,
 review Calendar for unexpected repeated posts and delete the source post's
 recurrence if it was a test.
+
+## Production check, 1 Oct 2026 (after PR #4 deployed)
+
+PR #4 (`dbe5301`) deployed on both services at 09:01 UTC. Evidence comes from the
+Railway logs and from live requests to the production URL.
+
+**Release step (pre-deploy), in order:**
+1. Backup: `backups/db-20261001T090041Z.tar.gz` written to the bucket.
+2. Migrations: all 8 pending ones applied, `media_library.0004` (BUG-34) and
+   `notifications.0006_notification_shown_in_app` (BUG-32) included.
+3. Legacy media: 1 file copied to the bucket. 1 file could not be recovered:
+   `media_library/2026/09/vasavi-atlantis-meta-9x16.mp4` returned 404 on the
+   old container disk, which was wiped by an earlier redeploy. **Re-upload that video.**
+
+**Services:** gunicorn boots and logs JSON at level `info` (BUG-31). The worker
+reports "recurring schedules verified". Its first cycle logged "Generated 0
+recurring posts", so the calendar has no surprise clones (owner note above:
+resolved). The `shown_in_app` errors have stopped.
+
+**Live checks on the public site:**
+
+| Check | Result | Bugs |
+|---|---|---|
+| `/health/` | 200, `{"status":"ok","checks":{"database":"ok","cache":"ok"}}` | 01, 31 |
+| `/accounts/signup/` | "SM Bean is invite-only right now" | 05, 22 |
+| `/terms/`, `/privacy/`, `/support/` | 200, own content (DPDP, Google Limited Use, Meta terms) | 08 |
+| `GET /accounts/logout/` | 405 | 10 |
+| Unknown URL | Branded 404 | 24 |
+| Bad portal link | "This link isn't valid" page, not "expired" | 24 |
+| `/robots.txt`, `/sitemap.xml`, titles | Present | 25 |
+| Landing, platforms, get-started | SM Bean brand; 3 live networks, the rest "coming" | 22, 23, 33 |
+
+**One new finding, fixed in PR #5:** on the marketing pages, the "Source code"
+links (footer and get-started) still pointed to the upstream
+`brightbeanxyz/brightbean-studio` repository. The app pages already link to
+this deployment's repository. AGPL-3.0 §13 asks for the source of the version
+users actually run, so these links now use `SOURCE_URL`. The "Built on…"
+attribution line still credits the upstream. A test covers it.
+
+**Still open. Each needs an owner action, not code:**
+- BUG-02: connect neopolisinfrallp3@gmail.com at `/ops/email/`, then set `ACCOUNT_EMAIL_VERIFICATION=mandatory` (boot warning W009).
+- BUG-04: set `SENTRY_DSN` (W005).
+- BUG-07: set `ADMIN_ALLOWED_IPS` (W010), delete `DJANGO_SUPERUSER_*`, rotate the admin password.
+- BUG-09: connect the Bluesky, Mastodon and DEV.to test accounts.
+- Signed-in screens (11–21, 27–30): deployed. QA needs to retest them signed in. The sandbox has no production login.

@@ -85,3 +85,12 @@ def test_pages_carry_canonical_and_description_metadata(client, settings):
     assert '<link rel="canonical" href="https://studio.example.com/features/">' in content
     assert '<meta name="description" content="' in content
     assert 'property="og:image" content="https://studio.example.com/static/' in content
+
+
+@pytest.mark.django_db
+def test_source_code_links_point_at_this_deployments_repository(client, settings):
+    # AGPL-3.0 §13: users must be offered the source of the version they use, not the upstream's.
+    settings.SOURCE_URL = "https://example.com/our-fork"
+    for url_name in ("marketing:home", "marketing:get_started"):
+        html = client.get(reverse(url_name)).content.decode()
+        assert 'href="https://example.com/our-fork" rel="noopener">Source code</a>' in html
