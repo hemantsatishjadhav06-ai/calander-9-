@@ -12,7 +12,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -44,19 +44,8 @@ def check_folder_depth(parent_folder):
     return depth
 
 
-def free_folder_name(organization, workspace, parent_folder, name):
-    """*name*, or ``name (2)``, ``name (3)``... whichever is free at that level.
-
-    Used when a folder has to move to a level that may already hold its name,
-    e.g. subfolders promoted when their parent is deleted.
-    """
-    taken = set(
-        MediaFolder.objects.filter(
-            organization=organization, workspace=workspace, parent_folder=parent_folder
-        ).values_list("name", flat=True)
-    )
-    if name not in taken:
-        return name
+def _suffixed_name(name, taken):
+    """The first ``name (N)`` not in *taken*, kept within the column width."""
     index = 2
     while True:
         suffix = f" ({index})"
@@ -64,6 +53,52 @@ def free_folder_name(organization, workspace, parent_folder, name):
         if candidate not in taken:
             return candidate
         index += 1
+
+
+def _level(organization_id, workspace_id, parent_folder_id):
+    return MediaFolder.objects.filter(
+        organization_id=organization_id, workspace_id=workspace_id, parent_folder_id=parent_folder_id
+    )
+
+
+def promote_subfolders(folder):
+    """Move *folder*'s children up to its parent level, renaming only true clashes.
+
+    Call inside a transaction that serialises folder changes in the workspace
+    (folder_delete locks the workspace row). Every final name is planned in
+    memory first, so no intermediate save can hit the unique constraint:
+
+    - the doomed folder moves to a temporary name that is free at its level, so
+      a child sharing its name ("Brand/Brand") keeps it;
+    - children whose names are free at the destination keep them;
+    - only the rest get the first free ``(N)`` suffix, never one a sibling
+      already uses.
+    """
+    children = list(MediaFolder.objects.filter(parent_folder=folder).order_by("created_at", "id"))
+    if not children:
+        return
+    level = _level(folder.organization_id, folder.workspace_id, folder.parent_folder_id)
+    taken = set(level.exclude(pk=folder.pk).values_list("name", flat=True))
+
+    placeholder = str(folder.pk)
+    if placeholder in taken or placeholder in {child.name for child in children}:
+        placeholder = _suffixed_name(placeholder, taken | {child.name for child in children})
+    MediaFolder.objects.filter(pk=folder.pk).update(name=placeholder)
+    taken.add(placeholder)
+
+    clashing = []
+    for child in children:
+        if child.name in taken:
+            clashing.append(child)
+        else:
+            taken.add(child.name)
+    for child in clashing:
+        child.name = _suffixed_name(child.name, taken)
+        taken.add(child.name)
+
+    for child in children:
+        child.parent_folder_id = folder.parent_folder_id
+        child.save(update_fields=["name", "parent_folder", "updated_at"])
 
 
 def create_folder(organization, workspace, name, parent_folder=None):
@@ -81,7 +116,13 @@ def create_folder(organization, workspace, name, parent_folder=None):
         name=name,
     )
     folder.full_clean()
-    folder.save()
+    try:
+        # A double submit can pass the check above twice; the second insert
+        # then hits the unique constraint. Report it like the check would.
+        with transaction.atomic():
+            folder.save()
+    except IntegrityError:
+        raise ValidationError("A folder with this name already exists here.") from None
     return folder
 
 

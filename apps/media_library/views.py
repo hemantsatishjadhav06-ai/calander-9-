@@ -6,13 +6,14 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.common.validators import normalize_tags
 from apps.members.decorators import require_org_role, require_permission
+from apps.workspaces.models import Workspace
 
 from .models import MediaAsset, MediaFolder
 from .quotas import StorageQuotaExceededError
@@ -22,7 +23,7 @@ from .services import (
     create_folder,
     create_version,
     delete_asset,
-    free_folder_name,
+    promote_subfolders,
     restore_version,
     upload_rejection_message,
 )
@@ -598,6 +599,8 @@ def folder_create(request, workspace_id):
     name = request.POST.get("name", "").strip()
     if not name:
         return JsonResponse({"error": "Folder name is required"}, status=400)
+    if "\x00" in name:
+        return JsonResponse({"error": "Folder name contains an invalid character"}, status=400)
 
     parent_id = request.POST.get("parent_folder_id")
     parent = None
@@ -640,6 +643,8 @@ def folder_rename(request, workspace_id, folder_id):
     name = request.POST.get("name", "").strip()
     if not name:
         return JsonResponse({"error": "Folder name is required"}, status=400)
+    if "\x00" in name:
+        return JsonResponse({"error": "Folder name contains an invalid character"}, status=400)
 
     # Check for duplicate sibling name before saving
     duplicate = (
@@ -658,7 +663,12 @@ def folder_rename(request, workspace_id, folder_id):
         )
 
     folder.name = name
-    folder.save(update_fields=["name", "updated_at"])
+    try:
+        with transaction.atomic():
+            folder.save(update_fields=["name", "updated_at"])
+    except IntegrityError:
+        # Another request took the name between the check above and this save.
+        return JsonResponse({"error": f"A folder named '{name}' already exists in this location."}, status=400)
 
     if request.htmx:
         folders = MediaFolder.objects.filter(
@@ -684,22 +694,17 @@ def folder_delete(request, workspace_id, folder_id):
     folder = get_object_or_404(MediaFolder, pk=folder_id, workspace=workspace)
 
     # One transaction: a failure part-way used to leave the assets moved but
-    # the folder still there.
+    # the folder still there. The workspace row lock serialises folder
+    # deletes in this workspace: two at once could otherwise pick the same
+    # free name for promoted subfolders, or deadlock on each other's rows.
     with transaction.atomic():
+        Workspace.objects.select_for_update().filter(pk=workspace.pk).first()
+        folder = get_object_or_404(MediaFolder, pk=folder_id, workspace=workspace)
+
         # Move assets to parent folder (or root)
         MediaAsset.objects.filter(folder=folder).update(folder=folder.parent_folder)
-
-        # Move subfolders up a level. Folder names are unique per level, so a
-        # subfolder whose name is already taken there gets a "(2)" suffix
-        # instead of failing the whole delete with an IntegrityError. The
-        # doomed folder steps out of the way first, so a child sharing its
-        # name ("Brand/Brand") keeps it.
-        MediaFolder.objects.filter(pk=folder.pk).update(name=str(folder.pk))
-        for sub in MediaFolder.objects.filter(parent_folder=folder).order_by("created_at", "id"):
-            sub.name = free_folder_name(folder.organization, folder.workspace, folder.parent_folder, sub.name)
-            sub.parent_folder = folder.parent_folder
-            sub.save(update_fields=["name", "parent_folder", "updated_at"])
-
+        # Subfolders move up a level; only names that clash there get a suffix.
+        promote_subfolders(folder)
         folder.delete()
 
     if request.htmx:

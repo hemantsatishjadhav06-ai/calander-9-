@@ -43,6 +43,19 @@ def rename_duplicate_folder_names(apps, schema_editor):
             folder.save(update_fields=["name"])
 
 
+def flush_deferred_fk_checks(apps, schema_editor):
+    """Fire any deferred FK checks before the constraint swap (Postgres only).
+
+    Postgres refuses to ALTER a table with pending trigger events, which a row
+    updated twice in this transaction would leave behind (the inbox migrations
+    hit exactly that: apps/inbox/tests/test_reply_lifecycle_migrations.py).
+    The rename above touches each row once, so this is a guard, not a fix.
+    SQLite has no SET CONSTRAINTS and no deferred checks to flush.
+    """
+    if schema_editor.connection.vendor == "postgresql":
+        schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("media_library", "0003_pendingupload"),
@@ -52,10 +65,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(rename_duplicate_folder_names, migrations.RunPython.noop),
-        # The renames queue deferred FK trigger events on the table, and
-        # Postgres refuses to ALTER a table with pending trigger events
-        # (see apps/inbox/tests/test_reply_lifecycle_migrations.py). Fire them now.
-        migrations.RunSQL("SET CONSTRAINTS ALL IMMEDIATE", migrations.RunSQL.noop),
+        migrations.RunPython(flush_deferred_fk_checks, migrations.RunPython.noop),
         migrations.RemoveConstraint(
             model_name="mediafolder",
             name="unique_folder_name_per_parent",

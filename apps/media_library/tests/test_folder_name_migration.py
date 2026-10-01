@@ -119,3 +119,50 @@ def test_create_folder_scopes_duplicates_by_organisation(db):
     create_folder(org_b, None, "Shared")  # another tenant: allowed
     with pytest.raises(Exception, match="already exists"):
         create_folder(org_a, None, "Shared")
+
+
+def test_deleting_a_folder_whose_id_is_a_sibling_name_still_works(owner_client):
+    client, org, ws = owner_client
+    doomed = create_folder(org, ws, "Doomed")
+    create_folder(org, ws, "Child", parent_folder=doomed)
+    create_folder(org, ws, str(doomed.pk))  # a sibling deliberately named after the doomed folder's id
+
+    resp = client.post(reverse("media_library:folder_delete", kwargs={"workspace_id": ws.id, "folder_id": doomed.id}))
+
+    assert resp.status_code == 200
+    assert _names(workspace=ws, parent_folder=None) == sorted(["Child", str(doomed.pk)])
+
+
+def test_promotion_renames_only_children_that_really_clash(owner_client):
+    client, org, ws = owner_client
+    create_folder(org, ws, "A")
+    doomed = create_folder(org, ws, "F")
+    clashing = create_folder(org, ws, "A", parent_folder=doomed)  # older, clashes with root "A"
+    free = create_folder(org, ws, "A (2)", parent_folder=doomed)  # free at root: must keep its name
+
+    client.post(reverse("media_library:folder_delete", kwargs={"workspace_id": ws.id, "folder_id": doomed.id}))
+
+    free.refresh_from_db()
+    clashing.refresh_from_db()
+    assert free.name == "A (2)"
+    assert clashing.name == "A (3)"
+
+
+@pytest.mark.parametrize("view", ["folder_create", "folder_rename"])
+def test_a_nul_byte_in_a_folder_name_is_a_400_not_a_500(owner_client, view):
+    client, org, ws = owner_client
+    kwargs = {"workspace_id": ws.id}
+    if view == "folder_rename":
+        kwargs["folder_id"] = create_folder(org, ws, "Plain").id
+    resp = client.post(reverse(f"media_library:{view}", kwargs=kwargs), {"name": "a\x00b"})
+    assert resp.status_code == 400
+
+
+def test_a_double_submit_that_races_past_the_check_is_a_400(owner_client, monkeypatch):
+    client, org, ws = owner_client
+    create_folder(org, ws, "Brand")
+    # The second request's existence check ran before the first one's insert.
+    monkeypatch.setattr("django.db.models.query.QuerySet.exists", lambda self: False)
+    resp = client.post(reverse("media_library:folder_create", kwargs={"workspace_id": ws.id}), {"name": "Brand"})
+    assert resp.status_code == 400
+    assert _names(workspace=ws, parent_folder=None) == ["Brand"]

@@ -45,3 +45,35 @@ Per-bug evidence: `SM_Bean_QA_Round1_Retest_Engineering.xlsx`, Bugs tab, last fo
 3. Set `SENTRY_DSN` (both services), `SIGNUP_ALLOWLIST` and `ADMIN_ALLOWED_IPS`. Delete the `DJANGO_SUPERUSER_*` variables and rotate the admin password.
 4. Delete the QA accounts `qa-test-noninvited@example.com` and `qa-test-noninvited2@example.com`.
 5. Connect the Bluesky, Mastodon and DEV.to test accounts, then run QA round 2. Publishing (sections D, N) is still untested for lack of accounts.
+
+## Update, 1 Oct 2026: pre-deploy review of every migration
+
+Before the third deploy attempt, each of the 8 migrations production will run
+on top of `21052a5` was reviewed for failure on real data. A second,
+adversarial reviewer checked each verdict. A review of the resulting fixes
+followed. Production data could not be copied for a rehearsal (bucket
+credentials were not available to this session), so the risky shapes were
+seeded into a local Postgres database rewound to production's schema
+instead.
+
+| Found | Effect | Fixed |
+|---|---|---|
+| BUG-34 `media_library/0004`: the new folder-name key had no organisation; only root folders were de-duplicated; a duplicate could be renamed onto an existing "X (2)" | The deploy aborts (`could not create unique index`), or one tenant's org-wide folder is renamed because of another tenant's | The key includes the organisation; all scopes de-duplicated with the first free suffix. Test rewinds a real DB to `0003`, seeds every shape, migrates forward. It reproduces the abort on the old migration |
+| BUG-35 recurrence: two workers during a deploy each cloned the same dates | Duplicate scheduled posts, i.e. a double publish once accounts are connected | Ledger re-read under a row lock per occurrence. A two-thread race test gives 24 clones for 12 dates without the lock (3 of 3 runs) and passes with it |
+| Folder delete could 500 (name clash on promotion, concurrent deletes, an id-named sibling), and a non-clashing child could be renamed | Partial state or a failed delete | Atomic and serialised per workspace; names planned in memory; only real clashes get a suffix |
+| `SET CONSTRAINTS` broke `migrate` on the README's SQLite setup | Local dev only | Runs on Postgres only |
+| NUL byte in a folder name; double-submit on create/rename | HTTP 500 | 400 with a message |
+
+Checked and fine: production runs Postgres 18 (`postgres-ssl:18`), so `NULLS
+NOT DISTINCT` is supported. `composer/0015` was edited after production
+applied it, but only its reverse function changed, so there is no schema
+drift.
+
+**Owner note, recurring posts.** The worker already on `226ed66` has queued an
+hourly recurrence cycle. It fails today only because a column is missing.
+Once the release migrates, any "Make recurring" rule saved earlier will
+generate up to 90 days of scheduled copies. In the old build that tick did
+nothing, so the user may not remember setting it. No accounts are connected,
+so nothing would publish, but the calendar would fill. After the deploy,
+review Calendar for unexpected repeated posts and delete the source post's
+recurrence if it was a test.
