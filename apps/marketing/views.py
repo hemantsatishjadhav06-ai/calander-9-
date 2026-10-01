@@ -165,6 +165,7 @@ def _page(request: HttpRequest, template: str, *, key: str, title: str, descript
     context = {
         "site_name": getattr(settings, "SITE_NAME", "SM Bean"),
         "upstream_url": UPSTREAM_URL,
+        "source_url": settings.SOURCE_URL,
         "page_key": key,
         "page_title": title,
         "meta_description": description,
