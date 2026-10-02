@@ -52,6 +52,11 @@
                     {% if page.category %}
                     <p class="text-xs text-stone-500">{{ page.category }}</p>
                     {% endif %}
+                    {% if page.brand_expected %}
+                    <p class="text-xs text-emerald-700 font-semibold mt-0.5">This brand's account</p>
+                    {% elif page.brand_other %}
+                    <p class="text-xs text-red-700 font-semibold mt-0.5" role="note">Belongs to your other brand — connect it in that workspace instead</p>
+                    {% endif %}
                     {% if not page.can_publish %}
                     <p class="text-xs text-amber-600 mt-0.5">Missing Facebook content publishing access</p>
                     {% elif page.already_connected %}
