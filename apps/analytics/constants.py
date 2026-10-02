@@ -21,4 +21,8 @@ NO_ANALYTICS_PLATFORMS: dict[str, str] = {
     # AnalyticsPlatformConfig: a missing config row now reads as *enabled*, and
     # this is a capability gap, not an admin decision.
     "devto": ("Publishing to DEV.to is supported, but its analytics aren't wired up yet."),
+    # X's API exists, but it is pay-per-use: every metrics read is billed to the
+    # developer account. An hourly sync would spend that balance unattended, so
+    # X is publish-only by design rather than by omission.
+    "x": ("X's API bills every read, so analytics aren't synced for X. Publishing is supported."),
 }

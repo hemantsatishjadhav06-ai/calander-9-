@@ -28,6 +28,7 @@ class TestProviderRegistry:
             "google_business",
             "mastodon",
             "devto",
+            "x",
         }
         assert set(PROVIDER_REGISTRY.keys()) == expected
 

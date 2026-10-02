@@ -466,6 +466,7 @@ CSP_FORM_ACTION = (
     "https://www.linkedin.com",
     "https://www.pinterest.com",
     "https://www.tiktok.com",
+    "https://x.com",
 )
 CSP_INCLUDE_NONCE_IN = ["script-src"]
 
@@ -646,6 +647,14 @@ PLATFORM_CREDENTIALS_FROM_ENV = {
     # DEV.to - per-account API key (no OAuth). The key is supplied by the user
     # at connect time, so no app-level credentials apply (same as Bluesky).
     "devto": {},
+    # X (Twitter) - the OAuth 2.0 Client ID / Client Secret of an X developer app
+    # (confidential client, OAuth 2.0 + PKCE). X's API is pay-per-use: every
+    # post, and the periodic health check's profile read, spends credits on the
+    # developer account that owns this app. See the README "X (Twitter)" section.
+    "x": {
+        "client_id": env("PLATFORM_X_CLIENT_ID", default=""),
+        "client_secret": env("PLATFORM_X_CLIENT_SECRET", default=""),
+    },
 }
 
 # Publishing engine

@@ -27,7 +27,7 @@ def check_social_account_health(account_id: str):
     """
     from providers import get_provider
 
-    from .error_messages import friendly_health_check_error
+    from .error_messages import friendly_health_check_error, is_payment_required
     from .models import SocialAccount
 
     try:
@@ -107,8 +107,17 @@ def check_social_account_health(account_id: str):
             account.connection_status = SocialAccount.ConnectionStatus.CONNECTED
         account.last_error = friendly_health_check_error(e)
     except Exception as e:
-        logger.warning("Health check: profile fetch failed for %s: %s", account, e)
-        account.connection_status = SocialAccount.ConnectionStatus.ERROR
+        if is_payment_required(e):
+            # HTTP 402: the developer account behind the app is out of API
+            # credits (X is pay-per-use). Like a spent quota it says nothing
+            # about the grant, and ERROR would drop the account from this
+            # scheduler until someone reconnects — which can't fix a balance.
+            logger.warning("Health check: developer account out of API credits for %s: %s", account, e)
+            if account.connection_status == SocialAccount.ConnectionStatus.ERROR:
+                account.connection_status = SocialAccount.ConnectionStatus.CONNECTED
+        else:
+            logger.warning("Health check: profile fetch failed for %s: %s", account, e)
+            account.connection_status = SocialAccount.ConnectionStatus.ERROR
         account.last_error = friendly_health_check_error(e)
 
     account.last_health_check_at = timezone.now()

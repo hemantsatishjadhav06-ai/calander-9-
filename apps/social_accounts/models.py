@@ -227,6 +227,9 @@ class SocialAccount(models.Model):
         "google_business": 1500,
         "mastodon": 500,
         "devto": 25000,
+        # Weighted: links count 23 each, CJK and emoji two. caption_wire_length
+        # applies that weighting, so this compares like with like.
+        "x": 280,
     }
 
     @property
@@ -281,6 +284,11 @@ class SocialAccount(models.Model):
             "title_max_length": 128,
             "title_label": "Article Title",
             "caption_label": "Body (Markdown)",
+            "supports_first_comment": False,
+        },
+        # A first comment on X is a reply — a second billed post on a
+        # pay-per-use API — so it is not offered.
+        "x": {
             "supports_first_comment": False,
         },
     }
@@ -349,6 +357,7 @@ class SocialAccount(models.Model):
             "google_business": "gb",
             "mastodon": "ma",
             "devto": "dv",
+            "x": "x",
         }
         return icons.get(self.platform, self.platform[:2])
 

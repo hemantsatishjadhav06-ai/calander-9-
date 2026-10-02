@@ -34,6 +34,7 @@
                     {% elif value == 'google_business' %}bg-blue-50 text-blue-500
                     {% elif value == 'mastodon' %}bg-indigo-50 text-indigo-600
                     {% elif value == 'devto' %}bg-stone-100 text-stone-900
+                    {% elif value == 'x' %}bg-stone-900 text-white
                     {% endif %}">
                     {% include "social_accounts/partials/_platform_icon.html" with platform=value size="5" %}
                 </div>
@@ -54,10 +55,18 @@
                         {% elif value == 'google_business' %}Local posts
                         {% elif value == 'mastodon' %}Federated social
                         {% elif value == 'devto' %}Articles &amp; posts
+                        {% elif value == 'x' %}Posts &middot; pay-per-use API
                         {% endif %}
                     </p>
                 </div>
             </div>
+
+            {% if value == 'x' %}
+            {# X bills every request, so the inbox and analytics never call it. Say so before anyone connects. #}
+            <p class="mt-3 text-[11px] leading-snug text-stone-500">
+                Publishing only: no comments, DMs or insights. X charges the developer account behind this site's app for every post.
+            </p>
+            {% endif %}
 
             {% if value in configured_platforms %}
             <form method="post" action="{% url 'social_accounts:connect' workspace_id=workspace_id %}" class="mt-4">
@@ -68,6 +77,25 @@
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                 </button>
             </form>
+            {% elif value == 'x' %}
+            {# X has no app review to wait for: it is unavailable only until this site's X credentials are set, so "Coming soon" would be untrue. #}
+            <div class="mt-4">
+                <span class="w-full inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-stone-500 bg-stone-100 rounded-full cursor-not-allowed">
+                    Not configured
+                </span>
+                {% if request.user.is_staff %}
+                <p class="mt-2 text-[11px] leading-snug text-stone-500">
+                    Create an app at console.x.com with OAuth 2.0 (Web App, confidential client) and the callback
+                    <code class="text-[10px] break-all">{{ request.scheme }}://{{ request.get_host }}{% url 'social_accounts:oauth_callback' platform='x' %}</code>,
+                    then set <code class="text-[10px]">PLATFORM_X_CLIENT_ID</code> and <code class="text-[10px]">PLATFORM_X_CLIENT_SECRET</code>
+                    (or add them under <span class="font-medium text-stone-600">Admin → Platform credentials</span>). Add API credits before connecting: X has no free tier.
+                </p>
+                {% else %}
+                <p class="mt-2 text-[11px] leading-snug text-stone-500">
+                    Available once this site's X developer app is set up{% if SUPPORT_EMAIL %}. <a href="mailto:{{ SUPPORT_EMAIL }}?subject={{ label|urlencode }}%20access" class="underline hover:text-stone-700">Ask for it</a>{% endif %}.
+                </p>
+                {% endif %}
+            </div>
             {% else %}
             <div class="mt-4">
                 <span class="w-full inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-stone-500 bg-stone-100 rounded-full cursor-not-allowed">
