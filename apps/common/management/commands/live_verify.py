@@ -313,7 +313,9 @@ class Command(BaseCommand):
 
     def check_isolation_and_approval(self):
         try:
-            with transaction.atomic():
+            # Notifications are delivered inline (email, webhooks); the fixture's
+            # throwaway reviewers must not be emailed before the rollback.
+            with transaction.atomic(), patch("apps.notifications.engine._dispatch", lambda delivery: None):
                 self._workflow_fixture()
                 raise _FixtureRollbackError
         except _FixtureRollbackError:
