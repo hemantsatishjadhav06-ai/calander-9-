@@ -382,7 +382,7 @@ class Command(BaseCommand):
         )
 
         def client_for(u):
-            c = Client(HTTP_HOST=host, secure=True)
+            c = Client(HTTP_HOST=host, secure=True, HTTP_X_FORWARDED_PROTO="https")
             c.force_login(u)
             return c
 
@@ -397,7 +397,7 @@ class Command(BaseCommand):
             "isolation.workspace",
             f"outsider got {codes} (want 403/404)",
         )
-        login_page = Client(HTTP_HOST=host, secure=True).get(reverse("account_login"))
+        login_page = Client(HTTP_HOST=host, secure=True, HTTP_X_FORWARDED_PROTO="https").get(reverse("account_login"))
         self.record("PASS" if login_page.status_code == 200 else "FAIL", "login.page", f"HTTP {login_page.status_code}")
 
         # Draft → review: an editor's Schedule turns into a review request.
