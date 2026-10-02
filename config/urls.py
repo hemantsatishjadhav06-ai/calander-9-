@@ -108,6 +108,8 @@ urlpatterns = [
     path("workspace/<uuid:workspace_id>/settings/clients/", include("apps.client_portal.urls_admin")),
     # Media Library
     path("workspace/<uuid:workspace_id>/media/", include("apps.media_library.urls")),
+    # Blog posts for the brands' websites (write, approve, publish via GitHub)
+    path("workspace/<uuid:workspace_id>/blog/", include("apps.blog.urls")),
     # Client Portal (Stream F)
     path("portal/", include("apps.client_portal.urls")),
     path("notifications/", include("apps.notifications.urls")),

@@ -109,6 +109,8 @@ LOCAL_APPS = [
     "apps.oauth_server",
     "apps.analytics",
     "apps.marketing",
+    # Blog posts for the brands' own websites, committed to their GitHub repos.
+    "apps.blog",
     "theme",
 ]
 
@@ -673,6 +675,14 @@ PUBLISHER_PUBLISH_CONFIRM_TIMEOUT = env.int("PUBLISHER_PUBLISH_CONFIRM_TIMEOUT",
 PUBLISHER_MAX_CONCURRENT_PUBLISHES = env.int("PUBLISHER_MAX_CONCURRENT_PUBLISHES", default=10)
 PUBLISHER_MAX_CONCURRENT_POSTS = env.int("PUBLISHER_MAX_CONCURRENT_POSTS", default=4)
 PUBLISHER_MAX_CONCURRENT_PLATFORM_PUBLISHES = env.int("PUBLISHER_MAX_CONCURRENT_PLATFORM_PUBLISHES", default=6)
+
+# Blog publishing (apps.blog). A fine-grained GitHub personal access token
+# limited to the website repositories (hemantsatishjadhav06-ai/neopolis-site-deploy
+# and hemantsatishjadhav06-ai/morespace-website) with "Contents: read and write"
+# and "Actions: read and write". Approved blog posts are committed with it and
+# the site's deploy workflow dispatched. Empty: publishing refuses with a
+# message saying so, and posts stay approved.
+BLOG_GITHUB_TOKEN = env("BLOG_GITHUB_TOKEN", default="")
 
 # Webhook verification
 FACEBOOK_WEBHOOK_VERIFY_TOKEN = env("FACEBOOK_WEBHOOK_VERIFY_TOKEN", default="")
