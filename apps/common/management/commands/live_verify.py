@@ -194,6 +194,16 @@ class Command(BaseCommand):
                 f"{(getattr(settings, 'APP_URL', '') or '').rstrip('/')}/social-accounts/callback/x/), add credits "
                 "(pay-per-use), then set PLATFORM_X_CLIENT_ID / PLATFORM_X_CLIENT_SECRET",
             )
+        base = (getattr(settings, "APP_URL", "") or "").rstrip("/")
+        if getattr(settings, "FACEBOOK_WEBHOOK_VERIFY_TOKEN", ""):
+            self.record("PASS", "webhooks.meta", f"verify token set; Meta callback {base}/webhooks/facebook/")
+        else:
+            self.record(
+                "BLOCKED",
+                "webhooks.meta",
+                "FACEBOOK_WEBHOOK_VERIFY_TOKEN unset — comments/DMs arrive by polling only. For real-time, set it and "
+                f"subscribe {base}/webhooks/facebook/ in the Meta app (Webhooks → Page and Instagram)",
+            )
         token = bool(getattr(settings, "BLOG_GITHUB_TOKEN", ""))
         self.record(
             "PASS" if token else "BLOCKED",
