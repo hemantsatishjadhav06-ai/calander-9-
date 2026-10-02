@@ -436,7 +436,8 @@ def _find_run(client: GitHubClient, post: BlogPost) -> dict | None:
     def created(run):
         return parse_datetime(run.get("created_at") or "") or dt.datetime.min.replace(tzinfo=dt.UTC)
 
-    recent = [run for run in runs if created(run) >= post.dispatched_at - RUN_CLOCK_SKEW]
+    dispatched_at = post.dispatched_at or post.publish_started_at or timezone.now()
+    recent = [run for run in runs if created(run) >= dispatched_at - RUN_CLOCK_SKEW]
     ours = [run for run in recent if run.get("head_sha") == post.commit_sha]
     candidates = ours or recent
     return min(candidates, key=created) if candidates else None

@@ -31,7 +31,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from urllib.parse import quote, urljoin, urlsplit
 
-import markdown as markdown_lib
+import markdown as markdown_lib  # type: ignore[import-untyped]
 import nh3
 
 # ---------------------------------------------------------------------------
@@ -854,8 +854,9 @@ def hero_jpeg_bytes(asset) -> bytes:
     with asset.file.open("rb") as handle:
         data = handle.read()
     try:
-        image = Image.open(io.BytesIO(data))
-        image.draft("RGB", (HERO_MAX_WIDTH, 1))  # JPEG: decode at the smallest scale still >= 1600 wide
+        opened = Image.open(io.BytesIO(data))
+        opened.draft("RGB", (HERO_MAX_WIDTH, 1))
+        image: Image.Image = opened  # JPEG: decode at the smallest scale still >= 1600 wide
         if image.width * image.height > max_pixels:
             raise ValueError(
                 f"The featured image is {image.width}x{image.height}, larger than this server will process."

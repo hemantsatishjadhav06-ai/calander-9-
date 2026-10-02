@@ -155,7 +155,7 @@ class BlogPostForm(forms.ModelForm):
             bound = self[name].value()
             return "" if bound is None else str(bound)
 
-        sites = self.fields["site"].queryset
+        sites = self.fields["site"].queryset  # type: ignore[attr-defined]
         return {
             "title": value("title"),
             "slug": value("slug"),

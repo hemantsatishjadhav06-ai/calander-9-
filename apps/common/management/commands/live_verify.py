@@ -321,6 +321,12 @@ class Command(BaseCommand):
         except _FixtureRollbackError:
             self.record("INFO", "workflow.rollback", "fixture rolled back; nothing kept")
 
+    def _blog_fixture(self, ws, approver, editor, outsider, client_for, tag):
+        try:
+            _blog_fixture_checks(self, ws, approver, editor, outsider, client_for, tag)
+        except Exception as exc:
+            self.record("FAIL", "blog.workflow", f"check crashed: {type(exc).__name__}: {exc}")
+
     def _workflow_fixture(self):
         from django.test import Client
         from django.urls import reverse
@@ -519,6 +525,8 @@ class Command(BaseCommand):
             f"status={pp2.status}, provider calls={len(calls)}, error={pp2.publish_error[:80]}",
         )
 
+        self._blog_fixture(ws_a, approver, editor, outsider, client_for, tag)
+
         # The dashboard pages render for the approver.
         for name, url in (
             ("calendar", reverse("calendar:calendar", kwargs={"workspace_id": ws_a.id})),
@@ -526,6 +534,83 @@ class Command(BaseCommand):
         ):
             code = approver_client.get(url).status_code
             self.record("PASS" if code == 200 else "FAIL", f"dashboard.{name}", f"HTTP {code}")
+
+
+def _blog_fixture_checks(cmd, ws, approver, editor, outsider, client_for, tag):
+    from django.core.exceptions import PermissionDenied
+    from django.urls import reverse
+
+    from apps.approvals.actor import API, DASHBOARD, acting_as
+    from apps.blog import services as blog
+    from apps.blog.models import BlogSite
+
+    site = BlogSite.objects.create(
+        workspace=ws,
+        name="Fixture site",
+        kind="neopolis_static",
+        site_url="https://www.neopolisinfra.com",
+        repo="hemantsatishjadhav06-ai/neopolis-site-deploy",
+        workflow_file="publish3.yml",
+    )
+    post = blog.create_post(
+        workspace=ws, site=site, author=editor, title=f"Fixture {tag}", slug=f"fixture-{tag}", body="Body text."
+    )
+    blog.submit_for_review(post, editor)
+
+    refused = []
+    for user, channel in ((None, "system"), (approver, API), (editor, DASHBOARD)):
+        try:
+            with acting_as(user, channel):
+                blog.approve(post)
+            refused.append(False)
+        except PermissionDenied:
+            refused.append(True)
+    post.refresh_from_db()
+    cmd.record(
+        "PASS" if all(refused) and post.status == "pending_review" else "FAIL",
+        "blog.only_dashboard_approver_approves",
+        f"refused for system/api/editor={refused}, status={post.status}",
+    )
+
+    preview = reverse("blog:preview", kwargs={"workspace_id": ws.id, "post_id": post.id})
+    outsider_code = client_for(outsider).get(preview).status_code
+    approver_resp = client_for(approver).get(preview)
+    private = approver_resp.status_code == 200 and "noindex" in approver_resp.get("X-Robots-Tag", "")
+    cmd.record(
+        "PASS" if outsider_code in (403, 404) and private else "FAIL",
+        "blog.preview_private",
+        f"outsider HTTP {outsider_code}; approver HTTP {approver_resp.status_code}, "
+        f"X-Robots-Tag={approver_resp.get('X-Robots-Tag', '')!r}",
+    )
+
+    with acting_as(approver, DASHBOARD):
+        blog.approve(post)
+    post.refresh_from_db()
+    blog.update_content(post, approver, body="Edited after approval.")
+    post.refresh_from_db()
+    cmd.record(
+        "PASS" if post.status == "pending_review" and not post.approved_fingerprint else "FAIL",
+        "blog.edit_withdraws_approval",
+        f"status={post.status}",
+    )
+
+    with acting_as(approver, DASHBOARD):
+        blog.approve(post)
+    post.refresh_from_db()
+    if blog.github_token():
+        cmd.record("INFO", "blog.publish_ready", "token present; approved posts can be published from the dashboard")
+    else:
+        try:
+            with acting_as(approver, DASHBOARD):
+                blog.start_publish(post)
+            cmd.record("FAIL", "blog.publish_without_token", "started without a token")
+        except Exception as exc:
+            post.refresh_from_db()
+            cmd.record(
+                "PASS" if post.status == "approved" else "FAIL",
+                "blog.publish_without_token",
+                f"refused ({type(exc).__name__}); post stays {post.status}, nothing written to GitHub",
+            )
 
 
 def _json(data):

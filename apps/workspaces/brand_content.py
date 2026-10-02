@@ -217,10 +217,10 @@ BLOG_DRAFTS = {
         "title": "Joint Development Agreements Explained: Where Landlord-Share Flats Come From",
         "slug": "joint-development-agreement-landlord-share-explained",
         "category": "Buyer Guide",
-        "seo_title": "Joint Development & Landlord-Share Flats Explained | Neopolis Infra",
+        "seo_title": "Joint Development & Landlord-Share Flats Explained",
         "meta_description": (
-            "How a joint development agreement creates the landowner's share of flats in West Hyderabad, why that "
-            "share can cost less than resale, and what to check before you buy one."
+            "How a joint development creates the landowner's share of flats in West Hyderabad, why it can cost less "
+            "than resale, and what to check before you buy."
         ),
         "excerpt": (
             "Most landlord-share flats start life in a joint development agreement. Here is how the landowner's "
@@ -280,7 +280,7 @@ Tell us the corridor — Kokapet, Narsingi, Neopolis, Manchirevula, Tellapur or 
         "title": "Landlord Shares, Investor Flats or Builder Inventory: Which Route Fits Your Hyderabad Home Search?",
         "slug": "landlord-shares-investor-flats-builder-inventory-hyderabad",
         "category": "Buyer Guide",
-        "seo_title": "Landlord Shares vs Investor Flats vs Builder Inventory | More Space",
+        "seo_title": "Landlord Shares, Investor Flats or Builder Inventory?",
         "meta_description": (
             "Three ways to buy a premium Hyderabad flat — landlord shares, investor flats and builder inventory — "
             "and how More Space helps you choose the right route."

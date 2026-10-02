@@ -181,11 +181,8 @@ class Command(BaseCommand):
         describe_candidates(lambda m: self.stdout.write(f"setup_brands: {m}"))
         self.stdout.write(f"setup_brands: approver {mask_email(approver.email)} (set BRAND_APPROVER_EMAIL to choose)")
         workspaces = ensure_brand_workspaces(approver, log=lambda m: self.stdout.write(f"setup_brands: {m}"))
-        try:
-            from apps.blog.services import ensure_blog_sites
-        except ImportError:
-            ensure_blog_sites = None
-        if ensure_blog_sites is not None:
-            ensure_blog_sites(workspaces["neopolis"], workspaces["morespace"])
-            self.stdout.write("setup_brands: blog sites ensured")
+        from apps.blog.management.commands.ensure_blog_sites import ensure_blog_sites
+
+        for site, outcome in ensure_blog_sites(workspaces["neopolis"], workspaces["morespace"]):
+            self.stdout.write(f"setup_brands: blog site {site.name} -> {site.repo} ({outcome})")
         self.stdout.write(self.style.SUCCESS("setup_brands: done"))

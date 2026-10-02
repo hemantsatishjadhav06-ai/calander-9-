@@ -24,6 +24,7 @@ import hashlib
 import json
 import logging
 import re
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
@@ -157,7 +158,7 @@ def _require_create(user, workspace):
         raise PermissionDenied("You need permission to create posts in this workspace.")
 
 
-def _require_approver(post) -> object:
+def _require_approver(post) -> Any:
     approver = dashboard_approver(post.workspace)
     if approver is None:
         raise PermissionDenied(

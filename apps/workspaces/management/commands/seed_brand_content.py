@@ -160,10 +160,11 @@ def seed_blogs(ws, approver, brand_key, *, log):
     item = BLOG_DRAFTS.get(brand_key)
     if not item or _marker(ws, item["key"]) is not None:
         return 0
-    try:
-        from apps.blog.services import seed_blog_draft
-    except ImportError:
-        log("  blog app not installed; blog draft skipped")
+    from apps.blog.models import BlogSite
+
+    site = BlogSite.objects.filter(workspace=ws, is_enabled=True).order_by("created_at").first()
+    if site is None:
+        log("  no blog site for this workspace; blog draft skipped")
         return 0
     asset = None
     upload = fetch_image(item["image"], item["key"])
@@ -179,12 +180,27 @@ def seed_blogs(ws, approver, brand_key, *, log):
             title=item["title"],
             tags=["seed", "blog"],
         )
-    post = seed_blog_draft(ws, approver, item, featured_image=asset)
-    if post is None:
-        log("  no blog site for this workspace; blog draft skipped")
-        return 0
-    _set_marker(ws, item["key"], {"blog_post_id": str(post.pk)})
-    log(f"  created blog draft '{item['title']}' ({post.pk}), submitted for review")
+    from apps.blog import services as blog
+
+    with acting_as(None, SYSTEM):
+        post = blog.create_post(
+            workspace=ws,
+            site=site,
+            author=approver,
+            title=item["title"],
+            slug=item["slug"],
+            excerpt=item["excerpt"],
+            body=item["body"],
+            featured_image=asset,
+            featured_image_alt=item["image_alt"] if asset else "",
+            seo_title=item["seo_title"],
+            meta_description=item["meta_description"],
+            category=item["category"],
+            faq=item["faq"],
+        )
+        _set_marker(ws, item["key"], {"blog_post_id": str(post.pk)})
+        blog.submit_for_review(post, approver)
+    log(f"  created blog draft '{item['title']}' ({post.pk}) on {site.repo}; submitted for approval")
     return 1
 
 
