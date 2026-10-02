@@ -53,7 +53,7 @@ def fetch_image(url, name, *, timeout=20):
     from PIL import Image
 
     try:
-        resp = httpx.get(url, timeout=timeout, follow_redirects=True, headers={"User-Agent": "SM-Manager-seed/1.0"})
+        resp = httpx.get(url, timeout=timeout, follow_redirects=True, headers={"User-Agent": "SM-Manager-seed/1.0", "Accept": "image/jpeg,image/png;q=0.9,image/webp;q=0.8"})
         resp.raise_for_status()
         img = Image.open(io.BytesIO(resp.content))
         img = img.convert("RGB")
