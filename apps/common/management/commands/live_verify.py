@@ -159,6 +159,13 @@ class Command(BaseCommand):
                 f"workspace {ws.id} '{ws.name}', tz={ws.timezone}, enforced approval={ws.require_dashboard_approval}, "
                 f"approvers={len(approvers)}",
             )
+            base = (getattr(settings, "APP_URL", "") or "").rstrip("/")
+            self.record(
+                "INFO",
+                f"brand.{brand['key']}.links",
+                f"approvals {base}/workspace/{ws.id}/calendar/?mode=list&tab=approvals · "
+                f"calendar {base}/workspace/{ws.id}/calendar/ · accounts {base}/social-accounts/{ws.id}/connect/",
+            )
         others = Workspace.objects.filter(require_dashboard_approval=False, is_archived=False).count()
         self.record("INFO", "brand.other_workspaces", f"{others} other workspace(s) keep their existing approval mode")
 

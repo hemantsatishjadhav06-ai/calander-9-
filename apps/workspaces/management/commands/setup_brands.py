@@ -39,13 +39,53 @@ def mask_email(email: str) -> str:
 
 
 def resolve_approver(email=None):
+    """The person who approves brand content.
+
+    ``--approver-email``, else ``BRAND_APPROVER_EMAIL``; otherwise the
+    organization owner who signed in most recently (the person actually using
+    the dashboard), else ``DJANGO_SUPERUSER_EMAIL``, else the oldest superuser.
+    """
     user_model = get_user_model()
-    for candidate in (email, os.environ.get("BRAND_APPROVER_EMAIL"), os.environ.get("DJANGO_SUPERUSER_EMAIL")):
+    for candidate in (email, os.environ.get("BRAND_APPROVER_EMAIL")):
         if candidate:
-            user = user_model.objects.filter(email__iexact=candidate.strip()).first()
+            user = user_model.objects.filter(email__iexact=candidate.strip(), is_active=True).first()
             if user:
                 return user
+    owners = (
+        user_model.objects.filter(
+            is_active=True,
+            last_login__isnull=False,
+            org_memberships__org_role=OrgMembership.OrgRole.OWNER,
+        )
+        .exclude(email__startswith="live-verify-")
+        .order_by("-last_login")
+        .distinct()
+    )
+    recent = owners.first()
+    if recent is not None:
+        return recent
+    superuser_email = os.environ.get("DJANGO_SUPERUSER_EMAIL")
+    if superuser_email:
+        user = user_model.objects.filter(email__iexact=superuser_email.strip(), is_active=True).first()
+        if user:
+            return user
     return user_model.objects.filter(is_superuser=True, is_active=True).order_by("created_at").first()
+
+
+def describe_candidates(log):
+    """Log every org owner (masked) with their last sign-in, so the choice can be checked."""
+    user_model = get_user_model()
+    rows = (
+        user_model.objects.filter(is_active=True, org_memberships__org_role=OrgMembership.OrgRole.OWNER)
+        .exclude(email__startswith="live-verify-")
+        .distinct()
+        .order_by("-last_login")
+    )
+    for u in rows[:10]:
+        orgs = ", ".join(m.organization.name for m in u.org_memberships.select_related("organization")[:3])
+        log(
+            f"candidate {mask_email(u.email)} last sign-in {u.last_login or 'never'} superuser={u.is_superuser} orgs=[{orgs}]"
+        )
 
 
 def resolve_org(user):
@@ -138,7 +178,8 @@ class Command(BaseCommand):
         approver = resolve_approver(approver_email)
         if approver is None:
             raise CommandError("No approver: pass --approver-email or set BRAND_APPROVER_EMAIL.")
-        self.stdout.write(f"setup_brands: approver {mask_email(approver.email)}")
+        describe_candidates(lambda m: self.stdout.write(f"setup_brands: {m}"))
+        self.stdout.write(f"setup_brands: approver {mask_email(approver.email)} (set BRAND_APPROVER_EMAIL to choose)")
         workspaces = ensure_brand_workspaces(approver, log=lambda m: self.stdout.write(f"setup_brands: {m}"))
         try:
             from apps.blog.services import ensure_blog_sites
