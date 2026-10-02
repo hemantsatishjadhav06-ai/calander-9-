@@ -38,6 +38,24 @@ def test_derive_false_for_partial_or_empty():
     assert derive_is_configured("youtube", {"client_id": None, "client_secret": None}) is False
 
 
+def test_derive_x_requires_the_oauth2_client_pair():
+    assert derive_is_configured("x", {"client_id": "cid", "client_secret": "csec"}) is True
+    assert derive_is_configured("x", {"client_id": "cid"}) is False
+    # The OAuth 1.0a API key pair is not what the v2 PKCE flow uses.
+    assert derive_is_configured("x", {"api_key": "k", "api_secret": "s"}) is False
+
+
+def test_x_settings_read_platform_x_env_vars():
+    from django.conf import settings
+
+    assert set(settings.PLATFORM_CREDENTIALS_FROM_ENV["x"]) == {"client_id", "client_secret"}
+
+
+def test_admin_form_offers_x():
+    choice_values = [value for value, _label in PlatformCredentialAdminForm().fields["platform"].choices]
+    assert "x" in choice_values
+
+
 def test_derive_false_for_credential_less_platforms():
     assert derive_is_configured("bluesky", {"anything": "x"}) is False
     assert derive_is_configured("mastodon", {"client_id": "x", "client_secret": "y"}) is False
@@ -401,6 +419,7 @@ REALISTIC_ENV = {
     "youtube": {"client_id": "g-id", "client_secret": "g-sec"},
     "google_business": {"client_id": "g-id", "client_secret": "g-sec"},
     "pinterest": {"app_id": "pin-id", "app_secret": "pin-sec"},
+    "x": {"client_id": "x-id", "client_secret": "x-sec"},
 }
 
 

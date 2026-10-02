@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from apps.social_accounts.models import SocialAccount
 from apps.social_accounts.tasks import check_social_account_health
-from providers.exceptions import QuotaExceededError
+from providers.exceptions import APIError, QuotaExceededError
 from providers.types import AccountProfile, OAuthTokens
 
 
@@ -139,6 +139,28 @@ class TestCheckSocialAccountHealth:
         account = SocialAccount.objects.get(pk=connected_account.pk)
         assert account.connection_status == SocialAccount.ConnectionStatus.CONNECTED
         assert account.last_error == "Rate limit reached. We'll retry this check shortly."
+
+    @patch("providers.get_provider")
+    def test_out_of_credits_keeps_the_account_connected(self, mock_get_provider, connected_account):
+        """X's pay-per-use API answers 402 when the developer account is empty.
+
+        That says nothing about the grant: flipping to ERROR would drop the
+        account from this scheduler until someone reconnected, which can't fix
+        a balance.
+        """
+        from apps.social_accounts.error_messages import PAYMENT_REQUIRED_MESSAGE
+
+        connected_account.connection_status = SocialAccount.ConnectionStatus.ERROR
+        connected_account.save(update_fields=["connection_status"])
+        mock_provider = MagicMock()
+        mock_provider.get_profile.side_effect = APIError("out of credits", status_code=402, retryable=False)
+        mock_get_provider.return_value = mock_provider
+
+        check_social_account_health.now(str(connected_account.id))
+
+        account = SocialAccount.objects.get(pk=connected_account.pk)
+        assert account.connection_status == SocialAccount.ConnectionStatus.CONNECTED
+        assert account.last_error == PAYMENT_REQUIRED_MESSAGE
 
     @patch("providers.get_provider")
     def test_token_refresh_on_expiring(self, mock_get_provider, connected_account):

@@ -101,6 +101,10 @@ def _resolve_publish_credentials(account):
             )
     elif platform == "facebook":
         credentials["page_id"] = account.account_platform_id
+    elif platform == "x":
+        # Only used to build the post's public URL (x.com/<username>/status/<id>);
+        # X's create-post response doesn't carry the author's handle.
+        credentials["username"] = account.account_handle
     elif platform in ("instagram", "instagram_login"):
         credentials["ig_user_id"] = account.account_platform_id
         # The comment poll and the first-comment reconciliation both match our
