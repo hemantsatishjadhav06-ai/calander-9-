@@ -190,8 +190,19 @@ def approvals_settings(request, workspace_id):
             messages.error(request, "Invalid approval workflow mode.")
             return redirect("workspaces:approvals_settings", workspace_id=workspace.id)
 
+        require = request.POST.get("require_dashboard_approval") == "on"
+        if require != workspace.require_dashboard_approval and (
+            membership.workspace_role != WorkspaceMembership.WorkspaceRole.OWNER
+        ):
+            messages.error(request, "Only a workspace owner can change whether dashboard approval is required.")
+            return redirect("workspaces:approvals_settings", workspace_id=workspace.id)
+        if require and mode in (Workspace.ApprovalWorkflowMode.NONE, Workspace.ApprovalWorkflowMode.OPTIONAL):
+            # Enforced approval needs a review step to approve in.
+            mode = Workspace.ApprovalWorkflowMode.REQUIRED_INTERNAL
+
         workspace.approval_workflow_mode = mode
-        workspace.save(update_fields=["approval_workflow_mode", "updated_at"])
+        workspace.require_dashboard_approval = require
+        workspace.save(update_fields=["approval_workflow_mode", "require_dashboard_approval", "updated_at"])
         messages.success(request, "Approval workflow updated.")
         return redirect("workspaces:approvals_settings", workspace_id=workspace.id)
 
@@ -202,6 +213,7 @@ def approvals_settings(request, workspace_id):
             "workspace": workspace,
             "settings_active": "approvals",
             "is_owner_or_manager": is_owner_or_manager,
+            "is_owner": membership.workspace_role == WorkspaceMembership.WorkspaceRole.OWNER,
             "approval_modes": Workspace.ApprovalWorkflowMode,
         },
     )

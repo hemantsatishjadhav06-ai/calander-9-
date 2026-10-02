@@ -14,6 +14,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from apps.approvals.gate import ApprovalRequired
 from apps.common.timezones import canonical_timezone
 from apps.common.validators import is_valid_hex_color
 from apps.composer.models import ContentCategory, PlatformPost, Post
@@ -599,7 +600,12 @@ def _get_tab_context(request, workspace, tab: str) -> dict:
         Post.objects.for_workspace(workspace.id)
         .filter(Exists(pp_match))
         .select_related("author")
-        .prefetch_related("platform_posts__social_account", "media_attachments__media_asset", "versions")
+        .prefetch_related(
+            "platform_posts__social_account",
+            "platform_posts__approved_by",
+            "media_attachments__media_asset",
+            "versions",
+        )
         .order_by("scheduled_at", "-created_at")
     )
     # Tag is a Post-level attribute (can't cross child rows) — apply it directly.
@@ -1218,6 +1224,8 @@ def reschedule_post(request, workspace_id):
             assigned_slot_datetime=new_dt
         )
         sync_post_scheduled_at(post)
+    except ApprovalRequired as e:
+        return JsonResponse({"error": str(e)}, status=403)
     except (ValueError, TypeError) as e:
         return JsonResponse({"error": f"Invalid datetime: {e}"}, status=400)
 
@@ -1383,7 +1391,11 @@ def bulk_platform_action(request, workspace_id):
                     pp.next_retry_at = None
                     pp.platform_post_id = ""
                 if pp.status != "scheduled":
-                    pp.transition_to("scheduled")
+                    try:
+                        pp.transition_to("scheduled")
+                    except ApprovalRequired:
+                        # Needs approval first (workspace requires it); left as is.
+                        continue
                 changed.append(pp)
                 affected.add(pp.post_id)
                 touched.append((pp, slot))

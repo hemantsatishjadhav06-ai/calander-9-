@@ -22,6 +22,10 @@ class ApprovalAction(models.Model):
         REJECTED = "rejected", "Rejected"
         RESUBMITTED = "resubmitted", "Resubmitted"
         HELD = "held", "Hold Requested"
+        # Written by the approval gate (apps/approvals/gate.py).
+        TIME_APPROVED = "time_approved", "Publish Time Approved"
+        WITHDRAWN = "approval_withdrawn", "Approval Withdrawn"
+        BLOCKED = "publish_blocked", "Publish Blocked"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     post = models.ForeignKey(
@@ -47,6 +51,13 @@ class ApprovalAction(models.Model):
     )
     action = models.CharField(max_length=20, choices=ActionType.choices)
     comment = models.TextField(blank=True, default="")
+    # What was reviewed: the content fingerprint and version number the gate
+    # computed at the time, the publish time signed off on, and where the
+    # action came from (dashboard, api, portal, system).
+    fingerprint = models.CharField(max_length=64, blank=True, default="", db_default="")
+    revision = models.PositiveIntegerField(blank=True, null=True)
+    publish_at = models.DateTimeField(blank=True, null=True)
+    channel = models.CharField(max_length=20, blank=True, default="", db_default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
