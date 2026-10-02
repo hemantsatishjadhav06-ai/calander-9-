@@ -6,8 +6,10 @@ from apps.social_accounts.error_messages import (
     FIRST_COMMENT_REJECTED_MESSAGE,
     FIRST_COMMENT_TEMPORARY_MESSAGE,
     GENERIC_MESSAGE,
+    PAYMENT_REQUIRED_MESSAGE,
     PLATFORM_UNAVAILABLE_MESSAGE,
     PUBLISH_GENERIC_MESSAGE,
+    PUBLISH_PAYMENT_REQUIRED_MESSAGE,
     PUBLISH_RECONNECT_MESSAGE,
     PUBLISH_REJECTED_MESSAGE,
     RATE_LIMIT_MESSAGE,
@@ -15,6 +17,7 @@ from apps.social_accounts.error_messages import (
     friendly_first_comment_error,
     friendly_health_check_error,
     friendly_publish_error,
+    is_payment_required,
 )
 from providers.exceptions import (
     APIError,
@@ -209,3 +212,31 @@ class TestQuotaAndTokenClassification:
         exc = APIError("Forbidden", status_code=403)
 
         assert friendly_health_check_error(exc) == RECONNECT_MESSAGE
+
+
+class TestPaymentRequired:
+    """HTTP 402: a pay-per-use API (X) whose developer account is out of credits.
+
+    Nothing is wrong with the user's grant, so none of this copy may send them
+    to reconnect, and none of it may promise a retry.
+    """
+
+    def _exc(self):
+        return APIError("X rejected the post: ...", status_code=402, retryable=False)
+
+    def test_health_check_names_the_balance_not_the_connection(self):
+        message = friendly_health_check_error(self._exc())
+        assert message == PAYMENT_REQUIRED_MESSAGE
+        assert message not in (RECONNECT_MESSAGE, GENERIC_MESSAGE)
+
+    def test_publish_copy_for_an_unconverted_402(self):
+        assert friendly_publish_error(self._exc()) == PUBLISH_PAYMENT_REQUIRED_MESSAGE
+
+    def test_first_comment_reads_as_rejected(self):
+        assert friendly_first_comment_error(self._exc()) == FIRST_COMMENT_REJECTED_MESSAGE
+
+    def test_is_payment_required(self):
+        assert is_payment_required(self._exc()) is True
+        assert is_payment_required(APIError("nope", status_code=403)) is False
+        assert is_payment_required(RateLimitError("slow")) is False
+        assert is_payment_required(Exception("boom")) is False

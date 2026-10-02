@@ -23,6 +23,9 @@ REQUIRED_CREDENTIAL_KEYS = {
     "google_business": (("client_id",), ("client_secret",)),
     "linkedin_personal": (("client_id",), ("client_secret",)),
     "linkedin_company": (("client_id",), ("client_secret",)),
+    # OAuth 2.0 Client ID / Client Secret from console.x.com — not the
+    # OAuth 1.0a API key pair, which the v2 PKCE flow doesn't use.
+    "x": (("client_id",), ("client_secret",)),
 }
 
 
@@ -54,6 +57,7 @@ class PlatformCredential(models.Model):
         GOOGLE_BUSINESS = "google_business", "Google Business Profile"
         MASTODON = "mastodon", "Mastodon"
         DEVTO = "devto", "DEV.to"
+        X = "x", "X (Twitter)"
 
     class TestResult(models.TextChoices):
         SUCCESS = "success", "Success"

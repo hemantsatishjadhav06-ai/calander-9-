@@ -142,6 +142,17 @@ PLATFORMS = [
         "dms": False,
         "insights": False,
     },
+    {
+        # Publish-only on purpose: X's API is pay-per-use, so inbox polling and
+        # analytics sync would spend the app owner's credits unattended.
+        "name": "X (Twitter)",
+        "icon": "x",
+        "scope": "Posts only. X's API is pay-per-use, billed to your developer account",
+        "publish": True,
+        "comments": False,
+        "dms": False,
+        "insights": False,
+    },
 ]
 
 # Distinct networks for the logo strip on the home page (one entry per icon).
@@ -157,6 +168,7 @@ NETWORKS = [
     ("Google Business", "google_business"),
     ("Mastodon", "mastodon"),
     ("DEV.to", "devto"),
+    ("X", "x"),
 ]
 
 

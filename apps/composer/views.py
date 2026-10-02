@@ -23,6 +23,7 @@ from django.utils import timezone
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.approvals import gate as approval_gate
 from apps.common.net import UnsafeUrlError, pinned_request
 from apps.common.validators import (
     parse_and_truncate_tag_string,
@@ -295,6 +296,10 @@ def _sync_platform_posts(request, post, workspace, initial_status=None):
     """
     selected_ids = _parse_selected_account_ids(request.POST.get("selected_accounts", ""))
     _remove_deselected_platform_posts(request, post, selected_ids)
+    if initial_status in approval_gate.GATED_STATUSES and approval_gate.enforced(workspace):
+        # A channel added now has not been approved; it starts as a draft and
+        # the transition below is refused by the approval gate.
+        initial_status = "draft"
     for acc_id in selected_ids:
         try:
             account = SocialAccount.objects.get(id=acc_id, workspace=workspace)
@@ -909,6 +914,30 @@ def _transition_post_children(post, target, *, allow_via_draft=True, only=None):
     return moved, skipped
 
 
+def _needs_dashboard_approval(request, post, workspace, *, content_changed):
+    """True when an enforced workspace must review this post before it is scheduled.
+
+    Checks what the composer is about to commit: every selected channel must
+    already exist with an approval that matches its content, and the base
+    content must be unchanged by this save. The approval gate still has the
+    final word on each transition; this only turns a doomed "Schedule" into a
+    review request up front.
+    """
+    if not approval_gate.enforced(workspace):
+        return False
+    if post.pk is None or content_changed:
+        return True
+    selected = {str(x) for x in _parse_selected_account_ids(request.POST.get("selected_accounts", ""))}
+    children = {str(pp.social_account_id): pp for pp in post.platform_posts.select_related("post__workspace")}
+    if not selected or not selected <= set(children):
+        return True
+    for account_id in selected:
+        pp = children[account_id]
+        if not pp.approved_fingerprint or approval_gate.fingerprint(pp) != pp.approved_fingerprint:
+            return True
+    return False
+
+
 def _base_content_snapshot(post):
     """Reviewable base content used to detect edits to an approved post."""
     return (post.title, post.caption, post.first_comment, tuple(post.tags or []))
@@ -1057,6 +1086,17 @@ def save_post(request, workspace_id, post_id=None):
         if no_channel_error is not None:
             return no_channel_error
 
+    if action in ("schedule", "publish_now", "add_to_queue", "add_to_queue_priority") and _needs_dashboard_approval(
+        request,
+        post,
+        workspace,
+        content_changed=_orig_content is not None and _base_content_snapshot(post) != _orig_content,
+    ):
+        # The workspace requires dashboard approval and something here is not
+        # approved yet (new content, an edit, a new channel). Send it for
+        # review carrying the chosen time as the proposal; once approved, it
+        # can be scheduled.
+        action = "submit_for_approval"
     if action == "schedule":
         # Same gate as publish_now, the chip menu, drag and the API: only
         # ``publish_directly`` commits a time. Anyone else's "Schedule" is a
@@ -3743,6 +3783,10 @@ def csv_confirm_import(request, workspace_id):
     # used to be a way round client approval.
     membership = request.workspace_membership
     may_publish = bool((membership.effective_permissions if membership else {}).get("publish_directly"))
+    # Imported rows are unreviewed content: where the workspace requires
+    # dashboard approval, dated rows wait for review like everyone else's.
+    if approval_gate.enforced(workspace):
+        may_publish = False
 
     for row in rows:
         try:

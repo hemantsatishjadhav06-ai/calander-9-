@@ -15,7 +15,7 @@
 
 ## About SM Bean
 
-SM Bean is an open-source, self-hostable social media management platform built for creators, agencies and SMBs. It does what Sendible, SocialPilot, or ContentStudio do, but free and without per-seat, per-channel, or per-workspace limits. Plan, compose, schedule, approve, publish, and monitor content across Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business Profile, Mastodon, and DEV.to from a single multi-workspace dashboard.
+SM Bean is an open-source, self-hostable social media management platform built for creators, agencies and SMBs. It does what Sendible, SocialPilot, or ContentStudio do, but free and without per-seat, per-channel, or per-workspace limits. Plan, compose, schedule, approve, publish, and monitor content across Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business Profile, Mastodon, DEV.to, and X (publishing only) from a single multi-workspace dashboard.
 
 It's for people managing many client accounts under one roof who'd rather own their social stack than pay $100–300/month to a SaaS vendor. Seats, workspaces and channels are never metered, and publishing, scheduling, approvals, the client portal, inbox and analytics are all included. One optional add-on — AI Intelligence — runs on a paid third-party model and is billed by usage.
 
@@ -71,6 +71,9 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | <img src="https://api.iconify.design/logos/google-icon.svg" width="16" height="16"> Google Business Profile | ✓ | — | — | ✓ |
 | <img src="https://cdn.simpleicons.org/mastodon" width="16" height="16"> Mastodon | ✓ | ✓ | — | — |
 | <img src="https://cdn.simpleicons.org/devdotto/000000" width="16" height="16"> DEV.to | ✓ | — | — | — |
+| <img src="https://cdn.simpleicons.org/x/000000" width="16" height="16"> X (Twitter) | ✓ | — | — | — |
+
+X's API is pay-per-use with no free tier: every post and every read is billed to the developer account behind your X app, so SM Bean only publishes to X and never polls it for comments, DMs or analytics. See [X (Twitter)](#x-twitter).
 
 ---
 
@@ -587,6 +590,30 @@ No developer app registration needed. Users connect by entering a personal **API
 3. Copy the generated key and paste it when connecting your account in SM Bean
 
 Posts publish as DEV.to articles (title + Markdown body). The key can be revoked at any time from the same settings page.
+
+### X (Twitter)
+
+SM Bean publishes to X through the official X API v2 with OAuth 2.0 (Authorization Code + PKCE). It is **publishing only**: text with up to 4 images, or one video or GIF. Comments, DMs and analytics are deliberately not wired up.
+
+> **X's API is pay-per-use, with no free tier.** Requests are billed to the credits of the developer account that owns the app: each published post (as of October 2026 roughly $0.015, or about $0.20 when the post contains a link), and reads too, including the profile lookup the connection health check makes every six hours. Inbox polling and analytics sync would run unattended and spend those credits, which is why SM Bean doesn't do either for X. When the balance runs out, X refuses posts and they fail with "X rejected the post: the X developer account has no API credits. Add credits at console.x.com." Check current prices on the X developer console before you connect.
+
+1. Sign in to the [X developer console](https://console.x.com/) and create an app
+2. Enable **OAuth 2.0** user authentication for it as a **confidential client** (a web app, not a native/public one) with read and write permission
+3. Add the callback URI:
+   ```
+   {APP_URL}/social-accounts/callback/x/
+   ```
+   If you send clients connection links (onboarding), add `{APP_URL}/onboarding/connect/callback/x/` as well.
+4. Copy the **OAuth 2.0 Client ID** and **Client Secret** (not the API Key / API Secret, which are OAuth 1.0a credentials)
+5. Scopes requested: `tweet.read`, `tweet.write`, `users.read`, `offline.access`, `media.write`
+6. Add API credits to the developer account
+7. Set the environment variables:
+   ```
+   PLATFORM_X_CLIENT_ID=your-oauth2-client-id
+   PLATFORM_X_CLIENT_SECRET=your-oauth2-client-secret
+   ```
+
+Access tokens last two hours and are refreshed automatically; X rotates the refresh token on every refresh. The composer counts X's 280-character limit the way X does: every link counts as 23 characters, and CJK characters and emoji count as two.
 
 ## Inbox: Backfill Historical Messages
 

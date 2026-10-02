@@ -62,6 +62,11 @@ PLATFORM_DAILY_POST_LIMIT: dict[str, int] = {
     "mastodon": 200,
     "bluesky": 200,
     "google_business": 50,
+    # X's API is pay-per-use: every post an agent creates spends credits on the
+    # developer account. Kept at the conservative fallback level rather than
+    # anywhere near X's own posting ceiling; raise per account with
+    # ``daily_post_limit_override``.
+    "x": 50,
 }
 
 _DEFAULT_FALLBACK = 50

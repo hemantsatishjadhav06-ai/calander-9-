@@ -198,6 +198,50 @@ class TestConnectPlatformView:
         assert response.status_code == 302
         assert response.url == url
 
+    @override_settings(PLATFORM_CREDENTIALS_FROM_ENV={"x": {"client_id": "X_ID", "client_secret": "X_SECRET"}})
+    def test_x_connect_redirects_to_x_with_a_pkce_challenge(self, authenticated_client, workspace):
+        """The real XProvider: S256 challenge of the verifier stashed in the session."""
+        import base64
+        import hashlib
+        from urllib.parse import parse_qs, urlsplit
+
+        url = reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id})
+
+        grid = authenticated_client.get(url)
+        assert "x" in grid.context["configured_platforms"]
+
+        response = authenticated_client.post(url, {"platform": "x"})
+
+        assert response.status_code == 302
+        assert response.url.startswith("https://x.com/i/oauth2/authorize?")
+        query = parse_qs(urlsplit(response.url).query)
+        assert query["client_id"] == ["X_ID"]
+        assert query["redirect_uri"] == ["http://testserver/social-accounts/callback/x/"]
+        verifier = authenticated_client.session[OAUTH_SESSION_KEY]["code_verifier"]
+        assert verifier
+        expected = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+        assert query["code_challenge"] == [expected]
+        assert query["code_challenge_method"] == ["S256"]
+
+    @override_settings(PLATFORM_CREDENTIALS_FROM_ENV={"x": {"client_id": "", "client_secret": ""}})
+    def test_unconfigured_x_reads_as_not_configured_with_a_hint(self, authenticated_client, workspace, user):
+        user.is_staff = True
+        user.save(update_fields=["is_staff"])
+        url = reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id})
+
+        grid = authenticated_client.get(url)
+
+        assert "x" not in grid.context["configured_platforms"]
+        html = grid.content.decode()
+        assert "Not configured" in html
+        assert "PLATFORM_X_CLIENT_ID" in html
+        assert "/social-accounts/callback/x/" in html
+        assert "Publishing only: no comments, DMs or insights." in html
+
+        response = authenticated_client.post(url, {"platform": "x"})
+        assert response.status_code == 302
+        assert response.url == url  # bounced back to the grid, never off to X
+
     def test_non_pkce_connect_omits_verifier(self, authenticated_client, workspace):
         """A non-PKCE provider stores code_verifier=None and is called without it."""
         from apps.credentials.models import PlatformCredential
@@ -372,6 +416,57 @@ class TestOAuthCallbackView:
         mock_provider.exchange_code.assert_called_once()
         _, kwargs = mock_provider.exchange_code.call_args
         assert kwargs["code_verifier"] == verifier
+
+    @override_settings(PLATFORM_CREDENTIALS_FROM_ENV={"x": {"client_id": "X_ID", "client_secret": "X_SECRET"}})
+    def test_x_callback_replays_verifier_and_connects_the_account(self, authenticated_client, workspace, user):
+        """The generic callback at /social-accounts/callback/x/ drives the real XProvider."""
+        from providers.x import TOKEN_URL, XProvider
+
+        nonce = "nonce-x"
+        verifier = "stored-x-verifier"
+        state = _sign_state(workspace.id, "x", user.id, nonce)
+        session = authenticated_client.session
+        session[OAUTH_SESSION_KEY] = {"nonce": nonce, "code_verifier": verifier}
+        session.save()
+
+        def fake_request(method, url, **kwargs):
+            resp = MagicMock()
+            if url == TOKEN_URL:
+                resp.json.return_value = {
+                    "token_type": "bearer",
+                    "expires_in": 7200,
+                    "access_token": "x-access",
+                    "refresh_token": "x-refresh",
+                    "scope": "tweet.read tweet.write users.read offline.access media.write",
+                }
+            else:
+                resp.json.return_value = {
+                    "data": {
+                        "id": "2244994945",
+                        "name": "Brand",
+                        "username": "brand",
+                        "public_metrics": {"followers_count": 10},
+                    }
+                }
+            return resp
+
+        url = reverse("social_accounts:oauth_callback", kwargs={"platform": "x"})
+        assert url == "/social-accounts/callback/x/"
+        with patch.object(XProvider, "_request", side_effect=fake_request) as mock_request:
+            response = authenticated_client.get(url, {"code": "auth-code", "state": state})
+
+        assert response.status_code == 302
+        token_call = mock_request.call_args_list[0]
+        assert token_call.args == ("POST", TOKEN_URL)
+        assert token_call.kwargs["data"]["code_verifier"] == verifier
+        assert token_call.kwargs["data"]["redirect_uri"] == "http://testserver/social-accounts/callback/x/"
+
+        account = SocialAccount.objects.get(workspace=workspace, platform="x")
+        assert account.account_platform_id == "2244994945"
+        assert account.account_handle == "brand"
+        assert account.oauth_access_token == "x-access"
+        assert account.oauth_refresh_token == "x-refresh"
+        assert account.token_expires_at is not None
 
 
 class TestPromoteMetaUserToken:

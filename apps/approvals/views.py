@@ -14,7 +14,8 @@ from apps.members.decorators import require_permission, require_workspace_role
 from apps.workspaces.models import Workspace
 
 from . import comments as comment_service
-from . import services
+from . import gate, services
+from .actor import is_internal_approver
 from .models import PostComment
 
 
@@ -61,13 +62,53 @@ def approve(request, workspace_id, post_id):
         return _toast_response(tone="error", title="Couldn't approve", body=str(e))
 
     if not moved:
+        if gate.enforced(workspace) and not is_internal_approver(request.user, workspace):
+            return _toast_response(
+                tone="warn",
+                title="Not approved",
+                body="This workspace needs an internal approver (owner or manager) to approve content.",
+            )
         return _toast_response(tone="warn", title="Nothing to update", body="This post was already actioned.")
 
     if post.platform_posts.filter(status="pending_client").exists():
         return _toast_response(
             tone="success", title="Approved internally", body="Sent for client sign-off", refresh="approvalAction"
         )
-    return _toast_response(tone="success", title="Approved", body="Ready to publish", refresh="approvalAction")
+    if request.POST.get("schedule") == "1":
+        scheduled = _schedule_at_approved_time(post)
+        if scheduled:
+            return _toast_response(
+                tone="success",
+                title="Approved and scheduled",
+                body=f"{scheduled} channel(s) scheduled for the approved time",
+                refresh="approvalAction",
+            )
+        return _toast_response(
+            tone="success",
+            title="Approved",
+            body="No future time to schedule — pick one in the composer",
+            refresh="approvalAction",
+        )
+    return _toast_response(tone="success", title="Approved", body="Ready to schedule", refresh="approvalAction")
+
+
+def _schedule_at_approved_time(post):
+    """Schedule every just-approved channel for the time its approval names."""
+    from django.utils import timezone
+
+    from apps.composer.services import transition_platform_post
+
+    count = 0
+    for pp in post.platform_posts.select_related("post__workspace").filter(status="approved"):
+        when = pp.approved_publish_at
+        if when is None or when <= timezone.now():
+            continue
+        try:
+            transition_platform_post(pp, "scheduled", scheduled_at=when)
+            count += 1
+        except ValueError:
+            continue
+    return count
 
 
 @login_required

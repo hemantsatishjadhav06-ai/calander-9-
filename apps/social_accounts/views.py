@@ -24,6 +24,7 @@ from django_ratelimit.decorators import ratelimit
 from apps.common.validators import is_safe_url as _is_safe_url
 from apps.credentials.models import PlatformCredential, derive_is_configured
 from apps.members.decorators import require_permission
+from apps.workspaces.models import Workspace
 
 from .models import MastodonAppRegistration, PlatformVisibility, SocialAccount
 from .oauth_aliases import from_url_slug, redirect_uri_from_request, to_url_slug
@@ -437,6 +438,25 @@ def oauth_callback(request, platform):
 # ------------------------------------------------------------------
 
 
+def _mark_brand_match(rows, workspace_id, platform):
+    """Flag the Page/account this brand workspace expects, and any that belong to another brand.
+
+    A login that manages both brands' Pages sees both in the picker; the flag
+    keeps one brand's Page from being connected to the other's workspace.
+    """
+    from apps.workspaces.brands import expected_identifiers, other_brand_identifiers
+
+    workspace = Workspace.objects.filter(id=workspace_id).first()
+    if workspace is None:
+        return
+    expected = expected_identifiers(workspace, platform)
+    others = other_brand_identifiers(workspace, platform)
+    for row in rows:
+        keys = {str(row.get(k) or "").lower().lstrip("@") for k in ("id", "handle", "username")} - {""}
+        row["brand_expected"] = bool(expected and keys & expected)
+        row["brand_other"] = bool(others and keys & others)
+
+
 @login_required
 def select_account(request):
     """Show page/account selection after multi-page OAuth."""
@@ -453,6 +473,7 @@ def select_account(request):
         # in markup is a different predicate from the Python one and would drift
         # from it. The template gets a plain bool it can trust.
         rows = [{**page, "can_publish": page_is_publishable(page)} for page in page_data["pages"]]
+        _mark_brand_match(rows, workspace_id, page_data["platform"])
         return render(
             request,
             "social_accounts/account_select.html",

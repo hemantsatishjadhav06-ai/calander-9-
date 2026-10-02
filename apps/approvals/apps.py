@@ -9,6 +9,8 @@ class ApprovalsConfig(AppConfig):
     def ready(self):
         from apps.common.background import connect_recurring_tasks
 
+        from . import signals  # noqa: F401
+
         connect_recurring_tasks(self, self._register_tasks)
 
     @staticmethod

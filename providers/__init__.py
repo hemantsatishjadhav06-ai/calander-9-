@@ -6,6 +6,7 @@ Use get_provider() to instantiate a provider with app credentials.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from .bluesky import BlueskyProvider
@@ -21,6 +22,7 @@ from .mastodon import MastodonProvider
 from .pinterest import PinterestProvider
 from .threads import ThreadsProvider
 from .tiktok import TikTokProvider
+from .x import XProvider, weighted_length
 from .youtube import YouTubeProvider
 
 if TYPE_CHECKING:
@@ -40,6 +42,7 @@ PROVIDER_REGISTRY: dict[str, type[SocialProvider]] = {
     "google_business": GoogleBusinessProvider,
     "mastodon": MastodonProvider,
     "devto": DevtoProvider,
+    "x": XProvider,
 }
 
 # Characters a platform escapes in the caption it publishes. Each one costs two
@@ -51,6 +54,15 @@ CAPTION_ESCAPED_CHARS: dict[str, str] = {
     "linkedin_company": "\\" + LINKEDIN_RESERVED_CHARS,
 }
 
+# Platforms that don't count characters one for one. X weighs every link as 23
+# whatever its typed length, and CJK and emoji as two each, so its limit has to
+# be checked against that weighting: by raw length a caption holding one long
+# URL is refused here although X would take it, and one with a short link
+# passes here and is refused by X.
+CAPTION_LENGTH_COUNTERS: dict[str, Callable[[str], int]] = {
+    "x": weighted_length,
+}
+
 
 def caption_wire_length(platform: str, text: str) -> int:
     """Length of ``text`` as ``platform`` counts it, after any escaping.
@@ -60,7 +72,11 @@ def caption_wire_length(platform: str, text: str) -> int:
     rejected, even though the user was shown a green counter.
     ``providers.linkedin.escape_commentary`` is the transform this mirrors;
     ``tests/providers/test_caption_wire_length.py`` holds the two together.
+    Platforms in ``CAPTION_LENGTH_COUNTERS`` (X) use their own counting rule.
     """
+    counter = CAPTION_LENGTH_COUNTERS.get(platform)
+    if counter is not None:
+        return counter(text)
     escaped = CAPTION_ESCAPED_CHARS.get(platform)
     if not escaped:
         return len(text)

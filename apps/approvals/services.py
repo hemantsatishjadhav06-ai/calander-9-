@@ -19,6 +19,8 @@ from apps.members.models import WorkspaceMembership
 from apps.notifications.engine import notify
 from apps.notifications.models import EventType
 
+from . import gate
+from .actor import current_actor
 from .models import ApprovalAction, ApprovalReminder
 
 logger = logging.getLogger(__name__)
@@ -56,7 +58,12 @@ def _transition_or_skip(pp, target_status):
         return True
     if not pp.can_transition_to(target_status):
         return False
-    pp.transition_to(target_status)
+    try:
+        pp.transition_to(target_status)
+    except gate.ApprovalRequired:
+        # The approval gate refused (e.g. not a dashboard approver, or the
+        # content changed since it was approved): skip, as for any conflict.
+        return False
     # TRANSITION_FIELDS, not a hand-written list: transition_to writes the retry
     # budget and publish handle too, and omitting them drops the reset silently.
     # Guarded: if the publisher claimed the row (or anyone else moved it) since
@@ -65,13 +72,26 @@ def _transition_or_skip(pp, target_status):
 
 
 def _record_action(post, platform_post, user, action, comment=""):
-    """Create an ApprovalAction row for either a bundled or per-PP action."""
+    """Create an ApprovalAction row for either a bundled or per-PP action.
+
+    A per-channel row also records what was reviewed — the content
+    fingerprint, version number and publish time the gate stamped — and the
+    channel the action came from.
+    """
+    extra = {"channel": current_actor().channel}
+    if platform_post is not None:
+        extra.update(
+            fingerprint=platform_post.approved_fingerprint or "",
+            revision=platform_post.approved_revision,
+            publish_at=platform_post.approved_publish_at,
+        )
     return ApprovalAction.objects.create(
         post=post,
         platform_post=platform_post,
         user=user,
         action=action,
         comment=comment,
+        **extra,
     )
 
 
@@ -160,7 +180,9 @@ def approve_post(target, user, workspace, comment=""):
         if not moved:
             return moved
 
-        if is_bundled:
+        # In a workspace that requires dashboard approval every channel's
+        # approval is its own audit row, carrying the fingerprint it approved.
+        if is_bundled and not gate.enforced(workspace):
             _record_action(post, None, user, ApprovalAction.ActionType.APPROVED, comment)
         else:
             for pp in moved:

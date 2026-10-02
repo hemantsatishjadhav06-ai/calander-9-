@@ -249,10 +249,18 @@ def transition_platform_post(
     # promotes a draft to scheduled (REST `/schedule` route, any future
     # MCP transition tool, the composer's HTMX `transition_platform_post`
     # view) is covered.
-    if target_status == "scheduled":
+    #
+    # An ``approved`` row has been through that workflow already; where the
+    # workspace also requires dashboard approval, ``transition_to`` checks the
+    # approval still matches the content and the time.
+    if target_status == "scheduled" and platform_post.status != PlatformPost.Status.APPROVED:
         _require_approval_gate_passes(platform_post.post.workspace)
 
     with transaction.atomic():
+        if target_status == "scheduled" and scheduled_at is not None:
+            # Before transition_to, so the approval gate judges the time this
+            # row is being scheduled for, not the one it had.
+            platform_post.scheduled_at = scheduled_at
         platform_post.transition_to(target_status)
         # Always include ``updated_at`` — Django docs: when ``update_fields``
         # is explicit, ``auto_now`` fields are NOT touched unless listed.
@@ -366,7 +374,9 @@ def _require_approval_gate_passes(workspace) -> None:
     approval workflow gates.
     """
     if getattr(workspace, "approval_workflow_mode", "none") in _APPROVAL_MODES_BLOCKING_DIRECT_SCHEDULE:
-        raise ValueError(
+        from apps.approvals.gate import ApprovalRequired
+
+        raise ApprovalRequired(
             "Workspace requires approval before scheduling; create the post as a "
             "draft and route it through the approval workflow."
         )

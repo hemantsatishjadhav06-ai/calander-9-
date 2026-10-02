@@ -109,6 +109,8 @@ LOCAL_APPS = [
     "apps.oauth_server",
     "apps.analytics",
     "apps.marketing",
+    # Blog posts for the brands' own websites, committed to their GitHub repos.
+    "apps.blog",
     "theme",
 ]
 
@@ -128,6 +130,7 @@ MIDDLEWARE = [
     "apps.accounts.middleware.TosAcceptanceMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "apps.members.middleware.RBACMiddleware",
+    "apps.approvals.actor.ApprovalActorMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "csp.middleware.CSPMiddleware",
@@ -465,6 +468,7 @@ CSP_FORM_ACTION = (
     "https://www.linkedin.com",
     "https://www.pinterest.com",
     "https://www.tiktok.com",
+    "https://x.com",
 )
 CSP_INCLUDE_NONCE_IN = ["script-src"]
 
@@ -645,6 +649,14 @@ PLATFORM_CREDENTIALS_FROM_ENV = {
     # DEV.to - per-account API key (no OAuth). The key is supplied by the user
     # at connect time, so no app-level credentials apply (same as Bluesky).
     "devto": {},
+    # X (Twitter) - the OAuth 2.0 Client ID / Client Secret of an X developer app
+    # (confidential client, OAuth 2.0 + PKCE). X's API is pay-per-use: every
+    # post, and the periodic health check's profile read, spends credits on the
+    # developer account that owns this app. See the README "X (Twitter)" section.
+    "x": {
+        "client_id": env("PLATFORM_X_CLIENT_ID", default=""),
+        "client_secret": env("PLATFORM_X_CLIENT_SECRET", default=""),
+    },
 }
 
 # Publishing engine
@@ -672,6 +684,14 @@ PUBLISHER_PUBLISH_CONFIRM_TIMEOUT = env.int("PUBLISHER_PUBLISH_CONFIRM_TIMEOUT",
 PUBLISHER_MAX_CONCURRENT_PUBLISHES = env.int("PUBLISHER_MAX_CONCURRENT_PUBLISHES", default=10)
 PUBLISHER_MAX_CONCURRENT_POSTS = env.int("PUBLISHER_MAX_CONCURRENT_POSTS", default=4)
 PUBLISHER_MAX_CONCURRENT_PLATFORM_PUBLISHES = env.int("PUBLISHER_MAX_CONCURRENT_PLATFORM_PUBLISHES", default=6)
+
+# Blog publishing (apps.blog). A fine-grained GitHub personal access token
+# limited to the website repositories (hemantsatishjadhav06-ai/neopolis-site-deploy
+# and hemantsatishjadhav06-ai/morespace-website) with "Contents: read and write"
+# and "Actions: read and write". Approved blog posts are committed with it and
+# the site's deploy workflow dispatched. Empty: publishing refuses with a
+# message saying so, and posts stay approved.
+BLOG_GITHUB_TOKEN = env("BLOG_GITHUB_TOKEN", default="")
 
 # Webhook verification
 FACEBOOK_WEBHOOK_VERIFY_TOKEN = env("FACEBOOK_WEBHOOK_VERIFY_TOKEN", default="")

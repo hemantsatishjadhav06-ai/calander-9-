@@ -35,6 +35,7 @@
             </table>
         </div>
         <p class="mk-small mk-muted reveal" style="margin-top: 14px;">"Comments" covers reading and replying to comments and mentions in the unified inbox. "Insights" means channel and post analytics from that platform's native analytics API.</p>
+        <p class="mk-small mk-muted reveal" style="margin-top: 6px;">X's API is pay-per-use with no free tier: every post, and every read, is billed to the developer account behind the app. That is why X publishes only: {{ site_name }} doesn't poll X for comments, messages or analytics, which would spend those credits without anyone asking.</p>
     </div>
 </section>
 
@@ -48,7 +49,7 @@
             <div class="mk-card reveal">
                 <div class="mk-card__icon mk-card__icon--orange">{% include "marketing/_icon.html" with name="key" %}</div>
                 <h3 class="mk-h3">Your developer app, OAuth login</h3>
-                <p>Facebook, Instagram, Threads, LinkedIn, TikTok, YouTube, Pinterest and Google Business Profile use an app you register with the platform. Paste its keys into the environment or the admin, and users connect with the familiar "Continue with…" flow.</p>
+                <p>Facebook, Instagram, Threads, LinkedIn, TikTok, YouTube, Pinterest, Google Business Profile and X use an app you register with the platform. Paste its keys into the environment or the admin, and users connect with the familiar "Continue with…" flow.</p>
             </div>
             <div class="mk-card reveal" data-delay="1">
                 <div class="mk-card__icon mk-card__icon--green">{% include "marketing/_icon.html" with name="lock" %}</div>
@@ -84,6 +85,7 @@
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Pinterest</strong> publishes pins to a board you choose per post, with a destination link.</span></li>
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Facebook and Instagram inbox</strong> use Meta webhooks for instant delivery, with a five-minute poll as the fallback.</span></li>
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>DEV.to</strong> publishes a title and Markdown body as an article, which makes it a good home for long-form companions to a social post.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>X</strong> publishes text with up to four images, or one video or GIF. Its API charges per request, so add credits to your X developer account first; posts with a link cost more than posts without.</span></li>
                 </ul>
             </div>
         </div>

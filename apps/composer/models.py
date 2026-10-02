@@ -361,6 +361,13 @@ class PlatformPost(models.Model):
         "retry_count",
         "next_retry_at",
         "publish_error",
+        # Written by the approval gate (apps/approvals/gate.py) when a
+        # transition approves content, or approves a new publish time.
+        "approved_fingerprint",
+        "approved_revision",
+        "approved_by",
+        "approved_at",
+        "approved_publish_at",
     )
 
     # Statuses that must never be removed by *accidental* deletion paths
@@ -499,6 +506,23 @@ class PlatformPost(models.Model):
     retry_count = models.PositiveIntegerField(default=0)
     next_retry_at = models.DateTimeField(blank=True, null=True)
 
+    # The approval this row is publishing under, in workspaces that require
+    # dashboard approval. ``approved_fingerprint`` is a hash of exactly what
+    # goes out (text, media, destination, format); ``approved_publish_at`` is
+    # the time the approver signed off on. Any difference withdraws the
+    # approval, and the publisher re-checks both before calling the platform.
+    approved_fingerprint = models.CharField(max_length=64, blank=True, default="", db_default="")
+    approved_revision = models.PositiveIntegerField(blank=True, null=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    approved_at = models.DateTimeField(blank=True, null=True)
+    approved_publish_at = models.DateTimeField(blank=True, null=True)
+
     # Analytics sync state — the read-side counterpart to the retry budget
     # above, owned solely by ``apps.analytics.tasks``.
     #
@@ -562,6 +586,10 @@ class PlatformPost(models.Model):
         return instance
 
     def save(self, *args, **kwargs):
+        from apps.approvals import gate
+
+        # Backstop for writers that set ``status`` without transition_to().
+        gate.check_write(self, getattr(self, "_loaded_status", None))
         super().save(*args, **kwargs)
         # A plain save is authoritative for this instance from here on.
         self._loaded_status = self.status
@@ -579,16 +607,23 @@ class PlatformPost(models.Model):
         Returns False, writing nothing, when the row moved on (or was deleted).
         Callers treat that as a conflict: report it, or skip the row.
         """
+        from apps.approvals import gate
+
+        expected = getattr(self, "_loaded_status", None)
+        if "status" in fields:
+            gate.check_write(self, expected)
         values = {name: getattr(self, name) for name in fields if name != "updated_at"}
         values["updated_at"] = timezone.now()
         rows = type(self).objects.filter(pk=self.pk)
-        expected = getattr(self, "_loaded_status", None)
         if expected is not None:
             rows = rows.filter(status=expected)
         if not rows.update(**values):
             return False
         self.updated_at = values["updated_at"]
         self._loaded_status = self.status
+        # .update() sends no post_save, so run what the signal handler would.
+        gate.record_time_approval_if_any(self)
+        gate.schedule_revalidation(self.post_id)
         return True
 
     def can_transition_to(self, new_status):
@@ -597,12 +632,20 @@ class PlatformPost(models.Model):
         return new_status in allowed
 
     def transition_to(self, new_status):
-        """Transition to a new status, raising ValueError if invalid."""
+        """Transition to a new status, raising ValueError if invalid.
+
+        In a workspace that requires dashboard approval this also enforces the
+        approval gate, raising ``ApprovalRequired`` (a ``ValueError``) when the
+        content may not go where it is headed.
+        """
         if not self.can_transition_to(new_status):
             raise ValueError(
                 f"Invalid status transition: {self.status} → {new_status}. "
                 f"Allowed: {self.VALID_TRANSITIONS.get(self.status, set())}"
             )
+        from apps.approvals import gate
+
+        gate.on_transition(self, new_status)
         self.status = new_status
         if new_status == "published":
             self.published_at = timezone.now()

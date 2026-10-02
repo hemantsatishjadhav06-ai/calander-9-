@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }} - Blog - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl">
+    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
+        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Blog</a>
+        <span aria-hidden="true"> / </span><span>{{ post.site.name }}</span>
+    </nav>
+
+    <div class="flex flex-wrap items-start justify-between gap-4 mb-6">
+        <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+                {% include "blog/partials/status_badge.html" with status=post.status label=post.get_status_display %}
+                <span class="text-xs text-stone-600">Revision {{ post.revision }}</span>
+            </div>
+            <h1 class="text-xl font-semibold text-stone-900 break-words">{{ post.title }}</h1>
+            {% if post.excerpt %}<p class="text-sm text-stone-600 mt-1 max-w-2xl">{{ post.excerpt }}</p>{% endif %}
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{% url 'blog:preview' workspace_id=workspace.id post_id=post.id %}" target="_blank" rel="noopener"
+               class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">
+                Preview<span class="sr-only"> (opens in a new tab)</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 3h7v7m0-7L10 14M5 5h4M5 5v14h14v-4"/></svg>
+            </a>
+            {% if can_edit %}
+            <a href="{% url 'blog:edit' workspace_id=workspace.id post_id=post.id %}"
+               class="inline-flex items-center px-4 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Edit</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid lg:grid-cols-[1fr_20rem] gap-6 items-start">
+        <div class="space-y-6 min-w-0">
+            {# ---- Actions ---- #}
+            {% if can_submit or can_approve or can_request_changes or can_publish or can_retry or can_social %}
+            <section aria-labelledby="actions-heading" class="bg-white border border-stone-200 rounded-xl p-5">
+                <h2 id="actions-heading" class="text-sm font-semibold text-stone-900 mb-3">Next step</h2>
+                <div class="flex flex-wrap items-start gap-3">
+                    {% if can_submit %}
+                    <form method="post" action="{% url 'blog:submit' workspace_id=workspace.id post_id=post.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Submit for approval</button>
+                    </form>
+                    {% endif %}
+
+                    {% if can_approve %}
+                    <form method="post" action="{% url 'blog:approve' workspace_id=workspace.id post_id=post.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-teal-700 rounded-full hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">Approve revision {{ post.revision }}</button>
+                    </form>
+                    {% endif %}
+
+                    {% if can_publish %}
+                    <form method="post" action="{% url 'blog:publish' workspace_id=workspace.id post_id=post.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                        {% csrf_token %}
+                        <button type="submit" x-bind:disabled="busy" {% if not token_configured %}aria-describedby="token-missing"{% endif %}
+                                class="px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                            <span x-show="!busy">Publish to {{ post.site.name }}</span><span x-show="busy" x-cloak>Starting…</span>
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if can_retry %}
+                    <form method="post" action="{% url 'blog:publish' workspace_id=workspace.id post_id=post.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                        {% csrf_token %}
+                        <button type="submit" x-bind:disabled="busy" class="px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                            <span x-show="!busy">Retry publish</span><span x-show="busy" x-cloak>Starting…</span>
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if can_social %}
+                    <form method="post" action="{% url 'blog:social_drafts' workspace_id=workspace.id post_id=post.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="px-5 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Create social drafts</button>
+                    </form>
+                    {% endif %}
+                </div>
+
+                {% if can_publish and not token_configured %}
+                <p id="token-missing" class="mt-3 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Publishing needs <code class="font-mono text-xs">BLOG_GITHUB_TOKEN</code> on the SM Manager service: a fine-grained GitHub token with Contents and Actions read/write on {{ post.site.repo }}.
+                </p>
+                {% endif %}
+
+                {% if can_request_changes %}
+                <details class="mt-4 group">
+                    <summary class="cursor-pointer text-sm font-medium text-stone-800 underline w-fit focus-visible:outline-2 focus-visible:outline-orange-700 rounded">Request changes</summary>
+                    <form method="post" action="{% url 'blog:request_changes' workspace_id=workspace.id post_id=post.id %}" class="mt-3">
+                        {% csrf_token %}
+                        <label for="changes-comment" class="block text-sm font-semibold text-stone-900 mb-1.5">What needs to change? <span class="text-red-700" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
+                        <textarea id="changes-comment" name="comment" rows="3" required class="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                        <button type="submit" class="mt-2 px-4 py-2 text-sm font-semibold text-orange-900 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-700">Send back to author</button>
+                    </form>
+                </details>
+                {% endif %}
+            </section>
+            {% elif post.status == 'pending_review' %}
+            <p role="status" class="text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-xl p-4">Waiting for an approver. Only an internal approver signed in here can approve it.</p>
+            {% endif %}
+
+            {% include "blog/partials/publish_status.html" %}
+
+            {# ---- Audit trail ---- #}
+            <section aria-labelledby="history-heading" class="bg-white border border-stone-200 rounded-xl p-5">
+                <h2 id="history-heading" class="text-sm font-semibold text-stone-900 mb-3">History</h2>
+                {% if events %}
+                <ol class="space-y-3">
+                    {% for event in events %}
+                    <li class="flex gap-3 text-sm">
+                        <span class="mt-1.5 w-2 h-2 rounded-full flex-shrink-0 {% if event.action == 'approved' or event.action == 'verified' or event.action == 'deploy_succeeded' %}bg-green-600{% elif event.action == 'publish_failed' or event.action == 'deploy_failed' %}bg-red-600{% elif event.action == 'approval_withdrawn' or event.action == 'changes_requested' %}bg-amber-600{% else %}bg-stone-400{% endif %}" aria-hidden="true"></span>
+                        <div class="min-w-0">
+                            <p class="text-stone-900"><span class="font-medium">{{ event.get_action_display }}</span>
+                                <span class="text-stone-600">· revision {{ event.revision }} · {% if event.user %}{{ event.user.display_name }}{% else %}system{% endif %} ·
+                                <time datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:"j M Y, H:i" }}</time></span></p>
+                            {% if event.detail %}<p class="text-stone-700 break-words whitespace-pre-line">{{ event.detail }}</p>{% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ol>
+                {% else %}
+                <p class="text-sm text-stone-600">No history yet.</p>
+                {% endif %}
+            </section>
+        </div>
+
+        <aside class="space-y-6">
+            <section aria-labelledby="approval-heading" class="bg-white border border-stone-200 rounded-xl p-5">
+                <h2 id="approval-heading" class="text-sm font-semibold text-stone-900 mb-3">Approval</h2>
+                {% if post.approved_at %}
+                <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+                    <dt class="text-stone-600">By</dt><dd class="text-stone-900">{{ post.approved_by.display_name|default:"(removed user)" }}</dd>
+                    <dt class="text-stone-600">When</dt><dd class="text-stone-900">{{ post.approved_at|date:"j M Y, H:i" }}</dd>
+                    <dt class="text-stone-600">Revision</dt><dd class="text-stone-900">{{ post.approved_revision }}{% if approval_matches %} (current){% endif %}</dd>
+                    <dt class="text-stone-600">Fingerprint</dt><dd class="font-mono text-xs text-stone-700 break-all" title="{{ post.approved_fingerprint }}">{{ post.approved_fingerprint|slice:":12" }}…</dd>
+                </dl>
+                {% if not approval_matches %}<p class="mt-3 text-sm text-amber-900">The post changed after approval; it needs approving again.</p>{% endif %}
+                {% else %}
+                <p class="text-sm text-stone-600">Not approved{% if post.status == 'pending_review' %} yet{% endif %}.</p>
+                {% endif %}
+            </section>
+
+            <section aria-labelledby="details-heading" class="bg-white border border-stone-200 rounded-xl p-5">
+                <h2 id="details-heading" class="text-sm font-semibold text-stone-900 mb-3">Details</h2>
+                {% if post.featured_image %}
+                <img src="{% if post.featured_image.thumbnail %}{{ post.featured_image.thumbnail.url }}{% else %}{{ post.featured_image.file.url }}{% endif %}"
+                     alt="{{ post.featured_image_alt }}" class="w-full aspect-video object-cover rounded-lg mb-3 bg-stone-100">
+                {% endif %}
+                <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+                    <dt class="text-stone-600">Address</dt><dd class="font-mono text-xs text-stone-900 break-all">{{ post.slug }}</dd>
+                    {% if post.category %}<dt class="text-stone-600">Category</dt><dd class="text-stone-900">{{ post.category }}</dd>{% endif %}
+                    <dt class="text-stone-600">SEO title</dt><dd class="text-stone-900 break-words">{{ post.seo_title|default:"(uses the title)" }}</dd>
+                    <dt class="text-stone-600">Description</dt><dd class="text-stone-900 break-words">{{ post.meta_description|default:"(uses the excerpt)" }}</dd>
+                    <dt class="text-stone-600">FAQ</dt><dd class="text-stone-900">{{ post.faq|length }} question{{ post.faq|length|pluralize }}</dd>
+                    <dt class="text-stone-600">Author</dt><dd class="text-stone-900">{{ post.author.display_name|default:"—" }}</dd>
+                    <dt class="text-stone-600">Created</dt><dd class="text-stone-900">{{ post.created_at|date:"j M Y" }}</dd>
+                </dl>
+            </section>
+        </aside>
+    </div>
+</div>
+{% endblock %}

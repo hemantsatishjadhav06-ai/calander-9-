@@ -127,12 +127,14 @@ BACKFILL_DAYS_PER_PLATFORM: dict[str, int] = {
     "tiktok": 60,
     # Bluesky / Mastodon / LinkedIn-Personal / DEV.to have no analytics surface
     # — skip. LinkedIn only exposes share statistics for Organization URNs, not
-    # personal Person URNs, regardless of granted scopes. Each of these must
+    # personal Person URNs, regardless of granted scopes. X has one, but every
+    # read is billed (pay-per-use), so it is skipped too. Each of these must
     # also appear in ``NO_ANALYTICS_PLATFORMS``.
     "bluesky": 0,
     "mastodon": 0,
     "linkedin_personal": 0,
     "devto": 0,
+    "x": 0,
 }
 DEFAULT_BACKFILL_DAYS = 90
 

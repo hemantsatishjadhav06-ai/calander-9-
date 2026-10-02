@@ -30,6 +30,7 @@ from django.db.models import F, Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from apps.approvals import gate as approval_gate
 from apps.common.db import in_worker_thread, release_idle_connection
 from apps.composer.models import PlatformPost
 from apps.credentials.models import resolve_platform_credentials
@@ -101,6 +102,10 @@ def _resolve_publish_credentials(account):
             )
     elif platform == "facebook":
         credentials["page_id"] = account.account_platform_id
+    elif platform == "x":
+        # Only used to build the post's public URL (x.com/<username>/status/<id>);
+        # X's create-post response doesn't carry the author's handle.
+        credentials["username"] = account.account_handle
     elif platform in ("instagram", "instagram_login"):
         credentials["ig_user_id"] = account.account_platform_id
         # The comment poll and the first-comment reconciliation both match our
@@ -454,6 +459,19 @@ class PublishEngine:
             due_ids = {pp.id for pp in due_pps}
             platform_posts = [pp for pp in locked if pp.id in due_ids and pp.status == PlatformPost.Status.SCHEDULED]
 
+            # Approval gate, under the lock and before the claim: in a
+            # workspace that requires dashboard approval, a row whose approval
+            # is missing, or no longer matches its content or time, is taken
+            # out of the publish path with the reason instead of being sent.
+            cleared = []
+            for pp in platform_posts:
+                reason = approval_gate.publish_blocker(pp)
+                if reason:
+                    approval_gate.block_publish(pp, reason)
+                else:
+                    cleared.append(pp)
+            platform_posts = cleared
+
             if not platform_posts:
                 return False
 
@@ -563,6 +581,15 @@ class PublishEngine:
                 retry_at=rate_state.window_resets_at,
             )
             return {"success": False, "error": error_msg}
+
+        # Last look before anything leaves: re-read the row and check its
+        # approval against what is in the database now *and* against the copy
+        # this thread is about to send. An edit that committed between the
+        # due-query and the claim is caught here, not on the platform.
+        reason = self._approval_blocker(platform_post)
+        if reason:
+            approval_gate.block_publish(platform_post, reason, from_status=PlatformPost.Status.PUBLISHING)
+            return {"success": False, "error": reason}
 
         try:
             # Get the provider for this platform
@@ -701,6 +728,23 @@ class PublishEngine:
             else:
                 self._fail_permanently(platform_post, error_msg, user_message=user_message)
             return {"success": False, "error": error_msg}
+
+    @staticmethod
+    def _approval_blocker(platform_post):
+        """Why *platform_post* must not be sent now, or None."""
+        if not approval_gate.enforced(platform_post.post.workspace):
+            return None
+        fresh = (
+            PlatformPost.objects.select_related("post__workspace", "social_account").filter(pk=platform_post.pk).first()
+        )
+        if fresh is None:
+            return "Not published: the post was deleted."
+        reason = approval_gate.publish_blocker(fresh)
+        if reason:
+            return reason
+        if approval_gate.fingerprint(platform_post) != fresh.approved_fingerprint:
+            return "Not published: the content changed after approval. Review and approve it again."
+        return None
 
     @staticmethod
     def _drop_queue_entry(platform_post):
@@ -1170,6 +1214,11 @@ class PublishEngine:
 
         for pp in retry_posts:
             if pp.post.platform_posts.filter(status=PlatformPost.Status.ON_HOLD).exists():
+                continue
+            # A retry is a publish like any other: its approval must still hold.
+            reason = approval_gate.publish_blocker(pp)
+            if reason:
+                approval_gate.block_publish(pp, reason)
                 continue
             try:
                 # Claim on the row's *current* state, not the state read when

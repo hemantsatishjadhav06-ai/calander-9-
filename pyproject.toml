@@ -22,6 +22,9 @@ ignore = [
 # a "this branch deferred to the worker" signal.
 "apps/intelligence/services/exceptions.py" = ["N818"]
 "apps/intelligence/views.py" = ["N818"]
+# ``ApprovalRequired`` reads as the condition it signals at every call site
+# ("except ApprovalRequired:"), like the intelligence exceptions above.
+"apps/approvals/gate.py" = ["N818"]
 # Ninja's ``File(...)`` / ``Form(...)`` / ``Query(...)`` are intentionally
 # called in argument defaults — that's how Ninja registers field
 # metadata for OpenAPI generation and request parsing. The B008 check
