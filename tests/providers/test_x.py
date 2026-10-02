@@ -302,7 +302,7 @@ def _router(routes: dict):
             return answer.pop(0)
         return answer
 
-    handler.calls = calls
+    handler.calls = calls  # type: ignore[attr-defined]
     return handler
 
 

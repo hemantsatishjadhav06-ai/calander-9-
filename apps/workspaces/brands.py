@@ -12,7 +12,9 @@ id is a different number. Both are recorded; the connection stores the Graph
 id, and ``live_verify`` checks the Page's ``link`` for the profile id.
 """
 
-BRANDS = [
+from typing import Any
+
+BRANDS: list[dict[str, Any]] = [
     {
         "key": "neopolis",
         "name": "Neopolis",
