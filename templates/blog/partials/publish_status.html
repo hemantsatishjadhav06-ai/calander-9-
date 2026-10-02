@@ -1,0 +1,53 @@
+{% comment %}
+Publish result panel. While a publish runs it polls itself every 10 s; the
+status view answers with HX-Refresh once publishing finishes.
+Context: workspace, post, commit_url.
+{% endcomment %}
+<section id="publish-status" aria-labelledby="publish-status-heading" class="bg-white border border-stone-200 rounded-xl p-5"
+         {% if post.status == 'publishing' %}hx-get="{% url 'blog:status' workspace_id=workspace.id post_id=post.id %}" hx-trigger="every 10s" hx-swap="outerHTML"{% endif %}>
+    <h2 id="publish-status-heading" class="text-sm font-semibold text-stone-900 mb-3">Website</h2>
+
+    {% if post.status == 'publishing' %}
+    <p role="status" class="flex items-center gap-2 text-sm text-indigo-900 bg-indigo-50 rounded-lg px-3 py-2 mb-3">
+        <svg class="w-4 h-4 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        {% if not post.commit_sha %}Writing the post to {{ post.site.repo }}…{% elif not post.deploy_run_url %}Committed. Starting the deploy…{% else %}Deploying ({{ post.deploy_status|default:"queued" }})…{% endif %}
+    </p>
+    {% endif %}
+
+    {% if post.status == 'failed' and post.last_error %}
+    <div role="alert" class="text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+        <p class="font-semibold">Publishing failed</p>
+        <p class="mt-0.5 break-words">{{ post.last_error }}</p>
+    </div>
+    {% elif post.last_error and post.status != 'publishing' %}
+    <div role="alert" class="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+        <p class="break-words">{{ post.last_error }}</p>
+    </div>
+    {% endif %}
+
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="text-stone-600">Site</dt>
+        <dd class="text-stone-900 min-w-0"><a href="{{ post.site.site_url }}" class="underline break-all" target="_blank" rel="noopener">{{ post.site.name }}</a></dd>
+        <dt class="text-stone-600">{% if post.published_url %}Live at{% else %}Will be at{% endif %}</dt>
+        <dd class="text-stone-900 min-w-0">
+            {% if post.published_url %}<a href="{{ post.published_url }}" class="underline break-all" target="_blank" rel="noopener">{{ post.published_url }}</a>
+            {% else %}<span class="font-mono text-xs break-all">{{ post.expected_url }}</span>{% endif %}
+        </dd>
+        {% if post.published_at %}
+        <dt class="text-stone-600">First published</dt>
+        <dd class="text-stone-900">{{ post.published_at|date:"j M Y, H:i" }}</dd>
+        {% endif %}
+        {% if post.commit_sha %}
+        <dt class="text-stone-600">Commit</dt>
+        <dd class="min-w-0"><a href="{{ commit_url }}" class="font-mono text-xs underline text-stone-900" target="_blank" rel="noopener">{{ post.commit_sha|slice:":7" }}</a> <span class="text-stone-600 text-xs">in {{ post.site.repo }}</span></dd>
+        {% endif %}
+        {% if post.deploy_run_url %}
+        <dt class="text-stone-600">Deploy run</dt>
+        <dd class="min-w-0"><a href="{{ post.deploy_run_url }}" class="underline text-stone-900" target="_blank" rel="noopener">{{ post.site.workflow_file }}</a>{% if post.deploy_status %} <span class="text-stone-600 text-xs">({{ post.deploy_status }})</span>{% endif %}</dd>
+        {% endif %}
+        {% if post.publish_attempts %}
+        <dt class="text-stone-600">Attempts</dt>
+        <dd class="text-stone-900">{{ post.publish_attempts }}</dd>
+        {% endif %}
+    </dl>
+</section>

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Blog - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Blog{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-lg font-semibold text-stone-900">Blog</h1>
+            <p class="text-sm text-stone-600 mt-0.5">Write posts for this workspace's website, get them approved, then publish.</p>
+        </div>
+        {% if can_create and has_sites %}
+        <a href="{% url 'blog:create' workspace_id=workspace.id %}"
+           class="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full shadow-[0_4px_14px_rgba(249,115,22,0.28)] hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700 transition-all duration-150">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            New blog post
+        </a>
+        {% endif %}
+    </div>
+
+    {% if not has_sites %}
+    <div class="text-center py-16 border border-dashed border-stone-300 rounded-xl">
+        <p class="text-sm font-medium text-stone-700 mb-1">No website is connected to this workspace yet</p>
+        <p class="text-sm text-stone-600 max-w-md mx-auto">An administrator connects one with <code class="text-xs bg-stone-100 px-1 py-0.5 rounded">manage.py ensure_blog_sites</code>. Blog posts are written for, approved for and published to that site.</p>
+    </div>
+    {% else %}
+
+    <nav aria-label="Blog posts by status" class="mb-5 -mx-1 overflow-x-auto">
+        <ul class="flex gap-1 px-1 border-b border-stone-200 min-w-max">
+            {% for key, label, count in tabs %}
+            <li>
+                <a href="?tab={{ key }}"
+                   {% if key == active_tab %}aria-current="page"{% endif %}
+                   class="inline-flex items-center gap-2 px-3 py-2 -mb-px text-sm font-medium border-b-2 rounded-t-md focus-visible:outline-2 focus-visible:outline-orange-700
+                          {% if key == active_tab %}border-orange-700 text-stone-900{% else %}border-transparent text-stone-600 hover:text-stone-900 hover:border-stone-300{% endif %}">
+                    {{ label }}
+                    <span class="inline-flex min-w-5 justify-center px-1.5 rounded-full text-xs {% if key == active_tab %}bg-orange-100 text-orange-900{% else %}bg-stone-100 text-stone-700{% endif %}">{{ count }}</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+
+    {% if posts %}
+    <ul class="space-y-3" aria-label="{{ active_tab|capfirst }} posts">
+        {% for post in posts %}
+        <li>
+            <a href="{% url 'blog:detail' workspace_id=workspace.id post_id=post.id %}"
+               class="flex items-start gap-4 bg-white border border-stone-200 rounded-xl p-4 hover:shadow-lg hover:border-transparent focus-visible:outline-2 focus-visible:outline-orange-700 transition-all duration-200 group">
+                {% if post.featured_image %}
+                <img src="{% if post.featured_image.thumbnail %}{{ post.featured_image.thumbnail.url }}{% else %}{{ post.featured_image.file.url }}{% endif %}" alt=""
+                     class="hidden sm:block w-24 h-16 rounded-lg object-cover flex-shrink-0 bg-stone-100" loading="lazy">
+                {% endif %}
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                        {% include "blog/partials/status_badge.html" with status=post.status label=post.get_status_display %}
+                        <span class="text-xs text-stone-600">{{ post.site.name }}</span>
+                    </div>
+                    <p class="text-sm font-semibold text-stone-900 truncate group-hover:underline">{{ post.title }}</p>
+                    {% if post.excerpt %}<p class="text-sm text-stone-600 line-clamp-2 mt-0.5">{{ post.excerpt }}</p>{% endif %}
+                    <p class="text-xs text-stone-600 mt-2">
+                        Revision {{ post.revision }} · updated {{ post.updated_at|timesince }} ago{% if post.author %} · by {{ post.author.display_name }}{% endif %}
+                        {% if post.status == 'failed' and post.last_error %}<span class="block text-red-800 mt-1 line-clamp-1">{{ post.last_error }}</span>{% endif %}
+                    </p>
+                </div>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="text-center py-16">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-stone-100 flex items-center justify-center mb-4">
+            <svg class="w-7 h-7 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 19.5A2.5 2.5 0 016.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        </div>
+        <p class="text-sm font-medium text-stone-700 mb-1">{{ empty_title }}</p>
+        <p class="text-sm text-stone-600 mb-4">{{ empty_body }}</p>
+        {% if active_tab == 'drafts' and can_create %}
+        <a href="{% url 'blog:create' workspace_id=workspace.id %}"
+           class="inline-flex items-center gap-1.5 px-5 py-1.5 text-sm font-semibold text-orange-800 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-700 transition-all duration-150">
+            Write a blog post
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

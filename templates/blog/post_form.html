@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}{% if post %}Edit {{ post.title }}{% else %}New blog post{% endif %} - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
+        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Blog</a>
+        {% if post %}<span aria-hidden="true"> / </span><a href="{% url 'blog:detail' workspace_id=workspace.id post_id=post.id %}" class="underline hover:text-stone-900">{{ post.title|truncatechars:50 }}</a>{% endif %}
+    </nav>
+    <h1 class="text-lg font-semibold text-stone-900 mb-1">{% if post %}Edit blog post{% else %}New blog post{% endif %}</h1>
+    <p class="text-sm text-stone-600 mb-6">Saved as a draft. Nothing reaches the website until an approver approves this exact version and publishes it.</p>
+
+    {% if warn_withdraw %}
+    <div role="status" class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        {% if post.status == 'published' %}
+        This post is live. Saving a change creates a new revision that needs approval before it replaces the live page.
+        {% else %}
+        This post is approved (revision {{ post.approved_revision }}). Saving a change withdraws the approval and sends it back for review.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+    <div role="alert" class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+    {% endif %}
+    {% if form.errors and not form.non_field_errors %}
+    <div role="alert" class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        Please fix the highlighted fields below.
+    </div>
+    {% endif %}
+
+    {{ form_state|json_script:"blog-form-state" }}
+    <form method="post" x-data="blogPostForm(JSON.parse(document.getElementById('blog-form-state').textContent))" class="pb-16">
+        {% csrf_token %}
+
+        <fieldset class="mb-8">
+            <legend class="text-base font-semibold text-stone-900 mb-4">Post</legend>
+            {% include "blog/partials/field.html" with field=form.site %}
+            {% include "blog/partials/field.html" with field=form.title %}
+            <div class="mb-5">
+                <div class="flex items-baseline justify-between gap-3 mb-1.5">
+                    <label for="{{ form.slug.auto_id }}" class="block text-sm font-semibold text-stone-900">{{ form.slug.label }} <span class="text-red-700" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
+                    {% if not slug_locked %}
+                    <button type="button" class="text-xs font-medium text-orange-800 underline hover:text-orange-900" x-on:click="slug = slugify(title); slugTouched = false">Suggest from title</button>
+                    {% endif %}
+                </div>
+                {{ form.slug }}
+                <p id="{{ form.slug.auto_id }}_helptext" class="mt-1 text-xs text-stone-600">
+                    {% if slug_locked %}This post has been published, so its address is fixed.{% else %}{{ form.slug.help_text }}{% endif %}
+                    <span class="block mt-0.5">Page: <span class="font-mono text-stone-700" x-text="urlFor(slug)"></span></span>
+                </p>
+                {% if form.slug.errors %}<div role="alert" class="mt-1 text-sm text-red-800">{% for error in form.slug.errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+            </div>
+            {% include "blog/partials/field.html" with field=form.category %}
+            {% include "blog/partials/field.html" with field=form.excerpt %}
+            {% include "blog/partials/field.html" with field=form.body %}
+        </fieldset>
+
+        <fieldset class="mb-8" aria-describedby="featured-image-help">
+            <legend class="text-base font-semibold text-stone-900 mb-1">{{ form.featured_image.label }}</legend>
+            <p id="featured-image-help" class="text-xs text-stone-600 mb-3">
+                The {{ form.image_choices|length }} most recent images in the media library. Published as a JPEG, at most 1600px wide.
+                <a href="{% url 'media_library:index' workspace_id=workspace.id %}" class="underline text-orange-800 hover:text-orange-900">Upload an image</a> first if yours isn't here.
+            </p>
+            {% with selected=form.featured_image.value|default_if_none:''|stringformat:"s" %}
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <label class="flex flex-col items-center justify-center gap-2 min-h-24 border border-stone-300 rounded-lg p-2 cursor-pointer text-sm text-stone-700 has-checked:border-orange-700 has-checked:ring-2 has-checked:ring-orange-600 focus-within:ring-2 focus-within:ring-orange-600">
+                    <input type="radio" name="{{ form.featured_image.html_name }}" value="" {% if not selected %}checked{% endif %} class="accent-orange-700">
+                    No image
+                </label>
+                {% for asset in form.image_choices %}
+                <label class="flex flex-col gap-1.5 border border-stone-300 rounded-lg p-2 cursor-pointer has-checked:border-orange-700 has-checked:ring-2 has-checked:ring-orange-600 focus-within:ring-2 focus-within:ring-orange-600">
+                    <img src="{% if asset.thumbnail %}{{ asset.thumbnail.url }}{% else %}{{ asset.file.url }}{% endif %}" alt="" loading="lazy" class="w-full aspect-video object-cover rounded bg-stone-100">
+                    <span class="flex items-center gap-1.5 min-w-0">
+                        <input type="radio" name="{{ form.featured_image.html_name }}" value="{{ asset.id }}" {% if selected == asset.id|stringformat:"s" %}checked{% endif %} class="accent-orange-700 flex-shrink-0">
+                        <span class="text-xs text-stone-700 truncate">{{ asset.title|default:asset.filename }}</span>
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+            {% endwith %}
+            {% if form.featured_image.errors %}<div role="alert" class="mt-2 text-sm text-red-800">{% for error in form.featured_image.errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+            <div class="mt-4">{% include "blog/partials/field.html" with field=form.featured_image_alt %}</div>
+        </fieldset>
+
+        <fieldset class="mb-8">
+            <legend class="text-base font-semibold text-stone-900 mb-4">Search &amp; FAQ</legend>
+            {% include "blog/partials/field.html" with field=form.seo_title counter_model="seo" counter_limit=60 %}
+            {% include "blog/partials/field.html" with field=form.meta_description counter_model="meta" counter_limit=160 %}
+            {% include "blog/partials/field.html" with field=form.faq_text %}
+        </fieldset>
+
+        <div class="flex flex-wrap items-center gap-3 sticky bottom-0 bg-white/95 backdrop-blur py-3 border-t border-stone-200">
+            <button type="submit" class="inline-flex items-center px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                {% if post %}Save changes{% else %}Save draft{% endif %}
+            </button>
+            <a href="{% if post %}{% url 'blog:detail' workspace_id=workspace.id post_id=post.id %}{% else %}{% url 'blog:list' workspace_id=workspace.id %}{% endif %}"
+               class="px-4 py-2 text-sm font-medium text-stone-700 rounded-full hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-orange-700">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ request.csp_nonce }}">
+function blogPostForm(state) {
+    return {
+        title: state.title || '',
+        slug: state.slug || '',
+        slugTouched: !!state.slugTouched,
+        slugLocked: !!state.slugLocked,
+        seo: state.seo || '',
+        meta: state.meta || '',
+        siteUrls: state.siteUrls || {},
+        site: state.site || '',
+        slugify(value) {
+            return (value || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+                .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100).replace(/-+$/, '');
+        },
+        onTitle() {
+            if (!this.slugTouched && !this.slugLocked) this.slug = this.slugify(this.title);
+        },
+        urlFor(slug) {
+            const pattern = this.siteUrls[this.site] || '';
+            return slug ? pattern.replace('__slug__', slug) : '—';
+        },
+    };
+}
+</script>
+{% endblock %}

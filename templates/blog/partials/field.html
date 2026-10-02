@@ -1,0 +1,18 @@
+{% comment %}One labelled form field with help text and errors. Context: field, optional counter_model + counter_limit (Alpine character counter).{% endcomment %}
+<div class="mb-5">
+    <div class="flex items-baseline justify-between gap-3 mb-1.5">
+        <label for="{{ field.auto_id }}" class="block text-sm font-semibold text-stone-900">{{ field.label }}{% if field.field.required %} <span class="text-red-700" aria-hidden="true">*</span><span class="sr-only">(required)</span>{% endif %}</label>
+        {% if counter_model %}
+        <span id="{{ field.auto_id }}_count" class="text-xs tabular-nums" aria-live="polite"
+              :class="{{ counter_model }}.length > {{ counter_limit }} ? 'text-red-700 font-semibold' : 'text-stone-600'"
+              x-text="{{ counter_model }}.length + ' / {{ counter_limit }}'">{{ field.value|default:''|length }} / {{ counter_limit }}</span>
+        {% endif %}
+    </div>
+    {{ field }}
+    {% if field.help_text %}<p id="{{ field.auto_id }}_helptext" class="mt-1 text-xs text-stone-600">{{ field.help_text }}</p>{% endif %}
+    {% if field.errors %}
+    <div id="{{ field.auto_id }}_errors" role="alert" class="mt-1 text-sm text-red-800">
+        {% for error in field.errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+    {% endif %}
+</div>
