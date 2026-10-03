@@ -3,7 +3,7 @@
 <html lang="en" style="{% block html_style %}{% endblock %}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
     {# On Back/Forward past htmx's history cache, reload the page instead of asking the view for a bare partial (views answer HX requests with fragments). #}
     <meta name="htmx-config" content='{"refreshOnHistoryMiss": true}'>
@@ -20,8 +20,14 @@
     <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
     <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
     <link rel="icon" type="image/png" sizes="96x96" href="{% static 'favicon/favicon-96x96.png' %}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
-    <link rel="manifest" href="{% static 'favicon/site.webmanifest' %}">
+    {# Installable app (templates/pwa, apps/mobile): manifest, home-screen icon, and how it looks when opened from the home screen. #}
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'pwa/apple-touch-icon.png' %}">
+    <link rel="manifest" href="{% url 'pwa_manifest' %}">
+    <meta name="theme-color" content="#F7F6F2">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="{{ SITE_NAME }}">
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     <script nonce="{{ request.csp_nonce }}">
@@ -217,7 +223,7 @@
     </style>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="text-gray-900 min-h-screen" style="background: var(--surface-page);">
+<body class="text-gray-900 min-h-screen{% if user.is_authenticated and request.workspace and not mobile_task_title and not mobile_full_screen %} m-has-tabbar{% endif %}" style="background: var(--surface-page);">
     {% csrf_token %}
     <!-- Global HTMX loading indicator: a thin top progress bar shown during
          any HTMX request (calendar/analytics/publish swaps had no feedback). -->
@@ -306,7 +312,7 @@
         });
     </script>
     {% if user.is_authenticated %}
-    <div class="flex h-screen overflow-hidden"
+    <div class="app-shell flex overflow-hidden"
          style="background: var(--surface-page);"
          x-data="{ sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true', mobileMenuOpen: false }"
          x-effect="localStorage.setItem('sidebarCollapsed', sidebarCollapsed)"
@@ -420,7 +426,7 @@
             <!-- + New CTA -->
             {% if request.workspace %}
             <div class="sidebar-new-wrap px-3 pt-2 pb-1" :class="sidebarCollapsed && 'px-2'"
-                 x-data="sidebarNewMenu()">
+                 x-data="sidebarNewMenu()" @open-create-idea.window="openCreateModal()">
                 <div class="relative">
                     <button aria-haspopup="true" :aria-expanded="newMenuOpen" @click="newMenuOpen = !newMenuOpen"
                             class="btn-brand w-full flex items-center justify-center gap-1.5 text-sm py-2 cursor-pointer"
@@ -935,8 +941,12 @@
         </aside>
 
         <!-- Main content area -->
-        <div class="flex-1 flex flex-col overflow-hidden">
-            <!-- Mobile top bar -->
+        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+            {% if request.workspace %}
+            <!-- Phone app bar: brand switcher, notifications (templates/mobile/partials) -->
+            {% if not mobile_full_screen %}{% block mobile_app_bar %}{% include "mobile/partials/_app_bar.html" %}{% endblock %}{% endif %}
+            {% else %}
+            <!-- Mobile top bar (no workspace yet: the menu is the only navigation) -->
             <div class="flex lg:hidden items-center justify-between px-4 py-3 border-b border-stone-200 bg-white flex-shrink-0">
                 <button aria-label="Toggle menu" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen"
                         class="w-9 h-9 flex items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer -ml-1"
@@ -964,11 +974,12 @@
                 </div>
                 <div class="w-9"></div>
             </div>
+            {% endif %}
             <!-- Main content -->
-            <main class="lg:border lg:border-stone-200 lg:m-2.5 bg-white lg:rounded-xl flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto flex flex-col">
+            <main class="lg:border lg:border-stone-200 lg:m-2.5 bg-white lg:rounded-xl flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto flex flex-col {% block main_class %}{% endblock %}">
                 {% block page_header %}{% endblock %}
                 {% if messages %}
-                <div class="mb-4 space-y-2">
+                <div class="mb-4 space-y-2 m-flash">
                     {% for message in messages %}
                     <div role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}" aria-live="{% if message.tags == 'error' %}assertive{% else %}polite{% endif %}" class="rounded-md p-4 {% if message.tags == 'error' %}bg-red-50 text-red-800{% elif message.tags == 'success' %}bg-green-50 text-green-800{% else %}bg-blue-50 text-blue-800{% endif %}">
                         {{ message }}
@@ -980,11 +991,18 @@
                 {% block content %}{% endblock %}
                 </div>
             </main>
+            {% if request.workspace and not mobile_task_title and not mobile_full_screen %}
+            <!-- Phone bottom tabs -->
+            {% include "mobile/partials/_tab_bar.html" %}
+            {% endif %}
         </div>
     </div>
+    {% if request.workspace %}{% include "mobile/partials/_sheets.html" %}{% endif %}
 
-    <!-- Onboarding checklist popup (fixed bottom-right) -->
+    <!-- Onboarding checklist popup (fixed bottom-right; on phones it would cover half the screen, so the app shows it on the laptop only) -->
+    <div class="m-hide-mobile">
     {% include "onboarding/partials/_checklist.html" %}
+    </div>
 
     {% else %}
     <main class="auth-bg min-h-screen flex flex-col items-center justify-center py-12 px-4" style="font-family: var(--font-body);">
@@ -1007,18 +1025,25 @@
         function notificationBadge(initial) {
             return {
                 count: initial || 0,
-                _timer: null,
                 start() {
-                    this._timer = setInterval(() => { if (!document.hidden) this.refresh(); }, 60000);
+                    // Every badge on the page (sidebar, phone app bar) shares one
+                    // 60s poll and one request.
+                    window.addEventListener('bb-notification-count', (e) => { this.count = e.detail; });
+                    if (!window.__bbNotificationPoll) {
+                        window.__bbNotificationPoll = setInterval(() => { if (!document.hidden) bbRefreshNotificationCount(); }, 60000);
+                    }
                 },
-                async refresh() {
-                    try {
-                        const resp = await fetch('{% url "notifications:unread_count" %}', { credentials: 'same-origin' });
-                        if (resp.ok) this.count = (await resp.json()).count;
-                    } catch (e) { /* offline: keep the last known count */ }
-                },
-                destroy() { if (this._timer) clearInterval(this._timer); },
+                refresh() { return bbRefreshNotificationCount(); },
             };
+        }
+        function bbRefreshNotificationCount() {
+            if (window.__bbNotificationFetch) return window.__bbNotificationFetch;
+            window.__bbNotificationFetch = fetch('{% url "notifications:unread_count" %}', { credentials: 'same-origin' })
+                .then(function (resp) { return resp.ok ? resp.json() : null; })
+                .then(function (data) { if (data) window.dispatchEvent(new CustomEvent('bb-notification-count', { detail: data.count })); })
+                .catch(function () { /* offline: keep the last known count */ })
+                .finally(function () { window.__bbNotificationFetch = null; });
+            return window.__bbNotificationFetch;
         }
         document.body.addEventListener('htmx:afterRequest', function(evt) {
             var path = (evt.detail.requestConfig && evt.detail.requestConfig.path) || '';
@@ -1027,6 +1052,7 @@
             }
         });
     </script>
+    <script src="{% static 'js/pwa.js' %}" defer></script>
     <script src="{% static 'js/vendor/alpine-focus.min.js' %}" defer></script>
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>

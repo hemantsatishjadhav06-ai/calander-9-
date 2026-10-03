@@ -1,0 +1,48 @@
+{% comment %}
+Phone app bar (below 1024px). Three shapes:
+  * a tab's first screen: the brand switcher, then notifications;
+  * any page opened from a tab: a back button before the switcher;
+  * a full-screen task (reviewing a post): back and a title.
+Needs request.workspace. Opens the brand sheet with the window event "m-brand-sheet".
+{% endcomment %}
+{% with ws=request.workspace %}
+{% if mobile_task_title %}
+<header class="m-appbar is-task" role="banner">
+    <button type="button" class="m-iconbtn is-plain" data-m-back data-m-fallback="{% url 'mobile:today' workspace_id=ws.id %}" aria-label="Back">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="m-appbar-title">{{ mobile_task_title }}</span>
+    <span class="m-brand-sub" style="max-width:40%">{{ ws.name }}</span>
+</header>
+{% else %}
+<header class="m-appbar" role="banner">
+    {% if not mobile_is_root %}
+    <button type="button" class="m-iconbtn is-plain" style="margin-left:-8px" data-m-back
+            data-m-fallback="{% if mobile_tab == 'publish' %}{% url 'calendar:calendar' workspace_id=ws.id %}?mode=list{% elif mobile_tab == 'inbox' %}{% url 'inbox:feed' workspace_id=ws.id %}{% elif mobile_tab == 'more' %}{% url 'mobile:more' workspace_id=ws.id %}{% else %}{% url 'mobile:today' workspace_id=ws.id %}{% endif %}"
+            aria-label="Back">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    {% endif %}
+    <button type="button" class="m-brand" aria-haspopup="dialog" aria-label="Switch brand. Current brand: {{ ws.name }}"
+            @click="$dispatch('m-brand-sheet')">
+        {% if ws.icon %}
+        <img src="{{ ws.icon.url }}" alt="" class="m-brand-logo">
+        {% else %}
+        <span class="m-brand-logo" aria-hidden="true"{% if ws.primary_color %} style="background: {{ ws.primary_color }};"{% endif %}>{{ ws.name|make_list|first|upper }}</span>
+        {% endif %}
+        <span class="m-brand-text">
+            <span class="m-brand-name"><span>{{ ws.name }}</span>
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--neutral-500); flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+            <span class="m-brand-sub">{% if mobile_brand.platforms %}{{ mobile_brand.platforms|join:" · " }}{% else %}No channels connected{% endif %}</span>
+        </span>
+    </button>
+    <a href="{% url 'notifications:list' %}" class="m-iconbtn"
+       x-data="notificationBadge({{ unread_notification_count|default:0 }})" x-init="start()" @notifications-read.window="refresh()"
+       :aria-label="count ? 'Notifications, ' + count + ' unread' : 'Notifications'" aria-label="Notifications">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span class="m-dot" x-show="count > 0"{% if not unread_notification_count %} x-cloak{% endif %}></span>
+    </a>
+</header>
+{% endif %}
+{% endwith %}

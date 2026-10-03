@@ -1,0 +1,143 @@
+{% comment %}
+Bottom sheets for the phone layout, included once per page:
+  * brand switcher  — window event "m-brand-sheet"
+  * create (+)      — window event "m-create-sheet"
+  * install the app — window event "m-install-sheet" (state in static/js/pwa.js)
+On a laptop the same sheets open as centred dialogs.
+{% endcomment %}
+{% load static %}
+{% with ws=request.workspace %}
+
+{# ── Switch brand ─────────────────────────────────────────── #}
+<div x-data="{ open: false }" @m-brand-sheet.window="open = true" @keydown.escape.window="open = false">
+    <div class="m-sheet-root" x-show="open" x-cloak
+         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="m-scrim" @click="open = false"></div>
+        <div class="m-sheet" role="dialog" aria-modal="true" aria-labelledby="m-brand-title" x-show="open" x-trap.noscroll="open"
+             x-transition:enter="m-sheet-enter" x-transition:enter-start="m-sheet-from" x-transition:enter-end="m-sheet-to"
+             x-transition:leave="m-sheet-enter" x-transition:leave-start="m-sheet-to" x-transition:leave-end="m-sheet-from">
+            <div class="m-sheet-handle" aria-hidden="true"></div>
+            <h2 class="m-sheet-title" id="m-brand-title">Switch brand</h2>
+            <div class="m-sheet-body">
+                {% for b in mobile_brands %}
+                {% with bw=b.workspace %}
+                <a class="m-sheet-row{% if bw.id == ws.id %} is-current{% endif %}"{% if bw.id == ws.id %} aria-current="true"{% endif %}
+                   href="{% if mobile_tab == 'publish' %}{% url 'calendar:calendar' workspace_id=bw.id %}?mode=list{% elif mobile_tab == 'inbox' %}{% url 'inbox:feed' workspace_id=bw.id %}{% elif mobile_tab == 'more' %}{% url 'mobile:more' workspace_id=bw.id %}{% else %}{% url 'mobile:today' workspace_id=bw.id %}{% endif %}">
+                    {% if bw.icon %}
+                    <img src="{{ bw.icon.url }}" alt="" class="m-brand-logo" style="width:44px;height:44px;border-radius:12px">
+                    {% else %}
+                    <span class="m-brand-logo" aria-hidden="true" style="width:44px;height:44px;border-radius:12px;{% if bw.primary_color %}background: {{ bw.primary_color }};{% endif %}">{{ bw.name|make_list|first|upper }}</span>
+                    {% endif %}
+                    <span class="flex-1 min-w-0">
+                        <span class="m-row-title block truncate">{{ bw.name }}</span>
+                        <span class="m-row-sub block truncate">{% if b.platforms %}{{ b.platforms|join:" · " }}{% else %}No channels yet{% endif %}{% if b.pending %} · <strong style="color: var(--brand-700)">{{ b.pending }} to approve</strong>{% endif %}</span>
+                    </span>
+                    {% if bw.id == ws.id %}
+                    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-700); flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>
+                    {% endif %}
+                </a>
+                {% endwith %}
+                {% endfor %}
+                {% if can_create_workspace %}
+                <button type="button" class="m-sheet-row" @click="open = false; $dispatch('open-create-ws')">
+                    <span class="m-sheet-icon" style="border: 1.5px dashed var(--neutral-300); color: var(--neutral-500)">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </span>
+                    <span class="m-row-title" style="font-weight:500">Add a brand</span>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Create ───────────────────────────────────────────────── #}
+<div x-data="{ open: false }" @m-create-sheet.window="open = true" @keydown.escape.window="open = false">
+    <div class="m-sheet-root" x-show="open" x-cloak
+         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="m-scrim" @click="open = false"></div>
+        <div class="m-sheet" role="dialog" aria-modal="true" aria-labelledby="m-create-title" x-show="open" x-trap.noscroll="open"
+             x-transition:enter="m-sheet-enter" x-transition:enter-start="m-sheet-from" x-transition:enter-end="m-sheet-to"
+             x-transition:leave="m-sheet-enter" x-transition:leave-start="m-sheet-to" x-transition:leave-end="m-sheet-from">
+            <div class="m-sheet-handle" aria-hidden="true"></div>
+            <h2 class="m-sheet-title" id="m-create-title">Create for {{ ws.name }}</h2>
+            <div class="m-sheet-body">
+                <a href="{% url 'composer:compose' workspace_id=ws.id %}" class="m-sheet-row">
+                    <span class="m-sheet-icon" style="background:#EFF6FF;color:#2563EB">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </span>
+                    <span><span class="m-row-title block">Post</span><span class="m-row-sub block">Write, add photos, pick channels and a time</span></span>
+                </a>
+                <button type="button" class="m-sheet-row" @click="open = false; $dispatch('open-create-idea')">
+                    <span class="m-sheet-icon" style="background:#F0FDF4;color:#16A34A">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    </span>
+                    <span><span class="m-row-title block">Idea</span><span class="m-row-sub block">Save a thought for later, with a photo if you like</span></span>
+                </button>
+                <a href="{% url 'blog:create' workspace_id=ws.id %}" class="m-sheet-row">
+                    <span class="m-sheet-icon" style="background:#FFF7ED;color:#C2410C">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="14" y2="11"/></svg>
+                    </span>
+                    <span><span class="m-row-title block">Blog post</span><span class="m-row-sub block">An article for the {{ ws.name }} website</span></span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Install the app ─────────────────────────────────────── #}
+<div x-data="mInstallSheet()" @m-install-sheet.window="show()" @keydown.escape.window="close()">
+    <div class="m-sheet-root" x-show="open" x-cloak
+         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="m-scrim" @click="close()"></div>
+        <div class="m-sheet" role="dialog" aria-modal="true" aria-labelledby="m-install-title" x-show="open" x-trap.noscroll="open"
+             x-transition:enter="m-sheet-enter" x-transition:enter-start="m-sheet-from" x-transition:enter-end="m-sheet-to"
+             x-transition:leave="m-sheet-enter" x-transition:leave-start="m-sheet-to" x-transition:leave-end="m-sheet-from">
+            <div class="m-sheet-handle" aria-hidden="true"></div>
+            <div class="m-sheet-body" style="padding: 8px 20px 0; text-align:center">
+                <img src="{% static 'pwa/icon-192.png' %}" alt="" width="64" height="64" style="margin: 4px auto 14px; border-radius: 16px; box-shadow: var(--shadow-md)">
+                <h2 id="m-install-title" style="font-size:1.25rem;font-weight:800;letter-spacing:-0.01em;color:var(--text-primary)">Install {{ SITE_NAME }}</h2>
+                <p style="margin-top:6px;font-size:.9375rem;line-height:1.5;color:var(--text-secondary)">Open it from your home screen like any app: full screen, quick to start, and one tap from what needs you.</p>
+                <ul style="margin-top:16px;text-align:left;background:var(--surface-page);border-radius:16px;padding:6px 4px" role="list">
+                    <li class="flex items-center gap-3 px-3 py-3">
+                        <span class="m-sheet-icon" style="width:36px;height:36px;border-radius:10px;background:#fff;color:var(--brand-700)"><svg aria-hidden="true" style="width:19px;height:19px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+                        <span><span class="block text-[0.9375rem] font-semibold text-stone-900">Approvals in one tap</span><span class="block text-[0.8125rem] text-stone-500">Opens straight to what is waiting for you today</span></span>
+                    </li>
+                    <li class="flex items-center gap-3 px-3 py-3">
+                        <span class="m-sheet-icon" style="width:36px;height:36px;border-radius:10px;background:#fff;color:var(--brand-700)"><svg aria-hidden="true" style="width:19px;height:19px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span>
+                        <span><span class="block text-[0.9375rem] font-semibold text-stone-900">Works like an app</span><span class="block text-[0.8125rem] text-stone-500">Its own icon, no browser bars, opens where you left off</span></span>
+                    </li>
+                    <li class="flex items-center gap-3 px-3 py-3">
+                        <span class="m-sheet-icon" style="width:36px;height:36px;border-radius:10px;background:#fff;color:var(--brand-700)"><svg aria-hidden="true" style="width:19px;height:19px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                        <span><span class="block text-[0.9375rem] font-semibold text-stone-900">Same login, same access</span><span class="block text-[0.8125rem] text-stone-500">Everything you can do on the laptop, on your phone</span></span>
+                    </li>
+                </ul>
+
+                {# Android and desktop Chrome/Edge: the browser's own install prompt #}
+                <template x-if="canPrompt">
+                    <button type="button" class="m-btn is-primary is-block" style="margin-top:18px" @click="install()">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Install app
+                    </button>
+                </template>
+                {# iPhone and iPad: Share, then Add to Home Screen #}
+                <template x-if="!canPrompt && isIOS">
+                    <ol style="margin-top:16px;text-align:left;font-size:.9375rem;line-height:1.45;color:var(--text-primary)" class="space-y-2.5">
+                        <li class="flex items-center gap-3"><span class="m-row-count" style="background:var(--neutral-800)">1</span><span>Tap <svg aria-label="Share" role="img" style="display:inline;width:18px;height:18px;vertical-align:-3px;color:#2563EB" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> <strong>Share</strong> in the browser bar</span></li>
+                        <li class="flex items-center gap-3"><span class="m-row-count" style="background:var(--neutral-800)">2</span><span>Scroll and tap <strong>Add to Home Screen</strong></span></li>
+                        <li class="flex items-center gap-3"><span class="m-row-count" style="background:var(--neutral-800)">3</span><span>Tap <strong>Add</strong>, then open {{ SITE_NAME }} from your home screen</span></li>
+                    </ol>
+                </template>
+                {# Any other browser: its menu has the option #}
+                <template x-if="!canPrompt && !isIOS">
+                    <p style="margin-top:16px;font-size:.9375rem;line-height:1.5;color:var(--text-primary)">Open your browser's menu <strong>⋮</strong> and tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>
+                </template>
+                <button type="button" class="m-btn is-ghost is-block" style="margin-top:8px" @click="close(true)">Not now</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endwith %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load tz approval_extras mobile_tags %}
+
+{% block title %}Today · {{ workspace.name }} · {{ SITE_NAME }}{% endblock %}
+{% block main_class %}m-main-surface{% endblock %}
+
+{% block content %}
+{% include "approvals/partials/_toasts.html" %}
+<div id="m-today" class="m-screen"
+     hx-get="{{ request.get_full_path }}" hx-trigger="approvalAction from:body, m-refresh from:body"
+     hx-select="#m-today" hx-select-oob="#m-tabbar" hx-target="this" hx-swap="outerHTML">
+
+    <p class="m-overline">{% timezone display_timezone %}{{ now_local|date:"l, j F" }}{% endtimezone %}</p>
+    <h1 class="m-large-title">Today</h1>
+
+    {# ── At a glance ── #}
+    <div class="m-tiles">
+        <a class="m-tile" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=approvals">
+            <span class="m-tile-icon" style="background:#FFF7ED;color:#C2410C">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </span>
+            <span class="m-tile-number">{{ sidebar_pending_approvals }}</span>
+            <span class="m-tile-label">To approve</span>
+        </a>
+        <a class="m-tile" href="{% url 'inbox:feed' workspace_id=workspace.id %}{% if sidebar_unread_inbox_count %}?status=unread{% endif %}">
+            <span class="m-tile-icon" style="background:#FFF1F2;color:#E11D48">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </span>
+            <span class="m-tile-number">{{ sidebar_unread_inbox_count }}</span>
+            <span class="m-tile-label">Unread message{{ sidebar_unread_inbox_count|pluralize }}</span>
+        </a>
+        <a class="m-tile" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=queue">
+            <span class="m-tile-icon" style="background:#EFF6FF;color:#2563EB">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </span>
+            <span class="m-tile-number">{{ scheduled_count }}</span>
+            <span class="m-tile-label">Going out in 7 days</span>
+        </a>
+    </div>
+
+    {% if failed_count %}
+    <a class="m-banner is-error" style="margin-top:14px" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=sent">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span><strong>{{ failed_count }} post{{ failed_count|pluralize }} failed to publish</strong> in the last two weeks. Tap to see why.</span>
+    </a>
+    {% endif %}
+
+    {# ── Approvals ── #}
+    <div class="m-section-head">
+        <h2 class="m-section-title">{% if can_approve %}Needs your approval{% else %}Waiting for approval{% endif %}</h2>
+        {% if sidebar_pending_approvals > approvals|length %}
+        <a class="m-link" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=approvals">See all {{ sidebar_pending_approvals }}</a>
+        {% endif %}
+    </div>
+    {% if overdue_count %}
+    <div class="m-banner is-warn" style="margin-bottom:12px">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>{% if overdue_count == 1 %}One post's proposed time has passed.{% else %}{{ overdue_count }} posts' proposed times have passed.{% endif %} You can still approve; then pick a new time.</span>
+    </div>
+    {% endif %}
+    {% for post in approvals %}
+    {% include "mobile/partials/_approval_card.html" %}
+    {% empty %}
+    <div class="m-card m-empty">
+        <svg aria-hidden="true" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <strong>All caught up</strong>
+        Nothing is waiting for approval in {{ workspace.name }}.
+    </div>
+    {% endfor %}
+    {% if blog.pending %}
+    <a class="m-banner is-info" style="margin-top:12px" href="{% url 'blog:list' workspace_id=workspace.id %}">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#C2410C"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        <span class="flex-1"><strong style="color:var(--text-primary)">{{ blog.pending }} blog post{{ blog.pending|pluralize }}</strong> waiting for approval</span>
+        <svg class="m-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+    {% endif %}
+
+    {# ── New messages ── #}
+    {% if inbox_messages %}
+    <div class="m-section-head">
+        <h2 class="m-section-title">New messages</h2>
+        <a class="m-link" href="{% url 'inbox:feed' workspace_id=workspace.id %}?status=unread">Inbox</a>
+    </div>
+    <div class="m-list">
+        {% for msg in inbox_messages %}
+        <a class="m-row" href="{% url 'inbox:message_detail' workspace_id=workspace.id message_id=msg.id %}">
+            <span class="relative flex-shrink-0">
+                {% if msg.sender_avatar_url %}
+                <img class="m-avatar" src="{{ msg.sender_avatar_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+                {% else %}
+                <span class="m-avatar" aria-hidden="true" style="background: var(--neutral-200); color: var(--neutral-700)">{{ msg.sender_name|make_list|first|upper|default:"?" }}</span>
+                {% endif %}
+                <span class="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-white rounded-full flex items-center justify-center">{% include "partials/_platform_icon.html" with platform=msg.social_account.platform %}</span>
+            </span>
+            <span class="m-row-main">
+                <span class="flex items-baseline gap-2">
+                    <span class="m-row-title flex-1" style="font-weight:700">{{ msg.sender_name|default:msg.sender_handle }}</span>
+                    <span class="m-when-time">{{ msg.received_at|short_ago }}</span>
+                </span>
+                <span class="m-row-sub block truncate">{{ msg.get_message_type_display }} · {{ msg.body|default:"(no text)" }}</span>
+            </span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── This week ── #}
+    <div class="m-section-head">
+        <h2 class="m-section-title">This week</h2>
+        <a class="m-link" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&amp;view=week">Calendar</a>
+    </div>
+    {% if schedule %}
+    <div class="m-list">
+        {% for day in schedule %}
+        {% for post in day.posts %}
+        <a class="m-row" href="{% url 'mobile:post' workspace_id=workspace.id post_id=post.id %}">
+            <span class="m-when">
+                <span class="m-when-day block">{% if forloop.first %}{{ day.label }}{% else %}&nbsp;{% endif %}</span>
+                <span class="m-when-time block">{% timezone display_timezone %}{{ post.local_time|date:"g:i A" }}{% endtimezone %}</span>
+            </span>
+            {% if post.thumb %}
+            <img class="m-thumb is-sm" src="{{ post.thumb }}" alt="" loading="lazy">
+            {% else %}
+            <span class="m-thumb is-sm" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            {% endif %}
+            <span class="m-row-main">
+                <span class="m-row-title block">{{ post.headline }}</span>
+                <span class="flex items-center gap-1.5 mt-1">{% status_badge post.status %}
+                    {% for p in post.channel_platforms %}<span class="m-platform" style="width:20px;height:20px">{% include "partials/_platform_icon.html" with platform=p %}</span>{% endfor %}
+                </span>
+            </span>
+            <svg class="m-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+        {% endfor %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="m-card m-empty">
+        <strong>Nothing planned this week</strong>
+        Tap <span aria-hidden="true">+</span><span class="sr-only">Create</span> to write a post.
+    </div>
+    {% endif %}
+    <p class="m-row-sub" style="text-align:center;margin-top:18px">Times in {{ display_timezone }}</p>
+</div>
+{% endblock %}

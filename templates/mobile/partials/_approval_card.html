@@ -1,0 +1,59 @@
+{% comment %}
+A post waiting for approval, as a phone card. Context: post (decorated by
+apps.mobile.services.decorate), workspace, can_approve, display_timezone.
+Approve posts to the same endpoint as the desktop list; its HX-Trigger
+(showToast + approvalAction) shows the toast and refreshes the screen.
+{% endcomment %}
+{% load tz approval_extras %}
+<article class="m-card m-approval">
+    <a class="m-approval-top" href="{% url 'mobile:post' workspace_id=workspace.id post_id=post.id %}">
+        {% if post.thumb %}
+        <img class="m-thumb" src="{{ post.thumb }}" alt="" loading="lazy">
+        {% else %}
+        <span class="m-thumb" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+        {% endif %}
+        <div class="min-w-0 flex-1">
+            {% status_badge post.status %}
+            <h3 class="m-approval-title">{{ post.headline }}</h3>
+            <div class="m-meta{% if post.is_past %} is-late{% endif %}">
+                <svg class="m-meta-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>{% if post.when %}{% timezone display_timezone %}{{ post.when|date:"D j M · g:i A" }}{% endtimezone %}{% if post.is_past %} · passed{% endif %}{% else %}No time set{% endif %}</span>
+                {% if post.channel_platforms %}
+                <span class="m-platforms" aria-label="Channels">
+                    {% for p in post.channel_platforms %}<span class="m-platform">{% include "partials/_platform_icon.html" with platform=p %}</span>{% endfor %}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </a>
+    {% if post.preview %}<p class="m-caption">{{ post.preview }}</p>{% endif %}
+
+    {% if can_approve and post.is_actionable %}
+    <div class="m-actions" style="grid-template-columns: auto 1fr">
+        <a class="m-btn is-secondary" href="{% url 'mobile:post' workspace_id=workspace.id post_id=post.id %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Review
+        </a>
+        {% if post.when and not post.is_past %}
+        <button type="button" class="m-btn is-primary"
+                hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-vals='{"schedule": "1"}'
+                hx-swap="none" hx-disabled-elt="this">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Approve &amp; schedule
+        </button>
+        {% else %}
+        <button type="button" class="m-btn is-primary"
+                hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}"
+                hx-swap="none" hx-disabled-elt="this">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Approve
+        </button>
+        {% endif %}
+    </div>
+    {% if post.is_past %}
+    <p class="m-row-sub" style="margin-top:10px">Its time has passed. Approve it, then open it to pick a new time.</p>
+    {% endif %}
+    {% elif post.is_actionable %}
+    <p class="m-row-sub" style="margin-top:10px">Waiting for an approver.</p>
+    {% endif %}
+</article>

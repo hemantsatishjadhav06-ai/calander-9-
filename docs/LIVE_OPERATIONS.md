@@ -10,7 +10,7 @@ Production: **https://sm-bean-production-eb50.up.railway.app** (Railway project
 |---|---|---|
 | Website | https://www.neopolisinfra.com (Netlify `neopolis-infra`, `47e0a5cc-…`) | https://morespace.netlify.app (Netlify `morespace`, `964e086b-…`) |
 | Facebook Page | "Neopolis Infra" — Graph Page id `585141221346435`, profile URL id `61595008380228` | "More Space" — Graph Page id `1282011328339050`, profile URL id `61577172604485` |
-| Instagram | @neopolis_infra | @morespacehyd |
+| Instagram | @neopolis_infra | @morespace.ai |
 | X | @neopolisinfra | @morespaceai |
 | Timezone | Asia/Kolkata | Asia/Kolkata |
 | Approval | required, dashboard-enforced | required, dashboard-enforced |

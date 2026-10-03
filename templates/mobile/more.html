@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}More · {{ workspace.name }} · {{ SITE_NAME }}{% endblock %}
+{% block main_class %}m-main-surface{% endblock %}
+
+{% block content %}
+<div class="m-screen">
+    <p class="m-overline">{{ SITE_NAME }}</p>
+    <h1 class="m-large-title">More</h1>
+
+    {# ── You ── #}
+    <div class="m-list" style="margin-top:18px">
+    <a class="m-row" style="padding:14px" href="{% url 'accounts:settings' %}">
+        {% if user.avatar %}
+        <img class="m-avatar is-lg" src="{{ user.avatar.url }}" alt="">
+        {% else %}
+        <span class="m-avatar is-lg" aria-hidden="true">{{ user.display_name|default:user.email|make_list|first|upper }}</span>
+        {% endif %}
+        <span class="m-row-main">
+            <span class="flex items-center gap-2 min-w-0">
+                <span class="m-row-title" style="font-size:1.0625rem;font-weight:700">{{ user.display_name|default:user.email }}</span>
+                {% if role_label %}<span class="m-role">{{ role_label }}</span>{% endif %}
+            </span>
+            <span class="m-row-sub block truncate">{{ user.email }}</span>
+        </span>
+        <svg class="m-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+    </div>
+
+    {# ── Brands ── #}
+    <h2 class="m-group-label">Brands</h2>
+    <div class="m-list">
+        {% for b in mobile_brands %}
+        {% with bw=b.workspace %}
+        <a class="m-row" href="{% url 'mobile:today' workspace_id=bw.id %}"{% if bw.id == workspace.id %} aria-current="true"{% endif %}>
+            {% if bw.icon %}
+            <img src="{{ bw.icon.url }}" alt="" class="m-brand-logo">
+            {% else %}
+            <span class="m-brand-logo" aria-hidden="true"{% if bw.primary_color %} style="background: {{ bw.primary_color }};"{% endif %}>{{ bw.name|make_list|first|upper }}</span>
+            {% endif %}
+            <span class="m-row-main">
+                <span class="m-row-title block" style="font-weight:700">{{ bw.name }}</span>
+                <span class="m-row-sub block truncate">{% if b.platforms %}{{ b.platforms|join:" · " }}{% else %}No channels yet{% endif %}{% if b.pending %} · {{ b.pending }} to approve{% endif %}</span>
+            </span>
+            {% if bw.id == workspace.id %}
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-700); flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>
+            {% else %}
+            <svg class="m-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            {% endif %}
+        </a>
+        {% endwith %}
+        {% endfor %}
+    </div>
+
+    {# ── Publishing ── #}
+    <h2 class="m-group-label">Publishing in {{ workspace.name }}</h2>
+    <div class="m-list">
+        {% url 'composer:drafts_list' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Drafts" icon="file" count=drafts_count %}
+        {% url 'blog:list' workspace_id=workspace.id as u %}
+        {% if blog.live %}{% with v=blog.live|stringformat:"d"|add:" live" %}{% include "mobile/partials/_more_row.html" with href=u label="Blog" icon="book" value=v count=blog.pending %}{% endwith %}{% else %}{% include "mobile/partials/_more_row.html" with href=u label="Blog" icon="book" count=blog.pending %}{% endif %}
+        {% url 'composer:create_landing' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Ideas" icon="bulb" %}
+        {% url 'calendar:queue_list' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Queues" icon="list" %}
+        {% url 'calendar:posting_slots' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Posting schedule" icon="clock" %}
+        {% url 'media_library:index' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Media library" icon="image" %}
+        {% url 'composer:template_list' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Templates" icon="layers" %}
+        {% url 'composer:category_list' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Categories" icon="tag" %}
+        {% url 'composer:csv_upload' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Import CSV" icon="upload" %}
+    </div>
+
+    {# ── Workspace ── #}
+    <h2 class="m-group-label">Workspace</h2>
+    <div class="m-list">
+        {% url 'social_accounts:list' workspace_id=workspace.id as u %}
+        {% with n=sidebar_channels|length %}{% with v=n|stringformat:"d"|add:" connected" %}{% include "mobile/partials/_more_row.html" with href=u label="Channels" icon="link" value=v alert=sidebar_unhealthy_channels|length %}{% endwith %}{% endwith %}
+        {% if analytics_enabled_platforms %}
+        {% url 'analytics:index' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Analytics" icon="chart" %}
+        {% endif %}
+        {% url 'notifications:list' as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Notifications" icon="bell" count=unread_notification_count %}
+        {% url 'members:list' as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Team members" icon="users" %}
+        {% url 'workspaces:settings' workspace_id=workspace.id as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Workspace settings" icon="settings" %}
+    </div>
+
+    {% if is_org_admin %}
+    {# ── Organization ── #}
+    <h2 class="m-group-label">{{ request.org.name|default:"Organization" }}</h2>
+    <div class="m-list">
+        {% url 'organizations:settings' as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Organization settings" icon="building" %}
+        {% url 'organizations:workspaces' as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="All workspaces" icon="grid" %}
+        {% url 'organizations:cross_workspace_calendar' as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="All calendars" icon="calendar" %}
+        {% url 'api_keys:list' as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="API keys" icon="key" %}
+    </div>
+    {% endif %}
+
+    {# ── App ── #}
+    <h2 class="m-group-label">App</h2>
+    <div class="m-list">
+        <button type="button" class="m-row" x-data x-show="!window.mIsStandalone || !window.mIsStandalone()" @click="$dispatch('m-install-sheet')">
+            <span class="m-row-icon" style="background:var(--brand-50);color:var(--brand-700)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span>
+            <span class="m-row-label">Install the app</span>
+            <svg class="m-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        {% url 'accounts:settings' as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Account and preferences" icon="user" %}
+        {% url 'support' as u %}
+        {% include "mobile/partials/_more_row.html" with href=u label="Help and support" icon="help" %}
+        <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="m-row" style="border-top:1px solid var(--neutral-100)">
+                <span class="m-row-icon" style="background:#FEF2F2;color:#B91C1C"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+                <span class="m-row-label" style="color:#B91C1C">Sign out</span>
+            </button>
+        </form>
+    </div>
+    <p class="m-row-sub" style="text-align:center;margin-top:20px">{{ SITE_NAME }}{% if SOURCE_URL %} · <a href="{{ SOURCE_URL }}" target="_blank" rel="noopener" style="text-decoration:underline">source code</a>{% endif %}</p>
+</div>
+{% endblock %}
