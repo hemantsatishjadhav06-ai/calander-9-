@@ -1,0 +1,39 @@
+{% comment %}
+Phone bottom tabs (below 1024px): Today, Publish, Create (+), Inbox, More.
+Badges reuse the sidebar's counts. The + opens the create sheet ("m-create-sheet").
+{% endcomment %}
+{% with ws=request.workspace %}
+<nav id="m-tabbar" class="m-tabbar" aria-label="Main" data-badge="{{ sidebar_pending_approvals|add:sidebar_unread_inbox_count }}">
+    <a href="{% url 'mobile:today' workspace_id=ws.id %}" class="m-tab{% if mobile_tab == 'today' %} is-active{% endif %}"{% if mobile_tab == 'today' %} aria-current="page"{% endif %}>
+        <span class="m-tab-icon">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V9.5"/></svg>
+        </span>
+        Today
+    </a>
+    <a href="{% url 'calendar:calendar' workspace_id=ws.id %}?mode=list{% if sidebar_pending_approvals %}&amp;tab=approvals{% endif %}" class="m-tab{% if mobile_tab == 'publish' %} is-active{% endif %}"{% if mobile_tab == 'publish' %} aria-current="page"{% endif %}
+       aria-label="Publish{% if sidebar_pending_approvals %}, {{ sidebar_pending_approvals }} waiting for approval{% endif %}">
+        <span class="m-tab-icon">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2.5"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            {% if sidebar_pending_approvals %}<span class="m-tab-badge" aria-hidden="true">{% if sidebar_pending_approvals > 99 %}99+{% else %}{{ sidebar_pending_approvals }}{% endif %}</span>{% endif %}
+        </span>
+        Publish
+    </a>
+    <button type="button" class="m-fab" aria-label="Create" aria-haspopup="dialog" @click="$dispatch('m-create-sheet')">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <a href="{% url 'inbox:feed' workspace_id=ws.id %}" class="m-tab{% if mobile_tab == 'inbox' %} is-active{% endif %}"{% if mobile_tab == 'inbox' %} aria-current="page"{% endif %}
+       aria-label="Inbox{% if sidebar_unread_inbox_count %}, {{ sidebar_unread_inbox_count }} unread{% endif %}">
+        <span class="m-tab-icon">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            {% if sidebar_unread_inbox_count %}<span class="m-tab-badge" aria-hidden="true">{% if sidebar_unread_inbox_count > 99 %}99+{% else %}{{ sidebar_unread_inbox_count }}{% endif %}</span>{% endif %}
+        </span>
+        Inbox
+    </a>
+    <a href="{% url 'mobile:more' workspace_id=ws.id %}" class="m-tab{% if mobile_tab == 'more' %} is-active{% endif %}"{% if mobile_tab == 'more' %} aria-current="page"{% endif %}>
+        <span class="m-tab-icon">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
+        </span>
+        More
+    </a>
+</nav>
+{% endwith %}

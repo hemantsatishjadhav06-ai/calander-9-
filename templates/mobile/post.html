@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% load tz approval_extras mobile_tags %}
+
+{% block title %}{{ post.headline|truncatechars:60 }} · {{ workspace.name }} · {{ SITE_NAME }}{% endblock %}
+{% block main_class %}m-main-surface{% endblock %}
+{% block mobile_app_bar %}{% if can_approve and post.is_actionable %}{% include "mobile/partials/_app_bar.html" with mobile_task_title="Review post" %}{% else %}{{ block.super }}{% endif %}{% endblock %}
+
+{% block content %}
+{% include "approvals/partials/_toasts.html" %}
+<div id="m-post" class="m-screen" style="padding-bottom:0"
+     hx-get="{{ request.get_full_path }}" hx-trigger="approvalAction from:body" hx-select="#m-post" hx-target="this" hx-swap="outerHTML"
+     x-data="{ channel: 0, sheet: null, comment: '' }">
+
+    {# ── Status ── #}
+    <div class="flex items-center flex-wrap gap-2" style="margin-top:8px">
+        {% status_badge post.status %}
+        <span class="m-row-sub">by {{ post.author.display_name|default:"Unknown" }}{% if versions %} · version {{ versions }}{% endif %}</span>
+    </div>
+    <h1 style="font-size:1.375rem;font-weight:800;line-height:1.25;letter-spacing:-0.015em;color:var(--text-primary);margin-top:8px">{{ post.headline }}</h1>
+
+    {# ── Channel switch ── #}
+    {% if channels|length > 1 %}
+    <div class="m-seg" role="tablist" aria-label="Preview for" style="margin-top:16px">
+        {% for pp in channels %}
+        <button type="button" role="tab" :aria-selected="channel === {{ forloop.counter0 }}" :class="channel === {{ forloop.counter0 }} && 'is-active'" @click="channel = {{ forloop.counter0 }}"{% if forloop.first %} class="is-active"{% endif %}>
+            {% include "partials/_platform_icon.html" with platform=pp.social_account.platform %}
+            <span>{{ pp.social_account.account_name|truncatechars:18 }}</span>
+        </button>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── Preview, one per channel ── #}
+    {% for pp in channels %}
+    <section class="m-card" style="margin-top:14px;overflow:hidden" {% if not forloop.first %}x-cloak{% endif %} x-show="channel === {{ forloop.counter0 }}" aria-label="As it will appear on {{ pp.social_account.account_name }}">
+        <div class="flex items-center gap-3" style="padding:12px 14px">
+            <span class="relative flex-shrink-0">
+                {% if pp.social_account.avatar_url %}
+                <img class="m-avatar" style="width:36px;height:36px" src="{{ pp.social_account.avatar_url }}" alt="" referrerpolicy="no-referrer">
+                {% else %}
+                <span class="m-avatar" style="width:36px;height:36px;background:var(--neutral-200);color:var(--neutral-700)" aria-hidden="true">{{ pp.social_account.account_name|make_list|first|upper }}</span>
+                {% endif %}
+                <span class="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-white rounded-full flex items-center justify-center">{% include "partials/_platform_icon.html" with platform=pp.social_account.platform %}</span>
+            </span>
+            <span class="min-w-0 flex-1">
+                <span class="block text-[0.9375rem] font-bold text-stone-900 truncate">{{ pp.social_account.account_name }}</span>
+                <span class="block text-[0.75rem] text-stone-500 truncate">{% if pp.social_account.account_handle %}@{{ pp.social_account.account_handle }} · {% endif %}{{ pp.get_status_display }}</span>
+            </span>
+            <span class="text-[0.75rem] tabular-nums {% if pp.is_over_limit %}text-red-700 font-bold{% else %}text-stone-500{% endif %}" title="Characters as the platform counts them, of the limit">{{ pp.caption_length }}/{{ pp.char_limit }}</span>
+        </div>
+        {% if media %}
+        <div class="m-post-media{% if media|length == 1 %} is-single{% endif %}" style="margin:0;padding:0 0 0 0;gap:2px">
+            {% for pm in media %}
+            {% if pm.media_asset.media_type == "video" %}
+            <video src="{{ pm.media_asset.file.url }}" controls playsinline preload="metadata"{% if pm.media_asset.thumbnail %} poster="{{ pm.media_asset.thumbnail.url }}"{% endif %} style="border-radius:0"></video>
+            {% else %}
+            <img src="{{ pm.media_asset.file.url }}" alt="{{ pm.alt_text|default:pm.media_asset.alt_text|default:'' }}" loading="lazy" style="border-radius:0">
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% elif pp.social_account.platform == "instagram" or pp.social_account.platform == "instagram_login" %}
+        <div class="m-banner is-warn" style="margin:0 14px 4px">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Instagram cannot publish without a photo or video.</span>
+        </div>
+        {% endif %}
+        <div style="padding:12px 14px 14px">
+            {% if pp.social_account.field_config.needs_title and pp.effective_title %}<p class="text-[0.9375rem] font-bold text-stone-900" style="margin-bottom:6px">{{ pp.effective_title }}</p>{% endif %}
+            <p class="text-[0.9375rem] text-stone-800" style="white-space:pre-wrap;line-height:1.55;overflow-wrap:anywhere">{{ pp.effective_caption|default:"(no text)" }}</p>
+            {% if pp.effective_first_comment and pp.social_account.supports_first_comment %}
+            <p class="text-[0.8125rem] text-stone-500" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--neutral-100)"><strong>First comment:</strong> {{ pp.effective_first_comment }}</p>
+            {% endif %}
+            {% if pp.is_over_limit %}<p role="alert" class="text-[0.8125rem] text-red-700 font-semibold" style="margin-top:10px">Too long for {{ pp.social_account.get_platform_display }}: {{ pp.caption_length }} of {{ pp.char_limit }} characters.</p>{% endif %}
+            {% if pp.status == "failed" and pp.publish_error %}<p role="alert" class="text-[0.8125rem] text-red-700" style="margin-top:10px"><strong>Didn't publish:</strong> {{ pp.publish_error }}</p>{% endif %}
+            {% if pp.public_url %}<a class="m-btn is-secondary is-block" style="margin-top:12px" href="{{ pp.public_url }}" target="_blank" rel="noopener">View on {{ pp.social_account.get_platform_display }}</a>{% endif %}
+        </div>
+    </section>
+    {% empty %}
+    <div class="m-card m-empty" style="margin-top:14px"><strong>No channels picked yet</strong>Open it in the editor to choose where it goes.</div>
+    {% endfor %}
+
+    {# ── Details ── #}
+    <div class="m-list" style="margin-top:14px">
+        <div class="m-detail">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="m-detail-key">{% if post.status == "published" %}Went out{% elif post.scheduled_at %}Goes out{% else %}Proposed time{% endif %}</span>
+            <span class="m-detail-value{% if post.is_past and post.status != 'published' %} text-red-700{% endif %}">
+                {% if post.status == "published" and post.published_at %}{% timezone display_timezone %}{{ post.published_at|date:"D j M, g:i A" }}{% endtimezone %}
+                {% elif post.when %}{% timezone display_timezone %}{{ post.when|date:"D j M, g:i A" }}{% endtimezone %}{% if post.is_past %} · passed{% endif %}
+                {% else %}Not set{% endif %}
+            </span>
+        </div>
+        <div class="m-detail">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+            <span class="m-detail-key">Channels</span>
+            <span class="m-detail-value">{{ channels|length }}</span>
+        </div>
+        {% for pp in channels %}{% if pp.approved_at %}
+        <div class="m-detail">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span class="m-detail-key">Approved for {{ pp.social_account.account_name|truncatechars:16 }}</span>
+            <span class="m-detail-value">{{ pp.approved_by.display_name|default:"an approver" }} · {{ pp.approved_at|short_ago }}</span>
+        </div>
+        {% endif %}{% endfor %}
+        <div class="m-detail">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+            <span class="m-detail-key">Timezone</span>
+            <span class="m-detail-value">{{ display_timezone }}</span>
+        </div>
+    </div>
+
+    {% if post.internal_notes %}
+    <h2 class="m-group-label">Notes for the team</h2>
+    <div class="m-card" style="padding:12px 14px">
+        <p class="text-[0.875rem] text-stone-600" style="white-space:pre-wrap;line-height:1.5;overflow-wrap:anywhere">{{ post.internal_notes }}</p>
+    </div>
+    {% endif %}
+
+    {% if comments %}
+    <h2 class="m-group-label">Comments</h2>
+    <div class="m-list">
+        {% for c in comments %}
+        <div class="m-comment">
+            <span class="m-avatar" style="width:30px;height:30px;font-size:.75rem" aria-hidden="true">{{ c.author.display_name|default:"?"|make_list|first|upper }}</span>
+            <div class="min-w-0 flex-1">
+                <p class="text-[0.8125rem]"><strong class="text-stone-900">{{ c.author.display_name|default:"Unknown" }}</strong> <span class="text-stone-500">· {{ c.created_at|short_ago }}{% if c.visibility == 'external' %} · shared with client{% endif %}</span></p>
+                <p class="text-[0.875rem] text-stone-700" style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:2px">{{ c.body }}</p>
+                {% for r in c.replies.all %}
+                <p class="text-[0.8125rem] text-stone-600" style="margin-top:8px;padding-left:10px;border-left:2px solid var(--neutral-200)"><strong>{{ r.author.display_name|default:"Unknown" }}:</strong> {{ r.body }}</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── Actions ── #}
+    {% if can_approve and post.is_actionable %}
+    <div class="m-sticky">
+        {% if post.is_past %}
+        <p class="m-row-sub" style="margin:0 0 10px;color:#B91C1C">The proposed time has passed. Approve now, then pick a new time in the editor.</p>
+        {% elif post.when %}
+        <p class="m-row-sub" style="margin:0 0 10px">Approving schedules it for {% timezone display_timezone %}{{ post.when|date:"D j M, g:i A" }}{% endtimezone %}.</p>
+        {% endif %}
+        <div class="m-actions" style="margin-top:0">
+            <button type="button" class="m-btn is-secondary" @click="sheet = 'changes'">Request changes</button>
+            {% if post.when and not post.is_past %}
+            <button type="button" class="m-btn is-primary" hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-vals='{"schedule": "1"}' hx-swap="none" hx-disabled-elt="this">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Approve
+            </button>
+            {% else %}
+            <button type="button" class="m-btn is-primary" hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-swap="none" hx-disabled-elt="this">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Approve
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Request changes / reject #}
+    <div class="m-sheet-root" x-show="sheet" x-cloak @keydown.escape.window="sheet = null"
+         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="m-scrim" @click="sheet = null"></div>
+        <div class="m-sheet" role="dialog" aria-modal="true" aria-labelledby="m-review-title" x-show="sheet" x-trap="sheet"
+             x-transition:enter="m-sheet-enter" x-transition:enter-start="m-sheet-from" x-transition:enter-end="m-sheet-to"
+             x-transition:leave="m-sheet-enter" x-transition:leave-start="m-sheet-to" x-transition:leave-end="m-sheet-from"
+             @htmx:after-request="if ($event.detail.successful) { sheet = null; comment = '' }">
+            <div class="m-sheet-handle" aria-hidden="true"></div>
+            <h2 class="m-sheet-title" id="m-review-title" x-text="sheet === 'reject' ? 'Reject this post' : 'Ask for changes'">Ask for changes</h2>
+            <div class="m-sheet-body" style="padding:0 20px">
+                <div class="m-seg" role="tablist" aria-label="Decision">
+                    <button type="button" role="tab" :aria-selected="sheet === 'changes'" :class="sheet === 'changes' && 'is-active'" @click="sheet = 'changes'">Request changes</button>
+                    <button type="button" role="tab" :aria-selected="sheet === 'reject'" :class="sheet === 'reject' && 'is-active'" @click="sheet = 'reject'">Reject</button>
+                </div>
+                <label for="m-review-comment" class="m-row-sub block" style="margin:14px 0 6px" x-text="sheet === 'reject' ? 'Why? The author sees this.' : 'What should change? The author sees this.'">What should change? The author sees this.</label>
+                <textarea id="m-review-comment" name="comment" class="m-textarea" x-model="comment" rows="4" required></textarea>
+                <button type="button" class="m-btn is-primary is-block" style="margin-top:14px" x-show="sheet === 'changes'" :disabled="!comment.trim()"
+                        hx-post="{% url 'approvals:request_changes' workspace_id=workspace.id post_id=post.id %}" hx-include="#m-review-comment" hx-swap="none">
+                    Send back for changes
+                </button>
+                <button type="button" class="m-btn is-block" style="margin-top:14px;background:#B91C1C;color:#fff" x-show="sheet === 'reject'" :disabled="!comment.trim()"
+                        hx-post="{% url 'approvals:reject' workspace_id=workspace.id post_id=post.id %}" hx-include="#m-review-comment" hx-swap="none">
+                    Reject post
+                </button>
+                <button type="button" class="m-btn is-ghost is-block" style="margin-top:6px" @click="sheet = null">Cancel</button>
+            </div>
+        </div>
+    </div>
+    {% elif can_edit %}
+    <div class="m-sticky">
+        {% if post.status == "approved" %}
+        <p class="m-row-sub" style="margin:0 0 10px">Approved. Pick a time in the editor to put it on the schedule.</p>
+        {% endif %}
+        <a class="m-btn {% if post.status == 'scheduled' %}is-secondary{% else %}is-primary{% endif %} is-block" href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=post.id %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            {% if post.status == "approved" %}Schedule it{% else %}Open in the editor{% endif %}
+        </a>
+    </div>
+    {% else %}
+    <div style="height:28px"></div>
+    {% endif %}
+</div>
+{% endblock %}

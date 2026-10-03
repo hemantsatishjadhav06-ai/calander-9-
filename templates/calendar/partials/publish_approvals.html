@@ -15,7 +15,7 @@ tear down the toast.
      {% if is_htmx %}class="tab-slide-in"{% endif %}>
 
     {# filter pills #}
-    <div class="flex flex-wrap items-center gap-x-1 gap-y-2 mb-5">
+    <div class="flex flex-nowrap sm:flex-wrap overflow-x-auto sm:overflow-visible items-center gap-x-1 gap-y-2 mb-5 -mx-3 px-3 sm:mx-0 sm:px-0 [scrollbar-width:none]">
         {% include "calendar/partials/_approval_pill.html" with pid="all" label="All" count=all_count %}
         {% include "calendar/partials/_approval_pill.html" with pid="pending_review" label="Pending Review" count=pending_review_count %}
         {% include "calendar/partials/_approval_pill.html" with pid="pending_client" label="Pending Client" count=pending_client_count %}

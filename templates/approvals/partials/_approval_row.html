@@ -15,11 +15,11 @@ can_approve, display_timezone, and the parent Alpine scope (selectedPosts, diffO
         {# media thumbnail #}
         {% with att=post.media_attachments.all.0 %}
         {% if att.media_asset.thumbnail %}
-        <img src="{{ att.media_asset.thumbnail.url }}" alt="" class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
+        <img src="{{ att.media_asset.thumbnail.url }}" alt="" class="w-16 h-16 sm:w-12 sm:h-12 rounded-lg object-cover flex-shrink-0">
         {% elif att.media_asset.file and att.media_asset.media_type == 'image' %}
-        <img src="{{ att.media_asset.file.url }}" alt="" class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
+        <img src="{{ att.media_asset.file.url }}" alt="" class="w-16 h-16 sm:w-12 sm:h-12 rounded-lg object-cover flex-shrink-0">
         {% else %}
-        <div class="w-12 h-12 rounded-lg bg-stone-100 flex items-center justify-center flex-shrink-0 text-stone-300">
+        <div class="w-16 h-16 sm:w-12 sm:h-12 rounded-lg bg-stone-100 flex items-center justify-center flex-shrink-0 text-stone-300">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </div>
         {% endif %}
@@ -40,7 +40,7 @@ can_approve, display_timezone, and the parent Alpine scope (selectedPosts, diffO
                 </span>
             </div>
 
-            <p class="text-[0.875rem] text-stone-700 leading-snug cursor-pointer hover:text-stone-900 line-clamp-1" @click="expanded = !expanded">{{ post.title|default:post.caption_snippet|default:"(no caption)" }}</p>
+            <p class="text-[0.9375rem] sm:text-[0.875rem] font-medium sm:font-normal text-stone-800 sm:text-stone-700 leading-snug cursor-pointer hover:text-stone-900 line-clamp-2 sm:line-clamp-1" @click="expanded = !expanded">{{ post.title|default:post.caption_snippet|default:"(no caption)" }}</p>
 
             <div class="flex items-center gap-1.5 mt-1.5">
                 <span class="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0" style="background: var(--primary-strong);">{{ post.author.display_name|default:"?"|make_list|first|upper }}</span>
@@ -122,17 +122,23 @@ can_approve, display_timezone, and the parent Alpine scope (selectedPosts, diffO
 
         {# right-hand actions #}
         {% if can_approve and post.is_actionable %}
-        <div class="flex flex-wrap items-center justify-end gap-1.5 w-full sm:w-auto sm:flex-shrink-0">
+        {# Phones: a full-width grid of thumb-sized buttons; laptop: compact pills on the right. #}
+        <div class="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-wrap sm:items-center sm:justify-end sm:gap-1.5 sm:w-auto sm:flex-shrink-0">
             <button hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-swap="none" hx-disabled-elt="this"
-                    class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-emerald-700 hover:bg-emerald-800 text-white transition-colors">Approve</button>
+                    class="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-[0.875rem] sm:text-[0.8125rem] font-semibold rounded-xl sm:rounded-full bg-emerald-700 hover:bg-emerald-800 text-white transition-colors">Approve</button>
             {% if post.proposed_publish_at or post.scheduled_at %}
             <button hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-vals='{"schedule": "1"}' hx-swap="none" hx-disabled-elt="this"
                     title="Approve this exact content and schedule it for the proposed time"
-                    class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full border border-emerald-600 text-emerald-800 hover:bg-emerald-50 transition-colors">Approve &amp; schedule</button>
+                    class="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-[0.875rem] sm:text-[0.8125rem] font-semibold rounded-xl sm:rounded-full border border-emerald-600 text-emerald-800 hover:bg-emerald-50 transition-colors">Approve &amp; schedule</button>
             {% endif %}
             <button @click="panel = panel ? null : 'changes'"
-                    class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full border transition-colors"
+                    class="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-[0.875rem] sm:text-[0.8125rem] font-semibold rounded-xl sm:rounded-full border transition-colors"
                     :class="panel ? 'border-stone-300 bg-stone-50 text-stone-700' : 'border-stone-200 text-stone-600 hover:bg-stone-50'">Review</button>
+            <a href="{% url 'mobile:post' workspace_id=workspace.id post_id=post.id %}"
+               class="sm:hidden min-h-[44px] px-3 py-1.5 text-[0.875rem] font-semibold rounded-xl border border-stone-200 text-stone-600 inline-flex items-center justify-center gap-1.5">
+                <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                Preview
+            </a>
         </div>
         {% elif post.status == 'changes_requested' or post.status == 'rejected' or post.status == 'approved' %}
         <div class="flex items-center gap-1.5 flex-shrink-0">

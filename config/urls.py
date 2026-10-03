@@ -31,6 +31,7 @@ def robots_txt(request):
         "Disallow: /admin/",
         "Disallow: /portal/",
         "Disallow: /ops/",
+        "Disallow: /app/",
         "Allow: /$",
         "",
         f"Sitemap: {request.build_absolute_uri('/sitemap.xml')}",
@@ -110,6 +111,8 @@ urlpatterns = [
     path("workspace/<uuid:workspace_id>/media/", include("apps.media_library.urls")),
     # Blog posts for the brands' websites (write, approve, publish via GitHub)
     path("workspace/<uuid:workspace_id>/blog/", include("apps.blog.urls")),
+    # The phone layout's own screens (Today, More, a post's review page)
+    path("workspace/<uuid:workspace_id>/app/", include("apps.mobile.urls")),
     # Client Portal (Stream F)
     path("portal/", include("apps.client_portal.urls")),
     path("notifications/", include("apps.notifications.urls")),
@@ -132,6 +135,8 @@ urlpatterns = [
         name="favicon",
     ),
     path("organizations/media/", include("apps.media_library.urls_org")),
+    # Installable app: manifest, service worker, offline page, /app/ launch URLs
+    path("", include("apps.mobile.urls_root")),
     # Public marketing pages. The marketing ``home`` view owns "/" for
     # anonymous visitors and hands signed-in users to the accounts dashboard,
     # so the ``dashboard`` URL name below still resolves to "/" and keeps
