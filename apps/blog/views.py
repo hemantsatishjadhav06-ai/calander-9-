@@ -18,7 +18,8 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from apps.approvals.actor import dashboard_approver
 from apps.members.decorators import require_permission
 
-from . import services
+from . import ai_images, services
+from .covers import cover_for_post
 from .forms import BlogPostForm
 from .models import BlogPost, BlogSite
 from .publisher import commit_link
@@ -143,7 +144,14 @@ def post_create(request, workspace_id):
     return render(
         request,
         "blog/post_form.html",
-        {"workspace": workspace, "form": form, "post": None, "form_state": form.alpine_state()},
+        {
+            "workspace": workspace,
+            "form": form,
+            "post": None,
+            "form_state": form.alpine_state(),
+            "ai_configured": ai_images.is_configured(),
+            "ai_model": ai_images.model_id(),
+        },
     )
 
 
@@ -175,6 +183,8 @@ def post_edit(request, workspace_id, post_id):
             "warn_withdraw": stored.status in (Status.APPROVED, Status.FAILED, Status.PUBLISHED),
             "slug_locked": form.slug_locked,
             "form_state": form.alpine_state(),
+            "ai_configured": ai_images.is_configured(),
+            "ai_model": ai_images.model_id(),
         },
     )
 
@@ -258,7 +268,14 @@ def post_preview(request, workspace_id, post_id):
     """The page exactly as it will be published, with asset URLs made absolute."""
     _workspace_obj, post = _get_post(request, workspace_id, post_id)
     hero_src = None
-    if post.featured_image_id and post.featured_image.file:
+    if post.cover_style == BlogPost.CoverStyle.DESIGNED:
+        hero_src = (
+            request.build_absolute_uri(
+                reverse("blog:cover", kwargs={"workspace_id": post.workspace_id, "post_id": post.id})
+            )
+            + f"?v={post.revision}"
+        )
+    elif post.featured_image_id and post.featured_image.file:
         hero_src = request.build_absolute_uri(post.featured_image.file.url)
     page = render_post_page(post.site, services.post_content(post), hero_src=hero_src)
     page = absolutize_urls(page, post.expected_url)
@@ -357,3 +374,92 @@ def post_social_drafts(request, workspace_id, post_id):
     else:
         messages.success(request, "Created a social draft. Connect a channel and pick it in the composer.")
     return redirect(reverse("composer:compose_edit", kwargs={"workspace_id": post.workspace_id, "post_id": draft.pk}))
+
+
+@login_required
+@require_GET
+def post_cover(request, workspace_id, post_id):
+    """The designed cover for this post's current content, as a JPEG.
+
+    Shown in the editor, the detail page and the preview; the publisher
+    renders the same bytes for the website (see ``apps.blog.covers``).
+    """
+    _ws, post = _get_post(request, workspace_id, post_id)
+    try:
+        data = cover_for_post(post, services.post_content(post))
+    except ValueError as exc:
+        return HttpResponse(str(exc), status=422, content_type="text/plain; charset=utf-8")
+    response = HttpResponse(data, content_type="image/jpeg")
+    response["Cache-Control"] = "private, no-store"
+    response["X-Robots-Tag"] = "noindex"
+    return response
+
+
+@login_required
+@require_permission("create_posts")
+@require_POST
+def post_generate_image(request, workspace_id, post_id):
+    """Ask fal.ai for a picture for this post and make it the featured image."""
+    from django.core.files.base import ContentFile
+
+    from apps.media_library.models import MediaAsset
+    from apps.media_library.quotas import StorageQuotaExceededError, enforce_storage_quota
+    from apps.media_library.tasks import process_media_asset
+
+    workspace, post = _get_post(request, workspace_id, post_id)
+    edit_url = reverse("blog:edit", kwargs={"workspace_id": workspace.id, "post_id": post.id})
+    if not services.can_edit(request.user, post):
+        raise PermissionDenied("You don't have permission to edit this blog post.")
+    if post.status == Status.PUBLISHING:
+        messages.info(request, "This post is being published; change its picture once publishing finishes.")
+        return _detail_redirect(post)
+
+    brief = (request.POST.get("brief") or "").strip()[:600]
+    try:
+        generated = ai_images.generate_image(
+            title=post.title, category=post.category, site_kind=post.site.kind, brief=brief, seed=post.slug
+        )
+        width, height = ai_images.validate_image(generated.content)
+        enforce_storage_quota(workspace.organization, len(generated.content))
+    except ai_images.ImageGenerationError as exc:
+        messages.error(request, str(exc))
+        return redirect(edit_url)
+    except StorageQuotaExceededError:
+        messages.error(request, "You're out of storage. Delete unused media, or ask your admin to raise the limit.")
+        return redirect(edit_url)
+
+    filename = f"ai-cover-{post.slug or post.pk}-r{post.revision}.{generated.extension}"
+    asset = MediaAsset.objects.create(
+        organization=workspace.organization,
+        workspace=workspace,
+        uploaded_by=request.user,
+        file=ContentFile(generated.content, name=filename),
+        filename=filename,
+        title=f"AI picture: {post.title}"[:255],
+        media_type=MediaAsset.MediaType.IMAGE,
+        mime_type=generated.content_type,
+        file_size=len(generated.content),
+        width=width,
+        height=height,
+        source="fal.ai",
+        attribution=f"Generated with {generated.model} on fal.ai",
+        alt_text=(post.featured_image_alt or post.title)[:500],
+        tags=["ai", "blog-cover"],
+    )
+    process_media_asset(str(asset.id))
+
+    changes = {"featured_image": asset}
+    if not (post.featured_image_alt or "").strip():
+        changes["featured_image_alt"] = post.title[:300]
+    try:
+        updated = services.update_content(BlogPost.objects.get(pk=post.pk), request.user, **changes)
+    except (ValidationError, services.BlogWorkflowError) as exc:
+        messages.error(request, f"The picture was saved to the media library but couldn't be attached: {exc}")
+        return redirect(edit_url)
+    if updated.status == Status.PENDING_REVIEW and post.status in (Status.APPROVED, Status.FAILED, Status.PUBLISHED):
+        messages.warning(
+            request, "Picture generated and attached. The change needs approval again before it goes live."
+        )
+    else:
+        messages.success(request, f"Picture generated with {generated.model} and set as the featured image.")
+    return redirect(edit_url)

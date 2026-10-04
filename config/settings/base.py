@@ -693,6 +693,14 @@ PUBLISHER_MAX_CONCURRENT_PLATFORM_PUBLISHES = env.int("PUBLISHER_MAX_CONCURRENT_
 # message saying so, and posts stay approved.
 BLOG_GITHUB_TOKEN = env("BLOG_GITHUB_TOKEN", default="")
 
+# AI pictures for blog posts (apps.blog.ai_images): a fal.ai API key. Empty: the
+# editor's "Generate picture" button is shown disabled with a note saying so.
+# FAL_IMAGE_MODEL is any fal.run text-to-image model that takes prompt +
+# image_size and answers with images[]; flux/dev is the quality/cost middle.
+FAL_KEY = env("FAL_KEY", default="")
+FAL_IMAGE_MODEL = env("FAL_IMAGE_MODEL", default="fal-ai/flux/dev")
+FAL_TIMEOUT = env.float("FAL_TIMEOUT", default=90.0)
+
 # Webhook verification
 FACEBOOK_WEBHOOK_VERIFY_TOKEN = env("FACEBOOK_WEBHOOK_VERIFY_TOKEN", default="")
 INSTAGRAM_LOGIN_WEBHOOK_VERIFY_TOKEN = env("INSTAGRAM_LOGIN_WEBHOOK_VERIFY_TOKEN", default="")

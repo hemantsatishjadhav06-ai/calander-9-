@@ -5,7 +5,8 @@ git binary, no clone. One publish is:
 
 1. Read the branch head and the current post/index/image files *at that
    commit* (their blob SHAs, and the index's content for Neopolis).
-2. Render the post page, the hero JPEG and the blog index.
+2. Render the post page, the hero JPEG (the designed cover, or the plain
+   featured image — see ``apps.blog.covers``) and the blog index.
 3. Re-check, against the database, that the post is still the claimed and
    approved revision — the last moment before anything is written.
 4. Write the changed files as **one commit** with the Git Data API (blobs ->
@@ -38,12 +39,12 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from . import services
+from .covers import hero_image_bytes
 from .models import BlogPost, BlogPostEvent, BlogSite
 from .renderers import (
     CardData,
     IndexStructureError,
     PostContent,
-    hero_jpeg_bytes,
     render_morespace_index,
     render_post_page,
     update_neopolis_index,
@@ -269,7 +270,8 @@ def commit_post(client: GitHubClient, post: BlogPost, content: PostContent, *, g
     site = post.site
     paths = site_paths(site, post.slug)
     page = render_post_page(site, content).encode("utf-8")
-    image = hero_jpeg_bytes(post.featured_image) if content.has_image else None
+    # The designed cover (title over the picture) or the plain featured image.
+    image = hero_image_bytes(post, content)
 
     for _attempt in range(COMMIT_ATTEMPTS):
         head = client.branch_head(site.branch)

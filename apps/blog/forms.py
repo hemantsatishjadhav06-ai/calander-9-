@@ -74,6 +74,7 @@ class BlogPostForm(forms.ModelForm):
             "body",
             "featured_image",
             "featured_image_alt",
+            "cover_style",
             "seo_title",
             "meta_description",
             "category",
@@ -85,6 +86,7 @@ class BlogPostForm(forms.ModelForm):
             "body": "Body (Markdown)",
             "featured_image": "Featured image",
             "featured_image_alt": "Featured image description (alt text)",
+            "cover_style": "Cover",
             "seo_title": "SEO title",
             "meta_description": "Meta description",
         }
@@ -104,6 +106,7 @@ class BlogPostForm(forms.ModelForm):
             "excerpt": forms.Textarea(attrs={"rows": 3, "class": _INPUT, "maxlength": 400}),
             "body": forms.Textarea(attrs={"rows": 22, "class": _INPUT + " font-mono"}),
             "featured_image_alt": forms.TextInput(attrs={"class": _INPUT}),
+            "cover_style": forms.RadioSelect(),
             "seo_title": forms.TextInput(attrs={"class": _INPUT}),
             "meta_description": forms.Textarea(attrs={"rows": 3, "class": _INPUT}),
             "category": forms.TextInput(attrs={"class": _INPUT}),
@@ -131,6 +134,9 @@ class BlogPostForm(forms.ModelForm):
         self.fields["featured_image"].queryset = MediaAsset.objects.filter(pk__in=recent_ids).order_by("-created_at")
         self.fields["featured_image"].required = False
         self.fields["featured_image"].widget = forms.RadioSelect()
+        # A form posted without a cover choice (older clients, scripts) keeps
+        # the default rather than failing validation.
+        self.fields["cover_style"].required = False
 
         if not self.is_bound and self.instance.pk:
             self.fields["faq_text"].initial = format_faq(self.instance.faq)
@@ -173,6 +179,9 @@ class BlogPostForm(forms.ModelForm):
 
     def clean_slug(self):
         return (self.cleaned_data.get("slug") or "").strip().lower()
+
+    def clean_cover_style(self):
+        return self.cleaned_data.get("cover_style") or BlogPost.CoverStyle.DESIGNED
 
     def clean_faq_text(self):
         return parse_faq(self.cleaned_data.get("faq_text", ""))

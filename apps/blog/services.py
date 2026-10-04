@@ -52,6 +52,7 @@ CONTENT_FIELDS = (
     "body",
     "featured_image",
     "featured_image_alt",
+    "cover_style",
     "seo_title",
     "meta_description",
     "category",
@@ -94,7 +95,8 @@ def fingerprint(post: BlogPost) -> str:
 
     The featured image contributes its id *and* its stored file name, so
     replacing or editing the image in the media library changes the
-    fingerprint too.
+    fingerprint too. ``cover_style`` is in because it decides what the hero
+    image looks like (apps.blog.covers).
     """
     image = post.featured_image if post.featured_image_id else None
     payload = {
@@ -106,6 +108,7 @@ def fingerprint(post: BlogPost) -> str:
         "featured_image_id": str(image.id) if image else None,
         "featured_image_file": image.file.name if image else "",
         "featured_image_alt": post.featured_image_alt,
+        "cover_style": post.cover_style,
         "seo_title": post.seo_title,
         "meta_description": post.meta_description,
         "category": post.category,

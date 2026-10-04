@@ -144,13 +144,17 @@
 
             <section aria-labelledby="details-heading" class="bg-white border border-stone-200 rounded-xl p-5">
                 <h2 id="details-heading" class="text-sm font-semibold text-stone-900 mb-3">Details</h2>
-                {% if post.featured_image %}
+                {% if post.cover_style == 'designed' %}
+                <img src="{% url 'blog:cover' workspace_id=workspace.id post_id=post.id %}?v={{ post.revision }}"
+                     alt="Designed cover: {{ post.title }}" width="1600" height="900" class="w-full aspect-video object-cover rounded-lg mb-3 bg-stone-100">
+                {% elif post.featured_image %}
                 <img src="{% if post.featured_image.thumbnail %}{{ post.featured_image.thumbnail.url }}{% else %}{{ post.featured_image.file.url }}{% endif %}"
                      alt="{{ post.featured_image_alt }}" class="w-full aspect-video object-cover rounded-lg mb-3 bg-stone-100">
                 {% endif %}
                 <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
                     <dt class="text-stone-600">Address</dt><dd class="font-mono text-xs text-stone-900 break-all">{{ post.slug }}</dd>
                     {% if post.category %}<dt class="text-stone-600">Category</dt><dd class="text-stone-900">{{ post.category }}</dd>{% endif %}
+                    <dt class="text-stone-600">Cover</dt><dd class="text-stone-900">{% if post.cover_style == 'designed' %}Designed (title over the picture){% else %}Plain featured image{% endif %}</dd>
                     <dt class="text-stone-600">SEO title</dt><dd class="text-stone-900 break-words">{{ post.seo_title|default:"(uses the title)" }}</dd>
                     <dt class="text-stone-600">Description</dt><dd class="text-stone-900 break-words">{{ post.meta_description|default:"(uses the excerpt)" }}</dd>
                     <dt class="text-stone-600">FAQ</dt><dd class="text-stone-900">{{ post.faq|length }} question{{ post.faq|length|pluralize }}</dd>

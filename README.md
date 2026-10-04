@@ -32,6 +32,7 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | **Approval workflows** | Configurable stages (none / optional / internal / internal + client), threaded internal & external comments, reminders, and a full audit trail. |
 | **Unified social inbox** | Comments, mentions, DMs, and reviews from every connected platform in one place, with sentiment analysis, assignments, threaded replies, and historical backfill. |
 | **Analytics** | Per-post and channel-level performance from every connected platform's native API, with KPI cards, 7/30/90-day trend charts, and a sortable all-posts table for views, engagement, follower growth, reach, and watch time. |
+| **Blog publishing** | Write posts for the brands' own websites, approve the exact revision, and commit + deploy them through GitHub. Every post gets a designed 1600×900 cover — the title set over its picture in the brand's look — and a "Generate picture" button that paints a wordless image with fal.ai (`FAL_KEY`). |
 | **Media library** | Org- and workspace-scoped libraries with nested folders, auto-generated platform-optimized variants, alt text, and built-in Unsplash stock-photo search in the composer. |
 | **Client portal** | Passwordless 30-day magic-link access so clients can approve or reject posts without creating an account. |
 | **Notifications** | In-app, email, and webhook delivery with per-user preferences for every event type. |
@@ -614,6 +615,20 @@ SM Bean publishes to X through the official X API v2 with OAuth 2.0 (Authorizati
    ```
 
 Access tokens last two hours and are refreshed automatically; X rotates the refresh token on every refresh. The composer counts X's 280-character limit the way X does: every link counts as 23 characters, and CJK characters and emoji count as two.
+
+### fal.ai (blog cover pictures)
+
+The blog editor's **Generate picture** button asks fal.ai for a wordless 16:9 picture that fits the post, saves it to the media library and selects it as the featured image. The **designed cover** then sets the title, category tag and brand wordmark over it with Pillow (`apps/blog/covers.py`, fonts bundled under `apps/blog/fonts/`), so the website's hero, the index card and the `og:image` all carry the headline — the model is never asked to draw text.
+
+1. Create an API key at [fal.ai/dashboard/keys](https://fal.ai/dashboard/keys) and add credit to the account.
+2. Set the environment variables (on the web **and** worker services):
+   ```
+   FAL_KEY=your-fal-key
+   FAL_IMAGE_MODEL=fal-ai/flux/dev   # optional; fal-ai/flux/schnell is faster, fal-ai/flux-pro/v1.1 finer
+   ```
+3. Without `FAL_KEY` the button is shown disabled with a note; posts still get the designed cover on the brand background, and uploaded pictures work as before.
+
+Each post's **Cover** setting chooses between the designed cover (default) and the plain featured image.
 
 ## Inbox: Backfill Historical Messages
 

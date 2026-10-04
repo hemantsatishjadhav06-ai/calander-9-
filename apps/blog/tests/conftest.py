@@ -106,6 +106,9 @@ def make_post(world, site=None, author=None, **overrides):
         "body": "## Why Kokapet\n\nIt is **booming**.\n\n- Close to the Financial District\n- New towers",
         "category": "Area Guide",
         "faq": [{"q": "Is Kokapet a good investment?", "a": "For most buyers, yes."}],
+        # The plain hero keeps these fixtures about the publishing flow itself;
+        # the designed cover has its own tests (test_covers.py).
+        "cover_style": "plain",
     }
     fields.update(overrides)
     return services.create_post(

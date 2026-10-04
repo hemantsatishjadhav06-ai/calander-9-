@@ -389,3 +389,24 @@ def test_run_lookup_ignores_an_earlier_run_on_the_same_commit(world):
     assert publisher._find_run(client, post)["id"] == 2
     fake.runs = [old]  # a retry of an unchanged post must not latch onto the last run
     assert publisher._find_run(client, post) is None
+
+
+def test_designed_cover_is_written_even_without_a_featured_image(world):
+    post = _claim(world, approved_post(world, cover_style="designed"))
+    fake = FakeGitHub(NEOPOLIS_REPO, {"publish-payload3/blog/index.html": NEOPOLIS_INDEX})
+
+    post = _run_publish(post, fake)
+
+    tree = next(iter(fake.trees.values()))
+    assert sorted(e["path"] for e in tree["tree"]) == [
+        "generated/blog/img/flats-in-kokapet-2026-hero.jpg",
+        "publish-payload3/blog/flats-in-kokapet-2026.html",
+        "publish-payload3/blog/index.html",
+    ]
+    hero = Image.open(io.BytesIO(fake.files["generated/blog/img/flats-in-kokapet-2026-hero.jpg"]))
+    assert hero.format == "JPEG" and hero.size == (1600, 900)
+    page = fake.files["publish-payload3/blog/flats-in-kokapet-2026.html"].decode()
+    assert 'src="img/flats-in-kokapet-2026-hero.jpg?v=1"' in page
+    index = fake.files["publish-payload3/blog/index.html"].decode()
+    assert 'src="img/flats-in-kokapet-2026-hero.jpg?v=1"' in index
+    assert post.published_card["has_image"] is True

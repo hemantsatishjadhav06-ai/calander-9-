@@ -51,6 +51,8 @@ class PostContent:
     faq: list = field(default_factory=list)
     image_alt: str = ""
     has_image: bool = False
+    # "designed" (title over the picture, see apps.blog.covers) or "plain".
+    cover_style: str = "plain"
     revision: int = 1
     date_published: dt.date | None = None
     date_modified: dt.date | None = None
@@ -60,6 +62,7 @@ class PostContent:
         """Snapshot ``post``. ``published_on`` is the first publish date (today when never published)."""
         today = today or dt.date.today()
         published = published_on or today
+        cover_style = getattr(post, "cover_style", "plain") or "plain"
         return cls(
             title=post.title.strip(),
             slug=post.slug,
@@ -70,7 +73,9 @@ class PostContent:
             category=(post.category or "").strip(),
             faq=[{"q": str(i["q"]).strip(), "a": str(i["a"]).strip()} for i in (post.faq or [])],
             image_alt=(post.featured_image_alt or "").strip(),
-            has_image=bool(post.featured_image_id),
+            # A designed cover always yields a hero, picture or not.
+            has_image=bool(post.featured_image_id) or cover_style == "designed",
+            cover_style=cover_style,
             revision=post.revision,
             date_published=published,
             date_modified=today,

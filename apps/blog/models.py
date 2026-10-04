@@ -88,6 +88,11 @@ class BlogSite(models.Model):
 
 
 class BlogPost(models.Model):
+    class CoverStyle(models.TextChoices):
+        # The hero image the website shows (see apps.blog.covers).
+        DESIGNED = "designed", "Designed cover: the title set over the picture in the brand's look"
+        PLAIN = "plain", "Plain: the featured image as uploaded (no image, no hero)"
+
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
         PENDING_REVIEW = "pending_review", "Awaiting approval"
@@ -128,6 +133,12 @@ class BlogPost(models.Model):
         related_name="blog_posts",
     )
     featured_image_alt = models.CharField(max_length=300, blank=True, default="")
+    # How the hero is made from the featured image (or, for a designed cover,
+    # from the brand background when there is no picture). Part of the
+    # fingerprint: switching styles changes what the website shows.
+    cover_style = models.CharField(
+        max_length=20, choices=CoverStyle.choices, default=CoverStyle.DESIGNED, db_default=CoverStyle.DESIGNED
+    )
     seo_title = models.CharField(max_length=60, blank=True, default="")
     meta_description = models.CharField(max_length=160, blank=True, default="")
     category = models.CharField(max_length=60, blank=True, default="")
