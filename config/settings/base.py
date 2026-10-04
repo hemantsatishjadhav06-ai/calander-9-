@@ -111,6 +111,7 @@ LOCAL_APPS = [
     "apps.marketing",
     # Blog posts for the brands' own websites, committed to their GitHub repos.
     "apps.blog",
+    "apps.mobile",
     "theme",
 ]
 
@@ -154,6 +155,7 @@ TEMPLATES = [
                 "apps.common.context_processors.branding",
                 "apps.onboarding.context_processors.onboarding_checklist",
                 "apps.intelligence.context_processors.intelligence_flag",
+                "apps.mobile.context_processors.mobile_shell",
             ],
         },
     },

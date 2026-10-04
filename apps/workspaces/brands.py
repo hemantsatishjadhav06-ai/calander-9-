@@ -50,7 +50,7 @@ BRANDS: list[dict[str, Any]] = [
                 "name": "More Space",
                 "url": "https://www.facebook.com/61577172604485",
             },
-            "instagram": {"username": "morespacehyd", "url": "https://www.instagram.com/morespacehyd/"},
+            "instagram": {"username": "morespace.ai", "url": "https://www.instagram.com/morespace.ai/"},
             "x": {"username": "morespaceai", "url": "https://x.com/morespaceai"},
         },
     },
