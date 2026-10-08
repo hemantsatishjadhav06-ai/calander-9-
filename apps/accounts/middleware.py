@@ -1,5 +1,6 @@
 import hashlib
 import ipaddress
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.core.cache import cache
@@ -62,7 +63,12 @@ class TosAcceptanceMiddleware:
             and request.user.is_authenticated
             and request.user.tos_accepted_at is None
         ):
-            return redirect(reverse("accounts:accept_terms"))
+            url = reverse("accounts:accept_terms")
+            # Someone who just signed up with Google lands here on the way to
+            # the page they asked for; carry it so accepting takes them there.
+            if request.method == "GET" and not request.headers.get("HX-Request") and request.path != "/":
+                url += "?" + urlencode({"next": request.get_full_path()})
+            return redirect(url)
 
         return self.get_response(request)
 

@@ -304,6 +304,21 @@ class TestOAuthCallbackView:
         response = authenticated_client.get(url, {"error": "access_denied", "error_description": "User denied"})
         assert response.status_code == 302
 
+    def test_a_linkedin_scope_refusal_says_how_to_fix_it(self, authenticated_client):
+        url = reverse("social_accounts:oauth_callback", kwargs={"platform": "linkedin_company"})
+        response = authenticated_client.get(
+            url,
+            {
+                "error": "unauthorized_scope_error",
+                "error_description": 'Scope "r_organization_social_feed" is not authorized for your application',
+            },
+            follow=True,
+        )
+        text = " ".join(str(m) for m in response.context["messages"])
+        assert "r_organization_social_feed" in text
+        assert "Community Management API" in text
+        assert "PLATFORM_LINKEDIN_COMPANY_SCOPES" in text
+
     def test_missing_code_shows_error(self, authenticated_client):
         url = reverse("social_accounts:oauth_callback", kwargs={"platform": "facebook"})
         response = authenticated_client.get(url, {"state": "somestate"})

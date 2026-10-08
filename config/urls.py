@@ -110,6 +110,8 @@ urlpatterns = [
     path("workspace/<uuid:workspace_id>/media/", include("apps.media_library.urls")),
     # Blog posts for the brands' websites (write, approve, publish via GitHub)
     path("workspace/<uuid:workspace_id>/blog/", include("apps.blog.urls")),
+    # AI Studio: the agent team that turns a small idea into a post for approval
+    path("workspace/<uuid:workspace_id>/studio/", include("apps.studio.urls")),
     # Client Portal (Stream F)
     path("portal/", include("apps.client_portal.urls")),
     path("notifications/", include("apps.notifications.urls")),

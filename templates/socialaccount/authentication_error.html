@@ -1,0 +1,19 @@
+{% extends "socialaccount/base_entrance.html" %}
+{% load allauth %}
+{% block head_title %}Sign-in didn't finish{% endblock head_title %}
+{% block content %}
+    {% element h1 %}
+        {% if auth_error.provider %}{{ auth_error.provider.name }} sign-in didn't finish{% else %}Sign-in didn't finish{% endif %}
+    {% endelement %}
+    {% element p %}
+        This usually means the sign-in page was left open too long, or it was finished in a different
+        browser or tab. Start again and it normally goes through.
+    {% endelement %}
+    {% element p %}
+        If it keeps happening, tell your {{ SITE_NAME }} admin: the reason is in the server log.
+    {% endelement %}
+    {% url 'account_login' as login_url %}
+    {% element button href=login_url %}
+        Back to sign in
+    {% endelement %}
+{% endblock content %}

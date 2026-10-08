@@ -1,0 +1,16 @@
+{% extends "socialaccount/base_entrance.html" %}
+{% load allauth %}
+{% block head_title %}Sign-in cancelled{% endblock head_title %}
+{% block content %}
+    {% element h1 %}
+        Sign-in cancelled
+    {% endelement %}
+    {% element p %}
+        You stopped before your account was shared, so nothing changed. You can sign in with Google
+        again, or use your email and password.
+    {% endelement %}
+    {% url 'account_login' as login_url %}
+    {% element button href=login_url %}
+        Back to sign in
+    {% endelement %}
+{% endblock content %}

@@ -1,0 +1,10 @@
+{% comment %}Status pill for a Studio brief. Context: status (value), label (display). Colours meet WCAG AA on their tint.{% endcomment %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap
+    {% if status == 'queued' or status == 'working' %}bg-indigo-50 text-indigo-800 ring-1 ring-inset ring-indigo-200
+    {% elif status == 'ready' %}bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200
+    {% elif status == 'approved' %}bg-green-50 text-green-800 ring-1 ring-inset ring-green-200
+    {% elif status == 'failed' %}bg-red-50 text-red-800 ring-1 ring-inset ring-red-200
+    {% else %}bg-stone-100 text-stone-700{% endif %}">
+    {% if status == 'queued' or status == 'working' %}<svg class="w-3 h-3 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>{% endif %}
+    {{ label }}
+</span>

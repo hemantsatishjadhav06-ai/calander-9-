@@ -32,6 +32,7 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | **Approval workflows** | Configurable stages (none / optional / internal / internal + client), threaded internal & external comments, reminders, and a full audit trail. |
 | **Unified social inbox** | Comments, mentions, DMs, and reviews from every connected platform in one place, with sentiment analysis, assignments, threaded replies, and historical backfill. |
 | **Analytics** | Per-post and channel-level performance from every connected platform's native API, with KPI cards, 7/30/90-day trend charts, and a sortable all-posts table for views, engagement, follower growth, reach, and watch time. |
+| **AI Studio** | Type a small idea; a team of Claude agents — strategist, copywriter, art director, illustrator, designer, brand reviewer — proposes angles, writes the post (caption, hashtags, first comment, alt text) and designs the graphic in the look of your last post. It waits in the approval queue; one click publishes or schedules it. Needs `ANTHROPIC_API_KEY` (pictures: `FAL_KEY`). See [AI Studio](#ai-studio). |
 | **Blog publishing** | Write posts for the brands' own websites, approve the exact revision, and commit + deploy them through GitHub. Every post gets a designed 1600×900 cover — the title set over its picture in the brand's look — and a "Generate picture" button that paints a wordless image with fal.ai (`FAL_KEY`). |
 | **Media library** | Org- and workspace-scoped libraries with nested folders, auto-generated platform-optimized variants, alt text, and built-in Unsplash stock-photo search in the composer. |
 | **Client portal** | Passwordless 30-day magic-link access so clients can approve or reject posts without creating an account. |
@@ -62,7 +63,7 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | <img src="https://cdn.simpleicons.org/facebook" width="16" height="16"> Facebook | ✓ | ✓ | ✓ | ✓ |
 | <img src="https://cdn.simpleicons.org/instagram" width="16" height="16"> Instagram | ✓ | ✓ | ✓ | ✓ |
 | <img src="https://cdn.simpleicons.org/instagram" width="16" height="16"> Instagram (Direct) | ✓ | ✓ | ✓ | ✓ |
-| <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Personal) | ✓ | ✓ | — | ✓ |
+| <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Personal) | ✓ | —¹ | — | — |
 | <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Company) | ✓ | ✓ | — | ✓ |
 | <img src="https://cdn.simpleicons.org/tiktok" width="16" height="16"> TikTok | ✓ | — | — | ✓ |
 | <img src="https://cdn.simpleicons.org/youtube" width="16" height="16"> YouTube | ✓ | ✓ | — | ✓ |
@@ -73,6 +74,8 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | <img src="https://cdn.simpleicons.org/mastodon" width="16" height="16"> Mastodon | ✓ | ✓ | — | — |
 | <img src="https://cdn.simpleicons.org/devdotto/000000" width="16" height="16"> DEV.to | ✓ | — | — | — |
 | <img src="https://cdn.simpleicons.org/x/000000" width="16" height="16"> X (Twitter) | ✓ | — | — | — |
+
+¹ Reading a member's own posts and their comments needs `r_member_social`, which LinkedIn grants only to select developers. LinkedIn (Company) Pages get comments, first comments posted as the Page, and post statistics. See [LinkedIn](#linkedin).
 
 X's API is pay-per-use with no free tier: every post and every read is billed to the developer account behind your X app, so SM Bean only publishes to X and never polls it for comments, DMs or analytics. See [X (Twitter)](#x-twitter).
 
@@ -355,6 +358,24 @@ calander-9-/
 
 > **Settings selection:** The `DJANGO_SETTINGS_MODULE` environment variable controls which settings file Django uses. The defaults are already wired for each context: `manage.py` uses `development`, `wsgi.py`/`asgi.py` use `production`, and `pytest` uses `test` (via `pyproject.toml`). Docker Compose files and platform deploy configs (Heroku, Render) also set it explicitly. You only need to override it manually if you want a non-default module for a specific command, e.g. `DJANGO_SETTINGS_MODULE=config.settings.production python manage.py check --deploy`.
 
+## Sign in with Google
+
+The login and signup pages show **Sign in with Google** / **Sign up with Google** once both `GOOGLE_AUTH_CLIENT_ID` and `GOOGLE_AUTH_CLIENT_SECRET` are set; without them the button stays hidden (it used to show and lead to Google's "missing client_id" page). Someone new who signs in with Google gets an account and their own workspace, accepts the Terms once, and lands on their calendar — or on the page they were trying to open.
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an **OAuth client ID** of type **Web application**.
+2. Add the authorized redirect URI (exactly, with the trailing slash):
+   ```
+   {APP_URL}/accounts/google/login/callback/
+   ```
+3. On the **OAuth consent screen**, add the `email` and `profile` scopes and publish the app (while it is in *Testing*, only listed test users can sign in).
+4. Set the environment variables on the web service and redeploy:
+   ```
+   GOOGLE_AUTH_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+   GOOGLE_AUTH_CLIENT_SECRET=your-client-secret
+   ```
+
+Who may create an account still follows `SIGNUP_MODE` (default `invite_only`): a Google sign-in from an address that has no invitation and isn't on `SIGNUP_ALLOWLIST` (`ana@agency.com` or a whole domain, `@agency.com`) sees the invite-only page and no account is made. Existing users can sign in with Google if the Google address matches their account's email. Don't also add a Google "Social application" in the Django admin while the variables are set: two apps for one provider make the login page fail. When a Google sign-in fails, the person sees "Google sign-in didn't finish" with a way back, and the reason is logged as `Social sign-in failed: …`.
+
 ## Platform Credentials
 
 To connect social media accounts, you need API credentials from each platform's developer portal. You can set these via environment variables in `.env` (see `.env.example`) or, per organization, through the Django admin at `{APP_URL}/admin/` → **Credentials → Platform credentials** (superuser only). If a platform is configured in both places, the `.env` value takes precedence.
@@ -499,16 +520,32 @@ SM Bean supports two LinkedIn paths. Pick whichever your LinkedIn dev app can ob
    {APP_URL}/social-accounts/callback/linkedin_personal/
    {APP_URL}/social-accounts/callback/linkedin_company/
    ```
-5. Scopes:
-   - **Personal:** `r_basicprofile`, `w_member_social`, `r_member_social`
-   - **Company:** `r_basicprofile`, `w_member_social`, `w_organization_social`, `r_organization_social`, `rw_organization_admin`
+5. Scopes requested (all granted by the Community Management API product):
+   - **Company:** `r_basicprofile`, `w_member_social`, `w_organization_social`, `r_organization_social`, `rw_organization_admin`, `w_organization_social_feed`, `r_organization_social_feed`
+   - **Personal:** `r_basicprofile`, `w_member_social`, `w_member_social_feed`
 6. Set the environment variables:
    ```
    PLATFORM_LINKEDIN_COMPANY_CLIENT_ID=your-client-id
    PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET=your-client-secret
    ```
 
-If you set only the Path B (Company) credentials, SM Bean automatically reuses them for personal connections too - refresh tokens (365-day) and inbox both work. You only need Path A vars if you have a separate Personal-only app.
+If you set only the Path B (Company) credentials, SM Bean automatically reuses them for personal connections too, with 365-day refresh tokens. You only need Path A vars if you have a separate Personal-only app.
+
+What a connected Company Page gets:
+
+- **Connecting** lists every Page you are an *Administrator* of (`/rest/organizationAcls`), with its name and logo; pick the ones to add to the workspace.
+- **Posts** go out as the Page: text, links, a video, or 1–20 images (two or more become one multi-image post), with each image's alt text from the composer. GIFs are posted as images. `#hashtags` stay real, linked hashtags; every other reserved character is escaped so LinkedIn doesn't cut the caption short.
+- **The first comment** (where the link usually goes) and replies from the inbox are posted **by the Page**, not by the admin who connected it. A retried first comment is never doubled.
+- **Inbox** picks up comments on the Page's 20 latest posts, leaving out the Page's own.
+- **Statistics**: impressions, reactions, comments, reposts and clicks per post (organic), up to 20 posts per API call.
+- **Health check** refreshes the Page's name, logo and follower count — and reports the account if the person who connected it is no longer one of its admins.
+
+> **Scopes must match the app.** LinkedIn refuses the whole sign-in when even one requested scope isn't granted to the app (the callback then says so). The app's **Auth** tab on developer.linkedin.com lists the scopes it holds. If yours differs — for example an older app that still holds `r_member_social`, which turns the Personal inbox back on — set the list explicitly, space- or comma-separated:
+> ```
+> PLATFORM_LINKEDIN_COMPANY_SCOPES=r_basicprofile w_member_social w_organization_social r_organization_social rw_organization_admin
+> PLATFORM_LINKEDIN_PERSONAL_SCOPES=r_basicprofile w_member_social r_member_social
+> ```
+> Without `w_organization_social_feed` the Page can't post its first comment, and without `r_organization_social_feed` its inbox stays empty.
 
 > **Note:** "Sign In with LinkedIn using OpenID Connect" / "Share on LinkedIn" and "Community Management API" are **mutually exclusive** on a single LinkedIn app. You need separate apps for Path A and Path B.
 
@@ -629,6 +666,37 @@ The blog editor's **Generate picture** button asks fal.ai for a wordless 16:9 pi
 3. Without `FAL_KEY` the button is shown disabled with a note; posts still get the designed cover on the brand background, and uploaded pictures work as before.
 
 Each post's **Cover** setting chooses between the designed cover (default) and the plain featured image.
+
+## AI Studio
+
+**AI Studio** in the sidebar turns a one-line idea into a finished post, made by a team of agents running on Claude, and puts it in front of a person to approve before anything goes out.
+
+| Agent | What it does |
+|---|---|
+| Strategist | Reads the brand profile and the workspace's recent posts, proposes three angles and recommends one. Unused angles can be saved to the idea board. |
+| Copywriter | Writes the post for the chosen channels: a hook in the first line, the caption, hashtags, a first comment (where the link goes on LinkedIn), a short version for X, and alt text. Only facts from the brand profile are used. |
+| Art director | Designs the graphic: layout (editorial, split, statement, big number), canvas, colour treatment and headline — in the look of the last post (below). |
+| Illustrator | Paints a wordless picture with fal.ai FLUX, or uses a photo picked from the media library. Optional: without `FAL_KEY` the design uses the brand background. |
+| Designer | Sets the type, logo and brand colours over the picture (Pillow, fonts bundled), so the text on the graphic is always exact. |
+| Brand reviewer | Looks at the finished graphic and the copy against the facts, the brand's rules and the platform's limits, and sends it back once with fixes if needed. |
+| Producer | Creates the post with its graphic, alt text and per-channel captions, proposes the next free slot, and submits it for approval. |
+
+**Same look as the last post.** With *Match the look of the last post* on (the default), the next graphic copies the layout, canvas, colour treatment and picture style of the last AI Studio graphic exactly; if the most recent post with a picture was made elsewhere, the art director is shown that picture and matches it by eye. Turn it off for a fresh look within the brand. The brand profile (**AI Studio → Brand profile**) holds the colours, typeface, wordmark, logo, voice, facts and rules every agent works from, with sample graphics.
+
+**Approval.** Nothing is published by the agents. The post waits in the normal approval queue (the same rules, audit trail and client sign-off as the Approvals page); from the Studio a person with *approve posts* can approve, approve and schedule, or — with *publish directly* — approve and publish now. *Ask for changes* sends notes back to the copywriter and art director; *Use this angle instead* rewrites from another angle.
+
+Setup — on the web **and** worker services (the agents run in the background worker):
+
+```
+ANTHROPIC_API_KEY=sk-ant-...        # required; console.anthropic.com
+STUDIO_MODEL=claude-opus-5-5        # optional; the Claude model every agent uses
+STUDIO_EFFORT=                      # optional; low|medium|high|xhigh|max for every agent (default: per agent)
+STUDIO_TIMEOUT=300                  # optional; seconds per agent turn
+STUDIO_FALLBACKS=true               # optional; retry a falsely declined request on Anthropic's fallback model
+FAL_KEY=...                         # optional; pictures (see fal.ai above)
+```
+
+A post takes two to four minutes. Each brief's timeline shows every agent's time, tokens and an estimated cost at list prices (expect tens of cents per post on Claude Opus 5.5, plus about $0.03 per fal.ai picture). Agent steps run at a lower priority than publishing, so a busy Studio never delays a scheduled post by more than one agent's turn.
 
 ## Inbox: Backfill Historical Messages
 

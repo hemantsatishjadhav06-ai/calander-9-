@@ -91,6 +91,27 @@ featured image, SEO title/description), **Preview** (signed-in only,
 * **Create social drafts** turns an approved or published blog into social
   drafts, which go through approval like any other post.
 
+## AI Studio
+
+**AI Studio** in the workspace sidebar. Type the idea in a line or two ("why
+landlord shares cost less than resale", "site visit this Saturday in Kollur"),
+pick the channels, and press **Brief the team**. A team of Claude agents finds
+three angles, writes the post, designs the graphic and checks it against the
+brand profile; two to four minutes later it is waiting for approval like any
+other post.
+
+* **Same look as the last post** is on by default: the graphic copies the
+  layout, canvas and colour treatment of the brand's last AI Studio graphic (or
+  matches the last post with a picture by eye). Untick it for a fresh look.
+* Facts come only from **AI Studio → Brand profile** (prices, offers, phone
+  numbers, RERA lines). Both brands start from their websites' details; check
+  them there before the first post.
+* On the post: **Approve & publish now**, schedule it for a date and time, or
+  just approve it and schedule from the calendar. **Ask for changes** sends
+  notes back to the team; **Use this angle instead** rewrites from another angle. In the
+  enforced brand workspaces approving still needs an owner or manager signed in
+  to the dashboard — the agents never approve or publish anything.
+
 ## One-time owner setup (still needed)
 
 1. **Connect accounts** — in each brand workspace: Settings → Social accounts
@@ -113,6 +134,26 @@ featured image, SEO title/description), **Preview** (signed-in only,
    on the service, then in the Meta app → Webhooks subscribe
    `…/webhooks/facebook/` with the same token (Page: feed, messages; Instagram:
    comments, messages).
+5. **AI Studio** — set `ANTHROPIC_API_KEY` (console.anthropic.com) on **both**
+   `sm-bean` and `sm-bean-worker`; the agents run in the worker. Set `FAL_KEY`
+   on both too for painted pictures; without it the graphics use the brand
+   background. The Studio says on its page what is missing.
+6. **LinkedIn Company Pages** — at developer.linkedin.com create an app tied to
+   a Company Page, add the **Community Management API** product (LinkedIn
+   reviews it), and list the redirect URLs
+   `https://sm-bean-production-eb50.up.railway.app/social-accounts/callback/linkedin_company/`
+   and `…/callback/linkedin_personal/`. Set `PLATFORM_LINKEDIN_COMPANY_CLIENT_ID`
+   / `PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET` on both services, then in each
+   brand workspace Connect → LinkedIn (Company Page) and pick that brand's Page.
+   The connecting LinkedIn member must be an admin of the Page. If LinkedIn
+   answers that a scope isn't authorized, see README → LinkedIn → "Scopes must
+   match the app".
+7. **Sign in with Google (optional)** — Google Cloud Console → Credentials →
+   OAuth client ID (Web application) with the redirect URI
+   `https://sm-bean-production-eb50.up.railway.app/accounts/google/login/callback/`;
+   set `GOOGLE_AUTH_CLIENT_ID` / `GOOGLE_AUTH_CLIENT_SECRET` on `sm-bean`. The
+   instance stays invite-only: a Google address needs an invitation or a
+   `SIGNUP_ALLOWLIST` entry (for example `@neopolisinfra.com`) to get an account.
 
 ## Checking the live deployment
 
@@ -133,7 +174,9 @@ The release step takes a database backup **before** migrating
 1. **Code only (normal case):** Railway → `sm-bean` → Deployments → the previous
    successful deployment → **Rollback**; do the same for `sm-bean-worker`. This
    release's migrations only *add* columns (nullable or with database
-   defaults), so the previous code runs against the migrated database as is.
+   defaults) and the AI Studio's own tables, so the previous code runs against
+   the migrated database as is. Posts the Studio already handed over stay
+   ordinary posts.
 2. **Turn the gate off without a deploy:** Settings → Approvals → untick
    *Require dashboard approval* (owner only). Posts keep their approvals.
 3. **Data restore (only if data was damaged):** with the matching code deployed,

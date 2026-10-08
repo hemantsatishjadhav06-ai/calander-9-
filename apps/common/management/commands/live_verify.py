@@ -195,6 +195,20 @@ class Command(BaseCommand):
                 "(pay-per-use), then set PLATFORM_X_CLIENT_ID / PLATFORM_X_CLIENT_SECRET",
             )
         base = (getattr(settings, "APP_URL", "") or "").rstrip("/")
+        if has("linkedin_company"):
+            self.record(
+                "PASS",
+                "credentials.linkedin_company",
+                "client id/secret present (posting as a Page needs the app's Community Management API product)",
+            )
+        else:
+            self.record(
+                "BLOCKED",
+                "credentials.linkedin_company",
+                "no LinkedIn app: create one at developer.linkedin.com tied to a Company Page, get the Community "
+                f"Management API product, add the redirect URL {base}/social-accounts/callback/linkedin_company/, "
+                "then set PLATFORM_LINKEDIN_COMPANY_CLIENT_ID / PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET",
+            )
         if getattr(settings, "FACEBOOK_WEBHOOK_VERIFY_TOKEN", ""):
             self.record("PASS", "webhooks.meta", f"verify token set; Meta callback {base}/webhooks/facebook/")
         else:

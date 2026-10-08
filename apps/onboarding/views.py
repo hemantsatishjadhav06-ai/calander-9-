@@ -520,6 +520,37 @@ def connection_oauth_callback(request, platform):
             )
             return redirect("onboarding:connection_page", token=token)
 
+        # LinkedIn Company: the member's token drives every Page they
+        # administer, so each Page becomes an account sharing it — with the
+        # refresh token, unlike a Meta Page token. The single-account flow below
+        # would have saved the member's own profile as a "Company Page".
+        if platform == PlatformCredential.Platform.LINKEDIN_COMPANY:
+            from providers.types import AccountProfile
+
+            pages = provider.get_user_pages(tokens.access_token)
+            if not pages:
+                request.session["connection_link_error"] = (
+                    "No LinkedIn Company Pages were found for this login. Only Pages you are an "
+                    "admin of can be connected; ask the Page's admin to add you, then try again."
+                )
+                return redirect("onboarding:connection_page", token=token)
+            for page in pages:
+                account = _create_or_update_account(
+                    workspace_id=workspace_id,
+                    platform=platform,
+                    profile=AccountProfile(
+                        platform_id=page["id"],
+                        name=page["name"],
+                        handle=page.get("handle") or None,
+                        avatar_url=page.get("picture") or None,
+                    ),
+                    access_token=tokens.access_token,
+                    refresh_token=tokens.refresh_token,
+                    expires_in=tokens.expires_in,
+                )
+                ConnectionLinkUsage.objects.get_or_create(connection_link=link, social_account=account)
+            return redirect("onboarding:connection_page", token=token)
+
         # Standard single-account flow
         profile = provider.get_profile(tokens.access_token)
         account = _create_or_update_account(

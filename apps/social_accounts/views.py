@@ -283,7 +283,24 @@ def oauth_callback(request, platform):
     error = request.GET.get("error")
     if error:
         error_desc = request.GET.get("error_description", error)
-        messages.error(request, f"OAuth error: {error_desc}")
+        message = f"OAuth error: {error_desc}"
+        if platform in (
+            PlatformCredential.Platform.LINKEDIN_COMPANY,
+            PlatformCredential.Platform.LINKEDIN_PERSONAL,
+        ) and ("scope" in f"{error} {error_desc}".lower()):
+            # LinkedIn refuses the whole sign-in when one requested scope isn't
+            # granted to the app; say where the granted list is and how to match it.
+            env_name = (
+                "PLATFORM_LINKEDIN_COMPANY_SCOPES"
+                if platform == PlatformCredential.Platform.LINKEDIN_COMPANY
+                else "PLATFORM_LINKEDIN_PERSONAL_SCOPES"
+            )
+            message += (
+                " — the LinkedIn app isn't allowed every permission this connection asks for. "
+                "Its Auth tab on developer.linkedin.com lists the scopes it holds: add the missing product "
+                f"(Community Management API for Company Pages), or have your admin set {env_name} to that list."
+            )
+        messages.error(request, message)
         session_data = request.session.pop(OAUTH_SESSION_KEY, {})
         workspace_id = session_data.get("workspace_id")
         if workspace_id:

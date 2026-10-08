@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}AI Studio - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}AI Studio{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-6">
+        <div class="max-w-2xl">
+            <h1 class="text-lg font-semibold text-stone-900">AI Studio</h1>
+            <p class="text-sm text-stone-600 mt-0.5">
+                Your creative team for {{ profile.brand_name }}: a strategist, a copywriter, an art director and a brand reviewer.
+                Give them a small idea and they come back with a finished LinkedIn post — the angle, the caption and a graphic
+                in the same look as your last post — for you to approve before anything goes out.
+            </p>
+        </div>
+        <a href="{% url 'studio:brand' workspace_id=workspace.id %}"
+           class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">
+            <span class="inline-flex -space-x-1" aria-hidden="true">
+                <span class="w-3.5 h-3.5 rounded-full ring-2 ring-white" style="background: {{ profile.primary_color }}"></span>
+                <span class="w-3.5 h-3.5 rounded-full ring-2 ring-white" style="background: {{ profile.accent_color }}"></span>
+            </span>
+            Brand profile
+        </a>
+    </div>
+
+    {% if not setup.claude_ready or not setup.has_accounts or not setup.pictures_ready %}
+    <ul class="space-y-2 mb-6" aria-label="Setup">
+        {% if not setup.claude_ready %}
+        <li class="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <span class="font-semibold">The team can't start yet.</span>
+            The server needs <code class="font-mono text-xs">ANTHROPIC_API_KEY</code> (an API key from console.anthropic.com) on the web and worker services. Ask your admin to add it.
+        </li>
+        {% endif %}
+        {% if not setup.has_accounts %}
+        <li class="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <span class="font-semibold">No account to post to.</span>
+            <a class="underline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect your LinkedIn page or profile</a> first.
+        </li>
+        {% elif not setup.has_linkedin %}
+        <li class="text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-xl px-4 py-3">
+            The team writes for LinkedIn. <a class="underline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect a LinkedIn page or profile</a> to post there; other accounts get the same graphic.
+        </li>
+        {% endif %}
+        {% if not setup.pictures_ready %}
+        <li class="text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-xl px-4 py-3">
+            Generated pictures need <code class="font-mono text-xs">FAL_KEY</code>. Until it is set, graphics use the brand background — or pick one of your own photos below.
+        </li>
+        {% endif %}
+    </ul>
+    {% endif %}
+
+    {% if can_create %}
+    <section aria-labelledby="brief-heading" class="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6 mb-8 shadow-sm">
+        <h2 id="brief-heading" class="text-base font-semibold text-stone-900 mb-4">Brief the team</h2>
+        <form method="post" action="{% url 'studio:create' workspace_id=workspace.id %}" x-data="{ busy: false }" x-on:submit="busy = true" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="mb-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+
+            <div class="mb-4">
+                <label for="{{ form.idea.id_for_label }}" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.idea.label }}</label>
+                {{ form.idea }}
+                {% if form.idea.errors %}<p class="mt-1 text-sm text-red-800">{{ form.idea.errors|join:" " }}</p>{% endif %}
+                <p class="mt-1 text-xs text-stone-600">A sentence is enough. The team only states facts that are in your idea, your direction or the brand profile.</p>
+            </div>
+
+            <details class="mb-4" {% if form.notes.value or form.goal.value %}open{% endif %}>
+                <summary class="cursor-pointer text-sm font-medium text-stone-800 underline w-fit rounded focus-visible:outline-2 focus-visible:outline-orange-700">Add direction (optional)</summary>
+                <div class="grid sm:grid-cols-[1fr_14rem] gap-4 mt-3">
+                    <div>
+                        <label for="{{ form.notes.id_for_label }}" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.notes.label }}</label>
+                        {{ form.notes }}
+                    </div>
+                    <div>
+                        <label for="{{ form.goal.id_for_label }}" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.goal.label }}</label>
+                        {{ form.goal }}
+                    </div>
+                </div>
+            </details>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <fieldset>
+                    <legend class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.accounts.label }}</legend>
+                    {% if form.accounts.field.choices %}
+                    <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {% for choice in form.accounts %}
+                        <label class="flex items-center gap-2 text-sm text-stone-800 cursor-pointer">
+                            {{ choice.tag }}<span>{{ choice.choice_label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-stone-600"><a class="underline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect an account</a> to choose where it goes.</p>
+                    {% endif %}
+                    {% if form.accounts.errors %}<p class="mt-1 text-sm text-red-800">{{ form.accounts.errors|join:" " }}</p>{% endif %}
+                </fieldset>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="flex items-start gap-2 text-sm text-stone-800 cursor-pointer">
+                            {{ form.style_lock }}
+                            <span><span class="font-semibold text-stone-900">{{ form.style_lock.label }}</span><br>
+                                <span class="text-stone-600">Next graphic follows {{ reference.label }}.</span></span>
+                        </label>
+                        {% if reference.asset %}
+                        <img src="{% if reference.asset.thumbnail %}{{ reference.asset.thumbnail.url }}{% else %}{{ reference.asset.file.url }}{% endif %}"
+                             alt="The post whose look the next graphic follows" class="mt-2 ml-6 h-20 w-auto rounded-lg border border-stone-200 bg-stone-100 object-cover" loading="lazy">
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="{{ form.source_picture.id_for_label }}" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.source_picture.label }}</label>
+                        {{ form.source_picture }}
+                        <p class="mt-1 text-xs text-stone-600">For a specific project, a real photo is more honest than a generated one.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 mt-6">
+                <button type="submit" x-bind:disabled="busy" {% if not setup.claude_ready %}disabled aria-disabled="true"{% endif %}
+                        class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full shadow-[0_4px_14px_rgba(249,115,22,0.28)] hover:bg-orange-800 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
+                    <span x-show="!busy">Brief the team</span><span x-show="busy" x-cloak>Briefing…</span>
+                </button>
+                <p class="text-xs text-stone-600">Takes two to four minutes. Nothing is posted until an approver approves it.</p>
+            </div>
+        </form>
+    </section>
+    {% endif %}
+
+    <section aria-labelledby="recent-heading">
+        <h2 id="recent-heading" class="text-sm font-semibold text-stone-900 mb-3">Recent work</h2>
+        {% if briefs %}
+        <ul class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for brief in briefs %}
+            <li>
+                <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=brief.id %}"
+                   class="block bg-white border border-stone-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-transparent focus-visible:outline-2 focus-visible:outline-orange-700 transition-all duration-200 group">
+                    <div class="aspect-[4/5] bg-stone-100 flex items-center justify-center overflow-hidden">
+                        {% if brief.graphic %}
+                        <img src="{% if brief.graphic.thumbnail %}{{ brief.graphic.thumbnail.url }}{% else %}{{ brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">
+                        {% else %}
+                        <svg class="w-8 h-8 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
+                        {% endif %}
+                    </div>
+                    <div class="p-3">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
+                            <span class="text-xs text-stone-600">{{ brief.created_at|timesince }} ago</span>
+                        </div>
+                        <p class="text-sm font-semibold text-stone-900 line-clamp-2 group-hover:underline">{{ brief.title }}</p>
+                    </div>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-center py-12 border border-dashed border-stone-300 rounded-xl">
+            <p class="text-sm font-medium text-stone-700 mb-1">Nothing yet</p>
+            <p class="text-sm text-stone-600">Your first brief appears here, with everything the team made for it.</p>
+        </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

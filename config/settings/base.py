@@ -111,6 +111,9 @@ LOCAL_APPS = [
     "apps.marketing",
     # Blog posts for the brands' own websites, committed to their GitHub repos.
     "apps.blog",
+    # AI Studio: a team of Claude agents that turns a small idea into a post
+    # (angles, copy, a designed graphic) and hands it to the approval workflow.
+    "apps.studio",
     "theme",
 ]
 
@@ -364,15 +367,21 @@ UNSPLASH_ACCESS_KEY = env("UNSPLASH_ACCESS_KEY", default="")
 
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
-        "APP": {
-            "client_id": GOOGLE_AUTH_CLIENT_ID,
-            "secret": GOOGLE_AUTH_CLIENT_SECRET,
-        },
         "SCOPE": ["profile", "email"],
         "AUTH_PARAMS": {"access_type": "online"},
         "VERIFIED_EMAIL": True,
     },
 }
+# allauth lists a provider as soon as it has an app, even one with an empty
+# client ID, so "Sign in with Google" showed on instances without Google
+# credentials and led to Google's "missing client_id" error page. The button
+# appears only once both are set. (Don't also add a Google "Social application"
+# in the Django admin: two apps for one provider make the login page fail.)
+if GOOGLE_AUTH_CLIENT_ID and GOOGLE_AUTH_CLIENT_SECRET:
+    SOCIALACCOUNT_PROVIDERS["google"]["APP"] = {
+        "client_id": GOOGLE_AUTH_CLIENT_ID,
+        "secret": GOOGLE_AUTH_CLIENT_SECRET,
+    }
 
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
@@ -585,6 +594,11 @@ _LINKEDIN_LEGACY_CLIENT_SECRET = env("PLATFORM_LINKEDIN_CLIENT_SECRET", default=
 _LINKEDIN_COMPANY_CREDENTIALS = {
     "client_id": env("PLATFORM_LINKEDIN_COMPANY_CLIENT_ID", default="") or _LINKEDIN_LEGACY_CLIENT_ID,
     "client_secret": env("PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET", default="") or _LINKEDIN_LEGACY_CLIENT_SECRET,
+    # Optional: the scopes to ask LinkedIn for, space- or comma-separated, when
+    # the app's Auth tab lists a different set from the Community Management
+    # API defaults in providers/linkedin_company.py. One scope the app doesn't
+    # hold makes LinkedIn refuse the whole sign-in.
+    "_scopes": env("PLATFORM_LINKEDIN_COMPANY_SCOPES", default=""),
 }
 
 # LinkedIn Personal credential resolution + auto-derived OAuth mode:
@@ -600,11 +614,13 @@ if _LINKEDIN_PERSONAL_CLIENT_ID:
         "client_id": _LINKEDIN_PERSONAL_CLIENT_ID,
         "client_secret": env("PLATFORM_LINKEDIN_PERSONAL_CLIENT_SECRET", default=""),
         "_oauth_mode": "oidc",
+        "_scopes": env("PLATFORM_LINKEDIN_PERSONAL_SCOPES", default=""),
     }
 elif _LINKEDIN_COMPANY_CREDENTIALS["client_id"]:
     _LINKEDIN_PERSONAL_CREDENTIALS = {
         **_LINKEDIN_COMPANY_CREDENTIALS,
         "_oauth_mode": "community_management",
+        "_scopes": env("PLATFORM_LINKEDIN_PERSONAL_SCOPES", default=""),
     }
 else:
     # No LinkedIn env vars set. Keep `_oauth_mode` out so the dict carries nothing
@@ -700,6 +716,19 @@ BLOG_GITHUB_TOKEN = env("BLOG_GITHUB_TOKEN", default="")
 FAL_KEY = env("FAL_KEY", default="")
 FAL_IMAGE_MODEL = env("FAL_IMAGE_MODEL", default="fal-ai/flux/dev")
 FAL_TIMEOUT = env.float("FAL_TIMEOUT", default=90.0)
+
+# AI Studio (apps.studio): the agent team runs on Claude through the Anthropic
+# API. Empty ANTHROPIC_API_KEY: the Studio explains it is not set up and runs
+# nothing. Set it on the web AND worker services — the agents run in the worker.
+# STUDIO_MODEL is the Claude model every agent uses; STUDIO_EFFORT, when set,
+# overrides each agent's own effort level (low | medium | high | xhigh | max).
+# STUDIO_FALLBACKS opts into Anthropic's server-side fallback model when the
+# requested model's safety classifiers decline a request (beta).
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+STUDIO_MODEL = env("STUDIO_MODEL", default="claude-opus-5-5")
+STUDIO_EFFORT = env("STUDIO_EFFORT", default="")
+STUDIO_TIMEOUT = env.float("STUDIO_TIMEOUT", default=300.0)
+STUDIO_FALLBACKS = env.bool("STUDIO_FALLBACKS", default=True)
 
 # Webhook verification
 FACEBOOK_WEBHOOK_VERIFY_TOKEN = env("FACEBOOK_WEBHOOK_VERIFY_TOKEN", default="")
