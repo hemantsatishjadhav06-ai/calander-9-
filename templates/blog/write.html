@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load tz %}
+
+{% block title %}Write with the SEO team - Blog - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Blog{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl">
+    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
+        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Blog</a>
+        <span aria-hidden="true"> / </span><span>Write with the team</span>
+    </nav>
+
+    <div class="mb-6 max-w-3xl">
+        <h1 class="text-2xl sm:text-3xl text-stone-900" style="font-family: var(--font-display)">Write with the SEO team</h1>
+        <p class="text-sm text-stone-600 mt-1">Give the team a topic. They research what people search for, plan the article, write it from your brand facts, check every claim and tune it for Google. The draft then waits for your approval — nothing goes on the website until a person approves and publishes it.</p>
+    </div>
+
+    {% if not claude_ready %}
+    <p role="status" class="mb-6 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+        <span class="font-semibold">The team can't start yet.</span>
+        The server needs <code class="font-mono text-xs">ANTHROPIC_API_KEY</code> on the web and worker services. Ask your admin to add it.
+    </p>
+    {% endif %}
+
+    <div class="grid lg:grid-cols-[1fr_20rem] gap-6 items-start">
+        <section aria-labelledby="brief-heading" class="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+            <h2 id="brief-heading" class="text-lg text-stone-900 mb-4" style="font-family: var(--font-display)">Brief the team</h2>
+
+            {% if error %}
+            <div role="alert" class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{{ error }}</div>
+            {% endif %}
+            {% if form.non_field_errors %}
+            <div role="alert" class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                {% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="post" x-data="{ busy: false }" x-on:submit="busy = true">
+                {% csrf_token %}
+                <div class="mb-5">
+                    <label for="write-topic" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.topic.label }} <span class="text-red-700" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
+                    <input id="write-topic" type="text" name="topic" value="{{ form.topic.value|default:'' }}" maxlength="300" required
+                           aria-describedby="write-topic-help{% if form.topic.errors %} write-topic-errors{% endif %}"
+                           placeholder="e.g. How to check a land title before you buy a flat"
+                           class="w-full text-sm px-3 py-2.5 rounded-xl border border-stone-300 bg-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100">
+                    <p id="write-topic-help" class="mt-1 text-xs text-stone-600">One line is enough: the question a reader has, or what you want them to learn.</p>
+                    {% if form.topic.errors %}<div id="write-topic-errors" role="alert" class="mt-1 text-sm text-red-800">{% for e in form.topic.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+
+                <div class="grid sm:grid-cols-2 gap-x-4">
+                    <div class="mb-5">
+                        <label for="write-site" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.site.label }} <span class="text-red-700" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
+                        <select id="write-site" name="site" required
+                                class="w-full text-sm px-3 py-2.5 rounded-xl border border-stone-300 bg-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                                {% if form.site.errors %}aria-describedby="write-site-errors"{% endif %}>
+                            {% for site in form.fields.site.queryset %}
+                            <option value="{{ site.pk }}"{% if form.site.value|stringformat:"s" == site.pk|stringformat:"s" %} selected{% endif %}>{{ site.name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if form.site.errors %}<div id="write-site-errors" role="alert" class="mt-1 text-sm text-red-800">{% for e in form.site.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                    </div>
+                    <div class="mb-5">
+                        <label for="write-keyword" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.focus_keyword.label }} <span class="font-normal text-stone-600">(optional)</span></label>
+                        <input id="write-keyword" type="text" name="focus_keyword" value="{{ form.focus_keyword.value|default:'' }}" maxlength="80"
+                               aria-describedby="write-keyword-help{% if form.focus_keyword.errors %} write-keyword-errors{% endif %}"
+                               placeholder="e.g. land title verification"
+                               class="w-full text-sm px-3 py-2.5 rounded-xl border border-stone-300 bg-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100">
+                        <p id="write-keyword-help" class="mt-1 text-xs text-stone-600">What a reader types into Google. Leave it empty and the SEO strategist picks one.</p>
+                        {% if form.focus_keyword.errors %}<div id="write-keyword-errors" role="alert" class="mt-1 text-sm text-red-800">{% for e in form.focus_keyword.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label for="write-notes" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.notes.label }} <span class="font-normal text-stone-600">(optional)</span></label>
+                    <textarea id="write-notes" name="notes" rows="4" maxlength="2000"
+                              aria-describedby="write-notes-help{% if form.notes.errors %} write-notes-errors{% endif %}"
+                              placeholder="e.g. Mention our free title check. Readers are first-time buyers in West Hyderabad."
+                              class="w-full text-sm px-3 py-2.5 rounded-xl border border-stone-300 bg-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100">{{ form.notes.value|default:'' }}</textarea>
+                    <p id="write-notes-help" class="mt-1 text-xs text-stone-600">Anything the team should cover or avoid. Facts come only from your brand profile and these notes.</p>
+                    {% if form.notes.errors %}<div id="write-notes-errors" role="alert" class="mt-1 text-sm text-red-800">{% for e in form.notes.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="submit" x-bind:disabled="busy"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-full shadow-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700 bg-orange-700 hover:bg-orange-800">
+                        <span x-show="!busy">Ask the team to write it</span><span x-show="busy" x-cloak>Starting…</span>
+                    </button>
+                    <a href="{% url 'blog:create' workspace_id=workspace.id %}" class="text-sm font-medium text-stone-700 underline hover:text-stone-900">Or write it yourself</a>
+                </div>
+            </form>
+        </section>
+
+        <aside class="space-y-6">
+            <section aria-labelledby="who-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+                <h2 id="who-heading" class="text-lg text-stone-900 mb-1" style="font-family: var(--font-display)">Who works on it</h2>
+                <p class="text-xs text-stone-600 mb-3">In this order. Each one's work shows up live once you start.</p>
+                <ol class="space-y-3">
+                    {% for agent in article_team %}
+                    {% if agent.slug != 'prompt_engineer' and agent.slug != 'illustrator' or pictures_ready %}
+                    <li class="flex items-start gap-3">
+                        {% include "components/agent_avatar.html" with agent=agent size="sm" %}
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-stone-900">{{ agent.name }}</p>
+                            <p class="text-xs text-stone-600">{{ agent.does }}</p>
+                        </div>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ol>
+                {% if not pictures_ready %}
+                <p class="mt-3 text-xs text-stone-600">The cover is the designed title card in your brand colours. Generated cover pictures switch on when your admin connects the picture service.</p>
+                {% endif %}
+            </section>
+
+            {% if recent_jobs %}
+            <section aria-labelledby="recent-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+                <h2 id="recent-heading" class="text-lg text-stone-900 mb-3" style="font-family: var(--font-display)">Recent work</h2>
+                <ul class="space-y-3">
+                    {% for job in recent_jobs %}
+                    <li>
+                        <a href="{% url 'blog:team_job' workspace_id=workspace.id job_id=job.id %}" class="block rounded-lg -m-1 p-1 hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">
+                            <span class="flex items-start justify-between gap-2">
+                                <span class="text-sm font-medium text-stone-900 break-words">{{ job.title|default:job.get_kind_display|truncatechars:70 }}</span>
+                                {% if job.status == 'done' %}{% include "components/agent_state.html" with state="done" %}{% elif job.status == 'failed' %}{% include "components/agent_state.html" with state="failed" %}{% elif job.status == 'cancelled' %}{% include "components/agent_state.html" with state="skipped" %}{% elif job.status == 'working' %}{% include "components/agent_state.html" with state="working" %}{% else %}{% include "components/agent_state.html" with state="queued" %}{% endif %}
+                            </span>
+                            <span class="block text-xs text-stone-600 mt-0.5">{{ job.get_kind_display }} · <time datetime="{{ job.created_at|date:'c' }}">{{ job.created_at|timezone:workspace.effective_timezone|date:"j M, H:i" }}</time></span>
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endif %}
+        </aside>
+    </div>
+</div>
+{% endblock %}
