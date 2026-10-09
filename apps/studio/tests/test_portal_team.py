@@ -267,3 +267,51 @@ def test_the_portal_approve_toast_does_not_claim_scheduling(client, world, clien
     assert "scheduled to publish" not in response["HX-Trigger"]
     assert "your agency team will schedule it" in response["HX-Trigger"]
     assert post.platform_posts.get().status == "approved"
+
+
+def test_portal_reports_show_the_weekly_report_and_nothing_internal(client, world, client_user):
+    other_org = Organization.objects.create(name="Other agency")
+    other = Workspace.objects.create(organization=other_org, name="Someone else")
+    result = {
+        "title": "Your week: 4 posts, one standout",
+        "summary": "The site visit post did twice as well as usual.",
+        "period": {"label": "2–8 Oct"},
+        "went_out": {"LinkedIn": 3, "Instagram": 1},
+        "sections": [
+            {"kind": "best", "heading": "What worked", "body": "The site visit carousel."},
+            {"kind": "internal", "heading": "Costs", "body": "We spent $4.20 on agents."},
+        ],
+        "cost_usd": 4.2,
+    }
+    now = timezone.now()
+    AgencyJob.objects.create(
+        workspace=world.workspace,
+        kind=AgencyJob.Kind.REPORT,
+        status=AgencyJob.Status.DONE,
+        result=result,
+        error="An internal error the client must not read",
+        finished_at=now,
+    )
+    AgencyJob.objects.create(
+        workspace=other,
+        kind=AgencyJob.Kind.REPORT,
+        status=AgencyJob.Status.DONE,
+        result={**result, "title": "Another client's week"},
+        finished_at=now,
+    )
+    portal_login(client, client_user, world.workspace)
+
+    html = client.get(reverse("client_portal:reports")).content.decode()
+
+    assert "Your week: 4 posts, one standout" in html and "twice as well as usual" in html
+    assert "LinkedIn · 3 posts" in html and "Instagram · 1 post<" in html
+    assert "What worked" in html and "site visit carousel" in html
+    assert "Costs" not in html and "$4.20" not in html and "4.2" not in html
+    assert "internal error" not in html
+    assert "Another client" not in html
+
+
+def test_portal_reports_say_when_there_are_none(client, world, client_user):
+    portal_login(client, client_user, world.workspace)
+    html = client.get(reverse("client_portal:reports")).content.decode()
+    assert "No reports yet" in html

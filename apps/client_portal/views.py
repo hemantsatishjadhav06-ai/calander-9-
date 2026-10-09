@@ -375,14 +375,20 @@ def portal_activity(request):
 
 
 # ---------------------------------------------------------------------------
-# Reports (Placeholder)
+# Reports
 # ---------------------------------------------------------------------------
 
 
 @portal_auth_required
 @require_GET
 def portal_reports(request):
-    """Placeholder reports page."""
+    """The agency's weekly reports: what went out, what worked, what's next.
+
+    Only the client-safe copy from ``apps.studio.reports`` reaches the page — the
+    report's own words and the numbers code counted, never costs or the team's notes.
+    """
+    from apps.studio.reports import recent_reports
+
     workspace = request.portal_workspace
 
     return render(
@@ -390,5 +396,6 @@ def portal_reports(request):
         "client_portal/reports.html",
         {
             "workspace": workspace,
+            "reports": recent_reports(workspace, limit=8),
         },
     )
