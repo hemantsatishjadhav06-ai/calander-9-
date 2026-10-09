@@ -1,0 +1,11 @@
+{% comment %}The SEO score ring. Context: report (apps.blog.seo.Report), ring ({radius, circumference, dash}), optional size ("sm").{% endcomment %}
+<div class="relative flex-shrink-0 {% if size == 'sm' %}w-12 h-12{% else %}w-16 h-16{% endif %}">
+    <svg viewBox="0 0 64 64" class="w-full h-full -rotate-90" aria-hidden="true">
+        <circle cx="32" cy="32" r="{{ ring.radius }}" fill="none" stroke="currentColor" stroke-width="6" class="text-stone-200"></circle>
+        <circle cx="32" cy="32" r="{{ ring.radius }}" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"
+                stroke-dasharray="{{ ring.dash }} {{ ring.circumference }}"
+                class="{% if report.tone == 'good' %}text-green-700{% elif report.tone == 'fair' %}text-amber-600{% else %}text-red-700{% endif %}"></circle>
+    </svg>
+    <span class="absolute inset-0 flex items-center justify-center font-semibold tabular-nums text-stone-900 {% if size == 'sm' %}text-base{% else %}text-xl{% endif %}"
+          style="font-family: var(--font-display)" aria-hidden="true">{{ report.score }}</span>
+</div>

@@ -1,0 +1,7 @@
+{% comment %}The SEO score as a small pill for the blog list. Context: report.{% endcomment %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums whitespace-nowrap
+    {% if report.tone == 'good' %}bg-green-50 text-green-800 ring-1 ring-inset ring-green-200
+    {% elif report.tone == 'fair' %}bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200
+    {% else %}bg-red-50 text-red-800 ring-1 ring-inset ring-red-200{% endif %}">
+    SEO {{ report.score }}<span class="sr-only"> of 100: {{ report.grade }}</span>
+</span>

@@ -332,6 +332,7 @@ class Command(BaseCommand):
             "blog.sites",
             ", ".join(f"{s.name}->{s.repo}" for s in sites) or "none",
         )
+        self.check_blog_seo(sites)
         token = getattr(settings, "BLOG_GITHUB_TOKEN", "")
         if not token:
             return
@@ -353,6 +354,42 @@ class Command(BaseCommand):
                 )
             except Exception as exc:
                 self.record("FAIL", f"blog.github.{site.repo}", f"{type(exc).__name__}: {exc}")
+
+    def check_blog_seo(self, sites):
+        """Search Console and IndexNow: configured or not, each website's connection, the SEO schedules."""
+        from background_task.models import Task
+
+        from apps.blog import publisher, search_console
+
+        configured = search_console.is_configured()
+        self.record(
+            "PASS" if configured else "INFO",
+            "blog.search_console.client",
+            f"set; redirect URI {search_console.redirect_uri()}"
+            if configured
+            else "GSC_CLIENT_ID/GSC_CLIENT_SECRET unset: rankings are off and the blog pages say so",
+        )
+        for site in sites:
+            connection = search_console.connection_for(site)
+            if connection is not None and search_console.is_connected(connection):
+                state = f"connected to {connection.property_url}; last sync {connection.last_sync_at or 'never'}"
+                if connection.last_error:
+                    state += f"; last error: {connection.last_error}"
+                self.record("FAIL" if connection.last_error else "PASS", f"blog.search_console.{site.repo}", state)
+            else:
+                self.record("INFO", f"blog.search_console.{site.repo}", "not connected")
+        self.record(
+            "PASS" if publisher.indexnow_key() else "INFO",
+            "blog.indexnow",
+            "key set: publishes write the key file and ping IndexNow" if publisher.indexnow_key() else "off",
+        )
+        names = set(Task.objects.filter(repeat__gt=0).values_list("verbose_name", flat=True))
+        for wanted in ("queue_search_console_syncs", "queue_seo_checkups"):
+            self.record(
+                "PASS" if wanted in names else "FAIL",
+                f"blog.schedule.{wanted}",
+                "registered" if wanted in names else "not registered (start the worker once to register it)",
+            )
 
     # ------------------------------------------------------------------
     # End-to-end workflow on a throwaway fixture, always rolled back

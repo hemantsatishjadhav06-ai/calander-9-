@@ -18,6 +18,12 @@ A follow-up task (:func:`poll_deploy`) watches the workflow run every ~30 s
 for up to ~20 minutes, then fetches the live URL and checks the post's title
 is on it before calling the post published.
 
+The same commit also rewrites the blog's ``sitemap.xml`` and RSS
+``feed.xml`` from the committed cards (unless a file of that name exists that
+SM Bean didn't write: that one is left alone), and, when ``INDEXNOW_KEY`` is
+set, the IndexNow key file; once the post is verified live, Bing and the other
+IndexNow engines are told about it (:func:`ping_indexnow`).
+
 File paths per site kind are in :func:`site_paths`. For Neopolis anything
 committed under ``publish-payload3/`` is deployed by the next workflow run,
 scheduled or dispatched — which is why only a claimed, approved revision is
@@ -31,9 +37,12 @@ import datetime as dt
 import hashlib
 import html
 import logging
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 import requests
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -42,11 +51,15 @@ from . import services
 from .covers import hero_image_bytes
 from .models import BlogPost, BlogPostEvent, BlogSite
 from .renderers import (
+    GENERATED_MARKER,
     CardData,
     IndexStructureError,
     PostContent,
+    blog_index_url,
+    render_feed,
     render_morespace_index,
     render_post_page,
+    render_sitemap,
     update_neopolis_index,
 )
 
@@ -216,16 +229,42 @@ def git_blob_sha(content: bytes) -> str:
 # ---------------------------------------------------------------------------
 
 
+_INDEXNOW_KEY_RE = re.compile(r"^[A-Za-z0-9-]{8,128}$")
+INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow"
+
+
+def indexnow_key() -> str:
+    """``INDEXNOW_KEY`` when it is a valid IndexNow key (8–128 letters, digits, dashes), else ""."""
+    key = (getattr(settings, "INDEXNOW_KEY", "") or "").strip()
+    return key if _INDEXNOW_KEY_RE.match(key) else ""
+
+
 def site_paths(site: BlogSite, slug: str) -> dict[str, str]:
+    key = indexnow_key()
     if site.kind == BlogSite.Kind.NEOPOLIS_STATIC:
-        return {
+        paths = {
             "post": f"publish-payload3/blog/{slug}.html",
             "index": "publish-payload3/blog/index.html",
             # The mirror script overlays generated/blog/img/*.jpg only.
             "image": f"generated/blog/img/{slug}-hero.jpg",
+            "sitemap": "publish-payload3/blog/sitemap.xml",
+            "feed": "publish-payload3/blog/feed.xml",
         }
+        if key:
+            # publish-payload3/ is the site root, like publish-payload3/blog/ is /blog/.
+            paths["indexnow"] = f"publish-payload3/{key}.txt"
+        return paths
     if site.kind == BlogSite.Kind.MORESPACE_STATIC:
-        return {"post": f"blog/{slug}.html", "index": "blog/index.html", "image": f"blog/img/{slug}-hero.jpg"}
+        paths = {
+            "post": f"blog/{slug}.html",
+            "index": "blog/index.html",
+            "image": f"blog/img/{slug}-hero.jpg",
+            "sitemap": "blog/sitemap.xml",
+            "feed": "blog/feed.xml",
+        }
+        if key:
+            paths["indexnow"] = f"{key}.txt"
+        return paths
     raise ValueError(f"Unknown site kind {site.kind!r}")
 
 
@@ -247,6 +286,8 @@ def published_cards(site: BlogSite, *, exclude_post_id=None) -> list[CardData]:
 class CommitResult:
     sha: str
     changed_paths: list[str]
+    # Files of ours (sitemap, feed) left alone because someone else's file is there.
+    skipped_paths: list[str] = field(default_factory=list)
 
 
 def _render_index(site: BlogSite, post: BlogPost, content: PostContent, existing_index: bytes | None) -> bytes:
@@ -261,8 +302,15 @@ def _render_index(site: BlogSite, post: BlogPost, content: PostContent, existing
     return render_morespace_index([content.card(), *cards], origin=site.origin).encode("utf-8")
 
 
+def _ours(existing: tuple[str, bytes | None] | None) -> bool:
+    """Whether a sitemap/feed path is free, or holds a file SM Bean wrote (so it may be rewritten)."""
+    if existing is None:
+        return True
+    return GENERATED_MARKER.encode("utf-8") in (existing[1] or b"")
+
+
 def commit_post(client: GitHubClient, post: BlogPost, content: PostContent, *, guard, message: str) -> CommitResult:
-    """Write the post, its hero image and the index as one commit.
+    """Write the post, its hero image, the index, the blog sitemap and feed as one commit.
 
     ``guard`` is called immediately before the first write of every attempt
     and must raise if the post may no longer be published.
@@ -272,6 +320,12 @@ def commit_post(client: GitHubClient, post: BlogPost, content: PostContent, *, g
     page = render_post_page(site, content).encode("utf-8")
     # The designed cover (title over the picture) or the plain featured image.
     image = hero_image_bytes(post, content)
+    # Every committed card of the site, this revision's first: what the
+    # sitemap and the feed list.
+    cards = [content.card(), *published_cards(site, exclude_post_id=post.pk)]
+    sitemap = render_sitemap(cards, site_kind=site.kind, origin=site.origin).encode("utf-8")
+    feed = render_feed(cards, site_kind=site.kind, origin=site.origin).encode("utf-8")
+    key = indexnow_key()
 
     for _attempt in range(COMMIT_ATTEMPTS):
         head = client.branch_head(site.branch)
@@ -279,6 +333,9 @@ def commit_post(client: GitHubClient, post: BlogPost, content: PostContent, *, g
         existing_post = client.get_file(paths["post"], head)
         existing_index = client.get_file(paths["index"], head, with_content=site.kind == BlogSite.Kind.NEOPOLIS_STATIC)
         existing_image = client.get_file(paths["image"], head) if image is not None else None
+        existing_sitemap = client.get_file(paths["sitemap"], head, with_content=True)
+        existing_feed = client.get_file(paths["feed"], head, with_content=True)
+        existing_key = client.get_file(paths["indexnow"], head) if "indexnow" in paths else None
 
         if existing_post is not None and not post.has_been_committed and existing_post[0] != git_blob_sha(page):
             raise PostPathTakenError(
@@ -292,16 +349,28 @@ def commit_post(client: GitHubClient, post: BlogPost, content: PostContent, *, g
         }
         if image is not None:
             files[paths["image"]] = image
+        skipped = []
+        for name, data, existing in (("sitemap", sitemap, existing_sitemap), ("feed", feed, existing_feed)):
+            if _ours(existing):
+                files[paths[name]] = data
+            else:
+                skipped.append(paths[name])
+        if "indexnow" in paths:
+            files[paths["indexnow"]] = key.encode("utf-8")
         current = {
             paths["post"]: existing_post and existing_post[0],
             paths["index"]: existing_index and existing_index[0],
             paths["image"]: existing_image and existing_image[0],
+            paths["sitemap"]: existing_sitemap and existing_sitemap[0],
+            paths["feed"]: existing_feed and existing_feed[0],
         }
+        if "indexnow" in paths:
+            current[paths["indexnow"]] = existing_key and existing_key[0]
         changed = {path: data for path, data in files.items() if current.get(path) != git_blob_sha(data)}
 
         guard()
         if not changed:
-            return CommitResult(sha=head, changed_paths=[])
+            return CommitResult(sha=head, changed_paths=[], skipped_paths=skipped)
 
         entries = [
             {"path": path, "mode": "100644", "type": "blob", "sha": client.create_blob(data)}
@@ -316,7 +385,7 @@ def commit_post(client: GitHubClient, post: BlogPost, content: PostContent, *, g
                 "Branch %s of %s moved while publishing blog post %s; retrying", site.branch, site.repo, post.pk
             )
             continue
-        return CommitResult(sha=commit, changed_paths=sorted(changed))
+        return CommitResult(sha=commit, changed_paths=sorted(changed), skipped_paths=skipped)
     raise GitHubError(f"The {site.branch} branch of {site.repo} kept changing while publishing. Try again shortly.")
 
 
@@ -394,6 +463,11 @@ def run_publish(post_id, attempt: int) -> None:
             detail = f"{site.repo}@{result.sha[:7]}: " + ", ".join(result.changed_paths)
         else:
             detail = f"{site.repo} already had this revision at {result.sha[:7]}; nothing to commit."
+        if result.skipped_paths:
+            detail += (
+                f" Left {', '.join(result.skipped_paths)} as it was: that file wasn't written by SM Bean, "
+                "so it is not overwritten."
+            )
         services.record_event(post, Action.COMMITTED, detail=detail, fingerprint_value=post.approved_fingerprint)
 
     # Stamped before the call: the run GitHub creates for it is never older.
@@ -563,6 +637,45 @@ def run_poll(post_id, attempt: int, verify_tries: int = 0) -> None:
         f'"{post.title}" is live at {url}.',
         post,
     )
+    if indexnow_key():
+        try:
+            from .tasks import PRIORITY_SEO, ping_indexnow_task
+
+            ping_indexnow_task(str(post.pk), priority=PRIORITY_SEO)
+        except Exception:
+            logger.exception("Could not queue the IndexNow ping for blog post %s", post.pk)
+
+
+def ping_indexnow(post_id) -> bool:
+    """Tell IndexNow (Bing, Yandex, Seznam, Naver…) that a post went live. Never raises.
+
+    Sends the post, the blog index and the sitemap. Google doesn't use
+    IndexNow; it finds the pages through the sitemap and Search Console.
+    Returns whether the ping was accepted.
+    """
+    import httpx
+
+    key = indexnow_key()
+    post = _load(post_id)
+    if not key or post is None or post.status != Status.PUBLISHED:
+        return False
+    site = post.site
+    host = urlsplit(site.origin).netloc
+    body = {
+        "host": host,
+        "key": key,
+        "keyLocation": f"{site.origin}/{key}.txt",
+        "urlList": [post.published_url or site.live_url_for(post.slug), blog_index_url(site.origin)],
+    }
+    try:
+        response = httpx.post(INDEXNOW_ENDPOINT, json=body, timeout=REQUEST_TIMEOUT)
+    except Exception as exc:
+        logger.warning("IndexNow ping for %s failed: %s", post_id, exc.__class__.__name__)
+        return False
+    if response.status_code in (200, 202):
+        return True
+    logger.warning("IndexNow answered %s for %s", response.status_code, host)
+    return False
 
 
 def sweep_stuck() -> int:
