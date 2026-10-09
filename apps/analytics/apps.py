@@ -13,31 +13,25 @@ class AnalyticsConfig(AppConfig):
     verbose_name = "Analytics"
 
     def ready(self):
-        from django.db.models.signals import post_migrate
+        from apps.common.background import connect_recurring_tasks
 
         from . import signals  # noqa: F401
 
-        # Register the recurring sync task with django-background-tasks. We
-        # use ``post_migrate`` so the task table exists before we touch it;
-        # mirrors the pattern in apps/publisher/apps.py.
-        post_migrate.connect(self._register_sync_task, sender=self)
+        # Register the recurring sync after migrate *and* when the worker starts
+        # (connect_recurring_tasks), so a schedule django-background-tasks
+        # dropped comes back on the next worker boot. The agency's creative
+        # memory and plans learn from these numbers, so a lost sync would
+        # quietly stop the team learning.
+        connect_recurring_tasks(self, self._register_sync_task)
 
     @staticmethod
     def _register_sync_task(sender, **kwargs):
         """Idempotently register the hourly analytics sync cron."""
-        try:
-            from background_task.models import Task
+        from apps.analytics.tasks import sync_all_account_analytics
+        from apps.common.background import register_recurring_task
 
-            from apps.analytics.tasks import sync_all_account_analytics
-
-            if not Task.objects.filter(verbose_name="sync_all_account_analytics").exists():
-                sync_all_account_analytics(
-                    repeat=SYNC_INTERVAL_SECONDS,
-                    verbose_name="sync_all_account_analytics",
-                )
-                logger.info(
-                    "Registered recurring analytics sync (every %ss)",
-                    SYNC_INTERVAL_SECONDS,
-                )
-        except Exception:
-            logger.debug("Skipping analytics sync registration (database not ready)")
+        register_recurring_task(
+            sync_all_account_analytics,
+            repeat=SYNC_INTERVAL_SECONDS,
+            verbose_name="sync_all_account_analytics",
+        )
