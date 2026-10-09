@@ -69,7 +69,8 @@ def best_buckets(account) -> dict[tuple[int, int], float]:
     zone = _zone(account.workspace)
     grouped: dict[tuple[int, int], list[float]] = defaultdict(list)
     for item in items:
-        grouped[_bucket(item.published_at, zone)].append(item.ratio)
+        if item.ratio is not None:
+            grouped[_bucket(item.published_at, zone)].append(item.ratio)
     return {key: statistics.mean(values) for key, values in grouped.items() if len(values) >= MIN_BUCKET_POSTS}
 
 
@@ -88,7 +89,7 @@ def taken_times(workspace, *, exclude_brief=None, exclude_post_id=None) -> set[d
     )
     if exclude_post_id:
         posts = posts.exclude(pk=exclude_post_id)
-    taken.update(posts.values_list("proposed_publish_at", flat=True).distinct())
+    taken.update(when for when in posts.values_list("proposed_publish_at", flat=True).distinct() if when)
     briefs = StudioBrief.objects.filter(
         workspace=workspace,
         proposed_publish_at__isnull=False,
@@ -102,7 +103,7 @@ def taken_times(workspace, *, exclude_brief=None, exclude_post_id=None) -> set[d
     )
     if exclude_brief is not None:
         briefs = briefs.exclude(pk=exclude_brief.pk)
-    taken.update(briefs.values_list("proposed_publish_at", flat=True))
+    taken.update(when for when in briefs.values_list("proposed_publish_at", flat=True) if when)
     return taken
 
 

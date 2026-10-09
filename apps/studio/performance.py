@@ -54,17 +54,17 @@ def measured(*, workspace=None, account=None, since: datetime | None = None) -> 
 
     now = timezone.now()
     since = since or now - LOOKBACK
-    rows = PlatformPost.objects.filter(
+    published = PlatformPost.objects.filter(
         status=PlatformPost.Status.PUBLISHED,
         published_at__isnull=False,
         published_at__gte=since,
         published_at__lte=now - MIN_AGE,
     )
     if workspace is not None:
-        rows = rows.filter(post__workspace=workspace)
+        published = published.filter(post__workspace=workspace)
     if account is not None:
-        rows = rows.filter(social_account=account)
-    rows = list(rows.values_list("id", "post_id", "social_account_id", "social_account__platform", "published_at"))
+        published = published.filter(social_account=account)
+    rows = published.values_list("id", "post_id", "social_account_id", "social_account__platform", "published_at")
     by_platform: dict[str, list[tuple]] = {}
     for row in rows:
         by_platform.setdefault(row[3], []).append(row)
