@@ -131,3 +131,25 @@ def test_jobs_of_another_workspace_are_not_found(client, world, report_job):
     AgencyJob.objects.filter(pk=report_job.pk).update(workspace=other)
     client.force_login(world.owner)
     assert client.get(_url("studio:job", world, job_id=report_job.id)).status_code == 404
+
+
+def test_what_the_team_learned_skips_a_newer_job_that_wrote_nothing_down(world):
+    from apps.studio import dashboard
+
+    now = timezone.now()
+    AgencyJob.objects.create(
+        workspace=world.workspace,
+        kind=AgencyJob.Kind.PLAN,
+        status=AgencyJob.Status.DONE,
+        result={"learned": ["Pricing carousels did 2.1× usual on LinkedIn."]},
+        finished_at=now - timedelta(days=1),
+    )
+    AgencyJob.objects.create(
+        workspace=world.workspace,
+        kind=AgencyJob.Kind.REPORT,
+        status=AgencyJob.Status.DONE,
+        result={"title": "Your week"},
+        finished_at=now,
+    )
+
+    assert dashboard.learned(world.workspace) == ["Pricing carousels did 2.1× usual on LinkedIn."]

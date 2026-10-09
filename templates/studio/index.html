@@ -269,9 +269,9 @@
                                 {% endif %}
                             </div>
                             <div class="p-3">
-                                <div class="flex items-center justify-between gap-2 mb-1">
+                                <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1">
                                     {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
-                                    <span class="text-xs text-stone-600">{{ brief.created_at|timesince }} ago</span>
+                                    <span class="text-xs text-stone-600 whitespace-nowrap">{{ brief.created_at|timesince }} ago</span>
                                 </div>
                                 <p class="text-sm font-semibold text-stone-900 line-clamp-2 group-hover:underline">{{ brief.title }}</p>
                             </div>

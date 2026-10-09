@@ -250,16 +250,18 @@ def stats(workspace) -> dict[str, Any]:
 def learned(workspace) -> list[str]:
     """A few plain lines the team learned, newest first."""
     lines: list[str] = []
-    job = (
-        AgencyJob.objects.filter(
-            workspace=workspace, kind__in=("learn", "plan", "report"), status=AgencyJob.Status.DONE
-        )
-        .order_by("-finished_at")
-        .first()
-    )
-    for line in (job.result or {}).get("learned", []) if job else []:
-        if isinstance(line, str) and line.strip():
-            lines.append(line.strip())
+    # The newest finished job that wrote anything down (a report usually doesn't).
+    for job in AgencyJob.objects.filter(
+        workspace=workspace, kind__in=("learn", "plan", "report"), status=AgencyJob.Status.DONE
+    ).order_by("-finished_at")[:5]:
+        found = [
+            line.strip()
+            for line in (job.result or {}).get("learned", []) or []
+            if isinstance(line, str) and line.strip()
+        ]
+        if found:
+            lines.extend(found)
+            break
     if len(lines) < 3:
         for hook in memory.winning_hooks(workspace, limit=3 - len(lines)):
             lines.append(f"Your best opener lately: “{hook}”")
