@@ -234,8 +234,14 @@ def portal_approve(request, post_id):
         return _portal_error(request, str(e))
 
     if request.htmx:
+        # A client's OK doesn't put the post on the calendar: the agency schedules it next.
+        scheduled = post.platform_posts.filter(status="scheduled").exists()
         return _portal_response(
-            post.id, "approved", tone="success", title="Approved", body="Thanks — scheduled to publish."
+            post.id,
+            "approved",
+            tone="success",
+            title="Approved",
+            body="Thanks — it's on the calendar." if scheduled else "Thanks — your agency team will schedule it.",
         )
     return redirect("client_portal:approval_queue")
 
