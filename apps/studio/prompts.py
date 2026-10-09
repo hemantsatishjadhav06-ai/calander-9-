@@ -130,6 +130,7 @@ def brand_block(profile) -> str:
         + _line("Wordmark", profile.wordmark)
         + _line("Domain on graphics", profile.domain)
         + _line("Picture style", profile.photo_style)
+        + _line("House style, learned from your best work", getattr(profile, "house_style", ""))
         + _line("Default layout", profile.default_template)
         + _line("Default colour treatment", profile.default_grade)
     )

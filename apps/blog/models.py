@@ -17,6 +17,9 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models import Value
+
+from apps.common.encryption import EncryptedTextField
 
 SLUG_RE = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 # Slugs that would overwrite something other than a post's own page.
@@ -143,6 +146,15 @@ class BlogPost(models.Model):
     meta_description = models.CharField(max_length=160, blank=True, default="")
     category = models.CharField(max_length=60, blank=True, default="")
     faq = models.JSONField(default=list, blank=True, help_text='List of {"q": ..., "a": ...}.')
+    # What the article should rank for. Rendered as the article's keywords and
+    # tags, so both are part of the fingerprint.
+    focus_keyword = models.CharField(max_length=80, blank=True, default="", db_default="")
+    secondary_keywords = models.JSONField(
+        default=list,
+        db_default=Value([], output_field=models.JSONField()),
+        blank=True,
+        help_text="Related search terms.",
+    )
 
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.DRAFT, db_index=True)
     # +1 on every content change; the approval records which one it covered.
@@ -231,6 +243,53 @@ def _validate_faq(faq):
             raise ValidationError({"faq": 'Each FAQ entry needs exactly a "q" and an "a".'})
         if not str(item["q"]).strip() or not str(item["a"]).strip():
             raise ValidationError({"faq": "Every FAQ entry needs both a question and an answer."})
+
+
+class SearchConsoleConnection(models.Model):
+    """A Google Search Console property this site's rankings are read from (read-only access)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    site = models.OneToOneField(BlogSite, on_delete=models.CASCADE, related_name="search_console")
+    property_url = models.CharField(
+        max_length=300, help_text='The Search Console property, e.g. "sc-domain:neopolisinfra.com".'
+    )
+    refresh_token = EncryptedTextField(blank=True, default="")
+    connected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    connected_at = models.DateTimeField(auto_now_add=True)
+    last_sync_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "blog_search_console_connection"
+
+    def __str__(self):
+        return f"SearchConsoleConnection({self.property_url})"
+
+
+class SearchPerformance(models.Model):
+    """Daily Google Search numbers for one page and query of a site."""
+
+    id = models.BigAutoField(primary_key=True)
+    site = models.ForeignKey(BlogSite, on_delete=models.CASCADE, related_name="search_performance")
+    date = models.DateField()
+    page = models.URLField(max_length=500)
+    query = models.CharField(max_length=300)
+    clicks = models.PositiveIntegerField(default=0)
+    impressions = models.PositiveIntegerField(default=0)
+    ctr = models.FloatField(default=0)
+    position = models.FloatField(default=0)
+
+    class Meta:
+        db_table = "blog_search_performance"
+        constraints = [
+            models.UniqueConstraint(fields=["site", "date", "page", "query"], name="blog_search_perf_unique_row")
+        ]
+        indexes = [models.Index(fields=["site", "page", "date"], name="idx_search_perf_site_page")]
+
+    def __str__(self):
+        return f"{self.date} {self.query} @ {self.position:.1f}"
 
 
 class BlogPostEvent(models.Model):

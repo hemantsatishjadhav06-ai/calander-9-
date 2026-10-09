@@ -332,6 +332,9 @@ def submit_for_review(post, user) -> BlogPost:
 
 def approve(post, comment: str = "") -> BlogPost:
     """Approve the current revision. Only a dashboard approver."""
+    from apps.studio.guards import forbid_in_agent_work
+
+    forbid_in_agent_work("approve a blog post")
     approver = _require_approver(post)
     with transaction.atomic():
         locked = _lock(post)
@@ -410,6 +413,9 @@ def start_publish(post) -> BlogPost:
     approved, when the GitHub token is missing. The claim is a single
     conditional UPDATE, so concurrent clicks or retries publish at most once.
     """
+    from apps.studio.guards import forbid_in_agent_work
+
+    forbid_in_agent_work("publish a blog post")
     from .tasks import publish_blog_post
 
     approver = _require_approver(post)

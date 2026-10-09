@@ -155,12 +155,15 @@ def submit_for_review(target, user, workspace):
 
 
 def approve_post(target, user, workspace, comment=""):
-    """Approve a post or single platform post.
+    """Approve a post or single platform post. Never from agency work (``apps.studio.guards``).
 
     If the workspace runs the two-stage internal+client flow and we're moving
     out of ``pending_review``, the target hops to ``approved`` and then to
     ``pending_client`` (the same behaviour as before, just per-target).
     """
+    from apps.studio.guards import forbid_in_agent_work
+
+    forbid_in_agent_work("approve a post")
     post, targets, is_bundled = _resolve_targets(
         target, eligible_from_states={"pending_review", "pending_client", "draft", "rejected", "changes_requested"}
     )

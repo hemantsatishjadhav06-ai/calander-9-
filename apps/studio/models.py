@@ -107,6 +107,16 @@ class BrandProfile(models.Model):
         default="",
         help_text="What the pictures look like: subject matter, light, lens, mood.",
     )
+    house_style = models.TextField(
+        blank=True,
+        default="",
+        db_default="",
+        help_text=(
+            "The look of your best work in a few lines, written by the creative memory curator from your "
+            "references and best-performing posts. You can edit it; the art director and prompt engineer use it."
+        ),
+    )
+    house_style_updated_at = models.DateTimeField(null=True, blank=True)
     default_template = models.CharField(max_length=20, choices=DesignTemplate.choices, default=DesignTemplate.EDITORIAL)
     default_format = models.CharField(max_length=20, choices=DesignFormat.choices, default=DesignFormat.PORTRAIT)
     default_grade = models.CharField(max_length=20, choices=PhotoGrade.choices, default=PhotoGrade.BRAND_TINT)
@@ -127,6 +137,7 @@ class StudioBrief(models.Model):
     """One run of the creative team, from a small idea to a post awaiting approval."""
 
     class Status(models.TextChoices):
+        PLANNED = "planned", "Planned — waiting its turn"
         QUEUED = "queued", "Queued"
         WORKING = "working", "The team is working"
         READY = "ready", "Ready for approval"
@@ -141,8 +152,17 @@ class StudioBrief(models.Model):
         PICTURE = "picture", "Illustrator"
         RENDER = "render", "Designer"
         REVIEW = "review", "Brand reviewer"
+        CHANNEL = "channel", "Channel editor"
+        QA = "qa", "QA inspector"
+        SCHEDULE = "schedule", "Scheduler"
         HANDOFF = "handoff", "Producer"
         DONE = "done", "Done"
+
+    class Origin(models.TextChoices):
+        MANUAL = "manual", "Briefed by a person"
+        AUTOPILOT = "autopilot", "Planned by autopilot"
+        CHAT = "chat", "Asked for in the team thread"
+        REPURPOSE = "repurpose", "Made from a blog article"
 
     class Goal(models.TextChoices):
         AWARENESS = "awareness", "Build awareness"
@@ -183,6 +203,23 @@ class StudioBrief(models.Model):
         blank=True,
         related_name="+",
         help_text="A photo from the media library to use instead of a generated picture.",
+    )
+    origin = models.CharField(max_length=20, choices=Origin.choices, default=Origin.MANUAL, db_default=Origin.MANUAL)
+    job = models.ForeignKey(
+        "AgencyJob",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="briefs",
+        help_text="The plan, chat or article job that asked for this brief.",
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Who asked for it, when that isn't the author (for example a client in the team thread).",
     )
 
     # Where the team is.
@@ -294,16 +331,26 @@ class StudioConcept(models.Model):
 
 
 class AgentRun(models.Model):
-    """One agent's turn on a brief: what it made, how long it took, what it cost."""
+    """One agent's turn on a brief or a job: what it made, how long it took, what it cost.
 
-    class Agent(models.TextChoices):
-        STRATEGIST = "strategist", "Strategist"
-        COPYWRITER = "copywriter", "Copywriter"
-        ART_DIRECTOR = "art_director", "Art director"
-        ILLUSTRATOR = "illustrator", "Illustrator"
-        DESIGNER = "designer", "Designer"
-        REVIEWER = "reviewer", "Brand reviewer"
-        PRODUCER = "producer", "Producer"
+    ``agent`` is a slug from ``apps.studio.team`` (no fixed choices, so the
+    team can grow without a migration).
+    """
+
+    class Agent:
+        """Slugs of the post team, for code that names them."""
+
+        STRATEGIST = "strategist"
+        COPYWRITER = "copywriter"
+        ART_DIRECTOR = "art_director"
+        PROMPT_ENGINEER = "prompt_engineer"
+        ILLUSTRATOR = "illustrator"
+        DESIGNER = "designer"
+        REVIEWER = "reviewer"
+        CHANNEL_EDITOR = "channel_editor"
+        QA_INSPECTOR = "qa_inspector"
+        SCHEDULER = "scheduler"
+        PRODUCER = "producer"
 
     class Status(models.TextChoices):
         RUNNING = "running", "Working"
@@ -312,9 +359,18 @@ class AgentRun(models.Model):
         SKIPPED = "skipped", "Skipped"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    brief = models.ForeignKey(StudioBrief, on_delete=models.CASCADE, related_name="runs")
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", on_delete=models.CASCADE, null=True, blank=True, related_name="agent_runs"
+    )
+    brief = models.ForeignKey(StudioBrief, on_delete=models.CASCADE, null=True, blank=True, related_name="runs")
+    job = models.ForeignKey("AgencyJob", on_delete=models.CASCADE, null=True, blank=True, related_name="runs")
     revision = models.PositiveIntegerField(default=1)
-    agent = models.CharField(max_length=20, choices=Agent.choices)
+    agent = models.CharField(max_length=40)
+    # Database defaults too, so the previous release can keep writing rows while
+    # this one migrates (see apps/inbox/migrations/0003_inboxreply_column_defaults.py).
+    stage = models.CharField(max_length=30, blank=True, default="", db_default="")
+    effort = models.CharField(max_length=10, blank=True, default="", db_default="")
+    fallback_used = models.BooleanField(default=False, db_default=False)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.RUNNING)
     summary = models.CharField(max_length=500, blank=True, default="")
     output = models.JSONField(default=dict, blank=True)
@@ -330,10 +386,333 @@ class AgentRun(models.Model):
     class Meta:
         db_table = "studio_agent_run"
         ordering = ["started_at"]
+        indexes = [models.Index(fields=["workspace", "started_at"], name="idx_agent_run_ws_started")]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(brief__isnull=False) | models.Q(job__isnull=False),
+                name="agent_run_has_brief_or_job",
+            )
+        ]
 
     def __str__(self):
         return f"AgentRun({self.agent} r{self.revision}): {self.status}"
 
+    def save(self, *args, **kwargs):
+        if self.workspace_id is None:
+            owner = self.brief if self.brief_id else self.job
+            if owner is not None:
+                self.workspace_id = owner.workspace_id
+        super().save(*args, **kwargs)
+
     @property
     def seconds(self) -> int:
         return round(self.duration_ms / 1000)
+
+    @property
+    def agent_name(self) -> str:
+        from . import team
+
+        return team.name(self.agent)
+
+
+# ---------------------------------------------------------------------------
+# The agency: jobs beyond a single post, autopilot, the team thread, memory
+# ---------------------------------------------------------------------------
+
+
+class AgencyJob(models.Model):
+    """A piece of agency work that isn't one post: a weekly plan, an article, a reply in the thread...
+
+    It moves through the stages of its kind (``apps.studio.jobs``) one worker
+    task at a time, with the same rules as a brief: revision-guarded writes,
+    tasks that never raise, lower priority than publishing. A job may create
+    briefs (a plan), a blog draft (an article) or inbox reply drafts; it never
+    approves, schedules or publishes.
+    """
+
+    class Kind(models.TextChoices):
+        PLAN = "plan", "Weekly plan"
+        BLOG = "blog", "Blog article"
+        CHAT = "chat", "Reply in the team thread"
+        INBOX = "inbox", "Inbox reply drafts"
+        REPORT = "report", "Client report"
+        LEARN = "learn", "Creative memory refresh"
+        REPURPOSE = "repurpose", "Posts from an article"
+        SEO = "seo", "SEO check-up"
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        WORKING = "working", "Working"
+        DONE = "done", "Done"
+        FAILED = "failed", "Failed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    ACTIVE_STATUSES = (Status.QUEUED, Status.WORKING)
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="agency_jobs")
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED, db_index=True)
+    stage = models.CharField(max_length=30, blank=True, default="")
+    revision = models.PositiveIntegerField(default=1)
+    title = models.CharField(max_length=200, blank=True, default="")
+    input = models.JSONField(default=dict, blank=True)
+    state = models.JSONField(default=dict, blank=True)
+    result = models.JSONField(default=dict, blank=True)
+    error = models.TextField(blank=True, default="")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    parent = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="children")
+    brief = models.ForeignKey(StudioBrief, on_delete=models.SET_NULL, null=True, blank=True, related_name="jobs")
+    blog_post = models.ForeignKey(
+        "blog.BlogPost", on_delete=models.SET_NULL, null=True, blank=True, related_name="agency_jobs"
+    )
+    conversation = models.ForeignKey(
+        "Conversation", on_delete=models.SET_NULL, null=True, blank=True, related_name="jobs"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    objects = WorkspaceScopedManager()
+
+    class Meta:
+        db_table = "studio_agency_job"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["workspace", "status"], name="idx_agency_job_ws_status"),
+            models.Index(fields=["kind", "status"], name="idx_agency_job_kind_status"),
+        ]
+
+    def __str__(self):
+        return f"AgencyJob({self.kind}, {self.status}): {self.title[:50]}"
+
+    @property
+    def is_active(self) -> bool:
+        return self.status in self.ACTIVE_STATUSES
+
+
+class AgencySettings(models.Model):
+    """One workspace's agency switches: autopilot, budget, who the drafts are from."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.OneToOneField("workspaces.Workspace", on_delete=models.CASCADE, related_name="agency_settings")
+    autopilot_enabled = models.BooleanField(
+        default=False, help_text="Plan and prepare next week's posts every week. Every post still needs approval."
+    )
+    posts_per_week = models.PositiveSmallIntegerField(default=5)
+    accounts = models.ManyToManyField("social_accounts.SocialAccount", blank=True, related_name="+")
+    pillars = models.JSONField(default=list, blank=True, help_text="Themes the planner rotates between.")
+    plan_weekday = models.PositiveSmallIntegerField(default=4, help_text="0 is Monday. The default is Friday.")
+    plan_hour = models.PositiveSmallIntegerField(default=16, help_text="Hour of day in the workspace timezone.")
+    blog_posts_per_month = models.PositiveSmallIntegerField(default=0)
+    blog_site = models.ForeignKey("blog.BlogSite", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    monthly_budget_usd = models.DecimalField(
+        max_digits=8, decimal_places=2, default=150, help_text="The team starts no new model work past this."
+    )
+    lead = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Drafts the team makes on its own carry this person's name. An owner or manager.",
+    )
+    learn_from_best = models.BooleanField(
+        default=False,
+        help_text="Let the art director start from your best creatives and references, not only the last post.",
+    )
+    inbox_drafts_enabled = models.BooleanField(
+        default=False, help_text="Draft replies to new comments, messages and reviews for a person to send."
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = WorkspaceScopedManager()
+
+    class Meta:
+        db_table = "studio_agency_settings"
+
+    def __str__(self):
+        return f"AgencySettings({self.workspace_id})"
+
+
+class AutopilotWeek(models.Model):
+    """One planned week per workspace. The unique row makes a double tick (two workers) harmless."""
+
+    class Status(models.TextChoices):
+        PLANNING = "planning", "Planning"
+        PLANNED = "planned", "Planned"
+        SKIPPED = "skipped", "Skipped"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="autopilot_weeks")
+    week_start = models.DateField(help_text="The Monday of the week being planned, in the workspace timezone.")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PLANNING)
+    job = models.ForeignKey(AgencyJob, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    note = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "studio_autopilot_week"
+        ordering = ["-week_start"]
+        constraints = [
+            models.UniqueConstraint(fields=["workspace", "week_start"], name="autopilot_week_unique_per_workspace")
+        ]
+
+    def __str__(self):
+        return f"AutopilotWeek({self.workspace_id}, {self.week_start}): {self.status}"
+
+
+class CreativeInsight(models.Model):
+    """One creative the team learns from: a post that performed, or a reference a person picked.
+
+    ``score`` is the post's percentile among its own account's posts (0–1,
+    higher is better) on that platform's main metric; ``ratio`` is its value
+    against the account's median. Both stay empty for references and for
+    accounts with too few measured posts.
+    """
+
+    class Source(models.TextChoices):
+        STUDIO = "studio", "Made by the team"
+        EXTERNAL = "external", "Made elsewhere"
+        UPLOAD = "upload", "Uploaded reference"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="creative_insights")
+    post = models.ForeignKey("composer.Post", on_delete=models.CASCADE, null=True, blank=True, related_name="+")
+    platform_post = models.ForeignKey(
+        "composer.PlatformPost", on_delete=models.CASCADE, null=True, blank=True, related_name="+"
+    )
+    media_asset = models.ForeignKey(
+        "media_library.MediaAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    social_account = models.ForeignKey(
+        "social_accounts.SocialAccount", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    platform = models.CharField(max_length=40, blank=True, default="")
+    source = models.CharField(max_length=20, choices=Source.choices, default=Source.EXTERNAL)
+    score = models.FloatField(null=True, blank=True)
+    ratio = models.FloatField(null=True, blank=True)
+    metrics = models.JSONField(default=dict, blank=True)
+    features = models.JSONField(default=dict, blank=True)
+    caption = models.TextField(blank=True, default="")
+    description = models.TextField(blank=True, default="", help_text="The curator's description of the look.")
+    is_reference = models.BooleanField(default=False, help_text="A person picked it: learn from this.")
+    reference_note = models.CharField(max_length=300, blank=True, default="")
+    published_at = models.DateTimeField(null=True, blank=True)
+    described_at = models.DateTimeField(null=True, blank=True)
+    computed_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = WorkspaceScopedManager()
+
+    class Meta:
+        db_table = "studio_creative_insight"
+        ordering = ["-is_reference", "-score", "-published_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "platform_post"],
+                condition=models.Q(platform_post__isnull=False),
+                name="creative_insight_unique_platform_post",
+            ),
+            models.UniqueConstraint(
+                fields=["workspace", "media_asset"],
+                condition=models.Q(platform_post__isnull=True, media_asset__isnull=False),
+                name="creative_insight_unique_upload",
+            ),
+        ]
+        indexes = [models.Index(fields=["workspace", "is_reference", "score"], name="idx_creative_ws_ref_score")]
+
+    def __str__(self):
+        return f"CreativeInsight({self.source}, {self.score})"
+
+
+class Conversation(models.Model):
+    """A thread between people (staff or a client) and the team, about the workspace or one item."""
+
+    class Audience(models.TextChoices):
+        CLIENT = "client", "With the client"
+        INTERNAL = "internal", "Internal"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="conversations")
+    audience = models.CharField(max_length=20, choices=Audience.choices, default=Audience.INTERNAL)
+    title = models.CharField(max_length=200, blank=True, default="")
+    brief = models.ForeignKey(
+        StudioBrief, on_delete=models.CASCADE, null=True, blank=True, related_name="conversations"
+    )
+    post = models.ForeignKey("composer.Post", on_delete=models.CASCADE, null=True, blank=True, related_name="+")
+    blog_post = models.ForeignKey(
+        "blog.BlogPost", on_delete=models.CASCADE, null=True, blank=True, related_name="conversations"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    last_message_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = WorkspaceScopedManager()
+
+    class Meta:
+        db_table = "studio_conversation"
+        ordering = ["-last_message_at", "-created_at"]
+        indexes = [models.Index(fields=["workspace", "audience"], name="idx_conversation_ws_audience")]
+
+    def __str__(self):
+        return f"Conversation({self.audience}): {self.title[:50]}"
+
+
+class Message(models.Model):
+    """One message in a thread: from a person, or from an agent (usually the account manager)."""
+
+    class AuthorKind(models.TextChoices):
+        CLIENT = "client", "Client"
+        STAFF = "staff", "Team member"
+        AGENT = "agent", "Agent"
+        SYSTEM = "system", "System"
+
+    class ActionStatus(models.TextChoices):
+        NONE = "", "No action"
+        DONE = "done", "Done"
+        STARTED = "started", "The team is on it"
+        NEEDS_HUMAN = "needs_human", "Waiting for a person"
+        DECLINED = "declined", "Not possible"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="messages")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    author_kind = models.CharField(max_length=20, choices=AuthorKind.choices)
+    agent = models.CharField(max_length=40, blank=True, default="")
+    body = models.TextField()
+    is_internal = models.BooleanField(
+        default=False, help_text="A note for the team only; never shown to a client, even in a client thread."
+    )
+    action = models.CharField(max_length=30, blank=True, default="")
+    action_status = models.CharField(max_length=20, choices=ActionStatus.choices, blank=True, default="")
+    job = models.ForeignKey(AgencyJob, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "studio_message"
+        ordering = ["created_at"]
+        indexes = [models.Index(fields=["conversation", "created_at"], name="idx_message_conv_created")]
+
+    def __str__(self):
+        return f"Message({self.author_kind}): {self.body[:50]}"
+
+    @property
+    def sender_name(self) -> str:
+        if self.author_kind == self.AuthorKind.AGENT:
+            from . import team
+
+            return team.name(self.agent or "account_manager")
+        if self.author is not None:
+            return self.author.name or self.author.email.split("@")[0]
+        return "Team"

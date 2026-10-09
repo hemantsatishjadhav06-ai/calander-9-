@@ -103,7 +103,7 @@ class TestWatchingAndReviewing:
 
         working = client.get(_url("progress", world, brief_id=brief.pk))
         assert working.status_code == 200
-        assert "Strategist" in working.content.decode()
+        assert "Content strategist" in working.content.decode()
 
         run_all(brief)
         done = client.get(_url("progress", world, brief_id=brief.pk))

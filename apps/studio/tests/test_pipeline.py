@@ -47,10 +47,18 @@ def test_a_small_idea_becomes_a_post_awaiting_approval(world, fake_team):
         "illustrator",
         "designer",
         "reviewer",
+        "channel_editor",
+        "qa_inspector",
+        "scheduler",
         "producer",
     ]
-    # Without FAL_KEY the illustrator steps aside and the brand background is used.
+    # Without FAL_KEY the illustrator steps aside and the brand background is used
+    # (and the prompt engineer has nothing to write for).
     assert ("illustrator", AgentRun.Status.SKIPPED) in agents_run
+    # LinkedIn takes the copywriter's own text, so the channel editor steps aside too.
+    assert ("channel_editor", AgentRun.Status.SKIPPED) in agents_run
+    assert brief.review_notes["qa"]["total"] >= 5
+    assert brief.proposed_publish_at == post.proposed_publish_at
     # Approvers are told; so is the author.
     assert Notification.objects.filter(user=world.owner, title__icontains="submitted").exists()
     assert Notification.objects.filter(user=world.editor, title__icontains="ready for approval").exists()
@@ -133,8 +141,16 @@ def test_with_fal_the_illustrator_paints_and_the_designer_uses_it(world, fake_te
     with mock.patch("apps.studio.images.ai_images.generate_from_prompt", return_value=generated) as gen:
         brief = run_all(make_brief(world))
     assert brief.picture is not None and brief.picture.source == "fal.ai"
+    # The prompt engineer rewrote the art director's direction in the house style;
+    # the illustrator sends that, with the series' style line and the no-text rule.
+    engineer = fake_team.calls["prompt_engineer"][0]
+    assert "Kokapet" in engineer["spec"]["picture_prompt"]
     prompt = gen.call_args.args[0]
-    assert "Kokapet" in prompt and "Style: Architectural photograph" in prompt and "no text" in prompt.lower()
+    assert prompt.startswith("Warm evening light on contemporary residential towers")
+    assert "Style: Warm dusk architectural photography" in prompt and "no text" in prompt.lower()
+    assert brief.design_spec["picture_prompt"].startswith("Warm evening light")
+    order = list(brief.runs.values_list("agent", flat=True))
+    assert order.index("prompt_engineer") == order.index("illustrator") - 1
     # The stat layout's picture strip is wide, so the request is landscape-shaped.
     size = gen.call_args.kwargs["image_size"]
     assert size["width"] > size["height"] and size["width"] % 16 == 0
@@ -256,3 +272,69 @@ def test_hashtags_and_captions_are_cleaned():
     ]
     assert pipeline.normalise_hashtags(["One"], ["#Brand", "#Two", "#Three"]) == ["#One", "#Brand", "#Two"]
     assert pipeline.clean_caption("**Bold** line\n\n\n\nNext\n\n#Tag #Two") == "Bold line\n\nNext"
+
+
+def test_a_failed_prompt_engineer_falls_back_to_the_art_directors_prompt(world, fake_team, settings):
+    settings.FAL_KEY = "fal-test"
+    fake_team.fail["prompt_engineer"] = "Claude is rate-limiting this account right now."
+    picture = jpeg_bytes(1088, 1360)
+    generated = GeneratedImage(content=picture, content_type="image/jpeg", prompt="p", model="fal-ai/flux/dev")
+    with mock.patch("apps.studio.images.ai_images.generate_from_prompt", return_value=generated) as gen:
+        brief = run_all(make_brief(world))
+
+    assert brief.status == StudioBrief.Status.READY
+    assert "Kokapet" in gen.call_args.args[0]
+    assert brief.runs.get(agent="prompt_engineer").status == AgentRun.Status.FAILED
+
+
+def test_the_channel_editor_writes_for_networks_the_copywriter_does_not(world, fake_team):
+    instagram = world.linkedin.__class__.objects.create(
+        workspace=world.workspace,
+        platform="instagram",
+        account_platform_id="ig-1",
+        account_name="@neopolis",
+        connection_status="connected",
+    )
+    brief = run_all(make_brief(world, accounts=[world.linkedin, instagram]))
+
+    assert fake_team.calls["channel_editor"][0]["destinations"] == [{"platform": "instagram", "name": "@neopolis"}]
+    assert brief.post_copy["channels"] == {"instagram": "Version for instagram. Link in bio."}
+    by_account = {pp.social_account_id: pp for pp in PlatformPost.objects.filter(post=brief.post)}
+    assert by_account[instagram.pk].platform_specific_caption == "Version for instagram. Link in bio."
+    assert by_account[world.linkedin.pk].platform_specific_caption is None
+
+
+def test_the_scheduler_gives_each_brief_its_own_slot(world, fake_team):
+    from apps.calendar.services import create_default_queue_and_slots
+
+    create_default_queue_and_slots(world.linkedin)
+    first = run_all(make_brief(world))
+    second = run_all(make_brief(world, idea="Why title checks matter"))
+
+    assert first.proposed_publish_at and second.proposed_publish_at
+    assert first.proposed_publish_at != second.proposed_publish_at
+    assert first.post.proposed_publish_at == first.proposed_publish_at
+    assert "posting slot" in first.runs.get(agent="scheduler").summary
+
+
+def test_a_stale_step_leaves_no_agent_working(world, fake_team):
+    from apps.studio import services
+
+    brief = make_brief(world)
+    brief.refresh_from_db()
+    pipeline.run_step(str(brief.pk), brief.revision, "strategy")
+    brief.refresh_from_db()
+    original = fake_team.copywriter
+
+    def copywriter_then_discard(*args, **kwargs):
+        services.discard(StudioBrief.objects.get(pk=brief.pk))
+        return original(*args, **kwargs)
+
+    fake_team.copywriter = copywriter_then_discard
+    from apps.studio import agents
+
+    agents.copywriter = copywriter_then_discard
+    pipeline.run_step(str(brief.pk), brief.revision, "copy")
+
+    assert not AgentRun.objects.filter(brief=brief, status=AgentRun.Status.RUNNING).exists()
+    assert AgentRun.objects.get(brief=brief, agent="copywriter").status == AgentRun.Status.SKIPPED

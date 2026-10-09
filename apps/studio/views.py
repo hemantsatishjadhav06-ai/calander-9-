@@ -21,21 +21,28 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from apps.members.decorators import require_permission
 
 from . import design, images, llm, services, style
+from . import team as roster
 from .brand_defaults import ensure_profile
 from .forms import BrandProfileForm, BriefForm, FeedbackForm, ScheduleForm, studio_accounts
 from .models import AgentRun, StudioBrief, StudioConcept
 
-#: The team, in the order it works, for the progress view.
-TEAM = (
-    ("strategy", AgentRun.Agent.STRATEGIST, "Strategist", "Finds three angles for the idea"),
-    ("copy", AgentRun.Agent.COPYWRITER, "Copywriter", "Writes the post, hook first"),
-    ("art", AgentRun.Agent.ART_DIRECTOR, "Art director", "Designs the graphic in your look"),
-    ("picture", AgentRun.Agent.ILLUSTRATOR, "Illustrator", "Paints the picture"),
-    ("render", AgentRun.Agent.DESIGNER, "Designer", "Sets the type and the brand"),
-    ("review", AgentRun.Agent.REVIEWER, "Brand reviewer", "Checks facts, rules and the look"),
-    ("handoff", AgentRun.Agent.PRODUCER, "Producer", "Sends it to you for approval"),
+#: The post team, in the order it works, for the progress view: (stage, agent slug).
+#: Names and roles come from the roster (``apps.studio.team``).
+POST_TEAM = (
+    ("strategy", AgentRun.Agent.STRATEGIST),
+    ("copy", AgentRun.Agent.COPYWRITER),
+    ("art", AgentRun.Agent.ART_DIRECTOR),
+    ("picture", AgentRun.Agent.PROMPT_ENGINEER),
+    ("picture", AgentRun.Agent.ILLUSTRATOR),
+    ("render", AgentRun.Agent.DESIGNER),
+    ("review", AgentRun.Agent.REVIEWER),
+    ("channel", AgentRun.Agent.CHANNEL_EDITOR),
+    ("qa", AgentRun.Agent.QA_INSPECTOR),
+    ("schedule", AgentRun.Agent.SCHEDULER),
+    ("handoff", AgentRun.Agent.PRODUCER),
 )
-_STAGE_ORDER = {stage: index for index, (stage, *_rest) in enumerate(TEAM)}
+TEAM = tuple((stage, agent, roster.get(agent).name, roster.get(agent).does) for stage, agent in POST_TEAM)
+_STAGE_ORDER = {stage: index for index, stage in enumerate(dict.fromkeys(stage for stage, _agent in POST_TEAM))}
 
 
 def _workspace(request, workspace_id):
@@ -136,10 +143,13 @@ def _team_progress(brief):
     runs = {}
     for run in brief.runs.filter(revision=brief.revision).order_by("started_at"):
         runs[run.agent] = run  # the latest run of each agent (a reviewer pass can repeat agents)
-    current = _STAGE_ORDER.get(brief.stage, len(TEAM))
+    current = _STAGE_ORDER.get(brief.stage, len(_STAGE_ORDER))
     rows = []
-    for index, (stage, agent, name, role) in enumerate(TEAM):
+    for stage, agent, name, role in TEAM:
+        index = _STAGE_ORDER[stage]
         run = runs.get(agent)
+        if agent == AgentRun.Agent.PROMPT_ENGINEER and run is None:
+            continue  # only works when pictures are painted; not shown otherwise
         if run is not None and run.status == AgentRun.Status.RUNNING:
             state = "working"
         elif run is not None and brief.status == StudioBrief.Status.FAILED and run.status == AgentRun.Status.FAILED:

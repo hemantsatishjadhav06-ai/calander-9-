@@ -14,7 +14,12 @@ class StudioConfig(AppConfig):
     @staticmethod
     def _register_tasks(sender, **kwargs):
         from apps.common.background import register_recurring_task
-        from apps.studio.tasks import STUCK_SWEEP_INTERVAL_SECONDS, sweep_stuck_briefs
+        from apps.studio.tasks import (
+            AGENCY_CYCLE_INTERVAL_SECONDS,
+            STUCK_SWEEP_INTERVAL_SECONDS,
+            run_agency_cycle,
+            sweep_stuck_briefs,
+        )
 
         # Each agent's turn is its own one-shot task, queued by the one before
         # it. This sweep only settles a brief whose worker died between turns,
@@ -23,4 +28,12 @@ class StudioConfig(AppConfig):
             sweep_stuck_briefs,
             repeat=STUCK_SWEEP_INTERVAL_SECONDS,
             verbose_name="sweep_stuck_studio_briefs",
+        )
+        # The agency's heartbeat: due autopilot plans, feeding planned briefs,
+        # creative memory, inbox drafts. It only reads the database and queues
+        # one-shot tasks, so it stays quick at the recurring tasks' priority.
+        register_recurring_task(
+            run_agency_cycle,
+            repeat=AGENCY_CYCLE_INTERVAL_SECONDS,
+            verbose_name="run_agency_cycle",
         )

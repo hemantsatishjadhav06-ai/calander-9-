@@ -194,7 +194,7 @@
                 <ol class="mt-3 space-y-2">
                     {% for run in runs %}
                     <li class="text-sm">
-                        <span class="font-medium text-stone-900">{{ run.get_agent_display }}</span>
+                        <span class="font-medium text-stone-900">{{ run.agent_name }}</span>
                         <span class="text-stone-600">· revision {{ run.revision }} · {{ run.get_status_display|lower }}{% if run.duration_ms %} · {{ run.seconds }}s{% endif %}{% if run.output_tokens %} · {{ run.input_tokens|add:run.cache_read_tokens }} in / {{ run.output_tokens }} out tokens{% endif %}</span>
                         {% if run.summary %}<p class="text-stone-700 break-words">{{ run.summary }}</p>{% endif %}
                         {% if run.error %}<p class="text-red-800 break-words">{{ run.error }}</p>{% endif %}

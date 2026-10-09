@@ -729,6 +729,12 @@ STUDIO_MODEL = env("STUDIO_MODEL", default="claude-opus-5-5")
 STUDIO_EFFORT = env("STUDIO_EFFORT", default="")
 STUDIO_TIMEOUT = env.float("STUDIO_TIMEOUT", default=300.0)
 STUDIO_FALLBACKS = env.bool("STUDIO_FALLBACKS", default=True)
+# Lets the moments scout and the SEO strategist search the web (Anthropic's
+# server-side web search tool, billed per search). Off by default.
+STUDIO_WEB_SEARCH = env.bool("STUDIO_WEB_SEARCH", default=False)
+# Autopilot runs at most this many briefs at once across all workspaces, so
+# the single worker keeps publishing on time and nothing looks stuck.
+AGENCY_MAX_ACTIVE_BRIEFS = env.int("AGENCY_MAX_ACTIVE_BRIEFS", default=3)
 
 # Webhook verification
 FACEBOOK_WEBHOOK_VERIFY_TOKEN = env("FACEBOOK_WEBHOOK_VERIFY_TOKEN", default="")

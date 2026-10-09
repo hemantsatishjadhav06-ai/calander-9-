@@ -1,21 +1,28 @@
 """The producer: runs the creative team on a brief and hands the result to approval.
 
-A brief moves through seven stages, one worker task each, so a single
+A brief moves through ten stages, one worker task each, so a single
 worker never spends more than one agent's turn away from the publishing
 cycle (studio tasks run at a lower priority than publishing):
 
-    strategy → copy → art → picture → render → review → handoff
+    strategy → copy → art → picture → render → review → channel → qa → schedule → handoff
 
 * **strategy** — the strategist proposes three angles; the recommended one is chosen.
 * **copy** — the copywriter writes the post for the chosen angle.
 * **art** — the art director designs the graphic, in the look of the last post
   (``apps.studio.style``) unless the person asked for a fresh one.
-* **picture** — the illustrator generates the picture with fal.ai (or uses the
-  photo the person chose, or none).
+* **picture** — the prompt engineer writes the image prompt from the art
+  director's direction and the brand's creative memory, and the illustrator
+  generates the picture with fal.ai (or uses the photo the person chose, or none).
 * **render** — the designer sets the graphic (``apps.studio.design``).
 * **review** — the brand reviewer checks facts, rules, craft and consistency.
   It may send the post back once for another pass; after that its notes go to
   the approver instead.
+* **channel** — the channel editor writes the versions Instagram, Facebook,
+  Threads... need (skipped when every destination takes the copywriter's text).
+* **qa** — the QA inspector runs plain checks (lengths, hashtags, links, alt
+  text, contrast) and notes anything off for the approver.
+* **schedule** — the scheduler proposes the best open time from the account's
+  history and posting slots. It only proposes.
 * **handoff** — the producer creates (or updates) the composer post with the
   graphic attached and submits it for review. From here the workspace's normal
   approval rules apply: only an approver can approve it, and only an approved
@@ -32,20 +39,19 @@ from __future__ import annotations
 
 import logging
 import re
-import zoneinfo
 from datetime import timedelta
 from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
 
-from . import agents, design, images, llm, style
+from . import agents, design, guards, images, llm, qa, scheduling, style
 from .brand_defaults import ensure_profile
 from .models import AgentRun, StudioBrief, StudioConcept
 
 logger = logging.getLogger(__name__)
 
-STAGES = ("strategy", "copy", "art", "picture", "render", "review", "handoff")
+STAGES = ("strategy", "copy", "art", "picture", "render", "review", "channel", "qa", "schedule", "handoff")
 #: Extra passes the brand reviewer may ask for on one revision.
 MAX_AUTO_REVISIONS = 1
 #: A brief with no progress for this long is assumed abandoned by a dead worker.
@@ -115,9 +121,13 @@ def run_step(brief_id: str, revision: int, stage: str) -> None:
 
     step = STEP_FUNCTIONS[stage]
     try:
-        next_stage = step(brief)
+        with guards.agent_work(f"brief {brief_id} {stage}"):
+            next_stage = step(brief)
     except _StaleStepError:
         logger.info("Studio: brief %s moved on during %s; stopping this run", brief_id, stage)
+        AgentRun.objects.filter(brief=brief, revision=revision, status=AgentRun.Status.RUNNING).update(
+            status=AgentRun.Status.SKIPPED, error="Superseded by a newer request.", finished_at=timezone.now()
+        )
         return
     except StudioError as exc:
         _fail(brief, str(exc))
@@ -149,9 +159,22 @@ def _fail(brief: StudioBrief, message: str) -> None:
 
 
 def sweep_stuck() -> int:
-    """Fail briefs whose worker died between (or during) steps, so they can be retried."""
+    """Fail briefs whose worker died between (or during) steps, so they can be retried.
+
+    A queued brief whose task is still in the queue is only waiting its turn
+    behind other work, not stuck, and is left alone.
+    """
+    from .engine import _has_pending_task
+
     cutoff = timezone.now() - STUCK_AFTER
-    stuck = list(StudioBrief.objects.filter(status__in=StudioBrief.ACTIVE_STATUSES, updated_at__lt=cutoff))
+    stuck = [
+        brief
+        for brief in StudioBrief.objects.filter(status__in=StudioBrief.ACTIVE_STATUSES, updated_at__lt=cutoff)
+        if not (
+            brief.status == StudioBrief.Status.QUEUED
+            and _has_pending_task("apps.studio.tasks.run_studio_step", str(brief.pk))
+        )
+    ]
     for brief in stuck:
         _fail(
             brief,
@@ -166,8 +189,16 @@ def sweep_stuck() -> int:
 # ---------------------------------------------------------------------------
 
 
-def _begin(brief: StudioBrief, agent: str) -> AgentRun:
-    return AgentRun.objects.create(brief=brief, revision=brief.revision, agent=agent, model=llm.model_id())
+def _begin(brief: StudioBrief, agent: str, *, model: str | None = None, effort: str = "") -> AgentRun:
+    return AgentRun.objects.create(
+        brief=brief,
+        workspace_id=brief.workspace_id,
+        revision=brief.revision,
+        agent=agent,
+        stage=brief.stage,
+        effort=effort,
+        model=llm.model_id() if model is None else model,
+    )
 
 
 def _end(
@@ -190,19 +221,26 @@ def _end(
         run.input_tokens = result.input_tokens
         run.output_tokens = result.output_tokens
         run.cache_read_tokens = result.cache_read_tokens
-        fields += ["model", "input_tokens", "output_tokens", "cache_read_tokens"]
+        run.fallback_used = result.fallback_used
+        fields += ["model", "input_tokens", "output_tokens", "cache_read_tokens", "fallback_used"]
     elif model is not None:
         run.model = model
         fields.append("model")
     run.save(update_fields=fields)
 
 
-def _fail_run(run: AgentRun, message: str) -> None:
+def _fail_run(run: AgentRun, error: str | Exception) -> None:
+    """Close ``run`` as failed, recording what a failed Claude call still cost."""
     run.status = AgentRun.Status.FAILED
-    run.error = message[:2000]
+    run.error = str(error)[:2000]
     run.finished_at = timezone.now()
     run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000)
-    run.save(update_fields=["status", "error", "finished_at", "duration_ms"])
+    fields = ["status", "error", "finished_at", "duration_ms"]
+    usage = getattr(error, "usage", None)
+    if usage:
+        run.model, run.input_tokens, run.output_tokens, run.cache_read_tokens = usage
+        fields += ["model", "input_tokens", "output_tokens", "cache_read_tokens"]
+    run.save(update_fields=fields)
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +325,7 @@ def step_strategy(brief: StudioBrief) -> str:
     try:
         result = agents.strategist(brief, profile, recent_posts(brief))
     except StudioError as exc:
-        _fail_run(run, str(exc))
+        _fail_run(run, exc)
         raise
     answer = result.output
     concepts = [c for c in answer.concepts if c.title.strip() and c.hook.strip()][:3]
@@ -350,7 +388,7 @@ def step_copy(brief: StudioBrief) -> str:
             fixes=fixes,
         )
     except StudioError as exc:
-        _fail_run(run, str(exc))
+        _fail_run(run, exc)
         raise
     answer = result.output.model_dump()
     caption = clean_caption(answer["caption"])
@@ -399,7 +437,7 @@ def step_art(brief: StudioBrief) -> str:
             fixes=fixes,
         )
     except StudioError as exc:
-        _fail_run(run, str(exc))
+        _fail_run(run, exc)
         raise
     spec = style.apply_lock(result.output.model_dump(), reference)
     if source_picture is not None:
@@ -446,6 +484,11 @@ def step_picture(brief: StudioBrief) -> str:
     if keep:
         _end(run, summary="Kept the current picture.", status=AgentRun.Status.SKIPPED, model="")
         return "render"
+    # The illustrator's row was opened first so the timeline reads in order;
+    # the prompt engineer's turn is recorded just before it.
+    run.delete()
+    spec = _engineer_prompt(brief, spec)
+    run = _begin(brief, AgentRun.Agent.ILLUSTRATOR, model="")
     try:
         generated = images.generate(spec)
         asset = images.save_picture(brief, generated)
@@ -463,6 +506,46 @@ def step_picture(brief: StudioBrief) -> str:
         model=generated.model,
     )
     return "render"
+
+
+def _engineer_prompt(brief: StudioBrief, spec: dict[str, Any]) -> dict[str, Any]:
+    """The prompt engineer's prompt for the picture, or the art director's own when that fails.
+
+    A failed prompt engineer never sinks the post: the art director already
+    wrote a usable prompt.
+    """
+    from . import memory
+    from .roles import creative
+
+    profile = ensure_profile(brief.workspace)
+    platforms = {a.platform for a in brief.social_accounts.all()}
+    run = _begin(brief, AgentRun.Agent.PROMPT_ENGINEER, effort=creative.PROMPT_ENGINEER_EFFORT)
+    try:
+        result = creative.prompt_engineer(
+            profile,
+            spec,
+            memory.prompt_memory(brief.workspace, platforms=platforms),
+            reference_images=memory.reference_images(brief.workspace, platforms=platforms),
+        )
+    except StudioError as exc:
+        _fail_run(run, exc)
+        return spec
+    answer = result.output
+    prompt = " ".join(answer.prompt.split())
+    if not prompt:
+        _fail_run(run, "Empty prompt.")
+        return spec
+    engineered = {**spec, "picture_prompt": prompt}
+    if (brief.style_reference or {}).get("kind") != "studio" and answer.picture_style.strip():
+        engineered["picture_style"] = answer.picture_style.strip()
+    _save(brief, design_spec=engineered)
+    _end(
+        run,
+        summary=f"Wrote a {len(prompt.split())}-word picture prompt. {answer.references_used.strip()}".strip(),
+        output=answer.model_dump(),
+        result=result,
+    )
+    return engineered
 
 
 def _look(profile) -> design.Look:
@@ -519,7 +602,7 @@ def step_review(brief: StudioBrief) -> str:
     try:
         result = agents.reviewer(brief, profile, brief.post_copy, brief.design_spec, graphic, _reference_image(brief))
     except StudioError as exc:
-        _fail_run(run, str(exc))
+        _fail_run(run, exc)
         raise
     review = result.output.model_dump()
     review["score"] = max(1, min(10, int(review.get("score") or 0)))
@@ -544,6 +627,80 @@ def step_review(brief: StudioBrief) -> str:
     _save(brief, review_notes=review)
     verdict = "approves" if review["verdict"] == "approve" else "has notes for the approver"
     _end(run, summary=f"Scored {review['score']}/10 and {verdict}. {review['summary']}", output=review, result=result)
+    return "channel"
+
+
+def step_channel(brief: StudioBrief) -> str:
+    """Per-network versions for destinations the copywriter's text doesn't fit."""
+    from .roles import creative
+
+    post_copy = dict(brief.post_copy or {})
+    accounts = [a for a in brief.social_accounts.all() if not a.needs_reconnect]
+    others = [a for a in accounts if a.platform not in creative.COPYWRITER_PLATFORMS]
+    run = _begin(brief, AgentRun.Agent.CHANNEL_EDITOR, effort=creative.CHANNEL_EDITOR_EFFORT)
+    if not others:
+        if post_copy.get("channels"):
+            post_copy.pop("channels")
+            _save(brief, post_copy=post_copy)
+        _end(
+            run,
+            summary="Every destination takes the copywriter's text as it is.",
+            status=AgentRun.Status.SKIPPED,
+            model="",
+        )
+        return "qa"
+    destinations = [{"platform": a.platform, "name": a.account_name or a.get_platform_display()} for a in others]
+    profile = ensure_profile(brief.workspace)
+    try:
+        result = creative.channel_editor(profile, post_copy, destinations)
+    except StudioError as exc:
+        # The copywriter's text still works everywhere (cut to the short version where too long).
+        _fail_run(run, exc)
+        return "qa"
+    wanted = {d["platform"] for d in destinations}
+    channels = {
+        v.platform: clean_caption(v.caption)
+        if v.platform not in ("instagram", "instagram_login")
+        else v.caption.strip()
+        for v in result.output.versions
+        if v.platform in wanted and v.caption.strip()
+    }
+    post_copy["channels"] = channels
+    _save(brief, post_copy=post_copy)
+    names = ", ".join(sorted({d["name"] for d in destinations if d["platform"] in channels})) or "none"
+    _end(
+        run,
+        summary=f"Wrote versions for {names}. {result.output.notes.strip()}".strip(),
+        output={"channels": channels},
+        result=result,
+    )
+    return "qa"
+
+
+def step_qa(brief: StudioBrief) -> str:
+    profile = ensure_profile(brief.workspace)
+    accounts = [a for a in brief.social_accounts.all() if not a.needs_reconnect]
+    run = _begin(brief, AgentRun.Agent.QA_INSPECTOR, model="")
+    report = qa.inspect(brief.post_copy or {}, brief.design_spec or {}, accounts, _look(profile))
+    _save(brief, review_notes={**(brief.review_notes or {}), "qa": report})
+    notes = [c["name"] for c in report["checks"] if not c["passed"]]
+    summary = f"{report['passed']} of {report['total']} checks pass."
+    if notes:
+        summary += " Note for you: " + "; ".join(notes) + "."
+    _end(run, summary=summary, output=report, model="")
+    return "schedule"
+
+
+def step_schedule(brief: StudioBrief) -> str:
+    accounts = [a for a in brief.social_accounts.all() if not a.needs_reconnect]
+    run = _begin(brief, AgentRun.Agent.SCHEDULER, model="")
+    if brief.proposed_publish_at and brief.proposed_publish_at > timezone.now() + scheduling.LEAD_TIME:
+        local = timezone.localtime(brief.proposed_publish_at, scheduling._zone(brief.workspace))
+        _end(run, summary=f"Keeping the planned time: {local:%a %d %b, %H:%M}.", model="")
+        return "handoff"
+    proposal = scheduling.propose(brief.workspace, accounts, exclude_brief=brief, exclude_post_id=brief.post_id)
+    _save(brief, proposed_publish_at=proposal.when)
+    _end(run, summary=f"Proposed {proposal.reason}", output={"when": proposal.when.isoformat()}, model="")
     return "handoff"
 
 
@@ -553,39 +710,24 @@ def step_review(brief: StudioBrief) -> str:
 
 
 def propose_time(brief: StudioBrief, accounts) -> Any:
-    """The next open posting slot on a chosen account, else the next weekday at 10:00 local time."""
-    from apps.calendar.services import _next_available_slot
-
-    after = timezone.now() + timedelta(hours=1)
-    for account in accounts:
-        try:
-            slot = _next_available_slot(account, after=after)
-        except Exception:
-            logger.exception("Studio: could not read posting slots for account %s", account.pk)
-            slot = None
-        if slot is not None:
-            return slot
-    try:
-        zone = zoneinfo.ZoneInfo(brief.workspace.effective_timezone or "UTC")
-    except (zoneinfo.ZoneInfoNotFoundError, ValueError):
-        zone = zoneinfo.ZoneInfo("UTC")
-    local = (timezone.now() + timedelta(hours=2)).astimezone(zone)
-    candidate = local.replace(hour=10, minute=0, second=0, microsecond=0)
-    if candidate <= local:
-        candidate += timedelta(days=1)
-    while candidate.weekday() >= 5:
-        candidate += timedelta(days=1)
-    return candidate
+    """The scheduler's proposal: the best open posting slot, else the next weekday at 10:00 local time."""
+    return scheduling.propose(brief.workspace, accounts, exclude_brief=brief, exclude_post_id=brief.post_id).when
 
 
 def account_overrides(account, caption: str, post_copy: dict[str, Any]) -> tuple[str | None, str | None]:
     """``(caption override, first comment override)`` for one destination.
 
+    The channel editor's version replaces the caption where there is one.
     Where the account can't take a first comment, its text (usually the link)
     moves into the caption so it isn't lost. Where the caption is over the
     network's limit (X, Threads), the short version is used instead.
     """
     first_comment = (post_copy.get("first_comment") or "").strip()
+    original = caption
+    # The channel editor's version for this network, when there is one.
+    channel_text = ((post_copy.get("channels") or {}).get(account.platform) or "").strip()
+    if channel_text:
+        caption = channel_text
     text = caption
     comment_override = None
     if first_comment and not account.supports_first_comment():
@@ -595,7 +737,7 @@ def account_overrides(account, caption: str, post_copy: dict[str, Any]) -> tuple
         short = (post_copy.get("short_caption") or "").strip()
         if short:
             text = short
-    return (None if text == caption else text), comment_override
+    return (None if text == original else text), comment_override
 
 
 def _internal_notes(brief: StudioBrief) -> str:
@@ -734,5 +876,8 @@ STEP_FUNCTIONS = {
     "picture": step_picture,
     "render": step_render,
     "review": step_review,
+    "channel": step_channel,
+    "qa": step_qa,
+    "schedule": step_schedule,
     "handoff": step_handoff,
 }

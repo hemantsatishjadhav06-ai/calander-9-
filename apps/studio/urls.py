@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import urls_agency, urls_autopilot, urls_chat, urls_memory, views
 
 app_name = "studio"
 
@@ -19,3 +19,7 @@ urlpatterns = [
     path("<uuid:brief_id>/retry/", views.retry, name="retry"),
     path("<uuid:brief_id>/discard/", views.discard, name="discard"),
 ]
+
+# The agency's own pages, one module each (team roster and jobs, creative
+# memory, autopilot, the team thread).
+urlpatterns += urls_agency.urlpatterns + urls_memory.urlpatterns + urls_autopilot.urlpatterns + urls_chat.urlpatterns

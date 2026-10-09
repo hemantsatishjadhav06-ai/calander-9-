@@ -48,7 +48,30 @@ def can_revise(brief: StudioBrief) -> bool:
     return post_statuses(brief) <= pipeline.REVISABLE_STATUSES
 
 
-def create_brief(workspace, author, *, idea, notes="", goal="", accounts=(), style_lock=True, source_picture=None):
+def create_brief(
+    workspace,
+    author,
+    *,
+    idea,
+    notes="",
+    goal="",
+    accounts=(),
+    style_lock=True,
+    source_picture=None,
+    proposed_publish_at=None,
+    origin=StudioBrief.Origin.MANUAL,
+    job=None,
+    requested_by=None,
+    start=True,
+):
+    """Create a brief and put the team to work on it.
+
+    With ``start=False`` the brief is PLANNED instead: it waits, outside the
+    team's active work, until :func:`start_planned` hands it over (autopilot
+    feeds a week of briefs a few at a time so the single worker keeps
+    publishing on time and nothing looks stuck). ``proposed_publish_at`` is the
+    time the plan reserved for it; the scheduler keeps it if it is still ahead.
+    """
     with transaction.atomic():
         brief = StudioBrief.objects.create(
             workspace=workspace,
@@ -59,10 +82,28 @@ def create_brief(workspace, author, *, idea, notes="", goal="", accounts=(), sty
             style_lock=style_lock,
             source_picture=source_picture,
             regenerate_picture=True,
+            proposed_publish_at=proposed_publish_at,
+            origin=origin,
+            job=job,
+            requested_by=requested_by,
+            status=StudioBrief.Status.QUEUED if start else StudioBrief.Status.PLANNED,
         )
         brief.social_accounts.set(accounts)
-        pipeline.start(brief, "strategy")
+        if start:
+            pipeline.start(brief, "strategy")
     return brief
+
+
+def start_planned(brief: StudioBrief) -> bool:
+    """Hand a PLANNED brief to the team. False when it was already started or dropped."""
+    with transaction.atomic():
+        updated = StudioBrief.objects.filter(pk=brief.pk, status=StudioBrief.Status.PLANNED).update(
+            status=StudioBrief.Status.QUEUED, stage="strategy", updated_at=timezone.now()
+        )
+        if updated:
+            brief.refresh_from_db()
+            pipeline.enqueue(brief, "strategy")
+    return bool(updated)
 
 
 def _new_revision(brief: StudioBrief, **changes) -> None:

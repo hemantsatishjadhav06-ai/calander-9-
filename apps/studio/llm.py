@@ -58,11 +58,25 @@ PRICES = {
 PICTURE_PRICE = 0.03
 
 
+#: Long answers (a blog article) stream instead of waiting on one response,
+#: so a long generation can't hit an HTTP timeout part-way.
+STREAM_ABOVE_TOKENS = MAX_TOKENS
+#: Server-side web search, used only by :func:`research` and only when
+#: ``STUDIO_WEB_SEARCH`` is on. Search answers carry citations, which can't be
+#: combined with structured outputs, so research is its own free-text call and
+#: the agent that uses it answers in a second, structured call.
+WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_uses": 3}
+#: Billed per search on top of tokens.
+WEB_SEARCH_PRICE = 0.01
+
+
 def estimate_cost(runs) -> float | None:
     """Roughly what ``runs`` (AgentRun rows) cost, or None when a model has no known price."""
+    from .team import PICTURE_AGENTS
+
     total = 0.0
     for run in runs:
-        if run.agent == "illustrator":
+        if run.agent in PICTURE_AGENTS:
             total += PICTURE_PRICE if run.status == "succeeded" else 0.0
             continue
         if not (run.input_tokens or run.output_tokens):
@@ -71,11 +85,22 @@ def estimate_cost(runs) -> float | None:
         if price is None:
             return None
         total += (run.input_tokens * price[0] + run.output_tokens * price[1] + run.cache_read_tokens * price[2]) / 1e6
+        total += WEB_SEARCH_PRICE * int((run.output or {}).get("web_searches", 0) or 0)
     return total
 
 
 class StudioAgentError(Exception):
-    """An agent could not do its turn. The message is for people."""
+    """An agent could not do its turn. The message is for people.
+
+    ``usage`` holds what the failed call still cost — ``(model, input tokens,
+    output tokens, cache-read tokens)`` — when Claude answered but the answer
+    couldn't be used (a refusal, a cut-off answer, the wrong shape), so the
+    spend can be recorded against the budget.
+    """
+
+    def __init__(self, message: str, *, usage: tuple[str, int, int, int] | None = None):
+        super().__init__(message)
+        self.usage = usage
 
 
 class NotConfiguredError(StudioAgentError):
@@ -180,6 +205,10 @@ def _fallback_used(response) -> bool:
     return any(getattr(entry, "type", "") == "fallback_message" for entry in iterations)
 
 
+def web_search_enabled() -> bool:
+    return bool(getattr(settings, "STUDIO_WEB_SEARCH", False))
+
+
 def run_agent[T: pydantic.BaseModel](
     *,
     agent: str,
@@ -193,7 +222,8 @@ def run_agent[T: pydantic.BaseModel](
 
     ``system`` is the agent's instructions followed by the brand block (the
     last block carries the cache breakpoint); ``content`` is this turn's user
-    message — text and image blocks.
+    message — text and image blocks. ``max_tokens`` above the usual ceiling
+    streams the response.
     """
     if not is_configured():
         raise NotConfiguredError(
@@ -215,15 +245,21 @@ def run_agent[T: pydantic.BaseModel](
     if getattr(settings, "STUDIO_FALLBACKS", True):
         request["betas"] = [FALLBACK_BETA]
         request["fallbacks"] = "default"
-
     started = time.monotonic()
     try:
-        response = get_client().beta.messages.create(**request)
+        messages = get_client().beta.messages
+        if max_tokens > STREAM_ABOVE_TOKENS:
+            with messages.stream(**request) as stream:
+                response = stream.get_final_message()
+        else:
+            response = messages.create(**request)
     except anthropic.APIError as exc:
         logger.warning("Studio %s: Claude call failed: %s", agent, exc)
         raise StudioAgentError(_explain_api_error(exc)) from exc
     duration_ms = int((time.monotonic() - started) * 1000)
     request_id = getattr(response, "_request_id", None)
+    input_tokens, output_tokens, cache_read = _usage(response)
+    spent = (str(getattr(response, "model", "") or model_id()), input_tokens, output_tokens, cache_read)
 
     if response.stop_reason == "refusal":
         details = getattr(response, "stop_details", None)
@@ -232,10 +268,11 @@ def run_agent[T: pydantic.BaseModel](
         raise StudioAgentError(
             "Claude declined this request"
             + (f" (its safety check flagged it as {category})" if category else "")
-            + ". Rephrase the idea or the notes, then press Retry."
+            + ". Rephrase the idea or the notes, then press Retry.",
+            usage=spent,
         )
     if response.stop_reason == "max_tokens":
-        raise StudioAgentError("Claude's answer was cut off before it finished. Press Retry.")
+        raise StudioAgentError("Claude's answer was cut off before it finished. Press Retry.", usage=spent)
 
     text = next((block.text for block in response.content if getattr(block, "type", "") == "text"), "")
     try:
@@ -244,9 +281,8 @@ def run_agent[T: pydantic.BaseModel](
         logger.warning(
             "Studio %s: answer did not match %s (request=%s): %s", agent, output_type.__name__, request_id, exc
         )
-        raise StudioAgentError("Claude's answer wasn't in the expected shape. Press Retry.") from exc
+        raise StudioAgentError("Claude's answer wasn't in the expected shape. Press Retry.", usage=spent) from exc
 
-    input_tokens, output_tokens, cache_read = _usage(response)
     return AgentResult(
         output=output,
         model=str(getattr(response, "model", "") or model_id()),
@@ -255,4 +291,75 @@ def run_agent[T: pydantic.BaseModel](
         cache_read_tokens=cache_read,
         duration_ms=duration_ms,
         fallback_used=_fallback_used(response),
+    )
+
+
+@dataclass(frozen=True)
+class ResearchResult:
+    text: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    web_searches: int
+    duration_ms: int
+
+
+#: How many times a paused search turn is resumed before giving up.
+MAX_RESEARCH_CONTINUATIONS = 3
+
+
+def research(*, agent: str, system: list[dict[str, Any]], question: str, effort: str = "low") -> ResearchResult:
+    """A free-text web research turn (server-side web search), for an agent to use afterwards.
+
+    Only call it when :func:`web_search_enabled`. Raises :class:`StudioAgentError`.
+    A long search can pause its turn (``stop_reason == "pause_turn"``); the turn is
+    resumed by sending the assistant's content back, a few times at most.
+    """
+    if not is_configured():
+        raise NotConfiguredError("Web research needs ANTHROPIC_API_KEY.")
+    import anthropic
+
+    messages: list[dict[str, Any]] = [{"role": "user", "content": [text_block(question)]}]
+    request: dict[str, Any] = {
+        "model": model_id(),
+        "max_tokens": 8000,
+        "system": system,
+        "tools": [WEB_SEARCH_TOOL],
+        "output_config": {"effort": effort_for(effort)},
+    }
+    totals = [0, 0, 0, 0]
+    texts: list[str] = []
+    assistant_so_far: list[Any] = []
+    model = model_id()
+    started = time.monotonic()
+    for _attempt in range(MAX_RESEARCH_CONTINUATIONS + 1):
+        try:
+            response = get_client().messages.create(**request, messages=messages)
+        except anthropic.APIError as exc:
+            logger.warning("Studio %s: research call failed: %s", agent, exc)
+            raise StudioAgentError(_explain_api_error(exc)) from exc
+        model = str(getattr(response, "model", "") or model)
+        used = _usage(response)
+        totals[0] += used[0]
+        totals[1] += used[1]
+        totals[2] += used[2]
+        server = getattr(getattr(response, "usage", None), "server_tool_use", None)
+        totals[3] += int(getattr(server, "web_search_requests", 0) or 0)
+        texts += [block.text for block in response.content if getattr(block, "type", "") == "text"]
+        if response.stop_reason != "pause_turn":
+            break
+        # Resume the paused turn: the question, then everything the assistant has said so far.
+        assistant_so_far = [*assistant_so_far, *response.content]
+        messages = [messages[0], {"role": "assistant", "content": assistant_so_far}]
+    if response.stop_reason == "refusal":
+        raise StudioAgentError("Claude declined the research request.", usage=(model, totals[0], totals[1], totals[2]))
+    return ResearchResult(
+        text="\n".join(t.strip() for t in texts if t.strip()),
+        model=model,
+        input_tokens=totals[0],
+        output_tokens=totals[1],
+        cache_read_tokens=totals[2],
+        web_searches=totals[3],
+        duration_ms=int((time.monotonic() - started) * 1000),
     )

@@ -21,6 +21,7 @@ from apps.members.models import OrgMembership, WorkspaceMembership
 from apps.organizations.models import Organization
 from apps.social_accounts.models import SocialAccount
 from apps.studio import agents, llm, pipeline
+from apps.studio.roles import creative
 from apps.studio.schemas import Concept, CopyAnswer, DesignAnswer, ReviewAnswer, ReviewCheck, StrategistAnswer
 from apps.workspaces.models import Workspace
 
@@ -249,12 +250,39 @@ class FakeTeam:
         verdict = self.verdicts.pop(0) if len(self.verdicts) > 1 else self.verdicts[0]
         return _result(review_answer(verdict))
 
+    def prompt_engineer(self, profile, spec, memory, *, reference_images=None):
+        self.calls.setdefault("prompt_engineer", []).append(
+            {"spec": spec, "memory": memory, "images": reference_images}
+        )
+        self._maybe_fail("prompt_engineer")
+        return _result(
+            creative.PromptAnswer(
+                prompt=(
+                    "Warm evening light on contemporary residential towers seen from street level, calm sky "
+                    "in the upper half, navy shadows, small figures walking away, 35mm, light haze"
+                ),
+                picture_style="Warm dusk architectural photography, 35mm, navy shadows",
+                references_used="The warm dusk light of the brand's best post.",
+            )
+        )
+
+    def channel_editor(self, profile, post_copy, destinations):
+        self.calls.setdefault("channel_editor", []).append({"destinations": destinations})
+        self._maybe_fail("channel_editor")
+        versions = [
+            creative.ChannelVersion(platform=d["platform"], caption=f"Version for {d['platform']}. Link in bio.")
+            for d in destinations
+        ]
+        return _result(creative.ChannelAnswer(versions=versions, notes="Shorter for Instagram."))
+
 
 @pytest.fixture
 def fake_team(monkeypatch):
     team = FakeTeam()
     for name in ("strategist", "copywriter", "art_director", "reviewer"):
         monkeypatch.setattr(agents, name, getattr(team, name))
+    for name in ("prompt_engineer", "channel_editor"):
+        monkeypatch.setattr(creative, name, getattr(team, name))
     queued = []
     monkeypatch.setattr(pipeline, "enqueue", lambda brief, stage: queued.append((brief.pk, brief.revision, stage)))
     team.queued = queued  # type: ignore[attr-defined]
