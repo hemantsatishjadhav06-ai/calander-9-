@@ -91,26 +91,41 @@ featured image, SEO title/description), **Preview** (signed-in only,
 * **Create social drafts** turns an approved or published blog into social
   drafts, which go through approval like any other post.
 
-## AI Studio
+## The agency
 
-**AI Studio** in the workspace sidebar. Type the idea in a line or two ("why
-landlord shares cost less than resale", "site visit this Saturday in Kollur"),
-pick the channels, and press **Brief the team**. A team of Claude agents finds
-three angles, writes the post, designs the graphic and checks it against the
-brand profile; two to four minutes later it is waiting for approval like any
-other post.
+**Agency** in the workspace sidebar is the AI team's home: 28 agents in seven
+departments (see **Agency → Team**). Everything they make waits for an owner or
+manager under **Waiting for you** — nothing is approved, scheduled or
+published by an agent, in any workspace.
 
-* **Same look as the last post** is on by default: the graphic copies the
-  layout, canvas and colour treatment of the brand's last AI Studio graphic (or
-  matches the last post with a picture by eye). Untick it for a fresh look.
-* Facts come only from **AI Studio → Brand profile** (prices, offers, phone
-  numbers, RERA lines). Both brands start from their websites' details; check
-  them there before the first post.
-* On the post: **Approve & publish now**, schedule it for a date and time, or
-  just approve it and schedule from the calendar. **Ask for changes** sends
-  notes back to the team; **Use this angle instead** rewrites from another angle. In the
-  enforced brand workspaces approving still needs an owner or manager signed in
-  to the dashboard — the agents never approve or publish anything.
+* **One post from one line**: type the idea at the top of the agency home and
+  press **Brief the team**. Two to four minutes later it is waiting with a
+  proposed time; **Approve & schedule for <time>** is one click.
+* **Same look as the best work**: *Match the look of the last post* is on by
+  default. **Agency → Creative memory** shows which past creatives worked best
+  for each account; mark the designer's best ones (or upload them) as
+  *Learn from this* and the art director and prompt engineer follow them.
+* **Autopilot** (**Agency → Autopilot**, workspace owners): set posts per
+  week, the accounts, the content pillars and when to plan (Friday 16:00 by
+  default, workspace time). The planner fills next week's open slots, the team
+  makes every post, and the lead approver gets one notification when they are
+  ready. Set a monthly budget; the team stops starting new work when the
+  month's estimate reaches it.
+* **Ask the team**: on the agency home and on every post. Ask a question or
+  for a change and the account manager gets the right agent on it. Tick
+  *Internal note* for a note clients never see. Clients have the same thread
+  in the client portal (**Talk to the team**), where the weekly report is under
+  **Reports**. Their requests still need internal approval.
+* **Inbox drafts**: with *Draft replies to comments, messages and reviews* on in
+  Autopilot (or **Draft replies with the team** in the inbox), new comments and
+  reviews get a drafted reply in the inbox, labelled with the agent that
+  wrote it. A person sends it; unhappy reviews are flagged.
+* **Blog**: **Write with the team** on the blog list turns a topic into a full
+  article (keyword, outline, article, fact check, SEO title and description, a
+  designed cover). The editor's **SEO score** lists every check with its fix;
+  *Improve SEO* sends the article back to the SEO team. Connect **Google
+  Search Console** on the blog list to see positions, clicks and searches per
+  article; **Run an SEO check-up** suggests what to refresh.
 
 ## One-time owner setup (still needed)
 
@@ -134,10 +149,12 @@ other post.
    on the service, then in the Meta app → Webhooks subscribe
    `…/webhooks/facebook/` with the same token (Page: feed, messages; Instagram:
    comments, messages).
-5. **AI Studio** — set `ANTHROPIC_API_KEY` (console.anthropic.com) on **both**
-   `sm-bean` and `sm-bean-worker`; the agents run in the worker. Set `FAL_KEY`
-   on both too for painted pictures; without it the graphics use the brand
-   background. The Studio says on its page what is missing.
+5. **The agency** — set `ANTHROPIC_API_KEY` (console.anthropic.com) on **both**
+   `sm-bean` and `sm-bean-worker`; the agents run in the worker. `FAL_KEY` is
+   already set on both, so graphics get painted pictures. The agency home says
+   on its page what is missing. Then in each brand workspace open **Agency →
+   Autopilot**, choose the accounts, posts per week, pillars and a monthly
+   budget, and switch it on.
 6. **LinkedIn Company Pages** — at developer.linkedin.com create an app tied to
    a Company Page, add the **Community Management API** product (LinkedIn
    reviews it), and list the redirect URLs
@@ -154,6 +171,13 @@ other post.
    set `GOOGLE_AUTH_CLIENT_ID` / `GOOGLE_AUTH_CLIENT_SECRET` on `sm-bean`. The
    instance stays invite-only: a Google address needs an invitation or a
    `SIGNUP_ALLOWLIST` entry (for example `@neopolisinfra.com`) to get an account.
+8. **Google Search Console (optional)** — in Google Cloud Console enable the
+   *Google Search Console API*, create an OAuth client ID (Web application)
+   with the redirect URI
+   `https://sm-bean-production-eb50.up.railway.app/blog/search-console/callback/`,
+   and set `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` on both services. Then on
+   each brand's blog list choose **Connect Google Search Console** with a Google
+   account that can see that website's property.
 
 ## Checking the live deployment
 

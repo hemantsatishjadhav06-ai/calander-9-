@@ -32,8 +32,8 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | **Approval workflows** | Configurable stages (none / optional / internal / internal + client), threaded internal & external comments, reminders, and a full audit trail. |
 | **Unified social inbox** | Comments, mentions, DMs, and reviews from every connected platform in one place, with sentiment analysis, assignments, threaded replies, and historical backfill. |
 | **Analytics** | Per-post and channel-level performance from every connected platform's native API, with KPI cards, 7/30/90-day trend charts, and a sortable all-posts table for views, engagement, follower growth, reach, and watch time. |
-| **AI Studio** | Type a small idea; a team of Claude agents — strategist, copywriter, art director, illustrator, designer, brand reviewer — proposes angles, writes the post (caption, hashtags, first comment, alt text) and designs the graphic in the look of your last post. It waits in the approval queue; one click publishes or schedules it. Needs `ANTHROPIC_API_KEY` (pictures: `FAL_KEY`). See [AI Studio](#ai-studio). |
-| **Blog publishing** | Write posts for the brands' own websites, approve the exact revision, and commit + deploy them through GitHub. Every post gets a designed 1600×900 cover — the title set over its picture in the brand's look — and a "Generate picture" button that paints a wordless image with fal.ai (`FAL_KEY`). |
+| **AI Agency** | A team of 28 agents in seven departments plans the week, writes and designs posts in the look of your best work, writes SEO blog articles, drafts inbox replies and answers questions in a team thread — staff and clients alike. Everything waits for a person to approve. Needs `ANTHROPIC_API_KEY` (pictures: `FAL_KEY`). See [AI Agency](#ai-agency). |
+| **Blog & SEO** | Write posts for the brands' own websites — or have the SEO team write them — with a live SEO score, approve the exact revision, and commit + deploy them through GitHub with a sitemap and RSS feed. Google Search Console rankings per article. Every post gets a designed 1600×900 cover — the title set over its picture in the brand's look — and a "Generate picture" button that paints a wordless image with fal.ai (`FAL_KEY`). |
 | **Media library** | Org- and workspace-scoped libraries with nested folders, auto-generated platform-optimized variants, alt text, and built-in Unsplash stock-photo search in the composer. |
 | **Client portal** | Passwordless 30-day magic-link access so clients can approve or reject posts without creating an account. |
 | **Notifications** | In-app, email, and webhook delivery with per-user preferences for every event type. |
@@ -667,23 +667,33 @@ The blog editor's **Generate picture** button asks fal.ai for a wordless 16:9 pi
 
 Each post's **Cover** setting chooses between the designed cover (default) and the plain featured image.
 
-## AI Studio
+## AI Agency
 
-**AI Studio** in the sidebar turns a one-line idea into a finished post, made by a team of agents running on Claude, and puts it in front of a person to approve before anything goes out.
+**Agency** in the sidebar is a team of 28 agents — 23 running on Claude, one painting pictures with fal.ai, one setting type with Pillow, and three plain-code agents — organised like a small agency in seven departments. It plans, writes, designs, checks and proposes times for posts and blog articles, reads what people say and how posts did, and learns the house style from your best creatives. **Nothing it makes goes out until a person approves it**: every post and article lands in the normal approval queue.
 
-| Agent | What it does |
+| Department | Agents |
 |---|---|
-| Strategist | Reads the brand profile and the workspace's recent posts, proposes three angles and recommends one. Unused angles can be saved to the idea board. |
-| Copywriter | Writes the post for the chosen channels: a hook in the first line, the caption, hashtags, a first comment (where the link goes on LinkedIn), a short version for X, and alt text. Only facts from the brand profile are used. |
-| Art director | Designs the graphic: layout (editorial, split, statement, big number), canvas, colour treatment and headline — in the look of the last post (below). |
-| Illustrator | Paints a wordless picture with fal.ai FLUX, or uses a photo picked from the media library. Optional: without `FAL_KEY` the design uses the brand background. |
-| Designer | Sets the type, logo and brand colours over the picture (Pillow, fonts bundled), so the text on the graphic is always exact. |
-| Brand reviewer | Looks at the finished graphic and the copy against the facts, the brand's rules and the platform's limits, and sends it back once with fixes if needed. |
-| Producer | Creates the post with its graphic, alt text and per-channel captions, proposes the next free slot, and submits it for approval. |
+| Client services | **Account manager** (answers questions and change requests in the team thread, and hands them to the right agent) · **Client reporter** (the weekly report) |
+| Strategy | **Content strategist** (three angles from one idea) · **Content planner** (next week's posts for your open slots) · **Moments scout** (festivals, seasons, industry dates) |
+| Insights | **Performance analyst** (what worked, against each account's own average) · **Audience listener** (questions, praise and complaints in comments, messages and reviews) · **Creative memory curator** (studies your best creatives and your designer's references and writes down the house style) |
+| Creative | **Copywriter** · **Channel editor** (the version each network needs) · **Art director** · **Prompt engineer** (writes the image prompt from the art director's direction and your best past creatives) · **Illustrator** (fal.ai) · **Graphic designer** (Pillow) |
+| Quality | **Brand reviewer** · **QA inspector** (lengths per network, hashtags, links, alt text, contrast) · **Fact checker** · **Editor-in-chief** |
+| Publishing | **Scheduler** (proposes the best free time from the account's history; never schedules) · **Producer** (creates the draft and submits it for approval) · **Community manager** and **Reviews manager** (draft replies for a person to send; unhappy reviews are flagged) |
+| Blog & SEO | **SEO strategist** · **Outline editor** · **Blog writer** · **SEO editor** · **Repurposer** (turns an article into posts) · **SEO monitor** (scores published articles, reads Google rankings, suggests refreshes) |
 
-**Same look as the last post.** With *Match the look of the last post* on (the default), the next graphic copies the layout, canvas, colour treatment and picture style of the last AI Studio graphic exactly; if the most recent post with a picture was made elsewhere, the art director is shown that picture and matches it by eye. Turn it off for a fresh look within the brand. The brand profile (**AI Studio → Brand profile**) holds the colours, typeface, wordmark, logo, voice, facts and rules every agent works from, with sample graphics.
+**A post**, from one line or from the weekly plan: strategist → copywriter → art director → prompt engineer → illustrator → designer → brand reviewer → channel editor → QA inspector → scheduler → producer. Two to four minutes later it waits on the agency home under *Waiting for you* with a proposed time; **Approve & schedule for <time>** is one click by an owner or manager.
 
-**Approval.** Nothing is published by the agents. The post waits in the normal approval queue (the same rules, audit trail and client sign-off as the Approvals page); from the Studio a person with *approve posts* can approve, approve and schedule, or — with *publish directly* — approve and publish now. *Ask for changes* sends notes back to the copywriter and art director; *Use this angle instead* rewrites from another angle.
+**Same look as your best work.** With *Match the look of the last post* on (the default), the next graphic copies the layout, canvas, colour treatment and picture style of the last one. **Agency → Creative memory** ranks published creatives against each account's own average, lets you mark any of them — or upload your designer's best work — as *Learn from this*, and keeps a house-style paragraph the curator writes (editable by managers). The art director, the prompt engineer and the reviewer all read it.
+
+**Autopilot** (**Agency → Autopilot**, workspace owners): posts per week, accounts, content pillars, the weekday and hour to plan, blog articles per month and a monthly budget. At the planning time the planner fills next week's open slots and the team makes every post; the lead approver gets one notification when they are all ready. It never approves or schedules — *Nothing goes out without you*.
+
+**Ask the team.** The agency home and every post have a thread with the account manager: ask a question, or ask for a change ("make the headline shorter", "new picture", "write one about Saturday's site visit") and the right agent does it. Staff can leave internal notes clients never see. Clients get the same thread in the client portal (**Talk to the team**, and *Ask a question* / *Request a change* on each post waiting for them), and the portal's **Reports** page shows the weekly report. Their requests still need internal approval.
+
+**Blog & SEO.** **Write with the team** on the blog list turns a topic into a full article: keyword and intent, outline, the article with links to your other articles, a fact check against the brand facts, the search title, description and slug, an editor's final read and a designed cover — then it waits for approval like any article. The editor shows a live **SEO score** (0–100, each check with its fix) and the Google result preview; *Ask the SEO team* and *Improve SEO* send an article back for a revision; *Make social posts* turns an approved article into posts. Published pages get complete Open Graph and Article structured data, related articles, and the blog's `sitemap.xml` and RSS `feed.xml` are written in the same commit. Connect **Google Search Console** on the blog list to see each article's position, clicks and top searches; **Run an SEO check-up** (and a weekly run) has the SEO monitor suggest what to refresh.
+
+**Inbox drafts.** With *Draft replies to comments, messages and reviews* on in Autopilot (or **Draft replies with the team** in the inbox), new comments, mentions, reviews and recent messages get a reply drafted by the community manager or the reviews manager, labelled as such in the inbox. A person sends it; one- and two-star reviews are flagged to the inbox staff.
+
+**Cost control.** Every agent's turn is recorded with tokens and an estimated cost at list prices (Claude Opus 5.5: tens of cents per post, around a dollar per article; fal.ai about $0.03 per picture). Autopilot, the thread and the blog team stop starting new work when the month's estimated spend reaches the workspace's budget, and the agency home shows the meter. The thread has a daily reply cap per workspace. Agent work runs below publishing in the worker's queue, so it never delays a scheduled post by more than one agent's turn.
 
 Setup — on the web **and** worker services (the agents run in the background worker):
 
@@ -693,10 +703,15 @@ STUDIO_MODEL=claude-opus-5-5        # optional; the Claude model every agent use
 STUDIO_EFFORT=                      # optional; low|medium|high|xhigh|max for every agent (default: per agent)
 STUDIO_TIMEOUT=300                  # optional; seconds per agent turn
 STUDIO_FALLBACKS=true               # optional; retry a falsely declined request on Anthropic's fallback model
+STUDIO_WEB_SEARCH=false             # optional; lets the moments scout and SEO strategist search the web ($0.01 a search)
+AGENCY_MAX_ACTIVE_BRIEFS=3          # optional; posts the autopilot has in the works at once, across workspaces
 FAL_KEY=...                         # optional; pictures (see fal.ai above)
+GSC_CLIENT_ID=                      # optional; Google Search Console rankings (see below)
+GSC_CLIENT_SECRET=
+INDEXNOW_KEY=                       # optional; tells Bing and other IndexNow engines when an article goes live
 ```
 
-A post takes two to four minutes. Each brief's timeline shows every agent's time, tokens and an estimated cost at list prices (expect tens of cents per post on Claude Opus 5.5, plus about $0.03 per fal.ai picture). Agent steps run at a lower priority than publishing, so a busy Studio never delays a scheduled post by more than one agent's turn.
+**Google Search Console** (optional): in Google Cloud Console create an OAuth client ID (Web application), enable the *Google Search Console API*, add the redirect URI `{APP_URL}/blog/search-console/callback/`, and set `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` on both services. Then an owner chooses **Connect Google Search Console** on the blog list and picks the property for that website (the Google account must have access to it). Rankings sync daily.
 
 ## Inbox: Backfill Historical Messages
 
