@@ -18,16 +18,24 @@ about answering readers' questions on the page, not about a snippet.
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 
-from .renderers import plain_text
+# The renderer owns the <title> rule; the score measures exactly what it writes.
+from .renderers import TITLE_MAX, TITLE_SUFFIX, plain_text, title_tag
 
-#: The " | Brand Blog" suffix each site's renderer adds to the <title> when it fits.
-TITLE_SUFFIX = {
-    "neopolis_static": " | Neopolis Infra Blog",
-    "morespace_static": " | More Space Blog",
-}
-TITLE_MAX = 60
+__all__ = [
+    "TITLE_MAX",
+    "TITLE_SUFFIX",
+    "Check",
+    "Report",
+    "score",
+    "score_post",
+    "score_posts",
+    "suggestion",
+    "title_tag",
+]
+
 TITLE_MIN = 30
 META_MIN = 120
 META_MAX = 160
@@ -71,19 +79,27 @@ class Report:
 
     @property
     def to_fix(self) -> list[Check]:
-        return [c for c in self.checks if not c.passed]
+        """Failures first, then warnings — the order a person should fix them in."""
+        return [c for c in self.checks if c.level == "fail"] + [c for c in self.checks if c.level == "warn"]
+
+    @property
+    def passing(self) -> list[Check]:
+        return [c for c in self.checks if c.passed]
+
+    @property
+    def title_fits(self) -> bool:
+        """Whether the <title> is within the ~60 characters Google shows."""
+        return len(self.title_tag) <= TITLE_MAX
+
+    @property
+    def tone(self) -> str:
+        """``good`` / ``fair`` / ``poor``: the colour the score is shown in."""
+        return "good" if self.score >= 80 else "fair" if self.score >= 60 else "poor"
 
     def as_dict(self) -> dict:
         data = asdict(self)
         data["passed"] = self.passed
         return data
-
-
-def title_tag(seo_title: str, title: str, site_kind: str = "") -> str:
-    """The <title> the renderer will write: the suffix only when the whole fits in 60 characters."""
-    base = (seo_title or title or "").strip()
-    suffix = TITLE_SUFFIX.get(site_kind, "")
-    return f"{base}{suffix}" if suffix and len(base) + len(suffix) <= TITLE_MAX else base
 
 
 def _norm(text: str) -> str:
@@ -400,13 +416,7 @@ def score(
     return Report(score=value, grade=grade, checks=checks, words=words, title_tag=tag)
 
 
-def score_post(post, *, exclude_self: bool = True) -> Report:
-    """Score a saved ``BlogPost`` against its site's other articles."""
-    from .models import BlogPost
-
-    others = BlogPost.objects.filter(site_id=post.site_id)
-    if exclude_self and post.pk:
-        others = others.exclude(pk=post.pk)
+def _score_saved(post, other_titles: list[str]) -> Report:
     return score(
         title=post.title,
         slug=post.slug,
@@ -421,5 +431,79 @@ def score_post(post, *, exclude_self: bool = True) -> Report:
         has_image=bool(post.featured_image_id) or post.cover_style == "designed",
         site_kind=post.site.kind if post.site_id else "",
         site_origin=post.site.origin if post.site_id else "",
-        other_titles=list(others.values_list("title", flat=True)[:500]),
+        other_titles=other_titles,
     )
+
+
+def score_post(post, *, exclude_self: bool = True) -> Report:
+    """Score a saved ``BlogPost`` against its site's other articles."""
+    from .models import BlogPost
+
+    others = BlogPost.objects.filter(site_id=post.site_id)
+    if exclude_self and post.pk:
+        others = others.exclude(pk=post.pk)
+    return _score_saved(post, list(others.values_list("title", flat=True)[:500]))
+
+
+def score_posts(posts) -> dict:
+    """Score several saved posts with one query for their sites' titles: ``{post.pk: Report}``.
+
+    For the blog list and the SEO monitor, where :func:`score_post` per row
+    would query the titles once per article.
+    """
+    from .models import BlogPost
+
+    posts = list(posts)
+    titles: dict = defaultdict(list)
+    site_ids = {p.site_id for p in posts if p.site_id}
+    for site_id, pk, title in BlogPost.objects.filter(site_id__in=site_ids).values_list("site_id", "pk", "title"):
+        titles[site_id].append((pk, title))
+    return {post.pk: _score_saved(post, [t for pk, t in titles[post.site_id] if pk != post.pk][:500]) for post in posts}
+
+
+# ---------------------------------------------------------------------------
+# What the SEO monitor suggests for a published article
+# ---------------------------------------------------------------------------
+
+#: Below this many impressions in 28 days, a query is too thin to act on.
+MIN_QUERY_IMPRESSIONS = 20
+#: A drop of this many places in average position is worth a refresh.
+SLIPPED_PLACES = 3.0
+
+
+def suggestion(report: Report | None, perf: dict | None) -> str:
+    """One plain sentence: the most useful next step for a published article.
+
+    ``perf`` is :func:`apps.blog.search_console.page_trend` (or None when
+    Search Console isn't connected): position, the change, clicks,
+    impressions, CTR and the top queries. Rankings come first — they are the
+    point — then the score.
+    """
+    if perf and perf.get("impressions"):
+        queries = [q for q in perf.get("queries", []) if q["impressions"] >= MIN_QUERY_IMPRESSIONS]
+        page_two = next((q for q in queries if 10.5 < q["position"] <= 20.5), None)
+        if page_two:
+            return (
+                f"Stuck on page 2 for “{page_two['query']}” (position {page_two['position']:.0f}) — "
+                "add a section that answers it."
+            )
+        change = perf.get("position_change")
+        if change is not None and change <= -SLIPPED_PLACES:
+            return (
+                f"Slipped {abs(change):.0f} places in Google over 28 days — refresh the facts and the year, "
+                "and add what's new."
+            )
+        edge = next((q for q in queries if 7.5 < q["position"] <= 10.5), None)
+        if edge:
+            return f"“{edge['query']}” sits at the bottom of page 1 — a short section on it could lift it."
+        if perf["impressions"] >= 200 and perf.get("ctr", 0) < 0.01 and perf.get("position", 99) <= 10:
+            return (
+                f"Seen {perf['impressions']:,} times but rarely clicked — rewrite the search title and "
+                "description so they promise the answer."
+            )
+    elif perf is not None:
+        return "No Google impressions yet — link to it from two of your other articles so Google finds it."
+    if report is not None and report.score < 80 and report.to_fix:
+        first = report.to_fix[0]
+        return f"Score {report.score} — fix: {first.label.lower()}: {first.detail}"
+    return "Doing well — nothing to change this week."

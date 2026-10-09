@@ -94,7 +94,10 @@ def test_neopolis_post_json_ld():
     assert posting["mainEntityOfPage"]["@id"] == "https://www.neopolisinfra.com/blog/flats-kokapet-narsingi-2026"
     assert posting["datePublished"] == "2026-10-02" and posting["inLanguage"] == "en-IN"
     assert blocks["FAQPage"]["mainEntity"][0]["acceptedAnswer"]["text"] == "Yes, for most buyers."
-    assert [i["name"] for i in blocks["BreadcrumbList"]["itemListElement"]] == ["Home", "Blog", posting["headline"]]
+    # The trail the page shows above the title: Home / Blog / the category (the last crumb is the page itself).
+    crumbs = blocks["BreadcrumbList"]["itemListElement"]
+    assert [i["name"] for i in crumbs] == ["Home", "Blog", "Area Guide"]
+    assert "item" not in crumbs[2]
 
 
 def test_neopolis_post_without_faq_or_image():
@@ -265,3 +268,173 @@ def test_hero_rejects_a_non_image(image_asset):
     asset = image_asset(b"not an image", filename="fake.png")
     with pytest.raises(ValueError):
         hero_jpeg_bytes(asset)
+
+
+# ---------------------------------------------------------------------------
+# SEO markup: the title rule, social tags, JSON-LD, related articles, sitemap and feed
+# ---------------------------------------------------------------------------
+
+IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
+PUBLISHED_AT = dt.datetime(2026, 9, 30, 10, 15, tzinfo=IST)
+APPROVED_AT = dt.datetime(2026, 10, 2, 9, 0, tzinfo=IST)
+
+
+def seo_content(**overrides):
+    fields = {
+        "focus_keyword": "flats in kokapet",
+        "keywords": ("kokapet prices", "landlord share"),
+        "image_width": 1600,
+        "image_height": 900,
+        "published_at": PUBLISHED_AT,
+        "modified_at": APPROVED_AT,
+        "date_published": PUBLISHED_AT.date(),
+        "date_modified": APPROVED_AT.date(),
+    }
+    fields.update(overrides)
+    return content(**fields)
+
+
+@pytest.mark.parametrize("render", [render_neopolis_post, render_morespace_post])
+def test_a_long_search_title_drops_the_site_suffix(render):
+    long_title = "Land Title Verification in Hyderabad: 5 Checks Before Buying"
+    assert len(long_title) == 60
+    page = render(seo_content(seo_title=long_title))
+    assert f"<title>{long_title}</title>" in page
+    short = render(seo_content(seo_title="Kokapet flats"))
+    assert re.search(r"<title>Kokapet flats \| (Neopolis Infra|More Space) Blog</title>", short)
+
+
+@pytest.mark.parametrize("render", [render_neopolis_post, render_morespace_post])
+def test_social_tags_carry_the_image_size_dates_section_and_tags(render):
+    page = render(seo_content())
+    assert '<meta property="og:image:width" content="1600">' in page
+    assert '<meta property="og:image:height" content="900">' in page
+    assert '<meta property="og:image:alt" content="Kokapet skyline">' in page
+    assert '<meta name="twitter:image:alt" content="Kokapet skyline">' in page
+    assert '<meta property="article:published_time" content="2026-09-30T10:15:00+05:30">' in page
+    assert '<meta property="article:modified_time" content="2026-10-02T09:00:00+05:30">' in page
+    assert '<meta property="article:section" content="Area Guide">' in page
+    assert page.count('<meta property="article:tag"') == 3
+    assert '<meta property="article:tag" content="flats in kokapet">' in page
+    assert 'type="application/rss+xml"' in page and "/blog/feed.xml" in page
+    # Google ignores meta keywords and Bing treats long ones as spam: not written.
+    assert 'name="keywords"' not in page
+
+
+def test_unknown_image_sizes_are_left_out():
+    page = render_neopolis_post(seo_content(image_width=0, image_height=0))
+    assert "og:image:width" not in page
+    assert 'width="1600" height="900"' in page  # the hero keeps the layout's default box
+
+
+@pytest.mark.parametrize(
+    ("render", "kind"), [(render_neopolis_post, "BlogPosting"), (render_morespace_post, "Article")]
+)
+def test_article_json_ld_has_image_object_word_count_keywords_and_stable_dates(render, kind):
+    article = next(b for b in json_ld(render(seo_content())) if b["@type"] == kind)
+    image = article["image"][0] if isinstance(article["image"], list) else article["image"]
+    assert image == {
+        "@type": "ImageObject",
+        "url": image["url"],
+        "width": 1600,
+        "height": 900,
+    }
+    assert article["wordCount"] > 0
+    assert article["keywords"] == "flats in kokapet, kokapet prices, landlord share"
+    assert article["datePublished"] == "2026-09-30T10:15:00+05:30"
+    assert article["dateModified"] == "2026-10-02T09:00:00+05:30"
+    assert article["publisher"]["logo"]["@type"] == "ImageObject"
+    assert article["inLanguage"] == "en-IN" and article["mainEntityOfPage"]["@type"] == "WebPage"
+
+
+def test_the_page_is_the_same_whatever_day_it_is_rendered():
+    """dateModified comes from the approval, not from "today": a later retry writes the same bytes."""
+    page = render_neopolis_post(seo_content())
+    assert page == render_neopolis_post(seo_content())
+    assert '"dateModified":"2026-10-02T09:00:00+05:30"' in page
+
+
+def test_related_articles_replace_the_legacy_pool_on_neopolis():
+    from apps.blog.renderers import RelatedLink
+
+    related = (RelatedLink("kokapet-prices", "Kokapet prices 2026"), RelatedLink("rera-checklist", "RERA checklist"))
+    page = render_neopolis_post(seo_content(related=related))
+    block = page[page.index('<div class="related">') :]
+    block = block[: block.index("</div>")]
+    assert '<a href="/blog/kokapet-prices">Kokapet prices 2026</a>' in block
+    assert "landlord-share-flats-in-hyderabad-guide" not in block
+    # No published articles yet: the site's flagship guides, as before.
+    assert "landlord-share-flats-in-hyderabad-guide" in render_neopolis_post(seo_content(related=()))
+
+
+def test_more_space_gets_a_related_block_only_when_there_are_related_articles():
+    from apps.blog.renderers import RelatedLink
+
+    page = render_morespace_post(seo_content(related=(RelatedLink("older", "Older <post>"),)))
+    assert '<aside class="blog-related"' in page
+    assert '<a href="blog/older.html">Older &lt;post&gt;</a>' in page
+    assert '<aside class="blog-related"' not in render_morespace_post(seo_content())
+
+
+def test_more_space_breadcrumb_matches_the_visible_trail():
+    page = render_morespace_post(seo_content())
+    crumbs = next(b for b in json_ld(page) if b["@type"] == "BreadcrumbList")["itemListElement"]
+    assert [c["name"] for c in crumbs] == ["Home", "Blog", "Area Guide"]
+
+
+def test_card_data_round_trips_and_reads_old_cards():
+    card = seo_content().card()
+    assert card.modified == "2026-10-02T09:00:00+05:30"
+    assert card.keywords == ("flats in kokapet", "kokapet prices", "landlord share")
+    assert CardData.from_dict(json.loads(json.dumps(card.to_dict()))) == card
+    old = CardData.from_dict({"slug": "a", "title": "A", "date": "2026-01-02"})
+    assert old.modified == "" and old.keywords == () and old.lastmod == "2026-01-02"
+
+
+def _seo_cards():
+    return [
+        CardData("older", "Older & wiser", "Earlier.", "Buyer Guide", False, 1, "2026-09-01", 3, "2026-09-03"),
+        seo_content().card(),
+    ]
+
+
+def _xml_root(text):
+    import xml.etree.ElementTree as ET
+
+    return ET.fromstring(text.split("\n", 2)[2])  # past the declaration and the marker comment
+
+
+def test_the_sitemap_lists_the_index_and_every_article_with_lastmod():
+    from apps.blog.renderers import GENERATED_MARKER, render_sitemap
+
+    origin = "https://www.neopolisinfra.com"
+    xml = render_sitemap(_seo_cards(), site_kind="neopolis_static", origin=origin)
+    assert xml.startswith('<?xml version="1.0" encoding="UTF-8"?>') and GENERATED_MARKER in xml
+    assert "<loc>https://www.neopolisinfra.com/blog/</loc><lastmod>2026-10-02T09:00:00+05:30</lastmod>" in xml
+    assert (
+        "<loc>https://www.neopolisinfra.com/blog/flats-kokapet-narsingi-2026</loc>"
+        "<lastmod>2026-10-02T09:00:00+05:30</lastmod>"
+    ) in xml
+    assert "<loc>https://www.neopolisinfra.com/blog/older</loc><lastmod>2026-09-03</lastmod>" in xml
+    # The same whatever order the cards come in, so an unchanged sitemap is never re-committed.
+    assert xml == render_sitemap(list(reversed(_seo_cards())), site_kind="neopolis_static", origin=origin)
+    assert len(_xml_root(xml)) == 3
+    empty = render_sitemap([], site_kind="morespace_static", origin="https://morespace.netlify.app")
+    assert "<loc>https://morespace.netlify.app/blog/</loc>" in empty
+
+
+def test_the_feed_is_rss_2_newest_first_and_escaped():
+    from apps.blog.renderers import render_feed
+
+    root = _xml_root(render_feed(_seo_cards(), site_kind="morespace_static", origin="https://morespace.netlify.app"))
+    channel = root.find("channel")
+    assert root.tag == "rss" and root.get("version") == "2.0"
+    assert channel.findtext("title") == "More Space Blog"
+    items = channel.findall("item")
+    assert [i.findtext("link") for i in items] == [
+        "https://morespace.netlify.app/blog/flats-kokapet-narsingi-2026.html",
+        "https://morespace.netlify.app/blog/older.html",
+    ]
+    assert items[1].findtext("title") == "Older & wiser"
+    assert items[0].findtext("pubDate").startswith("Wed, 30 Sep 2026")
+    assert channel.findtext("lastBuildDate")

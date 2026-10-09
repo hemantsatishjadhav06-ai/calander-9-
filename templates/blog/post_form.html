@@ -3,12 +3,14 @@
 {% block title %}{% if post %}Edit {{ post.title }}{% else %}New blog post{% endif %} - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl">
+<div class="max-w-6xl">
+<div class="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
+<div class="min-w-0 max-w-3xl">
     <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
         <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Blog</a>
         {% if post %}<span aria-hidden="true"> / </span><a href="{% url 'blog:detail' workspace_id=workspace.id post_id=post.id %}" class="underline hover:text-stone-900">{{ post.title|truncatechars:50 }}</a>{% endif %}
     </nav>
-    <h1 class="text-lg font-semibold text-stone-900 mb-1">{% if post %}Edit blog post{% else %}New blog post{% endif %}</h1>
+    <h1 class="text-2xl text-stone-900 mb-1 break-words" style="font-family: var(--font-display)">{% if post %}{{ post.title|default:"Edit blog post" }}{% else %}New blog post{% endif %}</h1>
     <p class="text-sm text-stone-600 mb-6">Saved as a draft. Nothing reaches the website until an approver approves this exact version and publishes it.</p>
 
     {% if warn_withdraw %}
@@ -33,7 +35,7 @@
     {% endif %}
 
     {{ form_state|json_script:"blog-form-state" }}
-    <form method="post" x-data="blogPostForm(JSON.parse(document.getElementById('blog-form-state').textContent))" class="pb-16">
+    <form method="post" x-data="blogPostForm(JSON.parse(document.getElementById('blog-form-state').textContent))" id="blog-post-form" class="pb-16">
         {% csrf_token %}
 
         <fieldset class="mb-8">
@@ -138,9 +140,18 @@
             {% endif %}
         </fieldset>
 
-        <fieldset class="mb-8">
-            <legend class="text-base font-semibold text-stone-900 mb-4">Search &amp; FAQ</legend>
+        <fieldset class="mb-8" aria-describedby="search-help">
+            <legend class="text-base font-semibold text-stone-900 mb-1">Search &amp; FAQ</legend>
+            <p id="search-help" class="text-xs text-stone-600 mb-4">What people type into Google, and what Google shows for this article. The SEO score{% if show_seo_panel %} beside the form{% endif %} updates as you type.</p>
+            <div class="grid sm:grid-cols-2 gap-x-4">
+                {% include "blog/partials/field.html" with field=form.focus_keyword %}
+                {% include "blog/partials/field.html" with field=form.secondary_keywords %}
+            </div>
             {% include "blog/partials/field.html" with field=form.seo_title counter_model="seo" counter_limit=60 %}
+            <p class="-mt-3 mb-5 text-xs text-stone-600">
+                In Google: <span class="font-medium text-stone-800 break-words" x-text="titleTag() || '—'"></span>
+                <span class="tabular-nums" :class="titleTag().length > titleMax ? 'text-red-700 font-semibold' : ''" x-text="'(' + titleTag().length + ' / ' + titleMax + ' characters)'"></span>
+            </p>
             {% include "blog/partials/field.html" with field=form.meta_description counter_model="meta" counter_limit=160 %}
             {% include "blog/partials/field.html" with field=form.faq_text %}
         </fieldset>
@@ -159,6 +170,25 @@
     </form>
     {% endif %}
 </div>
+
+{% if show_seo_panel %}
+{# The live SEO panel: re-scored from the form's unsaved values a moment after typing stops. Nothing is saved. #}
+<aside aria-label="SEO score and Google preview" class="space-y-4 lg:sticky lg:top-4 lg:mt-9">
+    <p id="seo-live" class="sr-only" aria-live="polite">SEO score {{ report.score }} of 100: {{ report.grade }}.</p>
+    <div id="seo-panel"
+         hx-post="{{ seo_score_url }}"
+         hx-trigger="input from:#blog-post-form delay:800ms, change from:#blog-post-form delay:300ms"
+         hx-include="#blog-post-form"
+         hx-target="this"
+         hx-swap="innerHTML"
+         hx-sync="this:replace">
+        {% include "blog/partials/seo_panel.html" %}
+    </div>
+    {% if ranking %}{% include "blog/partials/seo_ranking.html" %}{% endif %}
+</aside>
+{% endif %}
+</div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -173,6 +203,15 @@ function blogPostForm(state) {
         meta: state.meta || '',
         siteUrls: state.siteUrls || {},
         site: state.site || '',
+        titleSuffixes: state.titleSuffixes || {},
+        titleMax: state.titleMax || 60,
+        // The <title> the website gets (apps.blog.renderers.title_tag): the
+        // site name only when the whole still fits.
+        titleTag() {
+            const base = (this.seo || this.title || '').trim();
+            const suffix = this.titleSuffixes[this.site] || '';
+            return suffix && base.length + suffix.length <= this.titleMax ? base + suffix : base;
+        },
         slugify(value) {
             return (value || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
                 .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100).replace(/-+$/, '');

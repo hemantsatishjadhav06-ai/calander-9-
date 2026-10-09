@@ -57,7 +57,14 @@ CONTENT_FIELDS = (
     "meta_description",
     "category",
     "faq",
+    # Rendered as article:tag and the JSON-LD keywords (apps.blog.renderers).
+    "focus_keyword",
+    "secondary_keywords",
 )
+
+#: How many related search terms a post may carry, and how long each may be.
+MAX_RELATED_TERMS = 10
+MAX_TERM_LENGTH = 80
 
 TOKEN_MISSING_MESSAGE = (
     "Publishing needs BLOG_GITHUB_TOKEN on the SM Manager service: a fine-grained GitHub token with "
@@ -90,6 +97,52 @@ def _normalise_faq(faq) -> list:
     return [{"q": str(item.get("q", "")), "a": str(item.get("a", ""))} for item in (faq or [])]
 
 
+def clean_keyword(value) -> str:
+    """One search phrase with its spacing tidied."""
+    return " ".join(str(value or "").split())
+
+
+def clean_keywords(value) -> list[str]:
+    """Related search terms as a list: from a comma-separated string or a list, tidied and de-duplicated.
+
+    Raises ``ValidationError`` (on ``secondary_keywords``) for too many or too
+    long terms, so an agent or a form gets a sentence back.
+    """
+    if value in (None, ""):
+        return []
+    if isinstance(value, str):
+        parts: list = value.split(",")
+    elif isinstance(value, list | tuple):
+        parts = list(value)
+    else:
+        raise ValidationError({"secondary_keywords": "Related terms must be a list of phrases."})
+    seen: set[str] = set()
+    terms = []
+    for part in parts:
+        term = clean_keyword(part)
+        if not term or term.lower() in seen:
+            continue
+        if len(term) > MAX_TERM_LENGTH:
+            raise ValidationError(
+                {
+                    "secondary_keywords": f"“{term[:30]}…” is too long; keep each term under {MAX_TERM_LENGTH} characters."
+                }
+            )
+        seen.add(term.lower())
+        terms.append(term)
+    if len(terms) > MAX_RELATED_TERMS:
+        raise ValidationError({"secondary_keywords": f"Use at most {MAX_RELATED_TERMS} related terms."})
+    return terms
+
+
+def _clean_content_fields(fields: dict) -> dict:
+    if "focus_keyword" in fields:
+        fields["focus_keyword"] = clean_keyword(fields["focus_keyword"])
+    if "secondary_keywords" in fields:
+        fields["secondary_keywords"] = clean_keywords(fields["secondary_keywords"])
+    return fields
+
+
 def fingerprint(post: BlogPost) -> str:
     """sha256 of the canonical JSON of every field that is published.
 
@@ -97,6 +150,11 @@ def fingerprint(post: BlogPost) -> str:
     replacing or editing the image in the media library changes the
     fingerprint too. ``cover_style`` is in because it decides what the hero
     image looks like (apps.blog.covers).
+
+    The keywords joined the payload later. They are only added when a post
+    has any, so posts approved before then keep the exact fingerprint they
+    were approved with; setting, changing or clearing a keyword still moves
+    the fingerprint.
     """
     image = post.featured_image if post.featured_image_id else None
     payload = {
@@ -114,6 +172,11 @@ def fingerprint(post: BlogPost) -> str:
         "category": post.category,
         "faq": _normalise_faq(post.faq),
     }
+    focus_keyword = post.focus_keyword or ""
+    secondary = [str(term) for term in (post.secondary_keywords or [])]
+    if focus_keyword or secondary:
+        payload["focus_keyword"] = focus_keyword
+        payload["secondary_keywords"] = secondary
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -242,6 +305,7 @@ def create_post(*, workspace, site, author, **fields) -> BlogPost:
     unknown = set(fields) - set(CONTENT_FIELDS)
     if unknown:
         raise ValueError(f"Unknown blog post fields: {sorted(unknown)}")
+    fields = _clean_content_fields(dict(fields))
     with transaction.atomic():
         post = BlogPost(workspace=workspace, site=site, author=author, status=Status.DRAFT, revision=1, **fields)
         post.full_clean()
@@ -261,6 +325,7 @@ def update_content(post, user, **changes) -> BlogPost:
         raise ValueError(f"Unknown blog post fields: {sorted(unknown)}")
     if not can_edit(user, post):
         raise PermissionDenied("You don't have permission to edit this blog post.")
+    changes = _clean_content_fields(dict(changes))
 
     with transaction.atomic():
         locked = _lock(post)
@@ -624,12 +689,92 @@ def local_today(workspace) -> dt.date:
 
 
 def post_content(post):
-    """The renderer's snapshot of ``post``, dated in the workspace's timezone."""
+    """The renderer's snapshot of ``post``, dated in the workspace's timezone.
+
+    The dates are stable for a given revision, so publishing it again on a
+    later day writes the same bytes: published is when the post first went
+    live (or, before that, when this revision was approved); modified is when
+    the revision was approved, never earlier than published. A draft with no
+    current approval falls back to today, which only the preview shows.
+    """
     from .renderers import PostContent
 
     tz = _workspace_tz(post.workspace)
-    published_on = timezone.localtime(post.published_at, tz).date() if post.published_at else None
-    return PostContent.from_post(post, today=timezone.localdate(timezone=tz), published_on=published_on)
+    approved_at = post.approved_at if post.approval_is_current else None
+    published_at = post.published_at or approved_at
+    modified_at = approved_at
+    if published_at and modified_at and modified_at < published_at:
+        modified_at = published_at
+    published_at = timezone.localtime(published_at, tz) if published_at else None
+    modified_at = timezone.localtime(modified_at, tz) if modified_at else None
+    return PostContent.from_post(
+        post,
+        today=timezone.localdate(timezone=tz),
+        published_on=published_at.date() if published_at else None,
+        modified_on=modified_at.date() if modified_at else None,
+        published_at=published_at,
+        modified_at=modified_at,
+        related=related_posts(post),
+    )
+
+
+# Words too common to say two articles are about the same thing (shorter ones are skipped anyway).
+_STOPWORDS = frozenset(
+    {"and", "are", "for", "from", "how", "the", "what", "when", "where", "which", "who", "why", "with", "your", "you"}
+    | {"2024", "2025", "2026", "2027", "guide", "best", "complete"}
+)
+
+
+def _words(*texts) -> set[str]:
+    return {
+        word
+        for text in texts
+        for word in re.findall(r"[a-z0-9]+", str(text or "").lower())
+        if word not in _STOPWORDS and len(word) > 2
+    }
+
+
+def related_posts(post, *, limit: int = 3) -> tuple:
+    """Up to ``limit`` of the site's live articles closest to ``post``, as ``RelatedLink``s.
+
+    Read from what each article looked like when it was published
+    (``published_card``), never from an unapproved edit, and ranked by shared
+    keywords, then shared category, then shared title words, newest first on
+    a tie. These links are navigation, not the article's approved content, so
+    they are not in the fingerprint: a page re-published after a newer
+    article went live may link to it.
+    """
+    from .renderers import CardData, RelatedLink
+
+    if not post.site_id:
+        return ()
+    rows = (
+        BlogPost.objects.filter(site_id=post.site_id, status=Status.PUBLISHED)
+        .exclude(pk=post.pk)
+        .exclude(published_card={})
+        .values_list("published_card", flat=True)
+    )
+    my_keywords = {k.lower() for k in [post.focus_keyword, *(post.secondary_keywords or [])] if k}
+    my_words = _words(post.title, *my_keywords)
+    category = (post.category or "").strip().lower()
+    scored = []
+    for data in rows:
+        try:
+            card = CardData.from_dict(data)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if card.slug == post.slug:
+            continue
+        their_keywords = {k.lower() for k in card.keywords}
+        points = 3 * len(my_keywords & their_keywords)
+        points += 2 if category and card.category.strip().lower() == category else 0
+        points += len(my_words & _words(card.title, *their_keywords))
+        scored.append((points, card.date, card.slug, card))
+    # Stable sorts, least important key first: most in common, then newest, then by address.
+    scored.sort(key=lambda item: item[2])
+    scored.sort(key=lambda item: item[1], reverse=True)
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return tuple(RelatedLink(slug=card.slug, title=card.title) for _p, _d, _s, card in scored[:limit])
 
 
 def suggest_slug(title: str) -> str:

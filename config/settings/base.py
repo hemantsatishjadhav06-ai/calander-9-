@@ -717,6 +717,17 @@ FAL_KEY = env("FAL_KEY", default="")
 FAL_IMAGE_MODEL = env("FAL_IMAGE_MODEL", default="fal-ai/flux/dev")
 FAL_TIMEOUT = env.float("FAL_TIMEOUT", default=90.0)
 
+# Blog rankings (apps.blog.search_console): a Google OAuth web client with the
+# Search Console API enabled and <APP_URL>/blog/search-console/callback/ as its
+# one authorised redirect URI. Empty: the blog pages say to ask an admin, and
+# nothing reaches Google. Refresh tokens are stored encrypted per website.
+GSC_CLIENT_ID = env("GSC_CLIENT_ID", default="")
+GSC_CLIENT_SECRET = env("GSC_CLIENT_SECRET", default="")
+# IndexNow (Bing, Yandex, Seznam, Naver): 8–128 letters, digits or dashes. When
+# set, every blog publish writes <key>.txt at the site root and pings IndexNow
+# once the post is live. Empty: off.
+INDEXNOW_KEY = env("INDEXNOW_KEY", default="")
+
 # AI Studio (apps.studio): the agent team runs on Claude through the Anthropic
 # API. Empty ANTHROPIC_API_KEY: the Studio explains it is not set up and runs
 # nothing. Set it on the web AND worker services — the agents run in the worker.
