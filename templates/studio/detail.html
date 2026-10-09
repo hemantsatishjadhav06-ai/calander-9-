@@ -296,7 +296,8 @@
             {% endif %}
             {% if can_revise %}
             <section aria-labelledby="changes-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
-                <h2 id="changes-heading" class="text-sm font-semibold text-stone-900 mb-3">Ask for changes</h2>
+                <h2 id="changes-heading" class="text-sm font-semibold text-stone-900">Send it back with notes</h2>
+                <p class="text-xs text-stone-600 mt-0.5 mb-3">Goes straight to the copywriter and art director.</p>
                 <form method="post" action="{% url 'studio:request_changes' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
                     {% csrf_token %}
                     <label for="{{ feedback_form.feedback.id_for_label }}" class="sr-only">{{ feedback_form.feedback.label }}</label>
