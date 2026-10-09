@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load tz %}
 
 {% block title %}Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
@@ -167,7 +168,7 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=item.brief.id %}" class="text-sm font-semibold text-stone-900 hover:underline focus-visible:outline-2 focus-visible:outline-orange-700 rounded">{{ item.title }}</a>
-                            <p class="text-xs text-stone-600 mt-0.5">{{ item.where|default:"No account" }}{% if item.proposed %} · Proposed {{ item.proposed|date:"D j M, H:i" }}{% endif %}</p>
+                            <p class="text-xs text-stone-600 mt-0.5">{{ item.where|default:"No account" }}{% if item.proposed %} · Proposed {{ item.proposed|timezone:tzname|date:"D j M, H:i" }}{% endif %}</p>
                             <p class="text-xs mt-0.5 {% if item.flags %}text-amber-800{% else %}text-green-800{% endif %}">{% if item.score %}Brand reviewer {{ item.score }}/10{% endif %}{% if item.flags %} · {{ item.flags }} thing{{ item.flags|pluralize }} to check{% endif %}{% if item.qa_notes %} · {{ item.qa_notes }} QA note{{ item.qa_notes|pluralize }}{% endif %}</p>
                         </div>
                         <div class="flex items-center gap-2">
@@ -175,7 +176,7 @@
                             {% if can_approve and item.proposed_in_future %}
                             <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=item.brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
                                 {% csrf_token %}<input type="hidden" name="mode" value="proposed">
-                                <button type="submit" x-bind:disabled="busy" class="px-3 py-1.5 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Approve &amp; schedule<span class="sr-only"> {{ item.title }} for {{ item.proposed|date:"D j M, H:i" }}</span></button>
+                                <button type="submit" x-bind:disabled="busy" class="px-3 py-1.5 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Approve &amp; schedule<span class="sr-only"> {{ item.title }} for {{ item.proposed|timezone:tzname|date:"D j M, H:i" }}</span></button>
                             </form>
                             {% endif %}
                         </div>
@@ -234,13 +235,13 @@
                     </div>
                     {% for tab in tabs %}{% if tab.key == 'autopilot' %}<a href="{{ tab.url }}" class="px-3 py-1.5 text-sm font-semibold text-orange-800 bg-orange-50 rounded-lg hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-700">Autopilot settings</a>{% endif %}{% endfor %}
                 </div>
-                <ol class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                <ol class="grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-7 gap-2">
                     {% for day in week %}
                     <li class="rounded-lg p-2.5 min-h-24 {% if day.items %}bg-orange-50{% else %}bg-stone-50{% endif %}">
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-stone-600">{{ day.date|date:"D j" }}</p>
                         <ul class="mt-1 space-y-1">
                             {% for item in day.items %}
-                            <li class="text-xs leading-snug {% if item.tone == 'scheduled' %}text-green-800{% elif item.tone == 'ready' %}text-amber-800{% else %}text-orange-800{% endif %}"><span class="font-semibold">{{ item.time|date:"H:i" }}</span> {{ item.label|truncatechars:42 }}<span class="sr-only"> ({{ item.tone }})</span></li>
+                            <li class="text-xs leading-snug {% if item.tone == 'scheduled' %}text-green-800{% elif item.tone == 'ready' %}text-amber-800{% else %}text-orange-800{% endif %}"><span class="font-semibold">{{ item.time|timezone:tzname|date:"H:i" }}</span> {{ item.label|truncatechars:48 }}<span class="sr-only"> ({{ item.tone }})</span></li>
                             {% empty %}
                             <li class="text-xs text-stone-500">—</li>
                             {% endfor %}

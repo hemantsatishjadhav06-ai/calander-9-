@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load tz %}
 
 {% block title %}{{ brief.title|truncatechars:60 }} - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
@@ -231,7 +232,7 @@
                 <p class="text-xs text-stone-600 mb-3">Nothing goes out until you approve.</p>
                 {% if brief.status == 'ready' and proposed_local %}
                 <div class="rounded-xl bg-orange-50 px-3 py-2.5 mb-4">
-                    <p class="text-sm font-semibold text-orange-800">Proposed: {{ proposed_local|date:"D j M, H:i" }} <span class="font-normal text-stone-600">({{ workspace.effective_timezone|default:"UTC" }})</span></p>
+                    <p class="text-sm font-semibold text-orange-800">Proposed: {{ proposed_local|timezone:tzname|date:"D j M, H:i" }} <span class="font-normal text-stone-600">({{ workspace.effective_timezone|default:"UTC" }})</span></p>
                     {% if scheduler_note %}<p class="text-xs text-stone-700 mt-0.5 break-words">{{ scheduler_note }}</p>{% endif %}
                 </div>
                 {% endif %}
@@ -255,7 +256,7 @@
                     <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
                         {% csrf_token %}<input type="hidden" name="mode" value="proposed">
                         <button type="submit" x-bind:disabled="busy" class="w-full px-5 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
-                            <span x-show="!busy">Approve &amp; schedule for {{ proposed_local|date:"D H:i" }}</span><span x-show="busy" x-cloak>Approving…</span>
+                            <span x-show="!busy">Approve &amp; schedule for {{ proposed_local|timezone:tzname|date:"D H:i" }}</span><span x-show="busy" x-cloak>Approving…</span>
                         </button>
                     </form>
                     {% endif %}

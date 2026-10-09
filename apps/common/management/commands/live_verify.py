@@ -58,6 +58,7 @@ class Command(BaseCommand):
         if not skip_accounts:
             checks.append(self.check_accounts)
         checks.append(self.check_blog)
+        checks.append(self.check_agency)
         for check in checks:
             try:
                 check()
@@ -286,6 +287,38 @@ class Command(BaseCommand):
                     label,
                     f"{account.account_name}: read-only API call failed: {type(exc).__name__}: {exc}"[:400],
                 )
+
+    def check_agency(self):
+        """The AI agency: its keys, its schedules, and the rule that agents never approve."""
+        from background_task.models import Task
+
+        from apps.studio import guards, team
+
+        self.record("INFO", "agency.team", f"{len(team.AGENTS)} agents in {len(team.DEPARTMENTS)} departments")
+        claude = bool((getattr(settings, "ANTHROPIC_API_KEY", "") or "").strip())
+        self.record(
+            "PASS" if claude else "BLOCKED",
+            "agency.anthropic_key",
+            "set" if claude else "ANTHROPIC_API_KEY is not set on this service: the agents cannot run",
+        )
+        fal = bool((getattr(settings, "FAL_KEY", "") or "").strip())
+        self.record(
+            "PASS" if fal else "INFO", "agency.fal_key", "set" if fal else "not set: graphics use the brand background"
+        )
+        names = set(Task.objects.filter(repeat__gt=0).values_list("verbose_name", flat=True))
+        for wanted in ("run_agency_cycle", "sweep_stuck_studio_briefs"):
+            self.record(
+                "PASS" if wanted in names else "FAIL",
+                f"agency.schedule.{wanted}",
+                "registered" if wanted in names else "not registered (start the worker once to register it)",
+            )
+        try:
+            with guards.agent_work("live_verify"):
+                guards.forbid_in_agent_work("approve a post")
+        except guards.AgentMayNotApproveError:
+            self.record("PASS", "agency.agents_cannot_approve", "agency work is refused approve/schedule paths")
+        else:
+            self.record("FAIL", "agency.agents_cannot_approve", "the guard did not refuse agency work")
 
     def check_blog(self):
         try:

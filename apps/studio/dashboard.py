@@ -78,9 +78,10 @@ def waiting(workspace) -> list[dict[str, Any]]:
         .order_by("proposed_publish_at", "-finished_at")[:8]
     )
     now = timezone.now()
+    zone = _zone(workspace)
     for brief in briefs:
         review = brief.review_notes or {}
-        proposed = brief.proposed_publish_at
+        proposed = brief.proposed_publish_at.astimezone(zone) if brief.proposed_publish_at else None
         rows.append(
             {
                 "kind": "post",
