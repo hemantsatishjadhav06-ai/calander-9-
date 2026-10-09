@@ -50,6 +50,12 @@
                            {% if request.resolver_match.url_name == 'approval_queue' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
                             Approvals
                         </a>
+                        <a href="{% url 'client_portal:team' %}"
+                           class="inline-flex items-center px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'team' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
+                           {% if request.resolver_match.url_name == 'team' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                            Talk to the team
+                            <span id="team-unread-desktop" hx-get="{% url 'client_portal:team_unread' %}" hx-trigger="load" hx-swap="outerHTML"></span>
+                        </a>
                         <a href="{% url 'client_portal:published' %}"
                            class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'published' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
                            {% if request.resolver_match.url_name == 'published' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
@@ -83,6 +89,12 @@
                    class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'approval_queue' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
                    {% if request.resolver_match.url_name == 'approval_queue' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
                     Approvals
+                </a>
+                <a href="{% url 'client_portal:team' %}"
+                   class="inline-flex items-center px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'team' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
+                   {% if request.resolver_match.url_name == 'team' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                    Talk to the team
+                    <span id="team-unread-mobile"></span>
                 </a>
                 <a href="{% url 'client_portal:published' %}"
                    class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'published' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"

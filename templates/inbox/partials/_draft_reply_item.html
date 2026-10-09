@@ -7,7 +7,11 @@
         {% else %}
         <span class="badge-pill" style="background: var(--surface-2); color: var(--stone-600, #57534e);">Draft</span>
         {% endif %}
+        {% if draft.drafted_by %}
+        <span class="text-[11px] font-semibold text-orange-800">{% if draft.drafted_by == 'reputation_manager' %}Drafted by the reviews manager{% else %}Drafted by the community manager{% endif %} · check it before you send</span>
+        {% else %}
         <span class="text-[11px] text-stone-500">{{ draft.author.get_short_name|default:draft.author.email|default:"—" }}</span>
+        {% endif %}
         <span class="text-[11px] text-stone-500 ml-auto">{{ draft.created_at|timesince }} ago</span>
     </div>
     <p class="text-[13px] text-stone-700 leading-relaxed whitespace-pre-wrap">{{ draft.body }}</p>

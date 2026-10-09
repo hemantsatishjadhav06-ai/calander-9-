@@ -48,6 +48,33 @@ def can_revise(brief: StudioBrief) -> bool:
     return post_statuses(brief) <= pipeline.REVISABLE_STATUSES
 
 
+def reopen(brief: StudioBrief) -> bool:
+    """Make an approved brief revisable again once its post is back in the team's hands.
+
+    A brief counts as approved as soon as its post reaches the client stage
+    (:func:`sync_status`). When the client then asks for a change in the
+    portal, every channel goes back to ``changes_requested``, and the team
+    should be able to revise the post — so the brief returns to READY. Only
+    when every channel is in a revisable status (draft, pending review,
+    changes requested, rejected); an approved, scheduled or published channel
+    keeps it closed, and a person must put the post on hold first. True when
+    the brief can now be revised.
+    """
+    if brief.status != StudioBrief.Status.APPROVED:
+        return can_revise(brief)
+    statuses = post_statuses(brief)
+    if not statuses or not statuses <= pipeline.REVISABLE_STATUSES:
+        return False
+    updated = StudioBrief.objects.filter(pk=brief.pk, status=StudioBrief.Status.APPROVED).update(
+        status=StudioBrief.Status.READY, updated_at=timezone.now()
+    )
+    if updated:
+        brief.status = StudioBrief.Status.READY
+    else:
+        brief.refresh_from_db(fields=["status"])
+    return can_revise(brief)
+
+
 def create_brief(
     workspace,
     author,
