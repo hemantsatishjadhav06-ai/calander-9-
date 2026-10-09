@@ -484,6 +484,18 @@ def step_picture(brief: StudioBrief) -> str:
     if keep:
         _end(run, summary="Kept the current picture.", status=AgentRun.Status.SKIPPED, model="")
         return "render"
+    # Check storage before paying for a picture there would be no room to keep.
+    try:
+        images.check_room_for_picture(brief.workspace)
+    except StorageQuotaExceededError:
+        _save(brief, picture=None, regenerate_picture=False)
+        _end(
+            run,
+            summary="The workspace is out of media storage, so the graphic uses the brand background.",
+            status=AgentRun.Status.SKIPPED,
+            model="",
+        )
+        return "render"
     # The illustrator's row was opened first so the timeline reads in order;
     # the prompt engineer's turn is recorded just before it.
     run.delete()

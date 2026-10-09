@@ -9,7 +9,7 @@ from PIL import Image
 from apps.blog.ai_images import GeneratedImage, ImageGenerationError
 from apps.composer.models import PlatformPost, PostMedia
 from apps.notifications.models import Notification
-from apps.studio import pipeline
+from apps.studio import images, pipeline
 from apps.studio.models import AgentRun, StudioBrief
 from apps.studio.tests.conftest import jpeg_bytes, make_brief, run_all
 
@@ -167,6 +167,23 @@ def test_a_picture_failure_falls_back_to_the_brand_background(world, fake_team, 
     assert brief.status == StudioBrief.Status.READY and brief.picture is None
     run = brief.runs.get(agent="illustrator")
     assert run.status == AgentRun.Status.FAILED and "no credit" in run.error
+
+
+def test_no_picture_is_paid_for_when_media_storage_is_full(world, fake_team, settings):
+    from apps.media_library.quotas import StorageQuotaExceededError
+
+    settings.FAL_KEY = "fal-test"
+    full = StorageQuotaExceededError(used=10, limit=10, attempted=images.PICTURE_BYTES_ESTIMATE)
+    with (
+        mock.patch("apps.studio.images.ai_images.generate_from_prompt") as gen,
+        mock.patch("apps.studio.images.check_room_for_picture", side_effect=full),
+    ):
+        brief = run_all(make_brief(world))
+    gen.assert_not_called()
+    assert "prompt_engineer" not in fake_team.calls
+    assert brief.status == StudioBrief.Status.READY and brief.picture is None
+    run = brief.runs.get(agent="illustrator")
+    assert run.status == AgentRun.Status.SKIPPED and "storage" in run.summary
 
 
 def test_a_chosen_photo_is_used_instead_of_painting(world, fake_team, photo, settings):

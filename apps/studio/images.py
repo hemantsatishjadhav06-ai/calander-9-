@@ -53,6 +53,17 @@ def generate(spec: dict) -> ai_images.GeneratedImage:
     return ai_images.generate_from_prompt(prompt, image_size=size)
 
 
+#: About what one generated picture takes in the media library (a 1–2 MP JPEG or PNG).
+PICTURE_BYTES_ESTIMATE = 4 * 1024 * 1024
+
+
+def check_room_for_picture(workspace) -> None:
+    """Raise ``StorageQuotaExceededError`` before a paid picture is made with nowhere to keep it."""
+    from apps.media_library.quotas import enforce_storage_quota
+
+    enforce_storage_quota(workspace.organization, PICTURE_BYTES_ESTIMATE)
+
+
 def save_picture(brief, generated: ai_images.GeneratedImage):
     """Store a generated picture in the brief's workspace media library."""
     from apps.media_library.models import MediaAsset
