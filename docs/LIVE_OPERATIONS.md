@@ -91,6 +91,42 @@ featured image, SEO title/description), **Preview** (signed-in only,
 * **Create social drafts** turns an approved or published blog into social
   drafts, which go through approval like any other post.
 
+## The agency
+
+**Agency** in the workspace sidebar is the AI team's home: 28 agents in seven
+departments (see **Agency → Team**). Everything they make waits for an owner or
+manager under **Waiting for you** — nothing is approved, scheduled or
+published by an agent, in any workspace.
+
+* **One post from one line**: type the idea at the top of the agency home and
+  press **Brief the team**. Two to four minutes later it is waiting with a
+  proposed time; **Approve & schedule for <time>** is one click.
+* **Same look as the best work**: *Match the look of the last post* is on by
+  default. **Agency → Creative memory** shows which past creatives worked best
+  for each account; mark the designer's best ones (or upload them) as
+  *Learn from this* and the art director and prompt engineer follow them.
+* **Autopilot** (**Agency → Autopilot**, workspace owners): set posts per
+  week, the accounts, the content pillars and when to plan (Friday 16:00 by
+  default, workspace time). The planner fills next week's open slots, the team
+  makes every post, and the lead approver gets one notification when they are
+  ready. Set a monthly budget; the team stops starting new work when the
+  month's estimate reaches it.
+* **Ask the team**: on the agency home and on every post. Ask a question or
+  for a change and the account manager gets the right agent on it. Tick
+  *Internal note* for a note clients never see. Clients have the same thread
+  in the client portal (**Talk to the team**), where the weekly report is under
+  **Reports**. Their requests still need internal approval.
+* **Inbox drafts**: with *Draft replies to comments, messages and reviews* on in
+  Autopilot (or **Draft replies with the team** in the inbox), new comments and
+  reviews get a drafted reply in the inbox, labelled with the agent that
+  wrote it. A person sends it; unhappy reviews are flagged.
+* **Blog**: **Write with the team** on the blog list turns a topic into a full
+  article (keyword, outline, article, fact check, SEO title and description, a
+  designed cover). The editor's **SEO score** lists every check with its fix;
+  *Improve SEO* sends the article back to the SEO team. Connect **Google
+  Search Console** on the blog list to see positions, clicks and searches per
+  article; **Run an SEO check-up** suggests what to refresh.
+
 ## One-time owner setup (still needed)
 
 1. **Connect accounts** — in each brand workspace: Settings → Social accounts
@@ -113,6 +149,35 @@ featured image, SEO title/description), **Preview** (signed-in only,
    on the service, then in the Meta app → Webhooks subscribe
    `…/webhooks/facebook/` with the same token (Page: feed, messages; Instagram:
    comments, messages).
+5. **The agency** — set `ANTHROPIC_API_KEY` (console.anthropic.com) on **both**
+   `sm-bean` and `sm-bean-worker`; the agents run in the worker. `FAL_KEY` is
+   already set on both, so graphics get painted pictures. The agency home says
+   on its page what is missing. Then in each brand workspace open **Agency →
+   Autopilot**, choose the accounts, posts per week, pillars and a monthly
+   budget, and switch it on.
+6. **LinkedIn Company Pages** — at developer.linkedin.com create an app tied to
+   a Company Page, add the **Community Management API** product (LinkedIn
+   reviews it), and list the redirect URLs
+   `https://sm-bean-production-eb50.up.railway.app/social-accounts/callback/linkedin_company/`
+   and `…/callback/linkedin_personal/`. Set `PLATFORM_LINKEDIN_COMPANY_CLIENT_ID`
+   / `PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET` on both services, then in each
+   brand workspace Connect → LinkedIn (Company Page) and pick that brand's Page.
+   The connecting LinkedIn member must be an admin of the Page. If LinkedIn
+   answers that a scope isn't authorized, see README → LinkedIn → "Scopes must
+   match the app".
+7. **Sign in with Google (optional)** — Google Cloud Console → Credentials →
+   OAuth client ID (Web application) with the redirect URI
+   `https://sm-bean-production-eb50.up.railway.app/accounts/google/login/callback/`;
+   set `GOOGLE_AUTH_CLIENT_ID` / `GOOGLE_AUTH_CLIENT_SECRET` on `sm-bean`. The
+   instance stays invite-only: a Google address needs an invitation or a
+   `SIGNUP_ALLOWLIST` entry (for example `@neopolisinfra.com`) to get an account.
+8. **Google Search Console (optional)** — in Google Cloud Console enable the
+   *Google Search Console API*, create an OAuth client ID (Web application)
+   with the redirect URI
+   `https://sm-bean-production-eb50.up.railway.app/blog/search-console/callback/`,
+   and set `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` on both services. Then on
+   each brand's blog list choose **Connect Google Search Console** with a Google
+   account that can see that website's property.
 
 ## Checking the live deployment
 
@@ -133,7 +198,9 @@ The release step takes a database backup **before** migrating
 1. **Code only (normal case):** Railway → `sm-bean` → Deployments → the previous
    successful deployment → **Rollback**; do the same for `sm-bean-worker`. This
    release's migrations only *add* columns (nullable or with database
-   defaults), so the previous code runs against the migrated database as is.
+   defaults) and the AI Studio's own tables, so the previous code runs against
+   the migrated database as is. Posts the Studio already handed over stay
+   ordinary posts.
 2. **Turn the gate off without a deploy:** Settings → Approvals → untick
    *Require dashboard approval* (owner only). Posts keep their approvals.
 3. **Data restore (only if data was damaged):** with the matching code deployed,

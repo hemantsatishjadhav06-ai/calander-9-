@@ -58,6 +58,7 @@ class Command(BaseCommand):
         if not skip_accounts:
             checks.append(self.check_accounts)
         checks.append(self.check_blog)
+        checks.append(self.check_agency)
         for check in checks:
             try:
                 check()
@@ -195,6 +196,20 @@ class Command(BaseCommand):
                 "(pay-per-use), then set PLATFORM_X_CLIENT_ID / PLATFORM_X_CLIENT_SECRET",
             )
         base = (getattr(settings, "APP_URL", "") or "").rstrip("/")
+        if has("linkedin_company"):
+            self.record(
+                "PASS",
+                "credentials.linkedin_company",
+                "client id/secret present (posting as a Page needs the app's Community Management API product)",
+            )
+        else:
+            self.record(
+                "BLOCKED",
+                "credentials.linkedin_company",
+                "no LinkedIn app: create one at developer.linkedin.com tied to a Company Page, get the Community "
+                f"Management API product, add the redirect URL {base}/social-accounts/callback/linkedin_company/, "
+                "then set PLATFORM_LINKEDIN_COMPANY_CLIENT_ID / PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET",
+            )
         if getattr(settings, "FACEBOOK_WEBHOOK_VERIFY_TOKEN", ""):
             self.record("PASS", "webhooks.meta", f"verify token set; Meta callback {base}/webhooks/facebook/")
         else:
@@ -273,6 +288,38 @@ class Command(BaseCommand):
                     f"{account.account_name}: read-only API call failed: {type(exc).__name__}: {exc}"[:400],
                 )
 
+    def check_agency(self):
+        """The AI agency: its keys, its schedules, and the rule that agents never approve."""
+        from background_task.models import Task
+
+        from apps.studio import guards, team
+
+        self.record("INFO", "agency.team", f"{len(team.AGENTS)} agents in {len(team.DEPARTMENTS)} departments")
+        claude = bool((getattr(settings, "ANTHROPIC_API_KEY", "") or "").strip())
+        self.record(
+            "PASS" if claude else "BLOCKED",
+            "agency.anthropic_key",
+            "set" if claude else "ANTHROPIC_API_KEY is not set on this service: the agents cannot run",
+        )
+        fal = bool((getattr(settings, "FAL_KEY", "") or "").strip())
+        self.record(
+            "PASS" if fal else "INFO", "agency.fal_key", "set" if fal else "not set: graphics use the brand background"
+        )
+        names = set(Task.objects.filter(repeat__gt=0).values_list("verbose_name", flat=True))
+        for wanted in ("run_agency_cycle", "sweep_stuck_studio_briefs"):
+            self.record(
+                "PASS" if wanted in names else "FAIL",
+                f"agency.schedule.{wanted}",
+                "registered" if wanted in names else "not registered (start the worker once to register it)",
+            )
+        try:
+            with guards.agent_work("live_verify"):
+                guards.forbid_in_agent_work("approve a post")
+        except guards.AgentMayNotApproveError:
+            self.record("PASS", "agency.agents_cannot_approve", "agency work is refused approve/schedule paths")
+        else:
+            self.record("FAIL", "agency.agents_cannot_approve", "the guard did not refuse agency work")
+
     def check_blog(self):
         try:
             from apps.blog.models import BlogSite
@@ -285,6 +332,7 @@ class Command(BaseCommand):
             "blog.sites",
             ", ".join(f"{s.name}->{s.repo}" for s in sites) or "none",
         )
+        self.check_blog_seo(sites)
         token = getattr(settings, "BLOG_GITHUB_TOKEN", "")
         if not token:
             return
@@ -306,6 +354,42 @@ class Command(BaseCommand):
                 )
             except Exception as exc:
                 self.record("FAIL", f"blog.github.{site.repo}", f"{type(exc).__name__}: {exc}")
+
+    def check_blog_seo(self, sites):
+        """Search Console and IndexNow: configured or not, each website's connection, the SEO schedules."""
+        from background_task.models import Task
+
+        from apps.blog import publisher, search_console
+
+        configured = search_console.is_configured()
+        self.record(
+            "PASS" if configured else "INFO",
+            "blog.search_console.client",
+            f"set; redirect URI {search_console.redirect_uri()}"
+            if configured
+            else "GSC_CLIENT_ID/GSC_CLIENT_SECRET unset: rankings are off and the blog pages say so",
+        )
+        for site in sites:
+            connection = search_console.connection_for(site)
+            if connection is not None and search_console.is_connected(connection):
+                state = f"connected to {connection.property_url}; last sync {connection.last_sync_at or 'never'}"
+                if connection.last_error:
+                    state += f"; last error: {connection.last_error}"
+                self.record("FAIL" if connection.last_error else "PASS", f"blog.search_console.{site.repo}", state)
+            else:
+                self.record("INFO", f"blog.search_console.{site.repo}", "not connected")
+        self.record(
+            "PASS" if publisher.indexnow_key() else "INFO",
+            "blog.indexnow",
+            "key set: publishes write the key file and ping IndexNow" if publisher.indexnow_key() else "off",
+        )
+        names = set(Task.objects.filter(repeat__gt=0).values_list("verbose_name", flat=True))
+        for wanted in ("queue_search_console_syncs", "queue_seo_checkups"):
+            self.record(
+                "PASS" if wanted in names else "FAIL",
+                f"blog.schedule.{wanted}",
+                "registered" if wanted in names else "not registered (start the worker once to register it)",
+            )
 
     # ------------------------------------------------------------------
     # End-to-end workflow on a throwaway fixture, always rolled back

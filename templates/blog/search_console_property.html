@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Search Console for {{ site.name }} - Blog - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
+        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Blog</a>
+        <span aria-hidden="true"> / </span><span>Google Search Console</span>
+    </nav>
+    <h1 class="text-2xl text-stone-900 mb-1" style="font-family: var(--font-display)">Which property is {{ site.name }}?</h1>
+    <p class="text-sm text-stone-600 mb-6">
+        These are the Search Console properties the Google account you used can read. Pick the one for
+        <span class="font-mono text-xs text-stone-800">{{ site.origin }}</span> — a domain property
+        (<span class="font-mono text-xs">sc-domain:…</span>) covers every address of the site.
+    </p>
+
+    {% if error %}
+    <div role="alert" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ error }}</div>
+    {% endif %}
+
+    {% if properties %}
+    <form method="post" class="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+        {% csrf_token %}
+        <fieldset>
+            <legend class="text-sm font-semibold text-stone-900 mb-3">Search Console property</legend>
+            <div class="space-y-2">
+                {% for prop in properties %}
+                <label class="flex items-center gap-3 border border-stone-300 rounded-lg px-3 py-2.5 cursor-pointer has-checked:border-orange-700 has-checked:ring-2 has-checked:ring-orange-600 focus-within:ring-2 focus-within:ring-orange-600">
+                    <input type="radio" name="property" value="{{ prop.url }}" {% if prop.url == suggested %}checked{% endif %} required class="accent-orange-700">
+                    <span class="min-w-0">
+                        <span class="block font-mono text-sm text-stone-900 break-all">{{ prop.url }}</span>
+                        <span class="block text-xs text-stone-600">{% if prop.url == suggested %}Matches this website · {% endif %}{% if prop.permission == 'siteOwner' %}Owner{% elif prop.permission == 'siteFullUser' %}Full access{% else %}Read access{% endif %}</span>
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        <div class="mt-5 flex flex-wrap items-center gap-3">
+            <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Use this property</button>
+            <a href="{% url 'blog:list' workspace_id=workspace.id %}#google-search" class="px-4 py-2 text-sm font-medium text-stone-700 rounded-full hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-orange-700">Cancel</a>
+        </div>
+    </form>
+    {% else %}
+    <div class="bg-white border border-stone-200 rounded-xl p-5 shadow-sm text-sm text-stone-700">
+        <p class="font-semibold text-stone-900 mb-1">This Google account can't read any Search Console property.</p>
+        <p>Add and verify {{ site.origin }} in Google Search Console (or ask its owner to add this Google account), then connect again from the Blog page.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

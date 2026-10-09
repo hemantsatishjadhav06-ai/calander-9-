@@ -5,8 +5,10 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import re
 import tempfile
 import time
+import unicodedata
 from datetime import UTC, datetime
 from urllib.parse import quote, urlencode
 
@@ -21,7 +23,6 @@ from .types import (
     InboxMessage,
     MediaType,
     OAuthTokens,
-    PostMetrics,
     PostType,
     PublishContent,
     PublishResult,
@@ -42,6 +43,11 @@ API_BASE = "https://api.linkedin.com"
 # well under this, so the constant bounds our disk usage rather than deciding
 # what LinkedIn will accept.
 MAX_REMOTE_MEDIA_BYTES = 20 * 1024 * 1024
+
+#: A multiImage post takes 2 to 20 images.
+MAX_POST_IMAGES = 20
+#: LinkedIn's limit for an image's alt text (it recommends under 120).
+MAX_ALT_TEXT = 4086
 
 # Required headers for LinkedIn REST API.
 # LinkedIn sunsets versioned APIs after ~1 year; bump LinkedIn-Version
@@ -73,6 +79,44 @@ def _encode_urn(urn: str) -> str:
 LINKEDIN_RESERVED_CHARS = "|{}@[]()<>#*_~"
 
 
+def _escape_plain(text: str) -> str:
+    escaped = text.replace("\\", "\\\\")
+    for ch in LINKEDIN_RESERVED_CHARS:
+        escaped = escaped.replace(ch, "\\" + ch)
+    return escaped
+
+
+def _is_tag_char(ch: str) -> bool:
+    # Letters, combining marks (Devanagari vowel signs…) and digits.
+    return unicodedata.category(ch)[0] in ("L", "M", "N")
+
+
+def hashtag_spans(text: str) -> list[tuple[int, int]]:
+    """Where ``text`` holds hashtags LinkedIn will link: ``(start, end)`` pairs.
+
+    A hashtag is "#" and one word of letters and digits with at least one
+    letter, not glued to the word before it ("C#") and not running on into an
+    underscore ("#real_estate" stays literal text rather than linking "#real").
+    """
+    spans = []
+    index = text.find("#")
+    while index != -1:
+        before = text[index - 1] if index else ""
+        end = index + 1
+        while end < len(text) and _is_tag_char(text[end]):
+            end += 1
+        tag = text[index + 1 : end]
+        if (
+            tag
+            and not (before and (_is_tag_char(before) or before in "#_\\"))
+            and any(unicodedata.category(ch).startswith("L") for ch in tag)
+            and not (end < len(text) and text[end] == "_")
+        ):
+            spans.append((index, end))
+        index = text.find("#", end if end > index + 1 else index + 1)
+    return spans
+
+
 def escape_commentary(text: str) -> str:
     """Escape LinkedIn's reserved little-text characters in a post commentary.
 
@@ -82,14 +126,22 @@ def escape_commentary(text: str) -> str:
     full text renders literally. The backslash itself is escaped first to avoid
     double-escaping the escapes we add.
 
+    Hashtags are the exception: an unescaped ``#word`` is little-text's own
+    hashtag element, which LinkedIn turns into a linked, searchable hashtag.
+    Escaping those published every hashtag as dead text. Any other "#" ("#1",
+    "C#") is still escaped.
+
     Posts only: the Comments API takes plain text, not little-format.
     """
     if not text:
         return text
-    escaped = text.replace("\\", "\\\\")
-    for ch in LINKEDIN_RESERVED_CHARS:
-        escaped = escaped.replace(ch, "\\" + ch)
-    return escaped
+    out, last = [], 0
+    for start, end in hashtag_spans(text):
+        out.append(_escape_plain(text[last:start]))
+        out.append(text[start:end])
+        last = end
+    out.append(_escape_plain(text[last:]))
+    return "".join(out)
 
 
 class LinkedInProvider(SocialProvider):
@@ -146,6 +198,17 @@ class LinkedInProvider(SocialProvider):
                 "company_shares_per_day": 100,
             },
         )
+
+    def _configured_scopes(self, default: list[str]) -> list[str]:
+        """``default``, unless the deployment lists the scopes its LinkedIn app holds.
+
+        LinkedIn refuses the whole sign-in when one requested scope isn't
+        granted to the app, and which scopes an app holds depends on the
+        LinkedIn products it was approved for. ``PLATFORM_LINKEDIN_*_SCOPES``
+        (space- or comma-separated) arrives here as ``credentials["_scopes"]``.
+        """
+        override = [scope for scope in re.split(r"[\s,]+", str(self.credentials.get("_scopes") or "")) if scope]
+        return override or list(default)
 
     # ------------------------------------------------------------------
     # OAuth
@@ -300,8 +363,8 @@ class LinkedInProvider(SocialProvider):
             extra={"urn": post_urn},
         )
 
-    def _publish_image_post(self, access_token: str, author: str, content: PublishContent) -> PublishResult:
-        # Step 1: initialize upload
+    def _upload_image(self, access_token: str, author: str, source: str) -> str:
+        """Upload one image (JPG, PNG or GIF) owned by ``author``; return its ``urn:li:image``."""
         init_resp = self._request(
             "POST",
             f"{API_BASE}/rest/images",
@@ -324,18 +387,40 @@ class LinkedInProvider(SocialProvider):
                 platform=self.platform_name,
                 raw_response=init_data,
             )
+        self._upload_binary(access_token, upload_url, source)
+        return image_urn
 
-        # Step 2: upload image binary (prefer local file to avoid extra network hop)
-        image_source = content.media_files[0] if content.media_files else content.media_urls[0]
-        self._upload_binary(access_token, upload_url, image_source)
+    def _publish_image_post(self, access_token: str, author: str, content: PublishContent) -> PublishResult:
+        """One image as ``media``; two or more (up to 20) as a ``multiImage`` post.
 
-        # Step 3: create post with image
+        Only the first attachment used to be sent, so a post with three images
+        went out with one and nothing said so. Alt text rides along when the
+        composer has it for that attachment.
+        """
+        # Prefer local files: no extra network hop. Both lists, and the alt
+        # texts and media types, are parallel (the engine fills them together).
+        sources = content.media_files or content.media_urls
+        images: list[dict] = []
+        for index, source in enumerate(sources):
+            if content.is_video(index):
+                logger.info("LinkedIn image post: skipping attachment %s, a video can't join images", index)
+                continue
+            if len(images) == MAX_POST_IMAGES:
+                logger.warning("LinkedIn takes at most %s images per post; the rest were left out", MAX_POST_IMAGES)
+                break
+            image: dict = {"id": self._upload_image(access_token, author, source)}
+            alt_text = (content.media_alt_texts[index] if index < len(content.media_alt_texts) else "").strip()
+            if alt_text:
+                image["altText"] = alt_text[:MAX_ALT_TEXT]
+            images.append(image)
+        if not images:
+            raise PublishError("No image to publish", platform=self.platform_name, retryable=False)
+
         body = self._build_post_body(author, content.text)
-        body["content"] = {
-            "media": {
-                "id": image_urn,
-            }
-        }
+        if len(images) == 1:
+            body["content"] = {"media": images[0]}
+        else:
+            body["content"] = {"multiImage": {"images": images}}
 
         resp = self._request(
             "POST",
@@ -348,7 +433,7 @@ class LinkedInProvider(SocialProvider):
         return PublishResult(
             platform_post_id=post_urn,
             url=self._post_urn_to_url(post_urn),
-            extra={"urn": post_urn, "image_urn": image_urn},
+            extra={"urn": post_urn, "image_urn": images[0]["id"], "image_urns": [image["id"] for image in images]},
         )
 
     def _publish_video_post(self, access_token: str, author: str, content: PublishContent) -> PublishResult:
@@ -514,13 +599,17 @@ class LinkedInProvider(SocialProvider):
     # Comments
     # ------------------------------------------------------------------
 
+    def _comment_actor(self, access_token: str) -> str:
+        """Who comments: the signed-in member. Company Pages comment as the Page."""
+        profile = self.get_profile(access_token)
+        return f"urn:li:person:{profile.platform_id}"
+
     def publish_comment(self, access_token: str, post_id: str, text: str) -> CommentResult:
         """Post a comment on a LinkedIn post.
 
         post_id should be the post URN (e.g. urn:li:share:123456).
         """
-        profile = self.get_profile(access_token)
-        actor = f"urn:li:person:{profile.platform_id}"
+        actor = self._comment_actor(access_token)
 
         resp = self._request(
             "POST",
@@ -536,7 +625,8 @@ class LinkedInProvider(SocialProvider):
             },
         )
         data = resp.json()
-        comment_urn = resp.headers.get("x-restli-id", data.get("id", ""))
+        # The body's commentUrn is the comment's full id; x-restli-id is only its number.
+        comment_urn = data.get("commentUrn") or resp.headers.get("x-restli-id", data.get("id", ""))
         return CommentResult(platform_comment_id=comment_urn, extra=data)
 
     # ------------------------------------------------------------------
@@ -544,80 +634,78 @@ class LinkedInProvider(SocialProvider):
     # ------------------------------------------------------------------
 
     def get_messages(self, access_token: str, since: datetime | None = None) -> list[InboxMessage]:
-        # Determine author URN
         profile = self.get_profile(access_token)
-        author = f"urn:li:person:{profile.platform_id}"
+        return self._comments_on_posts_by(access_token, f"urn:li:person:{profile.platform_id}", since)
 
-        # Fetch recent posts by this author
-        params: dict = {"q": "author", "author": author, "count": 20}
+    def _comments_on_posts_by(self, access_token: str, author: str, since: datetime | None) -> list[InboxMessage]:
+        """Comments on ``author``'s 20 latest posts, leaving out ``author``'s own.
+
+        Our own comments (a first comment, a reply sent from the inbox) used to
+        come back as inbound messages from ourselves.
+        """
         resp = self._request(
             "GET",
             f"{API_BASE}/rest/posts",
             access_token=access_token,
-            headers=LINKEDIN_HEADERS,
-            params=params,
+            headers={**LINKEDIN_HEADERS, "X-RestLi-Method": "FINDER"},
+            params={"q": "author", "author": author, "count": 20},
         )
-        posts = resp.json().get("elements", [])
-
         messages: list[InboxMessage] = []
-
-        for post in posts:
+        for post in resp.json().get("elements", []):
             post_urn = post.get("id", "")
             if not post_urn:
                 continue
+            for comment in self._post_comments(access_token, post_urn):
+                actor_urn = comment.get("actor", "")
+                if actor_urn == author:
+                    continue
+                created_at_ms = comment.get("created", {}).get("time", 0)
+                created_at = datetime.fromtimestamp(created_at_ms / 1000, tz=UTC)
+                if since and created_at < since:
+                    continue
 
-            # Fetch comments on this post
-            start = 0
-            while True:
-                c_resp = self._request(
-                    "GET",
-                    f"{API_BASE}/rest/socialActions/{_encode_urn(post_urn)}/comments",
-                    access_token=access_token,
-                    headers=LINKEDIN_HEADERS,
-                    params={"start": start, "count": 100},
-                )
-                c_data = c_resp.json()
-                elements = c_data.get("elements", [])
-                if not elements:
-                    break
-
-                for comment in elements:
-                    created_at_ms = comment.get("created", {}).get("time", 0)
-                    created_at = datetime.fromtimestamp(created_at_ms / 1000, tz=UTC)
-
-                    if since and created_at < since:
-                        continue
-
-                    actor_urn = comment.get("actor", "")
-                    comment_urn = comment.get("$URN", comment.get("id", ""))
-                    comment_text = comment.get("message", {}).get("text", "")
-
-                    # Use actor~ expansion if available, otherwise fall back to URN
-                    actor_info = comment.get("actor~", {})
-                    sender_name = actor_info.get("name") or actor_info.get("localizedFirstName", "") or actor_urn
-
-                    messages.append(
-                        InboxMessage(
-                            platform_message_id=comment_urn,
-                            sender_id=actor_urn,
-                            sender_name=sender_name,
-                            text=comment_text,
-                            timestamp=created_at,
-                            message_type="comment",
-                            extra={
-                                "post_urn": post_urn,
-                                "comment_urn": comment_urn,
-                                "actor_urn": actor_urn,
-                            },
-                        )
+                comment_urn = self._comment_urn(comment)
+                # Use actor~ expansion if available, otherwise fall back to URN
+                actor_info = comment.get("actor~", {})
+                sender_name = actor_info.get("name") or actor_info.get("localizedFirstName", "") or actor_urn
+                messages.append(
+                    InboxMessage(
+                        platform_message_id=comment_urn,
+                        sender_id=actor_urn,
+                        sender_name=sender_name,
+                        text=comment.get("message", {}).get("text", ""),
+                        timestamp=created_at,
+                        message_type="comment",
+                        extra={
+                            "post_urn": post_urn,
+                            "comment_urn": comment_urn,
+                            "actor_urn": actor_urn,
+                        },
                     )
-
-                # Check if there are more comments
-                if len(elements) < 100:
-                    break
-                start += 100
-
+                )
         return messages
+
+    def _post_comments(self, access_token: str, post_urn: str, *, limit: int = 500):
+        """The comments on one post, 100 per request, at most ``limit``."""
+        start = 0
+        while start < limit:
+            resp = self._request(
+                "GET",
+                f"{API_BASE}/rest/socialActions/{_encode_urn(post_urn)}/comments",
+                access_token=access_token,
+                headers=LINKEDIN_HEADERS,
+                params={"start": start, "count": 100},
+            )
+            elements = resp.json().get("elements", [])
+            yield from elements
+            if len(elements) < 100:
+                return
+            start += 100
+
+    @staticmethod
+    def _comment_urn(comment: dict) -> str:
+        """A comment's full URN, which is what ``parentComment`` takes when replying."""
+        return str(comment.get("commentUrn") or comment.get("$URN") or comment.get("id", ""))
 
     def reply_to_comment(self, access_token: str, comment_id: str, text: str, extra: dict | None = None) -> ReplyResult:
         """Reply to a comment. LinkedIn answers on the post's comment edge, so this is the same call."""
@@ -640,8 +728,7 @@ class LinkedInProvider(SocialProvider):
                 platform=self.platform_name,
             )
 
-        profile = self.get_profile(access_token)
-        actor = f"urn:li:person:{profile.platform_id}"
+        actor = self._comment_actor(access_token)
 
         resp = self._request(
             "POST",
@@ -658,38 +745,6 @@ class LinkedInProvider(SocialProvider):
         data = resp.json()
         comment_urn = resp.headers.get("x-restli-id", data.get("id", ""))
         return ReplyResult(platform_message_id=comment_urn, extra=data)
-
-    # ------------------------------------------------------------------
-    # Analytics
-    # ------------------------------------------------------------------
-
-    def get_post_metrics(self, access_token: str, post_id: str) -> PostMetrics:
-        """Fetch metrics for a specific post.
-
-        post_id should be the post URN.
-        """
-        resp = self._request(
-            "GET",
-            f"{API_BASE}/rest/organizationalEntityShareStatistics",
-            access_token=access_token,
-            headers=LINKEDIN_HEADERS,
-            params={"q": "organizationalEntity", "shares[0]": post_id},
-        )
-        data = resp.json()
-        elements = data.get("elements", [])
-        if not elements:
-            return PostMetrics(extra={"raw": data})
-
-        stats = elements[0].get("totalShareStatistics", {})
-        return PostMetrics(
-            impressions=stats.get("impressionCount", 0),
-            engagements=stats.get("engagementCount", 0),
-            likes=stats.get("likeCount", 0),
-            comments=stats.get("commentCount", 0),
-            shares=stats.get("shareCount", 0),
-            clicks=stats.get("clickCount", 0),
-            extra={"raw_statistics": stats},
-        )
 
     # ------------------------------------------------------------------
     # Token management

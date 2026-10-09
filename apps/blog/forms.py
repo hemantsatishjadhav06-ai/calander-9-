@@ -55,6 +55,30 @@ def format_faq(faq) -> str:
     return "\n\n".join(f"Q: {item['q']}\nA: {item['a']}" for item in (faq or []))
 
 
+class KeywordListField(forms.CharField):
+    """Related search terms typed as a comma-separated line, stored as a list."""
+
+    def prepare_value(self, value):
+        if isinstance(value, list | tuple):
+            return ", ".join(str(v) for v in value)
+        return value
+
+    def to_python(self, value):
+        from .services import clean_keywords
+
+        text = super().to_python(value)
+        try:
+            return clean_keywords(text)
+        except ValidationError as exc:
+            raise ValidationError(exc.message_dict.get("secondary_keywords", exc.messages)) from exc
+
+    def has_changed(self, initial, data):
+        try:
+            return self.to_python(self.prepare_value(initial) or "") != self.to_python(data or "")
+        except ValidationError:
+            return True
+
+
 class BlogPostForm(forms.ModelForm):
     faq_text = forms.CharField(
         label="FAQ (optional)",
@@ -62,6 +86,12 @@ class BlogPostForm(forms.ModelForm):
         widget=forms.Textarea(attrs={"rows": 6, "class": _INPUT + " font-mono"}),
         help_text='One entry per question: a line starting "Q:" then a line starting "A:". '
         "Shown at the end of the post and marked up as FAQ for search engines.",
+    )
+    secondary_keywords = KeywordListField(
+        label="Related terms",
+        required=False,
+        widget=forms.TextInput(attrs={"class": _INPUT, "autocomplete": "off"}),
+        help_text="Other phrases people search for, separated by commas. Use them in headings and the text.",
     )
 
     class Meta:
@@ -78,6 +108,8 @@ class BlogPostForm(forms.ModelForm):
             "seo_title",
             "meta_description",
             "category",
+            "focus_keyword",
+            "secondary_keywords",
         ]
         labels = {
             "site": "Website",
@@ -87,16 +119,19 @@ class BlogPostForm(forms.ModelForm):
             "featured_image": "Featured image",
             "featured_image_alt": "Featured image description (alt text)",
             "cover_style": "Cover",
-            "seo_title": "SEO title",
-            "meta_description": "Meta description",
+            "seo_title": "Search title (Google)",
+            "meta_description": "Search description",
+            "focus_keyword": "Focus keyword",
         }
         help_texts = {
             "slug": "Lowercase letters, numbers and hyphens. It becomes the page address and can't change once published.",
             "excerpt": "One or two sentences for the blog index card and social drafts.",
             "body": "Markdown: ## headings, **bold**, lists, links and tables. Scripts and embeds are removed.",
-            "seo_title": "Shown in search results and browser tabs. Defaults to the title.",
-            "meta_description": "The search-result snippet. Defaults to the excerpt.",
+            "seo_title": "Shown as the blue link in Google and in browser tabs. Defaults to the title. "
+            "The site name is added only when it fits.",
+            "meta_description": "The grey text under the link in Google. Defaults to the excerpt.",
             "category": "Shown above the title and on the card, e.g. Buyer Guide.",
+            "focus_keyword": "What a buyer types into Google to find this article.",
         }
         widgets = {
             "title": forms.TextInput(attrs={"class": _INPUT}),
@@ -111,6 +146,7 @@ class BlogPostForm(forms.ModelForm):
             "meta_description": forms.Textarea(attrs={"rows": 3, "class": _INPUT}),
             "category": forms.TextInput(attrs={"class": _INPUT}),
             "site": forms.Select(attrs={"class": _INPUT}),
+            "focus_keyword": forms.TextInput(attrs={"class": _INPUT, "autocomplete": "off"}),
         }
 
     def __init__(self, *args, workspace, **kwargs):
@@ -161,6 +197,8 @@ class BlogPostForm(forms.ModelForm):
             bound = self[name].value()
             return "" if bound is None else str(bound)
 
+        from .renderers import TITLE_MAX, TITLE_SUFFIX
+
         sites = self.fields["site"].queryset  # type: ignore[attr-defined]
         return {
             "title": value("title"),
@@ -171,6 +209,9 @@ class BlogPostForm(forms.ModelForm):
             "meta": value("meta_description"),
             "site": value("site"),
             "siteUrls": {str(site.pk): site.live_url_for("__slug__") for site in sites},
+            # The " | Brand Blog" each site adds to the <title> when it fits (renderers.title_tag).
+            "titleSuffixes": {str(site.pk): TITLE_SUFFIX.get(site.kind, "") for site in sites},
+            "titleMax": TITLE_MAX,
         }
 
     @property

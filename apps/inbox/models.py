@@ -151,6 +151,9 @@ class InboxReply(models.Model):
     )
     platform_reply_id = models.CharField(max_length=255, blank=True, default="")
     send_error = models.TextField(blank=True, default="")
+    # The agency agent that drafted it (apps.studio.team slug), or "" when a
+    # person wrote it. Agent drafts are never sent without a person.
+    drafted_by = models.CharField(max_length=40, blank=True, default="", db_default="")
     # ``sent_at`` is null until the reply is actually delivered to the platform;
     # a row now exists in ``draft``/``failed`` states before any send happens.
     sent_at = models.DateTimeField(null=True, blank=True)

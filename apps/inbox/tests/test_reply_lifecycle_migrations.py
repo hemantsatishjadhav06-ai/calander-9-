@@ -65,6 +65,12 @@ def _migrate(target: str) -> None:
     MigrationExecutor(connection).migrate([(APP, target)])
 
 
+def _reply_model_at(target: str):
+    """``InboxReply`` as it was at ``target``: rows written at an older schema
+    must not name columns that later migrations add."""
+    return MigrationExecutor(connection).loader.project_state((APP, target)).apps.get_model(APP, "InboxReply")
+
+
 @pytest.fixture
 def restore_migrations():
     """Leave the database at the migration head however the test ends."""
@@ -188,22 +194,23 @@ def test_backfill_arriving_late_spares_rows_written_since_0002(inbox_message, re
     """Staging's path: it applied the backfill inside 0002 and has been taking
     traffic since, so the split backfill lands on a table holding real drafts."""
     _migrate(SCHEMA)
+    old_reply = _reply_model_at(SCHEMA)
 
     sent_at = timezone.now() - timedelta(hours=1)
     drafted_at = timezone.now() - timedelta(hours=3)
-    draft = InboxReply.objects.create(inbox_message=inbox_message, body="still a draft")
-    failed = InboxReply.objects.create(inbox_message=inbox_message, body="bounced")
-    InboxReply.objects.filter(pk=failed.pk).update(status=InboxReply.Status.FAILED, send_error="rate limited")
-    delivered = InboxReply.objects.create(inbox_message=inbox_message, body="drafted, then sent")
-    InboxReply.objects.filter(pk=delivered.pk).update(
+    draft = old_reply.objects.create(inbox_message_id=inbox_message.pk, body="still a draft")
+    failed = old_reply.objects.create(inbox_message_id=inbox_message.pk, body="bounced")
+    old_reply.objects.filter(pk=failed.pk).update(status=InboxReply.Status.FAILED, send_error="rate limited")
+    delivered = old_reply.objects.create(inbox_message_id=inbox_message.pk, body="drafted, then sent")
+    old_reply.objects.filter(pk=delivered.pk).update(
         status=InboxReply.Status.SENT, created_at=drafted_at, sent_at=sent_at
     )
 
     _migrate(_head())
 
-    draft.refresh_from_db()
-    failed.refresh_from_db()
-    delivered.refresh_from_db()
+    draft = InboxReply.objects.get(pk=draft.pk)
+    failed = InboxReply.objects.get(pk=failed.pk)
+    delivered = InboxReply.objects.get(pk=delivered.pk)
     assert draft.status == InboxReply.Status.DRAFT
     assert failed.status == InboxReply.Status.FAILED
     assert delivered.status == InboxReply.Status.SENT

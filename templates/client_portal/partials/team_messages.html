@@ -1,0 +1,40 @@
+{% comment %}
+A client thread's messages, oldest first (internal notes never reach this template).
+Context: pt — from apps.client_portal.views_team.thread_context. Polls every 5 seconds while
+the account manager is answering, then stops.
+{% endcomment %}
+{% load tz %}
+<div id="{{ pt.dom_id }}-messages" role="log" aria-live="polite" aria-label="Messages with your team"
+     class="space-y-2.5 max-h-[28rem] overflow-y-auto pr-1"
+     x-data x-init="$el.scrollTop = $el.scrollHeight"
+     {% if pt.polling and pt.messages_url %}hx-get="{{ pt.messages_url }}" hx-trigger="every 5s" hx-target="this" hx-select="unset" hx-swap="outerHTML"{% endif %}>
+    {% for m in pt.messages %}
+    {% if m.author_kind == 'system' %}
+    <p class="text-[0.75rem] text-center px-2 py-1 break-words" style="color: var(--text-secondary);">{{ m.body }}</p>
+    {% elif m.author_id and m.author_id == pt.viewer_id %}
+    <div class="ml-8 rounded-xl px-3.5 py-2.5 text-white" style="background: var(--primary-strong);">
+        <p class="text-[0.75rem] font-semibold">You <span class="font-normal">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:pt.tzname|date:"j M, H:i" }}</time></span></p>
+        <p class="text-[0.875rem] mt-0.5 whitespace-pre-line break-words">{{ m.body }}</p>
+    </div>
+    {% else %}
+    <div class="mr-8 rounded-xl border px-3.5 py-2.5" style="background: var(--surface-0); border-color: var(--border);">
+        <p class="text-[0.75rem] font-semibold" style="color: var(--primary);">{% if m.author_kind == 'agent' %}Account manager{% else %}{{ m.sender_name }}{% endif %}
+            <span class="font-normal" style="color: var(--text-secondary);">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:pt.tzname|date:"j M, H:i" }}</time></span></p>
+        <p class="text-[0.875rem] mt-0.5 whitespace-pre-line break-words" style="color: var(--text-primary);">{{ m.body }}</p>
+        {% if m.action_status == 'started' %}
+        <p class="mt-1.5"><span class="inline-flex px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold bg-indigo-50 text-indigo-800">The team is on it</span></p>
+        {% elif m.action_status == 'needs_human' %}
+        <p class="mt-1.5"><span class="inline-flex px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold bg-amber-50 text-amber-800">A person will reply</span></p>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% empty %}
+    <p class="text-[0.8125rem] py-2" style="color: var(--text-secondary);">{% if pt.post %}Ask a question about this post, or say what you'd like changed — in your own words.{% else %}Ask your agency anything, or tell them what you'd like next. Your account manager answers here, usually within a minute or two.{% endif %}</p>
+    {% endfor %}
+    {% if pt.polling %}
+    <p class="flex items-center gap-2 text-[0.75rem]" style="color: var(--text-secondary);">
+        <span class="w-1.5 h-1.5 rounded-full animate-pulse motion-reduce:animate-none" style="background: var(--primary-strong);" aria-hidden="true"></span>
+        Your account manager is writing a reply…
+    </p>
+    {% endif %}
+</div>

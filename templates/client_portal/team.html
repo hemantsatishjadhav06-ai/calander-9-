@@ -1,0 +1,48 @@
+{% extends "client_portal/portal_base.html" %}
+{% load tz %}
+{% block title %}Talk to the team - {{ workspace.name }}{% endblock %}
+
+{% block content %}
+<div>
+    <div class="mb-6">
+        <h1 class="text-[1.75rem] leading-tight tracking-tight" style="color: var(--text-primary); font-family: var(--font-display);">Talk to the team</h1>
+        <p class="text-[0.875rem] mt-1" style="color: var(--text-secondary);">Ask a question, ask for a change, or ask for a new post — in your own words. Your account manager answers here and gets the right person on it. Nothing goes out until it's approved.</p>
+    </div>
+
+    <div class="grid md:grid-cols-[15rem_minmax(0,1fr)] gap-5 items-start">
+        <nav aria-label="Conversations" class="rounded-2xl border p-2" style="background: var(--surface-0); border-color: var(--border);">
+            <ul class="space-y-1">
+                {% if not has_general_row %}
+                <li>
+                    <a href="{% url 'client_portal:team' %}" class="block rounded-xl px-3 py-2 text-[0.8125rem] {% if general_selected %}font-semibold{% else %}hover:bg-black/[0.04]{% endif %}"
+                       {% if general_selected %}style="background: var(--primary-soft); color: var(--text-primary);" aria-current="page"{% else %}style="color: var(--text-primary);"{% endif %}>
+                        <span class="block truncate">Talk to the team</span>
+                        <span class="block text-[0.75rem] font-normal" style="color: var(--text-secondary);">Anything about your account</span>
+                    </a>
+                </li>
+                {% endif %}
+                {% for row in rows %}
+                <li>
+                    <a href="{{ row.url }}" class="flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-[0.8125rem] {% if row.active %}font-semibold{% else %}hover:bg-black/[0.04]{% endif %}"
+                       {% if row.active %}style="background: var(--primary-soft); color: var(--text-primary);" aria-current="page"{% else %}style="color: var(--text-primary);"{% endif %}>
+                        <span class="min-w-0">
+                            <span class="block truncate">{{ row.title }}</span>
+                            <span class="block text-[0.75rem] font-normal" style="color: var(--text-secondary);">{% if row.is_post %}About a post{% else %}Your account{% endif %} · {{ row.conversation.last_message_at|timezone:tzname|date:"j M, H:i" }}</span>
+                        </span>
+                        {% if row.unread %}<span class="flex-shrink-0 px-1.5 py-px rounded-full text-[0.6875rem] font-bold bg-orange-100 text-orange-800">{{ row.unread }}<span class="sr-only"> unread</span></span>{% endif %}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </nav>
+
+        <section aria-labelledby="team-thread-heading" class="rounded-2xl border p-5 shadow-sm" style="background: var(--surface-0); border-color: var(--border);">
+            <h2 id="team-thread-heading" class="text-[1.125rem] mb-0.5" style="color: var(--text-primary); font-family: var(--font-display);">{% if pt.conversation.post_id %}{{ pt.conversation.title|default:"About a post" }}{% else %}Your account manager{% endif %}</h2>
+            <p class="text-[0.75rem] mb-3" style="color: var(--text-secondary);">{% if pt.post %}About a post. <a class="underline" href="{% url 'client_portal:approval_queue' %}">See it in Approvals</a>.{% elif pt.conversation.post_id %}About a post that's back with your agency team.{% else %}Replies usually take a minute or two. A person from your agency steps in whenever it's needed.{% endif %}</p>
+            <div id="{{ pt.dom_id }}">
+                {% include "client_portal/partials/team_thread.html" %}
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

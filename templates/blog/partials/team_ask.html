@@ -1,0 +1,2 @@
+{% comment %}"Ask the SEO team" on the article page: loads the banner (apps.blog.views_team.team_panel), which is empty for people who can't use it. Context: workspace, post.{% endcomment %}
+<div hx-get="{% url 'blog:team_panel' workspace_id=workspace.id post_id=post.id %}" hx-trigger="load" hx-swap="outerHTML"></div>

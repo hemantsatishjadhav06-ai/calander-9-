@@ -15,7 +15,7 @@ from .facebook import FacebookProvider
 from .google_business import GoogleBusinessProvider
 from .instagram import InstagramProvider
 from .instagram_login import InstagramLoginProvider
-from .linkedin import LINKEDIN_RESERVED_CHARS
+from .linkedin import LINKEDIN_RESERVED_CHARS, escape_commentary
 from .linkedin_company import LinkedInCompanyProvider
 from .linkedin_personal import LinkedInPersonalProvider
 from .mastodon import MastodonProvider
@@ -49,7 +49,9 @@ PROVIDER_REGISTRY: dict[str, type[SocialProvider]] = {
 # characters on the wire, so a limit has to be counted against the escaped text
 # rather than the text the user typed.
 CAPTION_ESCAPED_CHARS: dict[str, str] = {
-    # LinkedIn's little-text commentary; the backslash escapes itself too.
+    # LinkedIn's little-text commentary; the backslash escapes itself too. A
+    # "#" that starts a hashtag is sent as it is (LinkedIn links it), which
+    # CAPTION_LENGTH_COUNTERS accounts for and the composer's counter mirrors.
     "linkedin_personal": "\\" + LINKEDIN_RESERVED_CHARS,
     "linkedin_company": "\\" + LINKEDIN_RESERVED_CHARS,
 }
@@ -61,6 +63,9 @@ CAPTION_ESCAPED_CHARS: dict[str, str] = {
 # passes here and is refused by X.
 CAPTION_LENGTH_COUNTERS: dict[str, Callable[[str], int]] = {
     "x": weighted_length,
+    # LinkedIn: the escaped payload itself, hashtags left as they are.
+    "linkedin_personal": lambda text: len(escape_commentary(text)),
+    "linkedin_company": lambda text: len(escape_commentary(text)),
 }
 
 

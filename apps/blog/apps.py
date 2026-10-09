@@ -13,7 +13,14 @@ class BlogConfig(AppConfig):
 
     @staticmethod
     def _register_tasks(sender, **kwargs):
-        from apps.blog.tasks import STUCK_SWEEP_INTERVAL_SECONDS, sweep_stuck_blog_publishes
+        from apps.blog.tasks import (
+            SEARCH_CONSOLE_TICK_SECONDS,
+            SEO_CHECKUP_TICK_SECONDS,
+            STUCK_SWEEP_INTERVAL_SECONDS,
+            queue_search_console_syncs,
+            queue_seo_checkups,
+            sweep_stuck_blog_publishes,
+        )
         from apps.common.background import register_recurring_task
 
         # Publishing itself runs as one-shot tasks (publish, then poll the
@@ -23,4 +30,17 @@ class BlogConfig(AppConfig):
             sweep_stuck_blog_publishes,
             repeat=STUCK_SWEEP_INTERVAL_SECONDS,
             verbose_name="sweep_stuck_blog_publishes",
+        )
+        # Rankings: each connected website is synced about once a day; the
+        # tick only queues the one-shot syncs that are due.
+        register_recurring_task(
+            queue_search_console_syncs,
+            repeat=SEARCH_CONSOLE_TICK_SECONDS,
+            verbose_name="queue_search_console_syncs",
+        )
+        # The SEO monitor's weekly check-up of every workspace with live articles.
+        register_recurring_task(
+            queue_seo_checkups,
+            repeat=SEO_CHECKUP_TICK_SECONDS,
+            verbose_name="queue_seo_checkups",
         )

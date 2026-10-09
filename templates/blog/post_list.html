@@ -8,14 +8,18 @@
     <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
             <h1 class="text-lg font-semibold text-stone-900">Blog</h1>
-            <p class="text-sm text-stone-600 mt-0.5">Write posts for this workspace's website, get them approved, then publish.</p>
+            <p class="text-sm text-stone-600 mt-0.5">Write posts for this workspace's website, get them approved, then publish. Each one carries its SEO score{% if has_sites %} — <a href="#google-search" class="underline hover:text-stone-900">see how they rank in Google</a>{% endif %}.</p>
         </div>
         {% if can_create and has_sites %}
+        <div class="flex flex-wrap items-center gap-2">
+        <a href="{% url 'blog:write' workspace_id=workspace.id %}"
+           class="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full shadow-[0_4px_14px_rgba(249,115,22,0.28)] hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700 transition-all duration-150">Write with the team</a>
         <a href="{% url 'blog:create' workspace_id=workspace.id %}"
            class="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full shadow-[0_4px_14px_rgba(249,115,22,0.28)] hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700 transition-all duration-150">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             New blog post
         </a>
+        </div>
         {% endif %}
     </div>
 
@@ -55,6 +59,7 @@
                 <div class="flex-1 min-w-0">
                     <div class="flex flex-wrap items-center gap-2 mb-1">
                         {% include "blog/partials/status_badge.html" with status=post.status label=post.get_status_display %}
+                        {% if post.seo_report %}{% include "blog/partials/seo_badge.html" with report=post.seo_report %}{% endif %}
                         <span class="text-xs text-stone-600">{{ post.site.name }}</span>
                     </div>
                     <p class="text-sm font-semibold text-stone-900 truncate group-hover:underline">{{ post.title }}</p>
@@ -83,6 +88,8 @@
         {% endif %}
     </div>
     {% endif %}
+
+    {% include "blog/partials/seo_site_overview.html" %}
     {% endif %}
 </div>
 {% endblock %}

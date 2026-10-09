@@ -38,7 +38,11 @@ def _head() -> str:
 def rewound():
     _migrate(BEFORE)
     yield
-    _migrate(_head())
+    # Rewinding media_library also unapplies every other app's migrations that
+    # depend on its later ones (the AI Studio's, for one), so restore the whole
+    # project, not just this app, or later tests run without those tables.
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
 
 
 def _names(**scope):

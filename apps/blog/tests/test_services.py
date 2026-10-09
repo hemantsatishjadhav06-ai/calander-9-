@@ -48,11 +48,69 @@ def test_fingerprint_is_stable_and_covers_every_published_field(world, image_ass
         "faq": [{"q": "Q?", "a": "A."}],
         "site_id": world.morespace.pk,
         "featured_image_id": image_asset().pk,
+        # Rendered as article:tag and the JSON-LD keywords.
+        "focus_keyword": "flats in kokapet",
+        "secondary_keywords": ["kokapet prices"],
     }
     for name, value in changes.items():
         copy = BlogPost.objects.get(pk=post.pk)
         setattr(copy, name, value)
         assert services.fingerprint(copy) != base, name
+
+
+def test_keywords_join_the_fingerprint_without_moving_older_approvals(world):
+    """A post with no keywords keeps the exact fingerprint it had before keywords existed."""
+    import hashlib
+    import json
+
+    post = make_post(world)
+    payload = {
+        "site_id": str(post.site_id),
+        "title": post.title,
+        "slug": post.slug,
+        "excerpt": post.excerpt,
+        "body": post.body,
+        "featured_image_id": None,
+        "featured_image_file": "",
+        "featured_image_alt": post.featured_image_alt,
+        "cover_style": post.cover_style,
+        "seo_title": post.seo_title,
+        "meta_description": post.meta_description,
+        "category": post.category,
+        "faq": post.faq,
+    }
+    legacy = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    ).hexdigest()
+    assert services.fingerprint(post) == legacy
+
+    keyed = services.update_content(post, world.editor, focus_keyword="flats in kokapet")
+    with_keyword = services.fingerprint(keyed)
+    assert with_keyword != legacy and keyed.revision == 2
+    terms = services.update_content(keyed, world.editor, secondary_keywords=["kokapet prices"])
+    assert services.fingerprint(terms) != with_keyword and terms.revision == 3
+    cleared = services.update_content(terms, world.editor, focus_keyword="", secondary_keywords=[])
+    assert services.fingerprint(cleared) == legacy and cleared.revision == 4
+
+
+def test_editing_keywords_of_an_approved_post_withdraws_the_approval(world):
+    post = approved_post(world, focus_keyword="flats in kokapet")
+    post = services.update_content(
+        post, world.editor, secondary_keywords="kokapet prices, Kokapet Prices,  land rates "
+    )
+    assert post.secondary_keywords == ["kokapet prices", "land rates"]
+    assert post.status == Status.PENDING_REVIEW and not post.approved_fingerprint
+
+
+def test_related_terms_are_validated(world):
+    with pytest.raises(ValidationError):
+        make_post(world, secondary_keywords=[f"term {i}" for i in range(services.MAX_RELATED_TERMS + 1)])
+    with pytest.raises(ValidationError):
+        make_post(world, secondary_keywords=["x" * (services.MAX_TERM_LENGTH + 1)])
+    with pytest.raises(ValidationError):
+        make_post(world, secondary_keywords={"not": "a list"})
+    post = make_post(world, focus_keyword="  flats   in kokapet ", secondary_keywords="a b, , c d")
+    assert post.focus_keyword == "flats in kokapet" and post.secondary_keywords == ["a b", "c d"]
 
 
 def test_fingerprint_changes_when_the_image_file_is_replaced(world, image_asset):
@@ -361,3 +419,72 @@ def test_social_drafts_need_an_approved_or_published_post(world):
     approved = approved_post(world, slug="another")
     with pytest.raises(PermissionDenied):
         services.create_social_drafts(approved, world.viewer)
+
+
+# ---------------------------------------------------------------------------
+# What the renderer is given: stable dates, keywords, related articles
+# ---------------------------------------------------------------------------
+
+
+def test_post_content_dates_come_from_the_approval_not_from_today(world):
+    import datetime as dt
+    from unittest import mock
+
+    from django.utils import timezone
+
+    post = approved_post(world, focus_keyword="flats in kokapet", secondary_keywords=["kokapet prices"])
+    content = services.post_content(post)
+    assert content.modified_at == timezone.localtime(post.approved_at, content.modified_at.tzinfo)
+    assert content.published_at == content.modified_at  # first publish: the approval is the date
+    assert content.tags == ["flats in kokapet", "kokapet prices"]
+    later = timezone.now() + dt.timedelta(days=3)
+    with mock.patch("django.utils.timezone.now", return_value=later):
+        again = services.post_content(BlogPost.objects.get(pk=post.pk))
+    assert again.published_iso == content.published_iso and again.modified_iso == content.modified_iso
+
+    # Once live, published stays at the first go-live; a later approved revision moves only "modified".
+    live_at = post.approved_at + dt.timedelta(hours=2)
+    BlogPost.objects.filter(pk=post.pk).update(status=Status.PUBLISHED, published_at=live_at)
+    content = services.post_content(BlogPost.objects.get(pk=post.pk))
+    assert content.published_at == content.modified_at == timezone.localtime(live_at, content.published_at.tzinfo)
+
+
+def _published(world, slug, title, *, category="Area Guide", keywords=(), date="2026-09-01", site=None):
+    post = make_post(world, slug=slug, title=title, category=category, site=site)
+    card = {
+        "slug": slug,
+        "title": title,
+        "text": "",
+        "category": category,
+        "has_image": False,
+        "revision": 1,
+        "date": date,
+        "read_minutes": 3,
+        "keywords": list(keywords),
+    }
+    BlogPost.objects.filter(pk=post.pk).update(status=Status.PUBLISHED, published_card=card)
+    return post
+
+
+def test_related_articles_are_the_closest_live_ones_of_the_same_site(world):
+    post = make_post(world, slug="kokapet-flat-prices", title="Kokapet flat prices", focus_keyword="kokapet prices")
+    _published(world, "kokapet-guide", "Kokapet area guide", keywords=["kokapet prices"], date="2026-08-01")
+    _published(world, "rera-checklist", "RERA checklist", category="Legal", date="2026-09-20")
+    _published(world, "narsingi", "Narsingi area guide", date="2026-09-10")
+    _published(world, "same-category-newer", "Tellapur area guide", date="2026-09-15")
+    _published(world, "other-site", "Kokapet prices elsewhere", keywords=["kokapet prices"], site=world.morespace)
+    draft = make_post(world, slug="draft-kokapet", title="Kokapet prices draft", focus_keyword="kokapet prices")
+
+    related = services.related_posts(post)
+
+    assert [r.slug for r in related] == ["kokapet-guide", "same-category-newer", "narsingi"]
+    assert draft.slug not in {r.slug for r in related}
+    assert services.post_content(post).related == related
+
+
+def test_related_articles_use_the_published_title_not_an_unapproved_edit(world):
+    post = make_post(world, slug="a", title="A")
+    live = _published(world, "kokapet-guide", "Kokapet guide as published")
+    BlogPost.objects.filter(pk=live.pk).update(title="Unapproved new title")
+    assert [r.title for r in services.related_posts(post)] == ["Kokapet guide as published"]
+    assert services.related_posts(live) == ()  # never itself
