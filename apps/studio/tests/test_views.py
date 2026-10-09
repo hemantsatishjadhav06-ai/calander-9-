@@ -36,7 +36,7 @@ class TestPages:
 
         assert response.status_code == 200
         html = response.content.decode()
-        assert "AI Studio" in html
+        assert "AI Studio" in html and "Waiting for your approval" in html
         # A viewer can look but not brief the team.
         assert response.context["can_create"] is False
         assert BrandProfile.objects.filter(workspace=world.workspace).exists()

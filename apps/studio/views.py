@@ -10,12 +10,14 @@ Approvals page ask for.
 from __future__ import annotations
 
 import zoneinfo
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.members.decorators import require_permission
@@ -45,10 +47,29 @@ TEAM = tuple((stage, agent, roster.get(agent).name, roster.get(agent).does) for 
 _STAGE_ORDER = {stage: index for index, stage in enumerate(dict.fromkeys(stage for stage, _agent in POST_TEAM))}
 
 
+def is_plain_client(membership) -> bool:
+    """A client of the agency (not staff): they work in the client portal, not here."""
+    from apps.members.models import WorkspaceMembership
+
+    return bool(
+        membership is not None
+        and membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT
+        and membership.custom_role_id is None
+    )
+
+
 def _workspace(request, workspace_id):
+    """The workspace of the URL, for its staff. Clients use the client portal instead.
+
+    A client membership carries ``approve_posts`` (for the client sign-off
+    stage), so permission checks alone would let a client approve here; the
+    agency's pages are for the people who run the account.
+    """
     workspace = request.workspace
     if workspace is None or workspace.id != workspace_id:
         raise PermissionDenied("You do not have access to this workspace.")
+    if is_plain_client(request.workspace_membership):
+        raise PermissionDenied("This part of SM Bean is for your agency team. Your approvals are in the client portal.")
     return workspace
 
 
@@ -87,13 +108,23 @@ def _setup(workspace) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def _greeting(request, workspace) -> str:
+    hour = timezone.now().astimezone(zoneinfo.ZoneInfo(workspace.effective_timezone or "UTC")).hour
+    part = "morning" if hour < 12 else "afternoon" if hour < 17 else "evening"
+    name = (request.user.name or "").split(" ")[0] if getattr(request.user, "name", "") else ""
+    return f"Good {part}, {name}" if name else f"Good {part}"
+
+
 def _index_context(request, workspace, form):
+    from . import dashboard
+
     profile = ensure_profile(workspace)
     briefs = list(
         StudioBrief.objects.filter(workspace=workspace)
-        .exclude(status=StudioBrief.Status.DISCARDED)
-        .select_related("graphic", "author", "chosen_concept")[:30]
+        .exclude(status__in=(StudioBrief.Status.DISCARDED, StudioBrief.Status.PLANNED))
+        .select_related("graphic", "author", "chosen_concept")[:12]
     )
+    perms = _perms(request)
     return {
         "workspace": workspace,
         "profile": profile,
@@ -101,9 +132,28 @@ def _index_context(request, workspace, form):
         "briefs": briefs,
         "setup": _setup(workspace),
         "reference": style.preview(workspace),
-        "can_create": _perms(request).get("create_posts", False),
+        "can_create": perms.get("create_posts", False),
+        "can_approve": perms.get("approve_posts", False),
         "can_edit_brand": _can_edit_brand(request),
+        "greeting": _greeting(request, workspace),
+        "tabs": dashboard.tabs(workspace, "overview"),
+        "thread": _thread_panel(request, workspace),
+        **dashboard.overview(workspace),
     }
+
+
+def _thread_panel(request, workspace):
+    """The team thread panel's context, when the team thread is available."""
+    try:
+        from . import chat
+
+        builder = getattr(chat, "home_thread_context", None)
+        return builder(request, workspace) if builder else None
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Studio: could not load the team thread")
+        return None
 
 
 @login_required
@@ -196,6 +246,12 @@ def _detail_context(request, workspace, brief, *, feedback_form=None, schedule_f
     first_account = (
         platform_posts[0].social_account if platform_posts else next(iter(brief.social_accounts.all()), None)
     )
+    current_runs = [r for r in runs if r.revision == brief.revision]
+    scheduler_run = next((r for r in reversed(current_runs) if r.agent == AgentRun.Agent.SCHEDULER), None)
+    proposed = brief.proposed_publish_at
+    elapsed = None
+    if current_runs and current_runs[-1].finished_at:
+        elapsed = max(1, round((current_runs[-1].finished_at - current_runs[0].started_at).total_seconds() / 60))
     return {
         "workspace": workspace,
         "brief": brief,
@@ -225,7 +281,30 @@ def _detail_context(request, workspace, brief, *, feedback_form=None, schedule_f
         and brief.status not in (StudioBrief.Status.APPROVED, StudioBrief.Status.DISCARDED)
         and not (statuses & {"approved", "scheduled", "publishing", "published", "pending_client", "on_hold"}),
         "setup": _setup(workspace),
+        "proposed_local": _in_workspace_zone(proposed, workspace),
+        "proposed_in_future": bool(proposed and proposed > timezone.now() + timedelta(minutes=5)),
+        "scheduler_note": scheduler_run.summary if scheduler_run else "",
+        "qa": review.get("qa") or {},
+        "agents_used": len({r.agent for r in current_runs if r.status != AgentRun.Status.SKIPPED}),
+        "elapsed_minutes": elapsed,
+        "channel_versions": (post_copy.get("channels") or {}),
+        "tabs": [],
+        "thread": _brief_thread(request, brief),
     }
+
+
+def _brief_thread(request, brief):
+    """The brief's team thread panel, when the team thread is available."""
+    try:
+        from . import chat
+
+        builder = getattr(chat, "brief_thread_context", None)
+        return builder(request, brief) if builder else None
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Studio: could not load the brief's thread")
+        return None
 
 
 @login_required
@@ -279,6 +358,13 @@ def approve(request, workspace_id, brief_id):
         if not _perms(request).get("publish_directly", False):
             raise PermissionDenied("You do not have permission to publish directly.")
         return _run(request, brief, services.approve, brief, request.user, publish_now=True)
+    if mode == "proposed":
+        # One click from the agency home: approve and schedule at the time the scheduler proposed.
+        when = brief.proposed_publish_at or (brief.post.proposed_publish_at if brief.post_id else None)
+        if when is None or when <= timezone.now() + timedelta(minutes=5):
+            messages.error(request, "The proposed time has passed. Pick a new time below.")
+            return _detail_redirect(brief)
+        return _run(request, brief, services.approve, brief, request.user, publish_at=when)
     if mode == "schedule":
         form = ScheduleForm(request.POST, workspace=workspace)
         if not form.is_valid():

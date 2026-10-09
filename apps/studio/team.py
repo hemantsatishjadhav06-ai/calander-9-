@@ -27,7 +27,7 @@ class Department:
     slug: str
     name: str
     does: str
-    #: The avatar colour, a CSS custom property from theme/static_src/src/styles.css.
+    #: The avatar fill: a 700 shade of the department's accent, so white initials read at 4.5:1 or more.
     colour: str
 
 
@@ -50,15 +50,25 @@ class AgentSpec:
     def is_model(self) -> bool:
         return self.kind == "claude"
 
+    @property
+    def colour(self) -> str:
+        department = DEPARTMENTS_BY_SLUG.get(self.department)
+        return department.colour if department else "#57534E"
+
+    @property
+    def department_name(self) -> str:
+        department = DEPARTMENTS_BY_SLUG.get(self.department)
+        return department.name if department else ""
+
 
 DEPARTMENTS: tuple[Department, ...] = (
-    Department("client", "Client services", "Talks to you and your clients", "--accent-rose"),
-    Department("strategy", "Strategy", "Decides what to say", "--accent-indigo"),
-    Department("insights", "Insights", "Learns from results", "--accent-amber"),
-    Department("creative", "Creative", "Makes the post", "--primary-bright"),
-    Department("quality", "Quality", "Checks before you see it", "--accent-emerald"),
-    Department("publishing", "Publishing", "Gets it out, after you approve", "--accent-sky"),
-    Department("seo", "Blog & SEO", "Gets you found on Google", "--accent-teal"),
+    Department("client", "Client services", "Talks to you and your clients", "#BE123C"),
+    Department("strategy", "Strategy", "Decides what to say", "#4338CA"),
+    Department("insights", "Insights", "Learns from results", "#B45309"),
+    Department("creative", "Creative", "Makes the post", "#C2410C"),
+    Department("quality", "Quality", "Checks before you see it", "#047857"),
+    Department("publishing", "Publishing", "Gets it out, after you approve", "#0369A1"),
+    Department("seo", "Blog & SEO", "Gets you found on Google", "#0F766E"),
 )
 
 AGENTS: tuple[AgentSpec, ...] = (

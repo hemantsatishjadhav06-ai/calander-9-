@@ -1,28 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}AI Studio - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
-{% block page_title %}AI Studio{% endblock %}
+{% block title %}Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl">
-    <div class="flex flex-wrap items-start justify-between gap-3 mb-6">
-        <div class="max-w-2xl">
-            <h1 class="text-lg font-semibold text-stone-900">AI Studio</h1>
-            <p class="text-sm text-stone-600 mt-0.5">
-                Your creative team for {{ profile.brand_name }}: a strategist, a copywriter, an art director and a brand reviewer.
-                Give them a small idea and they come back with a finished LinkedIn post — the angle, the caption and a graphic
-                in the same look as your last post — for you to approve before anything goes out.
+<div class="max-w-7xl">
+    {# ---- Header ---- #}
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
+        <div class="max-w-3xl min-w-0">
+            <h1 class="text-2xl sm:text-3xl text-stone-900" style="font-family: var(--font-display)">{{ greeting }}</h1>
+            <p class="text-sm text-stone-600 mt-1">
+                Your agency team for {{ profile.brand_name }} — {{ agent_count }} AI specialists in the AI Studio who plan, write, design, check and schedule.
+                {% if stats.waiting %}<span class="font-semibold text-stone-800">{{ stats.waiting }} thing{{ stats.waiting|pluralize }} need{{ stats.waiting|pluralize:"s," }} you.</span>{% else %}Nothing is waiting for you right now.{% endif %}
+                Nothing goes out until a person approves it.
             </p>
         </div>
-        <a href="{% url 'studio:brand' workspace_id=workspace.id %}"
-           class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">
-            <span class="inline-flex -space-x-1" aria-hidden="true">
-                <span class="w-3.5 h-3.5 rounded-full ring-2 ring-white" style="background: {{ profile.primary_color }}"></span>
-                <span class="w-3.5 h-3.5 rounded-full ring-2 ring-white" style="background: {{ profile.accent_color }}"></span>
+        <div class="flex flex-wrap items-center gap-2">
+            {% if agency_settings and agency_settings.autopilot_enabled %}
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-800 ring-1 ring-inset ring-green-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-700" aria-hidden="true"></span>Autopilot on · {{ agency_settings.posts_per_week }} post{{ agency_settings.posts_per_week|pluralize }} a week
             </span>
-            Brand profile
-        </a>
+            {% endif %}
+            <a href="{% url 'studio:brand' workspace_id=workspace.id %}"
+               class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-stone-800 bg-white border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">
+                <span class="inline-flex -space-x-1" aria-hidden="true">
+                    <span class="w-3.5 h-3.5 rounded-full ring-2 ring-white" style="background: {{ profile.primary_color }}"></span>
+                    <span class="w-3.5 h-3.5 rounded-full ring-2 ring-white" style="background: {{ profile.accent_color }}"></span>
+                </span>
+                Brand profile
+            </a>
+        </div>
     </div>
+
+    {% include "components/agency_tabs.html" %}
 
     {% if not setup.claude_ready or not setup.has_accounts or not setup.pictures_ready %}
     <ul class="space-y-2 mb-6" aria-label="Setup">
@@ -35,38 +44,56 @@
         {% if not setup.has_accounts %}
         <li class="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
             <span class="font-semibold">No account to post to.</span>
-            <a class="underline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect your LinkedIn page or profile</a> first.
-        </li>
-        {% elif not setup.has_linkedin %}
-        <li class="text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-xl px-4 py-3">
-            The team writes for LinkedIn. <a class="underline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect a LinkedIn page or profile</a> to post there; other accounts get the same graphic.
+            <a class="underline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect your LinkedIn page, Instagram or Facebook</a> first.
         </li>
         {% endif %}
         {% if not setup.pictures_ready %}
         <li class="text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-xl px-4 py-3">
-            Generated pictures need <code class="font-mono text-xs">FAL_KEY</code>. Until it is set, graphics use the brand background — or pick one of your own photos below.
+            Generated pictures need <code class="font-mono text-xs">FAL_KEY</code>. Until it is set, graphics use the brand background — or pick one of your own photos when you brief the team.
         </li>
         {% endif %}
     </ul>
     {% endif %}
 
+    {# ---- Brief the team ---- #}
     {% if can_create %}
-    <section aria-labelledby="brief-heading" class="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6 mb-8 shadow-sm">
-        <h2 id="brief-heading" class="text-base font-semibold text-stone-900 mb-4">Brief the team</h2>
-        <form method="post" action="{% url 'studio:create' workspace_id=workspace.id %}" x-data="{ busy: false }" x-on:submit="busy = true" novalidate>
+    <section aria-labelledby="brief-heading" class="bg-white border border-stone-200 rounded-2xl p-5 mb-6 shadow-sm">
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-3">
+            <h2 id="brief-heading" class="text-base font-semibold text-stone-900">Brief the team</h2>
+            <p class="text-xs text-stone-600">One line is enough — the strategist, copywriter, art director and reviewers take it from there.</p>
+        </div>
+        <form method="post" action="{% url 'studio:create' workspace_id=workspace.id %}" x-data="{ busy: false, more: {% if form.errors or form.notes.value or form.goal.value %}true{% else %}false{% endif %} }" x-on:submit="busy = true" novalidate>
             {% csrf_token %}
             {% if form.non_field_errors %}<div class="mb-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
-
-            <div class="mb-4">
-                <label for="{{ form.idea.id_for_label }}" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.idea.label }}</label>
-                {{ form.idea }}
-                {% if form.idea.errors %}<p class="mt-1 text-sm text-red-800">{{ form.idea.errors|join:" " }}</p>{% endif %}
-                <p class="mt-1 text-xs text-stone-600">A sentence is enough. The team only states facts that are in your idea, your direction or the brand profile.</p>
+            <div class="flex flex-col lg:flex-row gap-3 lg:items-start">
+                <div class="flex-1 min-w-0">
+                    <label for="{{ form.idea.id_for_label }}" class="sr-only">{{ form.idea.label }}</label>
+                    {{ form.idea }}
+                    {% if form.idea.errors %}<p class="mt-1 text-sm text-red-800">{{ form.idea.errors|join:" " }}</p>{% endif %}
+                </div>
+                <button type="submit" x-bind:disabled="busy" {% if not setup.claude_ready %}disabled aria-disabled="true"{% endif %}
+                        class="inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full shadow-[0_4px_14px_rgba(249,115,22,0.28)] hover:bg-orange-800 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
+                    <span x-show="!busy">Brief the team</span><span x-show="busy" x-cloak>Briefing…</span>
+                </button>
             </div>
-
-            <details class="mb-4" {% if form.notes.value or form.goal.value %}open{% endif %}>
-                <summary class="cursor-pointer text-sm font-medium text-stone-800 underline w-fit rounded focus-visible:outline-2 focus-visible:outline-orange-700">Add direction (optional)</summary>
-                <div class="grid sm:grid-cols-[1fr_14rem] gap-4 mt-3">
+            <button type="button" x-on:click="more = !more" x-bind:aria-expanded="more.toString()" aria-controls="brief-more"
+                    class="mt-3 text-sm font-medium text-stone-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">Where it goes, direction and look</button>
+            <div id="brief-more" x-show="more" x-cloak class="mt-4 grid md:grid-cols-2 gap-6">
+                <fieldset>
+                    <legend class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.accounts.label }}</legend>
+                    {% if form.accounts.field.choices %}
+                    <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {% for choice in form.accounts %}
+                        <label class="flex items-center gap-2 text-sm text-stone-800 cursor-pointer">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-stone-600"><a class="underline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect an account</a> to choose where it goes.</p>
+                    {% endif %}
+                    {% if form.accounts.errors %}<p class="mt-1 text-sm text-red-800">{{ form.accounts.errors|join:" " }}</p>{% endif %}
+                </fieldset>
+                <div class="space-y-4">
                     <div>
                         <label for="{{ form.notes.id_for_label }}" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.notes.label }}</label>
                         {{ form.notes }}
@@ -75,37 +102,11 @@
                         <label for="{{ form.goal.id_for_label }}" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.goal.label }}</label>
                         {{ form.goal }}
                     </div>
-                </div>
-            </details>
-
-            <div class="grid md:grid-cols-2 gap-6">
-                <fieldset>
-                    <legend class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.accounts.label }}</legend>
-                    {% if form.accounts.field.choices %}
-                    <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                        {% for choice in form.accounts %}
-                        <label class="flex items-center gap-2 text-sm text-stone-800 cursor-pointer">
-                            {{ choice.tag }}<span>{{ choice.choice_label }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <p class="text-sm text-stone-600"><a class="underline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect an account</a> to choose where it goes.</p>
-                    {% endif %}
-                    {% if form.accounts.errors %}<p class="mt-1 text-sm text-red-800">{{ form.accounts.errors|join:" " }}</p>{% endif %}
-                </fieldset>
-
-                <div class="space-y-4">
                     <div>
                         <label class="flex items-start gap-2 text-sm text-stone-800 cursor-pointer">
                             {{ form.style_lock }}
-                            <span><span class="font-semibold text-stone-900">{{ form.style_lock.label }}</span><br>
-                                <span class="text-stone-600">Next graphic follows {{ reference.label }}.</span></span>
+                            <span><span class="font-semibold text-stone-900">{{ form.style_lock.label }}</span><br><span class="text-stone-600">Next graphic follows {{ reference.label }}.</span></span>
                         </label>
-                        {% if reference.asset %}
-                        <img src="{% if reference.asset.thumbnail %}{{ reference.asset.thumbnail.url }}{% else %}{{ reference.asset.file.url }}{% endif %}"
-                             alt="The post whose look the next graphic follows" class="mt-2 ml-6 h-20 w-auto rounded-lg border border-stone-200 bg-stone-100 object-cover" loading="lazy">
-                        {% endif %}
                     </div>
                     <div>
                         <label for="{{ form.source_picture.id_for_label }}" class="block text-sm font-semibold text-stone-900 mb-1.5">{{ form.source_picture.label }}</label>
@@ -114,51 +115,210 @@
                     </div>
                 </div>
             </div>
-
-            <div class="flex flex-wrap items-center gap-3 mt-6">
-                <button type="submit" x-bind:disabled="busy" {% if not setup.claude_ready %}disabled aria-disabled="true"{% endif %}
-                        class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full shadow-[0_4px_14px_rgba(249,115,22,0.28)] hover:bg-orange-800 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
-                    <span x-show="!busy">Brief the team</span><span x-show="busy" x-cloak>Briefing…</span>
-                </button>
-                <p class="text-xs text-stone-600">Takes two to four minutes. Nothing is posted until an approver approves it.</p>
-            </div>
         </form>
     </section>
     {% endif %}
 
-    <section aria-labelledby="recent-heading">
-        <h2 id="recent-heading" class="text-sm font-semibold text-stone-900 mb-3">Recent work</h2>
-        {% if briefs %}
-        <ul class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {% for brief in briefs %}
-            <li>
-                <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=brief.id %}"
-                   class="block bg-white border border-stone-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-transparent focus-visible:outline-2 focus-visible:outline-orange-700 transition-all duration-200 group">
-                    <div class="aspect-[4/5] bg-stone-100 flex items-center justify-center overflow-hidden">
-                        {% if brief.graphic %}
-                        <img src="{% if brief.graphic.thumbnail %}{{ brief.graphic.thumbnail.url }}{% else %}{{ brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">
-                        {% else %}
-                        <svg class="w-8 h-8 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
-                        {% endif %}
+    {# ---- Numbers ---- #}
+    <ul class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" aria-label="This week at a glance">
+        <li class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
+            <p class="text-xs text-stone-600">Waiting for you</p>
+            <p class="text-2xl font-bold text-stone-900 mt-0.5">{{ stats.waiting }}</p>
+            <p class="text-xs text-stone-600 mt-0.5">{{ stats.waiting_posts }} post{{ stats.waiting_posts|pluralize }}{% if stats.waiting_blogs %} · {{ stats.waiting_blogs }} article{{ stats.waiting_blogs|pluralize }}{% endif %}{% if inbox_drafts %} · {{ inbox_drafts }} repl{{ inbox_drafts|pluralize:"y,ies" }}{% endif %}</p>
+        </li>
+        <li class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
+            <p class="text-xs text-stone-600">Team working</p>
+            <p class="text-2xl font-bold text-stone-900 mt-0.5">{{ stats.working }} job{{ stats.working|pluralize }}</p>
+            <p class="text-xs text-stone-600 mt-0.5 truncate">{% if at_work and at_work.0.state != 'done' %}{{ at_work.0.agent.name }}: {{ at_work.0.doing }}{% else %}All quiet{% endif %}</p>
+        </li>
+        <li class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
+            <p class="text-xs text-stone-600">Out this week</p>
+            <p class="text-2xl font-bold text-stone-900 mt-0.5">{{ stats.out_this_week }}</p>
+            <p class="text-xs text-stone-600 mt-0.5">{% for platform, n in stats.out_by_platform.items %}{{ platform|cut:"_company"|cut:"_personal"|cut:"_login"|capfirst }} {{ n }}{% if not forloop.last %} · {% endif %}{% empty %}Posts published since Monday{% endfor %}</p>
+        </li>
+        <li class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm">
+            <p class="text-xs text-stone-600">AI spend this month</p>
+            <p class="text-2xl font-bold text-stone-900 mt-0.5">${{ stats.spend|floatformat:0 }}</p>
+            <div class="mt-1.5 h-1.5 rounded-full bg-stone-100 overflow-hidden" role="img" aria-label="{{ stats.spend_pct }}% of the monthly budget used">
+                <div class="h-full rounded-full {% if stats.spend_pct >= 90 %}bg-red-700{% elif stats.spend_pct >= 70 %}bg-amber-600{% else %}bg-green-700{% endif %}" style="width: {{ stats.spend_pct }}%"></div>
+            </div>
+            <p class="text-xs text-stone-600 mt-1">of your ${{ stats.budget|floatformat:0 }} budget</p>
+        </li>
+    </ul>
+
+    <div class="grid xl:grid-cols-[minmax(0,1fr)_24rem] gap-6 items-start">
+        <div class="space-y-6 min-w-0">
+            {# ---- Waiting for approval ---- #}
+            <section aria-labelledby="waiting-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
+                    <div>
+                        <h2 id="waiting-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">Waiting for your approval</h2>
+                        <p class="text-xs text-stone-600">Made by the team, reviewed, and given a time. Nothing goes out until you approve.</p>
                     </div>
-                    <div class="p-3">
-                        <div class="flex items-center justify-between gap-2 mb-1">
-                            {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
-                            <span class="text-xs text-stone-600">{{ brief.created_at|timesince }} ago</span>
+                    <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=approvals" class="px-3 py-1.5 text-sm font-semibold text-orange-800 bg-orange-50 rounded-lg hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-700">Open approvals</a>
+                </div>
+                {% if waiting %}
+                <ul class="divide-y divide-stone-200">
+                    {% for item in waiting %}
+                    <li class="flex flex-wrap sm:flex-nowrap items-center gap-4 py-3">
+                        {% if item.kind == 'post' %}
+                        <div class="w-16 h-20 flex-shrink-0 rounded-md overflow-hidden bg-stone-100">
+                            {% if item.brief.graphic %}<img src="{% if item.brief.graphic.thumbnail %}{{ item.brief.graphic.thumbnail.url }}{% else %}{{ item.brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">{% endif %}
                         </div>
-                        <p class="text-sm font-semibold text-stone-900 line-clamp-2 group-hover:underline">{{ brief.title }}</p>
+                        <div class="flex-1 min-w-0">
+                            <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=item.brief.id %}" class="text-sm font-semibold text-stone-900 hover:underline focus-visible:outline-2 focus-visible:outline-orange-700 rounded">{{ item.title }}</a>
+                            <p class="text-xs text-stone-600 mt-0.5">{{ item.where|default:"No account" }}{% if item.proposed %} · Proposed {{ item.proposed|date:"D j M, H:i" }}{% endif %}</p>
+                            <p class="text-xs mt-0.5 {% if item.flags %}text-amber-800{% else %}text-green-800{% endif %}">{% if item.score %}Brand reviewer {{ item.score }}/10{% endif %}{% if item.flags %} · {{ item.flags }} thing{{ item.flags|pluralize }} to check{% endif %}{% if item.qa_notes %} · {{ item.qa_notes }} QA note{{ item.qa_notes|pluralize }}{% endif %}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=item.brief.id %}" class="px-3 py-1.5 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Review<span class="sr-only"> {{ item.title }}</span></a>
+                            {% if can_approve and item.proposed_in_future %}
+                            <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=item.brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                                {% csrf_token %}<input type="hidden" name="mode" value="proposed">
+                                <button type="submit" x-bind:disabled="busy" class="px-3 py-1.5 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Approve &amp; schedule<span class="sr-only"> {{ item.title }} for {{ item.proposed|date:"D j M, H:i" }}</span></button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="w-16 h-20 flex-shrink-0 rounded-md bg-teal-50 flex items-center justify-center" aria-hidden="true">
+                            <svg class="w-6 h-6 text-teal-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <a href="{% url 'blog:detail' workspace_id=workspace.id post_id=item.blog_post.id %}" class="text-sm font-semibold text-stone-900 hover:underline focus-visible:outline-2 focus-visible:outline-orange-700 rounded">{{ item.title }}</a>
+                            <p class="text-xs text-stone-600 mt-0.5">Blog article · {{ item.where }} · {{ item.words }} words</p>
+                            <p class="text-xs mt-0.5 {% if item.score >= 80 %}text-green-800{% else %}text-amber-800{% endif %}">SEO score {{ item.score }}</p>
+                        </div>
+                        <a href="{% url 'blog:detail' workspace_id=workspace.id post_id=item.blog_post.id %}" class="px-3 py-1.5 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Review<span class="sr-only"> {{ item.title }}</span></a>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-stone-600 py-6 text-center">Nothing waiting. Brief the team above{% if agency_settings and agency_settings.autopilot_enabled %}, or wait for autopilot's next plan{% endif %}.</p>
+                {% endif %}
+            </section>
+
+            {# ---- Team at work ---- #}
+            <section aria-labelledby="work-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+                    <div>
+                        <h2 id="work-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">Team at work</h2>
+                        <p class="text-xs text-stone-600">{% if stats.working %}{{ stats.working }} job{{ stats.working|pluralize }} in progress.{% else %}No one is busy right now; here is what they did last.{% endif %}</p>
                     </div>
-                </a>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <div class="text-center py-12 border border-dashed border-stone-300 rounded-xl">
-            <p class="text-sm font-medium text-stone-700 mb-1">Nothing yet</p>
-            <p class="text-sm text-stone-600">Your first brief appears here, with everything the team made for it.</p>
+                    <a href="{% url 'studio:team' workspace_id=workspace.id %}" class="px-3 py-1.5 text-sm font-semibold text-orange-800 bg-orange-50 rounded-lg hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-700">Meet the team</a>
+                </div>
+                {% if at_work %}
+                <ul class="divide-y divide-stone-100">
+                    {% for row in at_work %}
+                    <li class="flex items-center gap-3 py-2.5">
+                        {% include "components/agent_avatar.html" with agent=row.agent %}
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-semibold text-stone-900">{{ row.agent.name }}</p>
+                            <p class="text-xs text-stone-600 break-words">{% if row.url %}<a href="{{ row.url }}" class="hover:underline">{{ row.doing }}</a>{% else %}{{ row.doing }}{% endif %}</p>
+                        </div>
+                        {% include "components/agent_state.html" with state=row.state %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-stone-600 py-6 text-center">The team hasn't worked here yet. Brief it above to see them go.</p>
+                {% endif %}
+            </section>
+
+            {# ---- This week ---- #}
+            <section aria-labelledby="week-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                    <div>
+                        <h2 id="week-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">The next seven days</h2>
+                        <p class="text-xs text-stone-600">Planned, waiting for approval, and scheduled.</p>
+                    </div>
+                    {% for tab in tabs %}{% if tab.key == 'autopilot' %}<a href="{{ tab.url }}" class="px-3 py-1.5 text-sm font-semibold text-orange-800 bg-orange-50 rounded-lg hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-700">Autopilot settings</a>{% endif %}{% endfor %}
+                </div>
+                <ol class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                    {% for day in week %}
+                    <li class="rounded-lg p-2.5 min-h-24 {% if day.items %}bg-orange-50{% else %}bg-stone-50{% endif %}">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-stone-600">{{ day.date|date:"D j" }}</p>
+                        <ul class="mt-1 space-y-1">
+                            {% for item in day.items %}
+                            <li class="text-xs leading-snug {% if item.tone == 'scheduled' %}text-green-800{% elif item.tone == 'ready' %}text-amber-800{% else %}text-orange-800{% endif %}"><span class="font-semibold">{{ item.time|date:"H:i" }}</span> {{ item.label|truncatechars:42 }}<span class="sr-only"> ({{ item.tone }})</span></li>
+                            {% empty %}
+                            <li class="text-xs text-stone-500">—</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    {% endfor %}
+                </ol>
+                <p class="mt-2 text-xs text-stone-600"><span class="text-green-800 font-semibold">Green</span> is scheduled, <span class="text-amber-800 font-semibold">amber</span> is waiting for you, <span class="text-orange-800 font-semibold">orange</span> is planned.</p>
+            </section>
+
+            {# ---- Recent work ---- #}
+            <section aria-labelledby="recent-heading">
+                <h2 id="recent-heading" class="text-sm font-semibold text-stone-900 mb-3">Recent work</h2>
+                {% if briefs %}
+                <ul class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {% for brief in briefs %}
+                    <li>
+                        <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=brief.id %}"
+                           class="block bg-white border border-stone-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-transparent focus-visible:outline-2 focus-visible:outline-orange-700 transition-all duration-200 group">
+                            <div class="aspect-[4/5] bg-stone-100 flex items-center justify-center overflow-hidden">
+                                {% if brief.graphic %}
+                                <img src="{% if brief.graphic.thumbnail %}{{ brief.graphic.thumbnail.url }}{% else %}{{ brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">
+                                {% else %}
+                                <svg class="w-8 h-8 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
+                                {% endif %}
+                            </div>
+                            <div class="p-3">
+                                <div class="flex items-center justify-between gap-2 mb-1">
+                                    {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
+                                    <span class="text-xs text-stone-600">{{ brief.created_at|timesince }} ago</span>
+                                </div>
+                                <p class="text-sm font-semibold text-stone-900 line-clamp-2 group-hover:underline">{{ brief.title }}</p>
+                            </div>
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center py-12 border border-dashed border-stone-300 rounded-xl">
+                    <p class="text-sm font-medium text-stone-700 mb-1">Nothing yet</p>
+                    <p class="text-sm text-stone-600">Your first brief appears here, with everything the team made for it.</p>
+                </div>
+                {% endif %}
+            </section>
         </div>
-        {% endif %}
-    </section>
+
+        <aside class="space-y-6">
+            {# ---- Ask the team ---- #}
+            {% if thread %}
+            {% include thread.template with thread=thread %}
+            {% else %}
+            <section aria-labelledby="ask-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+                <h2 id="ask-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">Ask the team</h2>
+                <p class="text-xs text-stone-600 mt-0.5">Questions and change requests go to your account manager, who gets the right agent on it.</p>
+            </section>
+            {% endif %}
+
+            {# ---- What the team learned ---- #}
+            <section aria-labelledby="learned-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+                <h2 id="learned-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">What the team learned</h2>
+                <p class="text-xs text-stone-600 mt-0.5 mb-3">From your analytics, comments and approvals.</p>
+                {% if learned %}
+                <ul class="space-y-2">
+                    {% for line in learned %}
+                    <li class="flex gap-2 text-sm text-stone-800"><span class="mt-2 w-1.5 h-1.5 flex-shrink-0 rounded-full bg-orange-500" aria-hidden="true"></span><span class="break-words">{{ line }}</span></li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-stone-600">Once a few posts are out, the team learns what works for your audience and uses it in the next ones.</p>
+                {% endif %}
+                {% if profile.house_style %}
+                <div class="mt-4 pt-3 border-t border-stone-200">
+                    <p class="text-xs font-semibold text-stone-700 mb-1">Your house style</p>
+                    <p class="text-sm text-stone-700 break-words">{{ profile.house_style|truncatechars:260 }}</p>
+                </div>
+                {% endif %}
+            </section>
+        </aside>
+    </div>
 </div>
 {% endblock %}

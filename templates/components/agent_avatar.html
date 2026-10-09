@@ -1,0 +1,2 @@
+{% comment %}One agent's avatar: initials on the department colour (700 shades, white text reads at 4.5:1+). Context: agent (apps.studio.team.AgentSpec), size ("sm" or default).{% endcomment %}
+<span class="inline-flex flex-shrink-0 items-center justify-center rounded-full font-semibold text-white {% if size == 'sm' %}w-7 h-7 text-[11px]{% else %}w-9 h-9 text-xs{% endif %}" style="background: {{ agent.colour }}" aria-hidden="true">{{ agent.initials }}</span>

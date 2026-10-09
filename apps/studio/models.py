@@ -414,6 +414,12 @@ class AgentRun(models.Model):
 
         return team.name(self.agent)
 
+    @property
+    def agent_spec(self):
+        from . import team
+
+        return team.get(self.agent)
+
 
 # ---------------------------------------------------------------------------
 # The agency: jobs beyond a single post, autopilot, the team thread, memory
