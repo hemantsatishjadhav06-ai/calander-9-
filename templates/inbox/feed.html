@@ -151,6 +151,19 @@
             </div>
         </div>
         <div class="flex items-center gap-2">
+            {% if can_draft_with_team %}
+            {# The agency's community and reviews managers draft replies; a person still reads and sends each one. #}
+            <form method="post" action="{% url 'studio:inbox_draft' workspace_id=workspace.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                {% csrf_token %}
+                <input type="hidden" name="message_ids" x-bind:value="Array.from(selected).join(',')">
+                <button type="submit" x-bind:disabled="busy"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-white rounded-full disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700"
+                        style="background: var(--primary-strong);">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
+                    <span x-text="selectedCount > 0 ? 'Draft replies to ' + selectedCount + ' selected' : 'Draft replies with the team'">Draft replies with the team</span>
+                </button>
+            </form>
+            {% endif %}
             <a href="{% url 'inbox:saved_replies' workspace_id=workspace.id %}"
                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-stone-600 bg-white border border-stone-200 rounded-full hover:border-stone-300 hover:bg-stone-50 transition-all duration-150"
                title="Saved Replies">

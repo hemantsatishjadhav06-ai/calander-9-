@@ -115,10 +115,10 @@ def build_prompt(*, title: str, category: str = "", site_kind: str = "", brief: 
     )
 
 
-def _request_body(prompt: str) -> dict:
+def _request_body(prompt: str, image_size: str | dict = "landscape_16_9") -> dict:
     return {
         "prompt": prompt,
-        "image_size": "landscape_16_9",
+        "image_size": image_size,
         "num_images": 1,
         "enable_safety_checker": True,
         "output_format": "jpeg",
@@ -203,15 +203,33 @@ def generate_image(
             "AI pictures need FAL_KEY on the SM Bean service (an API key from fal.ai). "
             "Upload a picture to the media library instead, or ask your admin to add the key."
         )
-    model = model_id()
     prompt = build_prompt(title=title, category=category, site_kind=site_kind, brief=brief, seed=seed)
+    return generate_from_prompt(prompt, client=client)
+
+
+def generate_from_prompt(
+    prompt: str,
+    *,
+    image_size: str | dict = "landscape_16_9",
+    client: httpx.Client | None = None,
+) -> GeneratedImage:
+    """Ask fal.ai for one picture for an already written ``prompt``.
+
+    ``image_size`` is a fal preset (``landscape_16_9``, ``portrait_4_3``, …) or
+    ``{"width": w, "height": h}``. Raises :class:`ImageGenerationError` with a
+    readable message. Used by the blog (through :func:`generate_image`) and by
+    the AI Studio's illustrator.
+    """
+    if not is_configured():
+        raise NotConfiguredError("AI pictures need FAL_KEY on the SM Bean service (an API key from fal.ai).")
+    model = model_id()
     timeout = float(getattr(settings, "FAL_TIMEOUT", DEFAULT_TIMEOUT))
     headers = {"Authorization": f"Key {settings.FAL_KEY.strip()}", "Content-Type": "application/json"}
     own_client = client is None
     client = client or httpx.Client(timeout=httpx.Timeout(timeout, connect=15.0), follow_redirects=False)
     try:
         try:
-            response = client.post(f"{FAL_RUN}/{model}", json=_request_body(prompt), headers=headers)
+            response = client.post(f"{FAL_RUN}/{model}", json=_request_body(prompt, image_size), headers=headers)
         except httpx.TimeoutException as exc:
             raise ImageGenerationError(
                 f"fal.ai took longer than {int(timeout)} seconds; try again, or pick a faster model."

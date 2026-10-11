@@ -1,0 +1,14 @@
+{% comment %}One weekly client report. Context: report (apps.studio.reports.client_safe), compact (bool: summary only).{% endcomment %}
+<article class="min-w-0" aria-label="{{ report.title }}">
+    <p class="text-sm font-semibold text-stone-900 break-words">{{ report.title }}</p>
+    {% if report.period %}<p class="text-xs text-stone-600">{{ report.period }}{% for name, count in report.went_out.items %}{% if forloop.first %} · {% endif %}{{ name }} {{ count }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+    {% if report.summary %}<p class="text-sm text-stone-700 mt-1 break-words">{{ report.summary }}</p>{% endif %}
+    {% if not compact %}
+    {% for section in report.sections %}
+    <div class="mt-3">
+        <p class="text-xs font-semibold uppercase tracking-wide text-stone-600">{{ section.heading }}</p>
+        <p class="text-sm text-stone-800 mt-0.5 break-words">{{ section.body }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+</article>

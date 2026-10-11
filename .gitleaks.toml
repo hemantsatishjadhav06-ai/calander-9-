@@ -12,6 +12,11 @@ useDefault = true
 # Affected lines (examples):
 #   providers/linkedin_personal.py:  from .linkedin import API_BASE, LinkedInProvider
 #   providers/linkedin_company.py:   from .linkedin import LinkedInProvider
+#
+# False positive: `generic-api-key` matches the made-up IndexNow key the blog
+# publisher tests use (apps/blog/tests/test_publisher.py). It is a fixture
+# string, not a credential; IndexNow keys are public by design (served as a
+# file on the website).
 [allowlist]
-description = "Project allowlist: ignore LinkedInProvider class-name imports"
-regexes = ['''LinkedInProvider''']
+description = "Project allowlist: LinkedInProvider class-name imports; the IndexNow test fixture key"
+regexes = ['''LinkedInProvider''', '''a1b2c3d4e5f6a7b8''']

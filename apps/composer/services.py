@@ -116,6 +116,10 @@ def create_post(
 
     Returns the persisted ``Post`` with one ``PlatformPost`` child.
     """
+    if status != "draft":
+        from apps.studio.guards import forbid_in_agent_work
+
+        forbid_in_agent_work(f"create a post as {status}")
     from django.db import transaction
 
     from apps.composer.models import PlatformPost, Post, PostMedia

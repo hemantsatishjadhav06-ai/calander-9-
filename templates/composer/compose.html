@@ -2116,7 +2116,30 @@ function composerApp() {
             for (const ch of text) {
                 if (escaped.includes(ch)) extra++;
             }
+            // LinkedIn sends "#word" hashtags unescaped so they link.
+            if ((this.charLimits[accId]?.platform || '').startsWith('linkedin')) extra -= this.linkedinHashtagCount(text);
             return text.length + extra;
+        },
+        // Mirrors providers.linkedin.hashtag_spans: "#" and one word of letters,
+        // marks and digits holding a letter, not glued to the word before it and
+        // not running on into "_".
+        linkedinHashtagCount(text) {
+            const chars = Array.from(text);
+            const isTag = (ch) => /[\p{L}\p{M}\p{N}]/u.test(ch);
+            const isLetter = (ch) => /\p{L}/u.test(ch);
+            let count = 0;
+            for (let i = 0; i < chars.length; i++) {
+                if (chars[i] !== '#') continue;
+                const before = i > 0 ? chars[i - 1] : '';
+                if (before && (isTag(before) || '#_\\'.includes(before))) continue;
+                let end = i + 1;
+                while (end < chars.length && isTag(chars[end])) end++;
+                const tag = chars.slice(i + 1, end);
+                if (!tag.some(isLetter)) continue;
+                if (end < chars.length && chars[end] === '_') continue;
+                count++;
+            }
+            return count;
         },
         // X counts its 280 by weight: every link is 23, CJK and emoji are two,
         // an emoji sequence is one emoji. Mirrors providers.x.weighted_length.

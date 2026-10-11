@@ -1,7 +1,9 @@
 {% comment %}
-Client approval card (design "ClientCard"). Context: post (+ post.visible_comments
-= external/team comments), workspace. Pending posts get approve/request-changes/reject;
-already-approved posts get "Put on hold"; held posts show their state.
+Client approval card (design "ClientCard", Figma 15:425 / phone 15:510). Context: post (+ post.visible_comments
+= external/team comments), workspace. Pending posts get approve / request a change / ask a question / reject;
+already-approved posts get "Put on hold"; held posts show their state. Every card has a thread with the
+team about the post (apps.client_portal.views_team), loaded when the card opens. "Request a change" goes
+through the team thread: the client's change request is recorded first, then the account manager routes it.
 {% endcomment %}
 {% load tz approval_extras %}
 <div class="rounded-2xl border border-stone-200 bg-white overflow-hidden transition-shadow hover:shadow-md"
@@ -58,12 +60,21 @@ already-approved posts get "Put on hold"; held posts show their state.
         </div>
         {% endif %}
 
+        <div class="px-5 py-4 border-t border-stone-100">
+            <p class="text-[0.8125rem] font-semibold text-stone-700 mb-2">Talk to the team about this post</p>
+            <div id="post-thread-{{ post.id }}" hx-get="{% url 'client_portal:post_thread' post_id=post.id %}" hx-trigger="intersect once" hx-target="this" hx-select="unset" hx-swap="innerHTML">
+                <p class="text-[0.8125rem] text-stone-600">Loading the conversation…</p>
+            </div>
+        </div>
+
         <div class="px-5 py-4 border-t border-stone-100 flex flex-wrap items-center gap-2 bg-stone-50">
             {% if post.client_pending %}
             <button hx-post="{% url 'client_portal:approve' post_id=post.id %}" hx-swap="none"
                     class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full text-white transition-all hover:-translate-y-px" style="background:#22C55E;">Approve</button>
             <button @click="panel = panel === 'changes' ? null : 'changes'"
-                    class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full" style="background:#FEFCE8;color:#A16207;border:1px solid rgba(234,179,8,0.25);">Request changes</button>
+                    class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full" style="background:#FEFCE8;color:#A16207;border:1px solid rgba(234,179,8,0.25);">Request a change</button>
+            <button @click="panel = panel === 'ask' ? null : 'ask'"
+                    class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full bg-orange-50 text-orange-800 border border-orange-200">Ask a question</button>
             <button @click="panel = panel === 'reject' ? null : 'reject'"
                     class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full" style="background:#FEF2F2;color:#B91C1C;border:1px solid rgba(239,68,68,0.18);">Reject</button>
             {% elif post.client_on_hold %}
@@ -71,11 +82,15 @@ already-approved posts get "Put on hold"; held posts show their state.
                 <svg class="w-[15px] h-[15px]" style="color:#7C3AED;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
                 On hold — the team has been notified.
             </span>
+            <button @click="panel = panel === 'ask' ? null : 'ask'"
+                    class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full bg-orange-50 text-orange-800 border border-orange-200">Ask a question</button>
             {% elif post.client_approved %}
             <span class="text-[0.8125rem] text-stone-500 inline-flex items-center gap-1.5 mr-1">
                 <svg class="w-[15px] h-[15px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
-                You approved this. Scheduled to publish
+                You approved this. {% if post.scheduled_at %}It's on the calendar.{% else %}Your agency team schedules it next.{% endif %}
             </span>
+            <button @click="panel = panel === 'ask' ? null : 'ask'"
+                    class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full bg-orange-50 text-orange-800 border border-orange-200">Ask a question</button>
             <button @click="panel = panel === 'hold' ? null : 'hold'"
                     class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full inline-flex items-center gap-1.5" style="background:#F5F3FF;color:#6D28D9;border:1px solid rgba(124,58,237,0.2);">
                 <svg class="w-[13px] h-[13px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
@@ -84,17 +99,23 @@ already-approved posts get "Put on hold"; held posts show their state.
             {% endif %}
         </div>
 
-        {% if post.client_pending or post.client_approved %}
-        <div x-show="panel" x-cloak class="px-5 py-4 border-t border-stone-100 anim-collapse">
+        {% if post.client_pending or post.client_approved or post.client_on_hold %}
+        <div x-show="panel" x-cloak class="px-5 py-4 border-t border-stone-100 anim-collapse"
+             x-on:htmx:after-request="if ($event.detail.successful && (panel === 'ask' || panel === 'changes')) { panel = null; comment = '' }">
             <label for="client-comment-{{ post.id }}" class="text-[0.8125rem] font-semibold text-stone-700 block mb-2"
-                   x-text="panel === 'changes' ? 'What changes would you like?' : panel === 'reject' ? 'Why are you rejecting this?' : 'Why put this on hold? The team is notified, and nothing publishes while held.'"></label>
+                   x-text="panel === 'changes' ? 'What would you like changed? Say it in your own words — the team does the rest.' : panel === 'ask' ? 'What would you like to ask the team?' : panel === 'reject' ? 'Why are you rejecting this?' : 'Why put this on hold? The team is notified, and nothing publishes while held.'"></label>
             <textarea id="client-comment-{{ post.id }}" name="comment" x-model="comment" rows="3"
-                      :placeholder="panel === 'hold' ? 'e.g. Legal wants to double-check the figures…' : 'Add a note…'"
+                      :placeholder="panel === 'hold' ? 'e.g. Legal wants to double-check the figures…' : panel === 'changes' ? 'e.g. Use a warmer photo, and mention free parking' : panel === 'ask' ? 'e.g. Can we mention the free site visit on Saturday?' : 'Add a note…'"
                       class="w-full px-3 py-2 text-[0.875rem] rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-200 border-[1.5px] border-stone-200"></textarea>
             <div class="flex gap-2 mt-3">
-                <button x-show="panel === 'changes'" hx-post="{% url 'client_portal:request_changes' post_id=post.id %}" hx-include="#client-comment-{{ post.id }}" hx-swap="none"
+                <button x-show="panel === 'changes'" hx-post="{% url 'client_portal:post_ask' post_id=post.id %}" hx-include="#client-comment-{{ post.id }}" hx-vals='{"kind": "change"}'
+                        hx-target="#post-thread-{{ post.id }}" hx-select="unset" hx-swap="innerHTML"
                         :disabled="!comment.trim()" :class="!comment.trim() && 'opacity-50 cursor-not-allowed'"
-                        class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full text-white" style="background:#EAB308;">Submit feedback</button>
+                        class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full text-white bg-amber-700">Send to the team</button>
+                <button x-show="panel === 'ask'" hx-post="{% url 'client_portal:post_ask' post_id=post.id %}" hx-include="#client-comment-{{ post.id }}" hx-vals='{"kind": "question"}'
+                        hx-target="#post-thread-{{ post.id }}" hx-select="unset" hx-swap="innerHTML"
+                        :disabled="!comment.trim()" :class="!comment.trim() && 'opacity-50 cursor-not-allowed'"
+                        class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full text-white" style="background: var(--primary-strong);">Send question</button>
                 <button x-show="panel === 'reject'" hx-post="{% url 'client_portal:reject' post_id=post.id %}" hx-include="#client-comment-{{ post.id }}" hx-swap="none"
                         :disabled="!comment.trim()" :class="!comment.trim() && 'opacity-50 cursor-not-allowed'"
                         class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full text-white" style="background:#EF4444;">Reject post</button>

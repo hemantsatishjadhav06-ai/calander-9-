@@ -6,6 +6,10 @@ about who may approve or publish live in :mod:`apps.blog.services` — these
 views only decide which buttons to show and translate refusals into messages.
 """
 
+import uuid
+from typing import Any
+from urllib.parse import urlsplit
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -14,16 +18,17 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
+from django_ratelimit.decorators import ratelimit
 
 from apps.approvals.actor import dashboard_approver
 from apps.members.decorators import require_permission
 
-from . import ai_images, services
+from . import ai_images, search_console, seo, services
 from .covers import cover_for_post
-from .forms import BlogPostForm
+from .forms import BlogPostForm, parse_faq
 from .models import BlogPost, BlogSite
 from .publisher import commit_link
-from .renderers import absolutize_urls, render_post_page
+from .renderers import PostContent, absolutize_urls, render_post_page
 
 Status = BlogPost.Status
 
@@ -64,6 +69,151 @@ def _detail_redirect(post):
     return redirect("blog:detail", workspace_id=post.workspace_id, post_id=post.pk)
 
 
+def is_staff(request) -> bool:
+    """A member of the agency's own team — not a client, who signs off in the client portal."""
+    from apps.studio.views import is_plain_client
+
+    return request.workspace_membership is not None and not is_plain_client(request.workspace_membership)
+
+
+def _staff_workspace(request, workspace_id):
+    workspace = _workspace(request, workspace_id)
+    if not is_staff(request):
+        raise PermissionDenied("This part of SM Bean is for your agency team. Your approvals are in the client portal.")
+    return workspace
+
+
+# ---------------------------------------------------------------------------
+# The SEO score, the Google preview and the rankings (apps.blog.seo / search_console)
+# ---------------------------------------------------------------------------
+
+#: The live score reads at most this much of the article (a long guide is ~30k).
+SEO_BODY_LIMIT = 200_000
+_RING_RADIUS = 26
+
+
+def _values_from_post(post) -> dict:
+    return {
+        "site": str(post.site_id or ""),
+        "title": post.title,
+        "slug": post.slug,
+        "body": post.body,
+        "seo_title": post.seo_title,
+        "meta_description": post.meta_description,
+        "excerpt": post.excerpt,
+        "focus_keyword": post.focus_keyword,
+        "secondary_keywords": ", ".join(post.secondary_keywords or []),
+        "faq": post.faq or [],
+        "featured_image_alt": post.featured_image_alt,
+        "featured_image": str(post.featured_image_id or ""),
+        "cover_style": post.cover_style,
+    }
+
+
+def _seo_inputs(data, workspace, post=None) -> dict:
+    """The editor's current values as score arguments. Reads only; nothing is saved."""
+    sites = BlogSite.objects.filter(workspace=workspace)
+    site = None
+    try:
+        site = sites.filter(pk=uuid.UUID(str(data.get("site") or ""))).first()
+    except ValueError:
+        site = None
+    if post is not None and (site is None or post.has_been_committed):
+        site = post.site
+    if site is None:
+        site = sites.filter(is_enabled=True).order_by("name").first() or sites.order_by("name").first()
+    slug = str(data.get("slug") or "").strip().lower()
+    if post is not None and (not slug or post.has_been_committed):
+        slug = post.slug
+    faq = data.get("faq")
+    if faq is None:
+        try:
+            faq = parse_faq(str(data.get("faq_text") or ""))
+        except ValidationError:
+            faq = []
+    raw_terms = str(data.get("secondary_keywords") or "")
+    try:
+        secondary = services.clean_keywords(raw_terms)
+    except ValidationError:
+        secondary = [t.strip() for t in raw_terms.split(",") if t.strip()]
+    cover_style = str(data.get("cover_style") or BlogPost.CoverStyle.DESIGNED)
+
+    def text(name, limit=2000):
+        return str(data.get(name) or "")[:limit]
+
+    return {
+        "site": site,
+        "title": text("title", 300),
+        "slug": slug[:120],
+        "body": str(data.get("body") or "")[:SEO_BODY_LIMIT],
+        "seo_title": text("seo_title", 300),
+        "meta_description": text("meta_description", 1000),
+        "excerpt": text("excerpt", 1000),
+        "focus_keyword": services.clean_keyword(text("focus_keyword", 200)),
+        "secondary_keywords": secondary,
+        "faq": faq,
+        "image_alt": text("featured_image_alt", 500),
+        "has_image": bool(data.get("featured_image")) or cover_style == BlogPost.CoverStyle.DESIGNED,
+    }
+
+
+def _ring(score: int) -> dict:
+    circumference = round(2 * 3.14159265 * _RING_RADIUS, 2)
+    return {"radius": _RING_RADIUS, "circumference": circumference, "dash": round(circumference * score / 100, 2)}
+
+
+def _google_preview(site, values: dict, report) -> dict:
+    slug = values["slug"] or "your-article"
+    url = site.live_url_for(slug) if site else f"https://example.com/blog/{slug}"
+    parts = urlsplit(url)
+    crumbs = [parts.netloc] + [p.removesuffix(".html") for p in parts.path.split("/") if p]
+    description = PostContent(
+        title=values["title"],
+        slug=slug,
+        excerpt=values["excerpt"].strip(),
+        body_md=values["body"],
+        meta_description=values["meta_description"].strip(),
+    ).description
+    return {"crumbs": crumbs, "title": report.title_tag, "description": description}
+
+
+def seo_panel_context(workspace, values: dict, post=None) -> dict:
+    """Everything the SEO panel shows for these values: the score, the checks, the Google preview."""
+    values = dict(values)
+    site = values.pop("site")
+    others = BlogPost.objects.filter(site=site) if site else BlogPost.objects.none()
+    if post is not None:
+        others = others.exclude(pk=post.pk)
+    report = seo.score(
+        **values,
+        site_kind=site.kind if site else "",
+        site_origin=site.origin if site else "",
+        other_titles=list(others.values_list("title", flat=True)[:500]),
+    )
+    return {
+        "report": report,
+        "ring": _ring(report.score),
+        "preview": _google_preview(site, {**values, "site": site}, report),
+    }
+
+
+def ranking_context(post, report=None) -> dict:
+    """The post's Google rankings over 28 days, when its website is connected to Search Console."""
+    connection = search_console.connection_for(post.site)
+    context: dict[str, Any] = {
+        "configured": search_console.is_configured(),
+        "connected": search_console.is_connected(connection),
+        "connection": connection,
+    }
+    if not context["connected"]:
+        return context
+    trend = search_console.page_trend(post.site, post.published_url or post.expected_url)
+    context["trend"] = trend
+    if post.status == Status.PUBLISHED:
+        context["suggestion"] = seo.suggestion(report, trend)
+    return context
+
+
 @login_required
 @require_GET
 def post_list(request, workspace_id):
@@ -75,11 +225,15 @@ def post_list(request, workspace_id):
         **{key: Count("pk", filter=Q(status__in=statuses)) for key, _label, statuses in TABS}
     )
     statuses = next(statuses for key, _label, statuses in TABS if key == active)
-    posts = (
+    posts = list(
         BlogPost.objects.filter(workspace=workspace, status__in=statuses)
         .select_related("site", "author", "featured_image")
         .order_by("-updated_at")
     )
+    # One query for the sites' titles, then the pure score per post.
+    reports = seo.score_posts(posts)
+    for post in posts:
+        post.seo_report = reports[post.pk]  # type: ignore[attr-defined]
     empty_title, empty_body = _EMPTY_STATES[active]
     return render(
         request,
@@ -93,8 +247,53 @@ def post_list(request, workspace_id):
             "empty_body": empty_body,
             "has_sites": BlogSite.objects.filter(workspace=workspace).exists(),
             "can_create": services.can_create(request.user, workspace),
+            **_search_overview(request, workspace),
         },
     )
+
+
+def _search_overview(request, workspace) -> dict:
+    """The list page's "Google Search" section: each website's rankings and the latest SEO check-up."""
+    from apps.studio.models import AgencyJob
+
+    staff = is_staff(request)
+    perms = request.workspace_membership.effective_permissions if request.workspace_membership else {}
+    sites = []
+    for site in BlogSite.objects.filter(workspace=workspace).select_related("search_console").order_by("name"):
+        connection = getattr(site, "search_console", None)
+        entry: dict[str, Any] = {
+            "site": site,
+            "connection": connection,
+            "has_token": search_console.has_token(connection),
+            "connected": search_console.is_connected(connection),
+        }
+        if entry["connected"]:
+            entry["overview"] = search_console.site_overview(site)
+            by_path = {
+                _page_path(p.published_url or p.expected_url): p
+                for p in BlogPost.objects.filter(site=site, status=Status.PUBLISHED).select_related("site")
+            }
+            for page in entry["overview"]["pages"]:
+                page["post"] = by_path.get(_page_path(page["page"]))
+        sites.append(entry)
+    checkup = (
+        AgencyJob.objects.filter(workspace=workspace, kind=AgencyJob.Kind.SEO).order_by("-created_at").first()
+        if staff
+        else None
+    )
+    return {
+        "search_sites": sites,
+        "search_configured": search_console.is_configured(),
+        "can_manage_search": staff and bool(perms.get("manage_workspace_settings")),
+        "can_run_checkup": staff and bool(perms.get("create_posts")),
+        "checkup": checkup,
+        "checkup_pages": (checkup.result.get("pages") or [])[:5] if checkup and checkup.result else [],
+    }
+
+
+def _page_path(url: str) -> str:
+    """An article's address without host, ``.html`` or trailing slash: how Google's rows are matched to posts."""
+    return urlsplit(url).path.rstrip("/").removesuffix(".html")
 
 
 def _save_form(request, workspace, form, post=None):
@@ -141,6 +340,7 @@ def post_create(request, workspace_id):
         post = _save_form(request, workspace, form)
         if post is not None:
             return _detail_redirect(post)
+    values = request.POST if request.method == "POST" else {}
     return render(
         request,
         "blog/post_form.html",
@@ -151,6 +351,9 @@ def post_create(request, workspace_id):
             "form_state": form.alpine_state(),
             "ai_configured": ai_images.is_configured(),
             "ai_model": ai_images.model_id(),
+            "seo_score_url": reverse("blog:seo_score", kwargs={"workspace_id": workspace.id}),
+            "show_seo_panel": is_staff(request),
+            **seo_panel_context(workspace, _seo_inputs(values, workspace)),
         },
     )
 
@@ -172,7 +375,9 @@ def post_edit(request, workspace_id, post_id):
         saved = _save_form(request, workspace, form, post=BlogPost.objects.get(pk=post.pk))
         if saved is not None:
             return _detail_redirect(saved)
-    stored = BlogPost.objects.get(pk=post.pk)
+    stored = BlogPost.objects.select_related("site").get(pk=post.pk)
+    values = request.POST if request.method == "POST" else _values_from_post(stored)
+    panel = seo_panel_context(workspace, _seo_inputs(values, workspace, stored), stored)
     return render(
         request,
         "blog/post_form.html",
@@ -185,6 +390,10 @@ def post_edit(request, workspace_id, post_id):
             "form_state": form.alpine_state(),
             "ai_configured": ai_images.is_configured(),
             "ai_model": ai_images.model_id(),
+            "seo_score_url": reverse("blog:post_seo_score", kwargs={"workspace_id": workspace.id, "post_id": post.id}),
+            "show_seo_panel": is_staff(request),
+            **panel,
+            "ranking": ranking_context(stored, panel["report"]) if stored.status == Status.PUBLISHED else None,
         },
     )
 
@@ -211,6 +420,7 @@ def _actions(request, post):
 def post_detail(request, workspace_id, post_id):
     workspace, post = _get_post(request, workspace_id, post_id)
     events = post.events.select_related("user").all()[:100]
+    report = seo.score_post(post)
     return render(
         request,
         "blog/post_detail.html",
@@ -221,6 +431,14 @@ def post_detail(request, workspace_id, post_id):
             "commit_url": commit_link(post),
             "token_configured": bool(services.github_token()),
             "approval_matches": post.approval_is_current,
+            "report": report,
+            "ring": _ring(report.score),
+            "ranking": ranking_context(post, report) if post.status == Status.PUBLISHED else None,
+            "can_manage_search": is_staff(request)
+            and bool(
+                request.workspace_membership
+                and request.workspace_membership.effective_permissions.get("manage_workspace_settings")
+            ),
             **_actions(request, post),
         },
     )
@@ -463,3 +681,52 @@ def post_generate_image(request, workspace_id, post_id):
     else:
         messages.success(request, f"Picture generated with {generated.model} and set as the featured image.")
     return redirect(edit_url)
+
+
+# ---------------------------------------------------------------------------
+# SEO: the live score in the editor and the on-demand check-up
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_POST
+@require_permission("create_posts")
+# Re-scored as the writer types (debounced in the page): generous, but bounded.
+@ratelimit(key="user", rate="240/m", method="POST", block=True)
+def seo_score(request, workspace_id, post_id=None):
+    """The SEO panel for the editor's current, unsaved values. Saves nothing.
+
+    The per-post variant scores against the site's *other* articles and keeps
+    a published post's fixed address.
+    """
+    workspace = _staff_workspace(request, workspace_id)
+    post = None
+    if post_id is not None:
+        _ws, post = _get_post(request, workspace_id, post_id)
+    context = seo_panel_context(workspace, _seo_inputs(request.POST, workspace, post), post)
+    return render(request, "blog/partials/seo_panel.html", {"workspace": workspace, "post": post, **context})
+
+
+@login_required
+@require_POST
+@require_permission("create_posts")
+@ratelimit(key="user", rate="10/m", method="POST", block=True)
+def seo_checkup(request, workspace_id):
+    """Ask the SEO monitor to check every published article now (it also runs weekly by itself).
+
+    The monitor is plain code — scores and Search Console numbers, no model —
+    so it costs nothing against the AI budget. It runs in the worker.
+    """
+    from apps.studio import engine
+    from apps.studio.models import AgencyJob
+
+    workspace = _staff_workspace(request, workspace_id)
+    active = AgencyJob.objects.filter(
+        workspace=workspace, kind=AgencyJob.Kind.SEO, status__in=AgencyJob.ACTIVE_STATUSES
+    ).first()
+    if active is not None:
+        messages.info(request, "The SEO monitor is already checking your articles.")
+        return redirect("studio:job", workspace_id=workspace.id, job_id=active.pk)
+    job = engine.create(workspace, AgencyJob.Kind.SEO, title="SEO check-up", requested_by=request.user)
+    messages.success(request, "The SEO monitor is checking your published articles. It takes a minute.")
+    return redirect("studio:job", workspace_id=workspace.id, job_id=job.pk)

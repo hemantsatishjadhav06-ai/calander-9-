@@ -43,6 +43,12 @@ markdown>=3.7,<4.0
 nh3>=0.2.18,<0.4
 requests>=2.32,<3.0
 
+# AI Studio (apps/studio): the agent team (strategist, copywriter, art director,
+# brand reviewer) calls Claude through the official Anthropic SDK. 1.12 is the
+# first release with structured outputs (output_config.format) and the
+# server-side fallback beta the Studio uses.
+anthropic>=1.12,<2.0
+
 # Date utilities
 python-dateutil>=2.9,<3.0
 # zoneinfo reads the *system* tz database, which python:3.12-slim (our

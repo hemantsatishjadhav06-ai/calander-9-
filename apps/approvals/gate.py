@@ -41,6 +41,9 @@ logger = logging.getLogger(__name__)
 
 #: Statuses that put a row on the path to the platform.
 GATED_STATUSES = frozenset({"scheduled", "publishing"})
+# Statuses only a person (or the publisher acting on a person's approval) may
+# move a post into. Agency code is refused these outright (apps.studio.guards).
+AGENT_FORBIDDEN_STATUSES = frozenset({"approved", "pending_client", "scheduled", "publishing", "published"})
 #: Statuses whose approval is re-checked when content or time changes.
 REVALIDATED_STATUSES = frozenset({"approved", "pending_client", "scheduled"})
 #: Statuses that end an approval: the reviewer asked for changes or rejected.
@@ -143,8 +146,13 @@ def on_transition(pp, new_status) -> None:
     """Enforce the gate for ``pp.transition_to(new_status)``.
 
     Mutates the approval fields in memory; the caller persists them with
-    ``PlatformPost.TRANSITION_FIELDS``.
+    ``PlatformPost.TRANSITION_FIELDS``. Agency work (the AI team) may never
+    move a post to approved, scheduled or later, enforced or not.
     """
+    if new_status in AGENT_FORBIDDEN_STATUSES:
+        from apps.studio.guards import forbid_in_agent_work
+
+        forbid_in_agent_work(f"move a post to {new_status}")
     workspace = pp.post.workspace
     if not enforced(workspace):
         return
@@ -164,6 +172,10 @@ def check_write(pp, loaded_status) -> None:
     the row was checked when it was claimed, and nothing about it can change
     while it is in flight.
     """
+    if pp.status in AGENT_FORBIDDEN_STATUSES and loaded_status != pp.status:
+        from apps.studio.guards import forbid_in_agent_work
+
+        forbid_in_agent_work(f"write status {pp.status}")
     if pp.status not in GATED_STATUSES or loaded_status in GATED_STATUSES:
         return
     if pp.pk is None or loaded_status != pp.status:

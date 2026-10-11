@@ -13,6 +13,7 @@ from django.views.static import serve
 
 from apps.accounts.views import health_check
 from apps.api.api import api as agent_api
+from apps.blog import views_search_console as search_console_views
 from apps.common import views_mail as mail_views
 from apps.oauth_server import views as oauth_views
 
@@ -110,6 +111,15 @@ urlpatterns = [
     path("workspace/<uuid:workspace_id>/media/", include("apps.media_library.urls")),
     # Blog posts for the brands' websites (write, approve, publish via GitHub)
     path("workspace/<uuid:workspace_id>/blog/", include("apps.blog.urls")),
+    # Google Search Console's one OAuth redirect URI for every workspace; the
+    # website and person travel in the signed state (apps.blog.search_console).
+    path(
+        "blog/search-console/callback/",
+        search_console_views.oauth_callback,
+        name="blog_search_console_callback",
+    ),
+    # AI Studio: the agent team that turns a small idea into a post for approval
+    path("workspace/<uuid:workspace_id>/studio/", include("apps.studio.urls")),
     # Client Portal (Stream F)
     path("portal/", include("apps.client_portal.urls")),
     path("notifications/", include("apps.notifications.urls")),

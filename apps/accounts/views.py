@@ -8,6 +8,7 @@ from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
 logger = logging.getLogger(__name__)
@@ -271,18 +272,28 @@ def _handle_account_deletion(request, user):
     return redirect("account_login")
 
 
+def _safe_next(request) -> str:
+    """Where to go after accepting: the page asked for, if it is on this site."""
+    target = request.POST.get("next") or request.GET.get("next") or ""
+    if target and url_has_allowed_host_and_scheme(
+        target, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return target
+    return "/"
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def accept_terms(request):
     """Terms of Service acceptance page for social signup users."""
     if request.user.tos_accepted_at is not None:
-        return redirect("/")
+        return redirect(_safe_next(request))
 
     if request.method == "POST":
         if request.POST.get("agree"):
             request.user.tos_accepted_at = timezone.now()
             request.user.save(update_fields=["tos_accepted_at"])
-            return redirect("/")
+            return redirect(_safe_next(request))
         messages.error(request, "You must agree to the Terms of Service and Privacy Policy to continue.")
 
     return render(request, "account/accept_terms.html")

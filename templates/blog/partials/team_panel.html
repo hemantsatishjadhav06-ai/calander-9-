@@ -1,0 +1,55 @@
+{% load tz %}
+{% comment %}The "Ask the SEO team" banner on an article (Figma 14:342). Context: workspace, post, active_job, latest_job, can_revise, can_repurpose, has_accounts.{% endcomment %}
+<section id="ask-seo-team" aria-labelledby="ask-seo-team-heading" x-data="{ asking: false }"
+         class="mb-6 rounded-xl border border-orange-200 bg-orange-50 px-5 py-4 shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="min-w-0 max-w-2xl">
+            <h2 id="ask-seo-team-heading" class="text-base font-semibold text-orange-800">Ask the SEO team</h2>
+            {% if active_job %}
+            <p class="flex flex-wrap items-center gap-2 text-sm text-stone-800 mt-1">
+                {% include "components/agent_state.html" with state="working" %}
+                <span>The team is working on this article now.</span>
+                <a href="{% url 'blog:team_job' workspace_id=workspace.id job_id=active_job.id %}" class="font-medium underline hover:text-stone-900">See their progress</a>
+            </p>
+            {% elif can_revise %}
+            <p class="text-xs text-stone-700 mt-0.5">SEO strategist → outline editor → writer → fact checker → SEO editor → editor-in-chief. Or ask for one change: “add a section on encumbrance certificates”.</p>
+            {% elif can_repurpose %}
+            <p class="text-xs text-stone-700 mt-0.5">Turn this article into two or three posts for your channels. Each one comes to you to approve before it goes out.</p>
+            {% endif %}
+            {% if latest_job and not active_job %}
+            <p class="text-xs text-stone-600 mt-1">
+                Last time: <a href="{% url 'blog:team_job' workspace_id=workspace.id job_id=latest_job.id %}" class="underline hover:text-stone-900">{{ latest_job.title|truncatechars:60 }}</a>
+                · {{ latest_job.get_status_display|lower }} · <time datetime="{{ latest_job.created_at|date:'c' }}">{{ latest_job.created_at|timezone:workspace.effective_timezone|date:"j M, H:i" }}</time>
+            </p>
+            {% endif %}
+        </div>
+        {% if not active_job %}
+        <div class="flex flex-wrap items-center gap-2">
+            {% if can_revise %}
+            <form method="post" action="{% url 'blog:team_revise' workspace_id=workspace.id post_id=post.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="mode" value="seo">
+                <button type="submit" class="px-4 py-2 text-sm font-medium text-stone-900 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Improve SEO</button>
+            </form>
+            <button type="button" x-on:click="asking = !asking" x-bind:aria-expanded="asking.toString()" aria-controls="ask-seo-team-form"
+                    class="px-4 py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Ask the team</button>
+            {% endif %}
+            {% if can_repurpose %}
+            {% if has_accounts %}
+            <form method="post" action="{% url 'blog:team_repurpose' workspace_id=workspace.id post_id=post.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                {% csrf_token %}
+                <button type="submit" x-bind:disabled="busy" class="px-4 py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                    <span x-show="!busy">Make social posts</span><span x-show="busy" x-cloak>Starting…</span>
+                </button>
+            </form>
+            {% else %}
+            <p class="text-xs text-stone-700 max-w-xs"><a href="{% url 'social_accounts:connect' workspace_id=workspace.id %}" class="font-medium underline hover:text-stone-900">Connect a social account</a> to make posts from this article.</p>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% if can_revise and not active_job %}
+    {% include "blog/partials/team_revise_form.html" %}
+    {% endif %}
+</section>

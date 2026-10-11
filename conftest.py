@@ -38,3 +38,18 @@ def _fresh_storage_client():
     reset_cached_client()
     yield
     reset_cached_client()
+
+
+@pytest.fixture(autouse=True)
+def _no_live_claude(monkeypatch):
+    """No test may reach the Anthropic API: a test that needs Claude fakes it.
+
+    ``apps.studio.tests.test_llm`` replaces ``get_client`` with its own stand-in,
+    which overrides this.
+    """
+    from apps.studio import llm
+
+    def refuse():
+        raise AssertionError("A test tried to call the Anthropic API; fake the agent instead.")
+
+    monkeypatch.setattr(llm, "get_client", refuse)

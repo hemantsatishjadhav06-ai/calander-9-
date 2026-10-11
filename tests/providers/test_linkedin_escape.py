@@ -11,7 +11,7 @@ Comments are a different API with a different model — plain text plus a separa
 
 from unittest.mock import MagicMock
 
-from providers.linkedin import LINKEDIN_RESERVED_CHARS, LinkedInProvider, escape_commentary
+from providers.linkedin import LINKEDIN_RESERVED_CHARS, LinkedInProvider, escape_commentary, hashtag_spans
 
 # Read from the module under test, so adding a reserved char there extends the
 # coverage below instead of silently leaving the new char unchecked.
@@ -22,7 +22,7 @@ class TestEscapeCommentary:
     def test_escapes_reserved_characters(self):
         assert escape_commentary("(a)") == "\\(a\\)"
         assert escape_commentary("pre_commands") == "pre\\_commands"
-        assert escape_commentary("#AI #Agents") == "\\#AI \\#Agents"
+        assert escape_commentary("We're #1") == "We're \\#1"
         assert escape_commentary("{{x}}") == "\\{\\{x\\}\\}"
         assert escape_commentary("a*b~c<d>e|f@g[h]i") == "a\\*b\\~c\\<d\\>e\\|f\\@g\\[h\\]i"
 
@@ -47,6 +47,35 @@ class TestEscapeCommentary:
         for i, ch in enumerate(out):
             if ch in RESERVED:
                 assert i > 0 and out[i - 1] == "\\", f"unescaped {ch!r} at index {i}"
+
+
+class TestHashtags:
+    """An unescaped "#word" is little-text's hashtag element: LinkedIn links it.
+
+    Escaping every "#" published hashtags as dead text, so real hashtags go out
+    as they are and every other "#" is still escaped.
+    """
+
+    def test_hashtags_are_left_to_link(self):
+        assert escape_commentary("#AI #Agents") == "#AI #Agents"
+        assert escape_commentary("Plots in #Hyderabad, #RealEstate.") == "Plots in #Hyderabad, #RealEstate."
+        assert escape_commentary("#Plot2026 (open)") == "#Plot2026 \\(open\\)"
+        assert escape_commentary("#हैदराबाद") == "#हैदराबाद"
+
+    def test_a_hash_that_is_not_a_hashtag_is_escaped(self):
+        assert escape_commentary("C# and F#") == "C\\# and F\\#"
+        assert escape_commentary("#2026") == "\\#2026"  # no letter
+        assert escape_commentary("# of units") == "\\# of units"
+        assert escape_commentary("##tag") == "\\#\\#tag"
+        # Runs on into an underscore: kept literal instead of linking "#real".
+        assert escape_commentary("#real_estate") == "\\#real\\_estate"
+
+    def test_only_hashtags_stay_unescaped(self):
+        caption = "Call (now) #RealEstate @agent [x] #1"
+        out = escape_commentary(caption)
+        tags = {start for start, _end in hashtag_spans(caption)}
+        assert out == "Call \\(now\\) #RealEstate \\@agent \\[x\\] \\#1"
+        assert len(tags) == 1
 
 
 class TestBuildPostBodyEscapes:

@@ -31,6 +31,8 @@
         </div>
     </div>
 
+    {# ---- Ask the SEO team (apps.blog.views_team.team_panel) ---- #}{% include "blog/partials/team_ask.html" %}
+
     <div class="grid lg:grid-cols-[1fr_20rem] gap-6 items-start">
         <div class="space-y-6 min-w-0">
             {# ---- Actions ---- #}
@@ -162,6 +164,10 @@
                     <dt class="text-stone-600">Created</dt><dd class="text-stone-900">{{ post.created_at|date:"j M Y" }}</dd>
                 </dl>
             </section>
+
+            {% include "blog/partials/seo_score_card.html" %}
+
+            {% if ranking %}{% include "blog/partials/seo_ranking.html" %}{% endif %}
         </aside>
     </div>
 </div>

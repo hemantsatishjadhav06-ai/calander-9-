@@ -102,6 +102,11 @@ def _resolve_publish_credentials(account):
             )
     elif platform == "facebook":
         credentials["page_id"] = account.account_platform_id
+    elif platform == "linkedin_company":
+        # The token is the member's and can administer several Pages, so this
+        # names the one the account is: its profile, inbox, statistics and the
+        # first comment (posted as the Page) all depend on it.
+        credentials["organization_id"] = account.account_platform_id
     elif platform == "x":
         # Only used to build the post's public URL (x.com/<username>/status/<id>);
         # X's create-post response doesn't carry the author's handle.
@@ -795,6 +800,7 @@ class PublishEngine:
         # at upload, so providers can route on what the file *is* rather than on
         # a storage-key extension copied from the client-declared filename.
         media_types = []
+        media_alt_texts = []
         temp_files = []
         # Owned locally only when the caller didn't hand us a post-level cache
         # (the retry path); ``owns_cache`` decides who cleans it up.
@@ -840,6 +846,7 @@ class PublishEngine:
                     url = f"{app_url}{url}"
                 media_urls.append(url)
                 media_types.append(asset.media_type)
+                media_alt_texts.append(pm.alt_text or asset.alt_text or "")
 
                 if needs_local_media:
                     media_files.append(media_cache.path_for(asset))
@@ -916,6 +923,7 @@ class PublishEngine:
                 media_files=media_files,
                 media_urls=media_urls,
                 media_types=media_types,
+                media_alt_texts=media_alt_texts,
                 post_type=post_type,
                 extra=extra,
                 link_url=link_url,
@@ -1025,6 +1033,10 @@ class PublishEngine:
                 return PostType.REEL
             return PostType.VIDEO
         if first_media_type == "image":
+            return PostType.IMAGE
+        # LinkedIn's Images API takes GIFs (up to 250 frames); without this a
+        # GIF went out as a text post and the GIF was dropped.
+        if first_media_type == "gif" and platform in ("linkedin_personal", "linkedin_company"):
             return PostType.IMAGE
         return PostType.TEXT
 

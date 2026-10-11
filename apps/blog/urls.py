@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import urls_team, views
 
 app_name = "blog"
 
@@ -19,3 +19,6 @@ urlpatterns = [
     path("<uuid:post_id>/publish/", views.post_publish, name="publish"),
     path("<uuid:post_id>/social-drafts/", views.post_social_drafts, name="social_drafts"),
 ]
+
+# Writing with the agency team, the SEO score and Search Console (urls_team.py).
+urlpatterns += urls_team.urlpatterns

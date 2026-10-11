@@ -87,6 +87,17 @@ def _get_workspace(request, workspace_id):
     return workspace
 
 
+def _can_draft_with_team(request) -> bool:
+    """Whether to offer "Draft replies with the team" (the agency's community manager; see apps.studio.views_chat)."""
+    membership = getattr(request, "workspace_membership", None)
+    if membership is None:
+        return False
+    plain_client = (
+        membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT and membership.custom_role_id is None
+    )
+    return not plain_client and bool(membership.effective_permissions.get("create_posts"))
+
+
 # --- Main Feed ---
 
 
@@ -161,6 +172,7 @@ def inbox_feed(request, workspace_id):
     context = {
         "workspace": workspace,
         "inbox_messages": messages,
+        "can_draft_with_team": _can_draft_with_team(request),
         "sla_config": sla_config,
         "team_members": team_members,
         "social_accounts": social_accounts,

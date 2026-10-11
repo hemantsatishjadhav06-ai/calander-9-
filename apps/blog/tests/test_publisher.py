@@ -77,14 +77,19 @@ def test_neopolis_publish_writes_one_commit_with_post_image_and_index(world, ima
     post = _run_publish(post, fake)
 
     # Read the head and the files at that commit, then blobs -> tree -> commit -> ref, then dispatch.
-    assert fake.calls[:5] == [
+    # The blog sitemap and RSS feed are read too: they are rewritten in the same commit.
+    assert fake.calls[:7] == [
         ("GET", "/git/ref/heads/main"),
         ("GET", f"/git/commits/{'a' * 40}"),
         ("GET", "/contents/publish-payload3/blog/flats-in-kokapet-2026.html"),
         ("GET", "/contents/publish-payload3/blog/index.html"),
         ("GET", "/contents/generated/blog/img/flats-in-kokapet-2026-hero.jpg"),
+        ("GET", "/contents/publish-payload3/blog/sitemap.xml"),
+        ("GET", "/contents/publish-payload3/blog/feed.xml"),
     ]
     assert fake.writes() == [
+        ("POST", "/git/blobs"),
+        ("POST", "/git/blobs"),
         ("POST", "/git/blobs"),
         ("POST", "/git/blobs"),
         ("POST", "/git/blobs"),
@@ -97,8 +102,10 @@ def test_neopolis_publish_writes_one_commit_with_post_image_and_index(world, ima
     assert tree["base_tree"] == "t" + "a" * 39
     assert sorted(e["path"] for e in tree["tree"]) == [
         "generated/blog/img/flats-in-kokapet-2026-hero.jpg",
+        "publish-payload3/blog/feed.xml",
         "publish-payload3/blog/flats-in-kokapet-2026.html",
         "publish-payload3/blog/index.html",
+        "publish-payload3/blog/sitemap.xml",
     ]
     commit = next(iter(fake.commits.values()))
     assert commit["parents"] == ["a" * 40]
@@ -140,7 +147,17 @@ def test_morespace_publish_uses_blog_paths_and_rebuilds_the_index(world):
 
     post = _run_publish(post, fake)
 
-    assert set(fake.files) == {"blog/flats-in-kokapet-2026.html", "blog/index.html"}
+    assert set(fake.files) == {
+        "blog/flats-in-kokapet-2026.html",
+        "blog/index.html",
+        "blog/sitemap.xml",
+        "blog/feed.xml",
+    }
+    sitemap = fake.files["blog/sitemap.xml"].decode()
+    assert "<loc>https://morespace.netlify.app/blog/flats-in-kokapet-2026.html</loc>" in sitemap
+    assert "<loc>https://morespace.netlify.app/blog/older-post.html</loc>" in sitemap
+    feed = fake.files["blog/feed.xml"].decode()
+    assert feed.index("flats-in-kokapet-2026.html") < feed.index("older-post.html")
     assert fake.dispatches == [("/actions/workflows/netlify-publish.yml/dispatches", {"ref": "main"})]
     index = fake.files["blog/index.html"].decode()
     assert index.index("blog/flats-in-kokapet-2026.html") < index.index("blog/older-post.html")
@@ -400,8 +417,10 @@ def test_designed_cover_is_written_even_without_a_featured_image(world):
     tree = next(iter(fake.trees.values()))
     assert sorted(e["path"] for e in tree["tree"]) == [
         "generated/blog/img/flats-in-kokapet-2026-hero.jpg",
+        "publish-payload3/blog/feed.xml",
         "publish-payload3/blog/flats-in-kokapet-2026.html",
         "publish-payload3/blog/index.html",
+        "publish-payload3/blog/sitemap.xml",
     ]
     hero = Image.open(io.BytesIO(fake.files["generated/blog/img/flats-in-kokapet-2026-hero.jpg"]))
     assert hero.format == "JPEG" and hero.size == (1600, 900)
@@ -410,3 +429,105 @@ def test_designed_cover_is_written_even_without_a_featured_image(world):
     index = fake.files["publish-payload3/blog/index.html"].decode()
     assert 'src="img/flats-in-kokapet-2026-hero.jpg?v=1"' in index
     assert post.published_card["has_image"] is True
+
+
+# ---------------------------------------------------------------------------
+# Sitemap, feed and IndexNow
+# ---------------------------------------------------------------------------
+
+
+def test_the_sitemap_and_feed_list_the_published_cards(world):
+    post = _claim(world, approved_post(world, focus_keyword="flats in kokapet"))
+    fake = FakeGitHub(NEOPOLIS_REPO, {"publish-payload3/blog/index.html": NEOPOLIS_INDEX})
+    post = _run_publish(post, fake)
+    sitemap = fake.files["publish-payload3/blog/sitemap.xml"].decode()
+    assert "<loc>https://www.neopolisinfra.com/blog/flats-in-kokapet-2026</loc>" in sitemap
+    assert f"<lastmod>{post.published_card['modified']}</lastmod>" in sitemap
+    feed = fake.files["publish-payload3/blog/feed.xml"].decode()
+    assert "<title>Flats in Kokapet 2026</title>" in feed
+    assert post.published_card["keywords"] == ["flats in kokapet"]
+    page = fake.files["publish-payload3/blog/flats-in-kokapet-2026.html"].decode()
+    assert '<meta property="article:tag" content="flats in kokapet">' in page
+
+
+def test_a_hand_made_sitemap_is_left_alone(world):
+    hand_made = b'<?xml version="1.0"?><urlset><url><loc>https://www.neopolisinfra.com/</loc></url></urlset>'
+    post = _claim(world, approved_post(world))
+    fake = FakeGitHub(
+        NEOPOLIS_REPO,
+        {"publish-payload3/blog/index.html": NEOPOLIS_INDEX, "publish-payload3/blog/sitemap.xml": hand_made},
+    )
+    post = _run_publish(post, fake)
+    assert fake.files["publish-payload3/blog/sitemap.xml"] == hand_made
+    assert "publish-payload3/blog/feed.xml" in fake.files  # ours, written as usual
+    committed = post.events.get(action=Action.COMMITTED)
+    assert "Left publish-payload3/blog/sitemap.xml as it was" in committed.detail
+    assert post.status == Status.PUBLISHING
+
+
+@override_settings(INDEXNOW_KEY="a1b2c3d4e5f6a7b8")
+def test_the_indexnow_key_file_is_committed_and_the_live_post_is_pinged(world):
+    fake = FakeGitHub(MORESPACE_REPO, {})
+    post = _dispatched(world, fake, site=world.morespace)
+    assert fake.files["a1b2c3d4e5f6a7b8.txt"] == b"a1b2c3d4e5f6a7b8"
+    _run(fake, post)
+    post, _get = _run_poll(post, fake)
+    assert post.status == Status.PUBLISHED
+    task = Task.objects.get(task_name="apps.blog.tasks.ping_indexnow_task")
+    assert task.priority == -30
+
+    sent = []
+
+    def fake_post(url, json=None, timeout=None):
+        sent.append((url, json))
+        return FakeResponse(202)
+
+    with mock.patch("httpx.post", fake_post):
+        assert publisher.ping_indexnow(str(post.pk)) is True
+    url, body = sent[0]
+    assert url == "https://api.indexnow.org/indexnow"
+    assert body == {
+        "host": "morespace.netlify.app",
+        "key": "a1b2c3d4e5f6a7b8",
+        "keyLocation": "https://morespace.netlify.app/a1b2c3d4e5f6a7b8.txt",
+        "urlList": [
+            "https://morespace.netlify.app/blog/flats-in-kokapet-2026.html",
+            "https://morespace.netlify.app/blog/",
+        ],
+    }
+
+
+@override_settings(INDEXNOW_KEY="a1b2c3d4e5f6a7b8")
+def test_an_indexnow_failure_never_raises(world):
+    fake = FakeGitHub(MORESPACE_REPO, {})
+    post = _dispatched(world, fake, site=world.morespace)
+    BlogPost.objects.filter(pk=post.pk).update(status=Status.PUBLISHED)
+
+    def boom(*args, **kwargs):
+        raise OSError("network down")
+
+    with mock.patch("httpx.post", boom):
+        assert publisher.ping_indexnow(str(post.pk)) is False
+    with mock.patch("httpx.post", return_value=FakeResponse(422)):
+        assert publisher.ping_indexnow(str(post.pk)) is False
+
+
+@pytest.mark.parametrize("key", ["", "short", "has spaces in it", "x" * 129])
+def test_indexnow_is_off_without_a_valid_key(world, key):
+    with override_settings(INDEXNOW_KEY=key):
+        assert publisher.indexnow_key() == ""
+        assert "indexnow" not in publisher.site_paths(world.neopolis, "x")
+
+
+def test_republishing_rewrites_only_what_changed_including_sitemap_and_feed(world):
+    """A retry of the same revision on another day changes nothing: the dates come from the approval."""
+    post = _claim(world, approved_post(world))
+    fake = FakeGitHub(NEOPOLIS_REPO, {"publish-payload3/blog/index.html": NEOPOLIS_INDEX})
+    post = _run_publish(post, fake)
+    BlogPost.objects.filter(pk=post.pk).update(status=Status.FAILED)
+    post = _claim(world, BlogPost.objects.get(pk=post.pk))
+    fake.calls.clear()
+    later = timezone.now() + dt.timedelta(days=5)
+    with mock.patch("django.utils.timezone.now", return_value=later):
+        post = _run_publish(post, fake)
+    assert [c for c in fake.writes() if c[1] != "/actions/workflows/publish3.yml/dispatches"] == []
