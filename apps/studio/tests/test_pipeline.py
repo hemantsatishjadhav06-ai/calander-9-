@@ -355,3 +355,59 @@ def test_a_stale_step_leaves_no_agent_working(world, fake_team):
 
     assert not AgentRun.objects.filter(brief=brief, status=AgentRun.Status.RUNNING).exists()
     assert AgentRun.objects.get(brief=brief, agent="copywriter").status == AgentRun.Status.SKIPPED
+
+
+def test_between_steps_a_brief_waits_as_queued_so_the_sweep_leaves_it(world, fake_team):
+    from background_task.models import Task
+
+    brief = make_brief(world)
+    pipeline.run_step(str(brief.pk), 1, "strategy")
+    brief.refresh_from_db()
+    assert brief.stage == "copy" and brief.status == StudioBrief.Status.QUEUED
+
+    # Its next step has been queued but the worker is busy elsewhere for a long time.
+    StudioBrief.objects.filter(pk=brief.pk).update(updated_at=timezone.now() - timedelta(hours=2))
+    Task.objects.create(
+        task_name="apps.studio.tasks.run_studio_step",
+        task_params=f'[["{brief.pk}", 1, "copy"], {{}}]',
+        task_hash="x",
+        run_at=timezone.now(),
+    )
+    assert pipeline.sweep_stuck() == 0
+    brief.refresh_from_db()
+    assert brief.status == StudioBrief.Status.QUEUED
+
+
+def test_the_team_stops_before_a_paid_step_once_the_budget_is_used(world, fake_team, monkeypatch):
+    from apps.studio import budget
+
+    monkeypatch.setattr(budget, "can_spend", lambda workspace: False)
+    brief = make_brief(world)
+    pipeline.run_step(str(brief.pk), 1, "strategy")
+    brief.refresh_from_db()
+    assert brief.status == StudioBrief.Status.FAILED and "AI budget" in brief.error
+    assert not fake_team.calls["strategist"]
+
+
+def test_a_call_that_finished_as_the_post_was_discarded_still_counts_its_tokens(world, fake_team, monkeypatch):
+    from apps.studio import services
+
+    brief = make_brief(world)
+    for stage in ("strategy", "copy", "art", "picture", "render"):
+        pipeline.run_step(str(brief.pk), 1, stage)
+    brief.refresh_from_db()
+    assert brief.stage == "review"
+
+    real = fake_team.reviewer
+
+    def discard_then_answer(*args, **kwargs):
+        result = real(*args, **kwargs)
+        services.discard(StudioBrief.objects.get(pk=brief.pk))
+        return result
+
+    monkeypatch.setattr(pipeline.agents, "reviewer", discard_then_answer)
+    pipeline.run_step(str(brief.pk), 1, "review")
+
+    run = brief.runs.get(agent="reviewer")
+    assert run.status == AgentRun.Status.SKIPPED and "Superseded" in run.error
+    assert run.input_tokens == 1200 and run.output_tokens == 600 and run.model

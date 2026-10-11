@@ -424,7 +424,9 @@ def test_web_research_is_used_and_counted_when_switched_on(world, site, seo_team
     assert "People ask about the EC" in seo_team.calls["seo_strategist"][0]["web_research"]
     run = AgentRun.objects.filter(job=job, agent="seo_strategist").order_by("started_at").first()
     assert run.output["web_searches"] == 2 and run.input_tokens == 2000
-    assert "https://registration.telangana.gov.in/ec" in job.state["sources"]
+    # What the web said is read, but a URL found there is never a place the article may link.
+    assert "https://registration.telangana.gov.in/ec" not in job.state["sources"]
+    assert job.state["sources"] == ["https://www.neopolisinfra.com/title-check"]
 
 
 # ---------------------------------------------------------------------------
@@ -817,3 +819,29 @@ def test_each_role_works_at_its_own_effort(world, captured):
         ("editor_in_chief", "medium"),
     ]
     assert all(c["output_type"].model_config.get("extra") == "forbid" for c in captured)
+
+
+def test_every_link_form_outside_the_allowlist_is_cut_before_the_renderer_sees_it():
+    import re
+
+    from apps.blog.renderers import render_markdown
+    from apps.studio.jobtypes.blog import clean_links, tidy_body
+
+    source = (
+        "Intro [ok](https://site.example/blog/a.html) and [here]( https://evil.example/x ) and [ref][1] "
+        "and [bare][] and <https://evil.example/auto>.\n\n"
+        '<a href="https://evil.example/raw">raw</a> <img src="https://evil.example/i.png"> '
+        "and ![pic](https://evil.example/p.png)\n\n"
+        '[1]: https://evil.example/ref\n[bare]: https://evil.example/bare "t"\n\n'
+        "Call [us](tel:+919533686567) or [mail](mailto:hi@site.example) and [a](<https://evil.example/angle>) "
+        'and [t](https://evil.example/q "title").'
+    )
+    body, removed = clean_links(
+        tidy_body(source), ["https://site.example/blog/a.html"], "WhatsApp +91 95336 86567, hi@site.example"
+    )
+
+    links = re.findall(r'(?:href|src)="([^"]+)"', render_markdown(body))
+    assert links == ["https://site.example/blog/a.html", "tel:+919533686567", "mailto:hi@site.example"]
+    assert "evil.example" not in render_markdown(body).replace("https://evil.example/auto", "")
+    assert set(removed) >= {"https://evil.example/x", "https://evil.example/angle", "https://evil.example/q"}
+    assert "here" in body and "raw" in body and "ref" in body  # the words stay, the links go

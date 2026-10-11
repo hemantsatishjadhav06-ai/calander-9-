@@ -19,10 +19,11 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
+from django_ratelimit.decorators import ratelimit
 
 from apps.members.decorators import require_permission
 
-from . import design, images, llm, services, style
+from . import budget, design, images, llm, services, style
 from . import team as roster
 from .brand_defaults import ensure_profile
 from .forms import BrandProfileForm, BriefForm, FeedbackForm, ScheduleForm, studio_accounts
@@ -166,12 +167,16 @@ def index(request, workspace_id):
 
 @login_required
 @require_permission("create_posts")
+@ratelimit(key="user", rate="10/m", method="POST", block=True)
 @require_POST
 def create(request, workspace_id):
     workspace = _workspace(request, workspace_id)
     form = BriefForm(request.POST, workspace=workspace)
     if not llm.is_configured():
         messages.error(request, "The AI Studio isn't set up yet: ANTHROPIC_API_KEY is missing on the server.")
+        return redirect("studio:index", workspace_id=workspace.id)
+    if not budget.can_spend(workspace):
+        messages.error(request, budget.over_budget_message(workspace))
         return redirect("studio:index", workspace_id=workspace.id)
     if not form.is_valid():
         return render(request, "studio/index.html", _index_context(request, workspace, form), status=400)
@@ -379,12 +384,16 @@ def approve(request, workspace_id, brief_id):
 
 @login_required
 @require_permission("create_posts")
+@ratelimit(key="user", rate="10/m", method="POST", block=True)
 @require_POST
 def request_changes(request, workspace_id, brief_id):
     workspace, brief = _get_brief(request, workspace_id, brief_id)
     form = FeedbackForm(request.POST)
     if not form.is_valid():
         messages.error(request, "Say what should change, so the team knows what to do.")
+        return _detail_redirect(brief)
+    if not budget.can_spend(workspace):
+        messages.error(request, budget.over_budget_message(workspace))
         return _detail_redirect(brief)
     return _run(
         request,
@@ -399,9 +408,13 @@ def request_changes(request, workspace_id, brief_id):
 
 @login_required
 @require_permission("create_posts")
+@ratelimit(key="user", rate="10/m", method="POST", block=True)
 @require_POST
 def new_angles(request, workspace_id, brief_id):
     workspace, brief = _get_brief(request, workspace_id, brief_id)
+    if not budget.can_spend(workspace):
+        messages.error(request, budget.over_budget_message(workspace))
+        return _detail_redirect(brief)
     return _run(
         request,
         brief,
@@ -414,10 +427,14 @@ def new_angles(request, workspace_id, brief_id):
 
 @login_required
 @require_permission("create_posts")
+@ratelimit(key="user", rate="10/m", method="POST", block=True)
 @require_POST
 def use_angle(request, workspace_id, brief_id, concept_id):
     workspace, brief = _get_brief(request, workspace_id, brief_id)
     concept = get_object_or_404(StudioConcept, pk=concept_id, brief=brief)
+    if not budget.can_spend(workspace):
+        messages.error(request, budget.over_budget_message(workspace))
+        return _detail_redirect(brief)
     return _run(request, brief, services.use_concept, brief, concept, success=f"Writing “{concept.title}” instead.")
 
 
@@ -434,11 +451,15 @@ def save_idea(request, workspace_id, brief_id, concept_id):
 
 @login_required
 @require_permission("create_posts")
+@ratelimit(key="user", rate="10/m", method="POST", block=True)
 @require_POST
 def retry(request, workspace_id, brief_id):
     workspace, brief = _get_brief(request, workspace_id, brief_id)
     if not llm.is_configured():
         messages.error(request, "ANTHROPIC_API_KEY is missing on the server, so the team can't run.")
+        return _detail_redirect(brief)
+    if not budget.can_spend(workspace):
+        messages.error(request, budget.over_budget_message(workspace))
         return _detail_redirect(brief)
     return _run(request, brief, services.retry, brief, success="Picking up where the team stopped.")
 

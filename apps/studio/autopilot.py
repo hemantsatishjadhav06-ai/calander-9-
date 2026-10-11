@@ -151,6 +151,20 @@ def plan_week(settings_row, week_start: date, *, manual: bool = False) -> PlanOu
                     "That week is already planned. Brief the team for anything extra.",
                     week,
                 )
+            if job is not None:
+                from .models import AgencyJob, StudioBrief
+
+                # A plan that failed part-way may have made some of its posts; the
+                # new plan replaces them, so they must not be fed to the team too,
+                # and the old plan loses its Retry (a failed job isn't active, so
+                # engine.cancel would leave it alone).
+                now = timezone.now()
+                AgencyJob.objects.filter(pk=job.pk).exclude(status=AgencyJob.Status.DONE).update(
+                    status=AgencyJob.Status.CANCELLED, finished_at=now, updated_at=now
+                )
+                StudioBrief.objects.filter(job=job, status=StudioBrief.Status.PLANNED).update(
+                    status=StudioBrief.Status.DISCARDED, updated_at=timezone.now()
+                )
         blocker = plan_blocker(row)
         if blocker:
             if not manual:

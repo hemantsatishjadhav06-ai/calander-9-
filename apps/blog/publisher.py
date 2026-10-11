@@ -320,14 +320,15 @@ def commit_post(client: GitHubClient, post: BlogPost, content: PostContent, *, g
     page = render_post_page(site, content).encode("utf-8")
     # The designed cover (title over the picture) or the plain featured image.
     image = hero_image_bytes(post, content)
-    # Every committed card of the site, this revision's first: what the
-    # sitemap and the feed list.
-    cards = [content.card(), *published_cards(site, exclude_post_id=post.pk)]
-    sitemap = render_sitemap(cards, site_kind=site.kind, origin=site.origin).encode("utf-8")
-    feed = render_feed(cards, site_kind=site.kind, origin=site.origin).encode("utf-8")
     key = indexnow_key()
 
     for _attempt in range(COMMIT_ATTEMPTS):
+        # Every committed card of the site, this revision's first: what the
+        # sitemap and the feed list. Read on each attempt, like the index, so a
+        # retry after another article went live lists that one too.
+        cards = [content.card(), *published_cards(site, exclude_post_id=post.pk)]
+        sitemap = render_sitemap(cards, site_kind=site.kind, origin=site.origin).encode("utf-8")
+        feed = render_feed(cards, site_kind=site.kind, origin=site.origin).encode("utf-8")
         head = client.branch_head(site.branch)
         base_tree = client.commit_tree(head)
         existing_post = client.get_file(paths["post"], head)

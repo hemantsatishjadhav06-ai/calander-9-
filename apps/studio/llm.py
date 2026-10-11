@@ -98,9 +98,10 @@ class StudioAgentError(Exception):
     spend can be recorded against the budget.
     """
 
-    def __init__(self, message: str, *, usage: tuple[str, int, int, int] | None = None):
+    def __init__(self, message: str, *, usage: tuple[str, int, int, int] | None = None, web_searches: int = 0):
         super().__init__(message)
         self.usage = usage
+        self.web_searches = web_searches
 
 
 class NotConfiguredError(StudioAgentError):
@@ -190,12 +191,18 @@ def _explain_api_error(exc: Exception) -> str:
     return f"Calling Claude failed ({exc.__class__.__name__})."
 
 
+#: Cache-creation input tokens cost this much more than plain input tokens.
+CACHE_WRITE_WEIGHT = 1.25
+
+
 def _usage(response) -> tuple[int, int, int]:
     usage = getattr(response, "usage", None)
     if usage is None:
         return 0, 0, 0
     input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
-    input_tokens += int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+    # Writing the cache is billed at 1.25x the input rate; count those tokens at
+    # that weight so the budget estimate never under-counts.
+    input_tokens += int(round(int(getattr(usage, "cache_creation_input_tokens", 0) or 0) * CACHE_WRITE_WEIGHT))
     cache_read = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
     return input_tokens, int(getattr(usage, "output_tokens", 0) or 0), cache_read
 
@@ -338,7 +345,8 @@ def research(*, agent: str, system: list[dict[str, Any]], question: str, effort:
             response = get_client().messages.create(**request, messages=messages)
         except anthropic.APIError as exc:
             logger.warning("Studio %s: research call failed: %s", agent, exc)
-            raise StudioAgentError(_explain_api_error(exc)) from exc
+            usage = (model, totals[0], totals[1], totals[2]) if any(totals[:3]) else None
+            raise StudioAgentError(_explain_api_error(exc), usage=usage, web_searches=totals[3]) from exc
         model = str(getattr(response, "model", "") or model)
         used = _usage(response)
         totals[0] += used[0]
@@ -353,7 +361,11 @@ def research(*, agent: str, system: list[dict[str, Any]], question: str, effort:
         assistant_so_far = [*assistant_so_far, *response.content]
         messages = [messages[0], {"role": "assistant", "content": assistant_so_far}]
     if response.stop_reason == "refusal":
-        raise StudioAgentError("Claude declined the research request.", usage=(model, totals[0], totals[1], totals[2]))
+        raise StudioAgentError(
+            "Claude declined the research request.",
+            usage=(model, totals[0], totals[1], totals[2]),
+            web_searches=totals[3],
+        )
     return ResearchResult(
         text="\n".join(t.strip() for t in texts if t.strip()),
         model=model,

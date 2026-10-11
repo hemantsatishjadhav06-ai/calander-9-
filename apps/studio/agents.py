@@ -28,7 +28,9 @@ def strategist(brief, profile, recent: list[dict[str, str]]) -> llm.AgentResult[
         [
             prompts.brief_block(brief),
             prompts.recent_posts_block(recent),
-            prompts.feedback_block(brief.feedback if brief.revision > 1 else "", [], "reviewer"),
+            prompts.feedback_block(
+                brief.feedback if brief.revision > 1 else "", [], "reviewer", untrusted=prompts.from_thread(brief)
+            ),
             "Propose three angles for this post.",
         ]
     )
@@ -54,7 +56,7 @@ def copywriter(
     parts = [prompts.brief_block(brief), prompts.concept_block(concept), prompts.recent_posts_block(recent)]
     if previous:
         parts.append(f"<previous_draft>\n{prompts.copy_block(previous)}\n</previous_draft>")
-    guidance = prompts.feedback_block(feedback, fixes or [], "reviewer")
+    guidance = prompts.feedback_block(feedback, fixes or [], "reviewer", untrusted=prompts.from_thread(brief))
     if guidance:
         parts.append(guidance)
     parts.append(
@@ -143,7 +145,7 @@ def art_director(
         parts.append(photo_note)
     if previous:
         parts.append(f"<previous_design>\n{prompts.design_block(previous)}\n</previous_design>")
-    guidance = prompts.feedback_block(feedback, fixes or [], "reviewer")
+    guidance = prompts.feedback_block(feedback, fixes or [], "reviewer", untrusted=prompts.from_thread(brief))
     if guidance:
         parts.append(guidance)
     parts.append(

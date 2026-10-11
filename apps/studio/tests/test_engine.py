@@ -213,3 +213,29 @@ class TestAgentsNeverApprove:
         assert job.status == AgencyJob.Status.FAILED
         pp.refresh_from_db()
         assert pp.status == "pending_review"
+
+
+def test_between_stages_a_job_waits_as_queued_so_the_sweep_leaves_it(world, queue):
+    from background_task.models import Task
+
+    job = engine.create(world.workspace, "report")
+    engine.run_step(str(job.pk), 1, "first")
+    job.refresh_from_db()
+    assert job.stage == "second" and job.status == AgencyJob.Status.QUEUED
+    assert (job.pk, 1, "second") in queue
+
+    # The next stage is queued behind a long run of other work.
+    AgencyJob.objects.filter(pk=job.pk).update(updated_at=timezone.now() - timedelta(hours=2))
+    Task.objects.create(
+        task_name="apps.studio.tasks.run_agency_step",
+        task_params=f'[["{job.pk}", 1, "second"], {{}}]',
+        task_hash="x",
+        run_at=timezone.now(),
+    )
+    assert engine.sweep_stuck() == 0
+    job.refresh_from_db()
+    assert job.status == AgencyJob.Status.QUEUED
+
+    engine.run_step(str(job.pk), 1, "second")
+    job.refresh_from_db()
+    assert job.status == AgencyJob.Status.DONE

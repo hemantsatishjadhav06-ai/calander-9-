@@ -373,3 +373,32 @@ def test_memory_refresh_skips_archived_over_budget_and_unused_workspaces(world, 
     agency_settings(world, monthly_budget_usd=5)
     overspend(world.workspace)
     assert autopilot.refresh_memory_due() == 0
+
+
+def test_a_picture_the_curator_cannot_describe_is_not_paid_for_again_every_day(
+    world, agency, ranked, photo, monkeypatch
+):
+    from apps.studio.roles import insights
+
+    drive(_learn(world))
+    silent = CreativeInsight.objects.create(
+        workspace=world.workspace,
+        media_asset=photo(filename="odd.jpg"),
+        source=CreativeInsight.Source.UPLOAD,
+        is_reference=True,
+    )
+    real = agency.creative_curator
+
+    def wordless(profile, images, **kwargs):
+        answer = real(profile, images, **kwargs)
+        for look in answer.output.images:
+            look.look = ""
+        return answer
+
+    monkeypatch.setattr(insights, "creative_curator", wordless)
+    drive(_learn(world))
+
+    silent.refresh_from_db()
+    assert silent.description == "" and silent.described_at is not None
+    # Nothing new for the curator: the next cycle does not queue (and pay for) another refresh.
+    assert not autopilot.memory_has_news(world.workspace, timezone.now())

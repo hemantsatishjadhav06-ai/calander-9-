@@ -12,6 +12,7 @@ in a tag the preamble tells every agent never to obey.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pydantic
@@ -47,8 +48,14 @@ def untrusted(tag: str, text: str, *, limit: int = 6000, **attrs: str) -> str:
     """``text`` wrapped as untrusted input. Tag-like sequences inside it are neutralised."""
     clean = (text or "").replace("</untrusted", "</ untrusted").replace("<untrusted", "< untrusted")
     clean = clean.strip()[:limit]
-    extra = "".join(f' {key}="{str(value)[:80]}"' for key, value in attrs.items() if value)
+    # Attribute values (sender names and the like) are outside text too: no
+    # quotes, angle brackets or line breaks, so a name can never close the tag.
+    extra = "".join(f' {key}="{_attr(value)}"' for key, value in attrs.items() if value is not None and _attr(value))
     return f'<untrusted source="{tag}"{extra}>\n{clean or "(empty)"}\n</untrusted>'
+
+
+def _attr(value: Any) -> str:
+    return re.sub(r"[\"<>\n\r\t]+", " ", str(value)).strip()[:80]
 
 
 def tagged(tag: str, body: str) -> str:

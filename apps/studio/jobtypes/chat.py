@@ -49,6 +49,12 @@ OTHER_ACTIONS = frozenset({"answer", "escalate"})
 HANDOFF = "A person from the team will reply here."
 NOT_ALLOWED = "I can't arrange that from here, so I've passed your message to a person on the team. " + HANDOFF
 BUSY = "The team is already working on this post. Once this round is ready, tell me what to change and I'll pass it on."
+ARTICLE_LOCKED = (
+    "This article is approved or already live, so the writers can't change it from here. I've asked a person on "
+    "the team to look at your request. " + HANDOFF
+)
+#: Posts one person may have in the works at once from the thread.
+MAX_ACTIVE_CHAT_POSTS = 2
 LOCKED = (
     "This post has already been approved or scheduled, so it can't be changed from here. I've asked a person on the "
     "team to pause it and make the change."
@@ -401,7 +407,7 @@ def perform(
     if action == "escalate":
         return Outcome(_with_handoff(reply), action, Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
     if action in REVISION_ACTIONS:
-        outcome = _revise(target.brief, action, instructions, reply, speaker=speaker)
+        outcome = _revise(target.brief, action, instructions, reply, speaker=speaker, requester=requester)
     elif action == "new_post":
         outcome = _new_post(job, conversation.workspace, requester, membership, instructions, reply)
     elif action == "edit_blog":
@@ -419,7 +425,13 @@ def _with_handoff(reply: str) -> str:
 
 
 def _revise(
-    brief: StudioBrief | None, action: str, instructions: str, reply: str, *, speaker: str = "staff"
+    brief: StudioBrief | None,
+    action: str,
+    instructions: str,
+    reply: str,
+    *,
+    speaker: str = "staff",
+    requester=None,
 ) -> Outcome:
     if brief is None:
         return Outcome(NOT_ALLOWED, action, Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
@@ -437,10 +449,13 @@ def _revise(
         return _locked(brief, action, speaker)
     try:
         if action == "new_angles":
-            services.new_angles(brief, instructions)
+            services.new_angles(brief, instructions, requested_by=requester)
         else:
             services.request_changes(
-                brief, _FEEDBACK_LEAD.get(action, "") + instructions, new_picture=action == "new_picture"
+                brief,
+                _FEEDBACK_LEAD.get(action, "") + instructions,
+                new_picture=action == "new_picture",
+                requested_by=requester,
             )
     except services.StudioActionError as exc:
         logger.info("Chat: revision of brief %s refused: %s", brief.pk, exc)
@@ -519,6 +534,21 @@ def _new_post(job, workspace, requester, membership, idea: str, reply: str) -> O
             Message.ActionStatus.NEEDS_HUMAN,
             notify_staff=True,
         )
+    # One message, one post, and only a couple in the works per person: a thread
+    # can't fan out into a run of paid pipelines.
+    in_progress = StudioBrief.objects.filter(
+        workspace=workspace,
+        origin=StudioBrief.Origin.CHAT,
+        requested_by=requester,
+        status__in=StudioBrief.ACTIVE_STATUSES,
+    ).count()
+    if in_progress >= MAX_ACTIVE_CHAT_POSTS:
+        return Outcome(
+            "The team is still making the last post you asked for. Once it's ready for review, ask again and "
+            "I'll start this one.",
+            "new_post",
+            Message.ActionStatus.DECLINED,
+        )
     brief = services.create_brief(
         workspace,
         author,
@@ -532,7 +562,16 @@ def _new_post(job, workspace, requester, membership, idea: str, reply: str) -> O
 
 
 def _edit_blog(job, workspace, blog_post, requester, instructions: str, reply: str) -> Outcome:
+    from apps.blog import services as blog_services
+    from apps.blog.views_team import REVISABLE
+
     if blog_post is None:
+        return Outcome(NOT_ALLOWED, "edit_blog", Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
+    # The same rules as the article page's own "Ask the SEO team": the person may edit
+    # this article, and it is still the team's to change (not approved or live).
+    if blog_post.status not in REVISABLE:
+        return Outcome(ARTICLE_LOCKED, "edit_blog", Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
+    if not blog_services.can_edit(requester, blog_post):
         return Outcome(NOT_ALLOWED, "edit_blog", Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
     busy = AgencyJob.objects.filter(
         workspace=workspace, kind=AgencyJob.Kind.BLOG, blog_post=blog_post, status__in=AgencyJob.ACTIVE_STATUSES

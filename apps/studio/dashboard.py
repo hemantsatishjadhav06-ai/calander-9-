@@ -14,7 +14,7 @@ from django.db.models import Count, Q
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
-from . import budget, memory, team
+from . import budget, memory, services, team
 from .models import AgencyJob, AgencySettings, AgentRun, StudioBrief
 
 #: The post pipeline's stage → the agent at work during it.
@@ -80,6 +80,11 @@ def waiting(workspace) -> list[dict[str, Any]]:
     now = timezone.now()
     zone = _zone(workspace)
     for brief in briefs:
+        if services.post_statuses(brief) & services._APPROVED_STATUSES:
+            # Approved on the Approvals page since the team finished (or with the
+            # client for sign-off): not this person's to approve any more.
+            services.sync_status(brief)
+            continue
         review = brief.review_notes or {}
         proposed = brief.proposed_publish_at.astimezone(zone) if brief.proposed_publish_at else None
         rows.append(

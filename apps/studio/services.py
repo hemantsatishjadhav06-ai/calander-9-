@@ -143,22 +143,28 @@ def _new_revision(brief: StudioBrief, **changes) -> None:
     brief.save()
 
 
-def request_changes(brief: StudioBrief, feedback: str, *, new_picture: bool = False) -> None:
+def request_changes(brief: StudioBrief, feedback: str, *, new_picture: bool = False, requested_by=None) -> None:
+    """Send the post back with notes. ``requested_by`` is set when the notes came through the team thread
+    (a client's words, or the account manager's relay of them): the agents then read them as untrusted."""
     feedback = (feedback or "").strip()
     if not feedback:
         raise StudioActionError("Say what should change, so the team knows what to do.")
     if not can_revise(brief):
         raise StudioActionError("This post can't be revised now — it is in progress, approved or already out.")
+    extra = {"requested_by": requested_by} if requested_by is not None else {}
     with transaction.atomic():
-        _new_revision(brief, feedback=feedback[:4000], regenerate_picture=new_picture)
+        _new_revision(brief, feedback=feedback[:4000], regenerate_picture=new_picture, **extra)
         pipeline.start(brief, "copy")
 
 
-def new_angles(brief: StudioBrief, feedback: str = "") -> None:
+def new_angles(brief: StudioBrief, feedback: str = "", *, requested_by=None) -> None:
     if not can_revise(brief):
         raise StudioActionError("This post can't be revised now — it is in progress, approved or already out.")
+    extra = {"requested_by": requested_by} if requested_by is not None else {}
     with transaction.atomic():
-        _new_revision(brief, feedback=(feedback or "").strip()[:4000], chosen_concept=None, regenerate_picture=True)
+        _new_revision(
+            brief, feedback=(feedback or "").strip()[:4000], chosen_concept=None, regenerate_picture=True, **extra
+        )
         pipeline.start(brief, "strategy")
 
 
@@ -209,6 +215,15 @@ def approve(brief: StudioBrief, user, *, publish_now: bool = False, publish_at=N
     workspace = brief.workspace
     if publish_at is not None and publish_at <= timezone.now():
         raise StudioActionError("Pick a time in the future, or use Publish now.")
+    statuses = post_statuses(brief)
+    if "pending_client" in statuses:
+        # An internal approval already happened on the Approvals page; the
+        # client's sign-off is theirs to give in the portal, never ours to skip.
+        sync_status(brief)
+        raise StudioActionError("This post is with the client for sign-off — it's theirs to approve in the portal.")
+    if statuses & _APPROVED_STATUSES:
+        sync_status(brief)
+        raise StudioActionError("This post was already approved. Schedule it from the calendar or the composer.")
     try:
         moved = approval_services.approve_post(post, user, workspace, comment="Approved in the AI Studio.")
     except ValueError as exc:

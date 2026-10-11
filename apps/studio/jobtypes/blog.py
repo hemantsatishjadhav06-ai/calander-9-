@@ -73,8 +73,17 @@ MIN_ARTICLE_WORDS = 150
 KEYWORD_FIELDS = ("focus_keyword", "secondary_keywords")
 
 _URL = re.compile(r"https?://[^\s<>()\[\]\"'`]+")
-_MD_LINK = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
+# Inline links: ``[text](url)``, ``[text]( url "title" )``, ``[text](<url>)``.
+_MD_LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(\s*<?([^)\s>]*)>?(?:\s+(?:\"[^\"]*\"|'[^']*'))?\s*\)")
 _MD_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+# Reference links: ``[text][id]`` / ``[text][]`` / ``[id]`` with a ``[id]: url`` definition somewhere.
+_MD_REF_DEF = re.compile(r"^[ \t]{0,3}\[([^\]]+)\]:[ \t]*\S.*$", re.M)
+_MD_REF_LINK = re.compile(r"(?<!!)\[([^\]]+)\]\[([^\]]*)\]")
+# Autolinks ``<https://…>`` and raw HTML links and images.
+_MD_AUTOLINK = re.compile(r"<((?:https?|mailto|tel):[^>\s]+)>")
+_HTML_ANCHOR = re.compile(r"<a\b[^>]*>(.*?)</a\s*>", re.I | re.S)
+_HTML_TAG = re.compile(r"</?(?:a|img|picture|source|iframe|object|embed|video|audio)\b[^>]*>", re.I)
+_HTML_URL_ATTR = re.compile(r"(?:href|src)\s*=\s*[\"']?([^\"'\s>]+)", re.I)
 _H1 = re.compile(r"^#\s+")
 _WORD = re.compile(r"\w+", re.UNICODE)
 
@@ -308,22 +317,65 @@ def clean_links(body: str, allowed: Iterable[str], facts: str = "") -> tuple[str
     digits = re.sub(r"\D", "", facts or "")
     removed: list[str] = []
 
-    def keep(match: re.Match) -> str:
-        text, url = match.group(1), match.group(2).strip()
+    def ok(url: str) -> bool:
         norm = _norm(url)
         if norm in exact or url.startswith("#"):
-            return match.group(0)
+            return True
         if url.startswith("/") and not url.startswith("//") and norm in paths:
-            return match.group(0)
+            return True
         if url.startswith("tel:") and len(re.sub(r"\D", "", url)) >= 6 and re.sub(r"\D", "", url) in digits:
+            return True
+        return bool(url.startswith("mailto:") and url[7:].lower() and url[7:].lower() in (facts or "").lower())
+
+    def drop(url: str) -> None:
+        if url not in removed:
+            removed.append(url)
+
+    def keep(match: re.Match) -> str:
+        text, url = match.group(1), match.group(2).strip()
+        if ok(url):
             return match.group(0)
-        if url.startswith("mailto:") and url[7:].lower() and url[7:].lower() in (facts or "").lower():
-            return match.group(0)
-        removed.append(url)
+        drop(url)
         return text
 
+    def keep_auto(match: re.Match) -> str:
+        url = match.group(1).strip()
+        if ok(url):
+            return match.group(0)
+        drop(url)
+        return url if url.startswith("http") else ""
+
     body = _MD_IMAGE.sub("", body or "")
-    return _MD_LINK.sub(keep, body), removed
+    # Reference-style links lose their definitions and become their text; raw
+    # HTML anchors become their text; other embedding tags are dropped.
+    body = _MD_REF_DEF.sub("", body)
+    body = _MD_REF_LINK.sub(lambda m: m.group(1), body)
+    body = _HTML_ANCHOR.sub(lambda m: m.group(1), body)
+    body = _HTML_TAG.sub("", body)
+    body = _MD_AUTOLINK.sub(keep_auto, body)
+    body = _MD_LINK.sub(keep, body)
+    return _verified_links(body, ok, removed), removed
+
+
+def _verified_links(body: str, ok, removed: list[str]) -> str:
+    """The body once the real renderer agrees: any link it would still emit to a
+    place the team wasn't given is cut out of the source, text and all."""
+    import html as html_lib
+
+    from apps.blog.renderers import render_markdown
+
+    for _ in range(4):
+        stray = [
+            url for url in (html_lib.unescape(u) for u in _HTML_URL_ATTR.findall(render_markdown(body))) if not ok(url)
+        ]
+        if not stray:
+            return body
+        for url in stray:
+            if url not in removed:
+                removed.append(url)
+            body = body.replace(url, "").replace(html_lib.escape(url), "")
+    # Still something we can't account for: no raw HTML at all, then.
+    return re.sub(r"<[^>]+>", "", body)
 
 
 def tidy_body(body: str) -> str:
@@ -507,7 +559,9 @@ def research(job: AgencyJob) -> str:
         internal_links=picks,
         category=clip(data.get("category") or answer.category, 60),
     )
-    sources = urls_in(_facts_text(profile), topic, notes, web)[:MAX_SOURCES]
+    # Outside links come only from what staff wrote (the brand facts, the topic, the
+    # notes). Web research is read, never trusted to choose where the article links.
+    sources = urls_in(_facts_text(profile), topic, notes)[:MAX_SOURCES]
     dropped = len(answer.internal_links) - len(picks)
     engine.end(
         run,

@@ -45,7 +45,7 @@ from typing import Any
 from django.db import transaction
 from django.utils import timezone
 
-from . import agents, design, guards, images, llm, qa, scheduling, style
+from . import agents, budget, design, guards, images, llm, qa, scheduling, style
 from .brand_defaults import ensure_profile
 from .models import AgentRun, StudioBrief, StudioConcept
 
@@ -91,6 +91,10 @@ def start(brief: StudioBrief, stage: str = "strategy") -> None:
     enqueue(brief, stage)
 
 
+#: Steps that call a model or fal.ai; the budget is checked before each of them.
+PAID_STAGES = frozenset({"strategy", "copy", "art", "picture", "review", "channel"})
+
+
 def _save(brief: StudioBrief, **fields: Any) -> None:
     """Write step results, but only while the brief is still on the step's revision."""
     fields["updated_at"] = timezone.now()
@@ -119,6 +123,11 @@ def run_step(brief_id: str, revision: int, stage: str) -> None:
         brief.started_at = brief.started_at or timezone.now()
         brief.save(update_fields=["status", "started_at", "updated_at"])
 
+    if stage in PAID_STAGES and not budget.can_spend(brief.workspace):
+        # A post is up to nine paid calls; stop before the next one once the month's budget is used.
+        _fail(brief, budget.over_budget_message(brief.workspace))
+        return
+
     step = STEP_FUNCTIONS[stage]
     try:
         with guards.agent_work(f"brief {brief_id} {stage}"):
@@ -141,11 +150,14 @@ def run_step(brief_id: str, revision: int, stage: str) -> None:
     if next_stage is None:
         return
     with transaction.atomic():
+        # Back to QUEUED between steps: the next task may wait behind other
+        # work, and the sweep leaves a queued brief with a pending task alone.
         moved = StudioBrief.objects.filter(pk=brief.pk, revision=revision, status=StudioBrief.Status.WORKING).update(
-            stage=next_stage, updated_at=timezone.now()
+            stage=next_stage, status=StudioBrief.Status.QUEUED, updated_at=timezone.now()
         )
         if moved:
             brief.stage = next_stage
+            brief.status = StudioBrief.Status.QUEUED
             enqueue(brief, next_stage)
 
 
@@ -229,6 +241,22 @@ def _end(
     run.save(update_fields=fields)
 
 
+def _note_usage(run: AgentRun, result: llm.AgentResult) -> llm.AgentResult:
+    """Record what a finished call cost before the step's revision-guarded write.
+
+    If that write finds the brief has moved on (someone discarded or re-asked
+    during the call), the row is closed as superseded and keeps these numbers.
+    """
+    run.model, run.input_tokens, run.output_tokens, run.cache_read_tokens = (
+        result.model,
+        result.input_tokens,
+        result.output_tokens,
+        result.cache_read_tokens,
+    )
+    run.save(update_fields=["model", "input_tokens", "output_tokens", "cache_read_tokens"])
+    return result
+
+
 def _fail_run(run: AgentRun, error: str | Exception) -> None:
     """Close ``run`` as failed, recording what a failed Claude call still cost."""
     run.status = AgentRun.Status.FAILED
@@ -240,6 +268,10 @@ def _fail_run(run: AgentRun, error: str | Exception) -> None:
     if usage:
         run.model, run.input_tokens, run.output_tokens, run.cache_read_tokens = usage
         fields += ["model", "input_tokens", "output_tokens", "cache_read_tokens"]
+    searches = int(getattr(error, "web_searches", 0) or 0)
+    if searches:
+        run.output = {**(run.output or {}), "web_searches": searches}
+        fields.append("output")
     run.save(update_fields=fields)
 
 
@@ -323,7 +355,7 @@ def step_strategy(brief: StudioBrief) -> str:
     profile = ensure_profile(brief.workspace)
     run = _begin(brief, AgentRun.Agent.STRATEGIST)
     try:
-        result = agents.strategist(brief, profile, recent_posts(brief))
+        result = _note_usage(run, agents.strategist(brief, profile, recent_posts(brief)))
     except StudioError as exc:
         _fail_run(run, exc)
         raise
@@ -378,14 +410,17 @@ def step_copy(brief: StudioBrief) -> str:
     feedback = _feedback(brief)
     run = _begin(brief, AgentRun.Agent.COPYWRITER)
     try:
-        result = agents.copywriter(
-            brief,
-            profile,
-            concept,
-            recent_posts(brief),
-            previous=previous if (feedback or fixes) else None,
-            feedback=feedback,
-            fixes=fixes,
+        result = _note_usage(
+            run,
+            agents.copywriter(
+                brief,
+                profile,
+                concept,
+                recent_posts(brief),
+                previous=previous if (feedback or fixes) else None,
+                feedback=feedback,
+                fixes=fixes,
+            ),
         )
     except StudioError as exc:
         _fail_run(run, exc)
@@ -425,16 +460,19 @@ def step_art(brief: StudioBrief) -> str:
     previous = brief.design_spec or None
     run = _begin(brief, AgentRun.Agent.ART_DIRECTOR)
     try:
-        result = agents.art_director(
-            brief,
-            profile,
-            concept,
-            brief.post_copy,
-            reference,
-            source_picture=source_picture,
-            previous=previous if (feedback or fixes) else None,
-            feedback=feedback,
-            fixes=fixes,
+        result = _note_usage(
+            run,
+            agents.art_director(
+                brief,
+                profile,
+                concept,
+                brief.post_copy,
+                reference,
+                source_picture=source_picture,
+                previous=previous if (feedback or fixes) else None,
+                feedback=feedback,
+                fixes=fixes,
+            ),
         )
     except StudioError as exc:
         _fail_run(run, exc)
@@ -612,7 +650,9 @@ def step_review(brief: StudioBrief) -> str:
         raise StudioError("The graphic couldn't be read back from storage. Press Retry.")
     run = _begin(brief, AgentRun.Agent.REVIEWER)
     try:
-        result = agents.reviewer(brief, profile, brief.post_copy, brief.design_spec, graphic, _reference_image(brief))
+        result = _note_usage(
+            run, agents.reviewer(brief, profile, brief.post_copy, brief.design_spec, graphic, _reference_image(brief))
+        )
     except StudioError as exc:
         _fail_run(run, exc)
         raise
@@ -664,7 +704,7 @@ def step_channel(brief: StudioBrief) -> str:
     destinations = [{"platform": a.platform, "name": a.account_name or a.get_platform_display()} for a in others]
     profile = ensure_profile(brief.workspace)
     try:
-        result = creative.channel_editor(profile, post_copy, destinations)
+        result = _note_usage(run, creative.channel_editor(profile, post_copy, destinations))
     except StudioError as exc:
         # The copywriter's text still works everywhere (cut to the short version where too long).
         _fail_run(run, exc)

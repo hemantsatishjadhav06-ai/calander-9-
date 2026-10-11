@@ -99,7 +99,11 @@ class TestTheRequest:
         assert "tool_choice" not in request
 
         assert result.output.verdict == "approve"
-        assert (result.input_tokens, result.output_tokens, result.cache_read_tokens) == (1200, 450, 2000)
+        assert (result.input_tokens, result.output_tokens, result.cache_read_tokens) == (
+            1275,
+            450,
+            2000,
+        )  # 300 cache-write tokens at 1.25x
         assert result.model == "claude-opus-5-5"
         assert result.fallback_used is False
 

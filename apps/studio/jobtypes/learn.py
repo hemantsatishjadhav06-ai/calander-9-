@@ -228,7 +228,9 @@ def _candidates(workspace) -> tuple[list[CreativeInsight], list[CreativeInsight]
         .select_related("media_asset")
         .order_by("-score", "-published_at")[:TOP_FOR_CURATOR]
     )
-    show = [i for i in references if not i.description][:MAX_REFERENCES] + [i for i in top if not i.description]
+    show = [i for i in references if i.described_at is None][:MAX_REFERENCES] + [
+        i for i in top if i.described_at is None
+    ]
     described = [i for i in references + top if i.description]
     return show, described
 
@@ -326,6 +328,11 @@ def stage_describe(job: AgencyJob) -> None:
             continue  # keys come from this run's own listing; anything else is ignored
         CreativeInsight.objects.filter(pk=shown.pk, workspace=workspace).update(description=text, described_at=now)
         written += 1
+    # Pictures the curator was shown but said nothing about are stamped too: paid
+    # for once, not again on every refresh until someone replaces the picture.
+    CreativeInsight.objects.filter(
+        pk__in=[row.pk for row in by_key.values()], workspace=workspace, described_at__isnull=True
+    ).update(described_at=now)
 
     house_style = " ".join((answer.house_style or "").split())[:1500]
     updated = False

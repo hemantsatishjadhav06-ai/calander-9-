@@ -153,3 +153,47 @@ def test_what_the_team_learned_skips_a_newer_job_that_wrote_nothing_down(world):
     )
 
     assert dashboard.learned(world.workspace) == ["Pricing carousels did 2.1× usual on LinkedIn."]
+
+
+def test_one_click_approval_never_skips_the_clients_sign_off(client, world, fake_team):
+    from apps.approvals import services as approval_services
+    from apps.composer.models import PlatformPost
+    from apps.studio import dashboard, services
+
+    world.workspace.approval_workflow_mode = "required_internal_and_client"
+    world.workspace.save(update_fields=["approval_workflow_mode"])
+    brief = run_all(make_brief(world))
+    assert brief.status == StudioBrief.Status.READY
+    # Approved on the Approvals page: the post is now the client's to sign off.
+    approval_services.approve_post(brief.post, world.owner, world.workspace)
+    assert set(PlatformPost.objects.filter(post=brief.post).values_list("status", flat=True)) == {"pending_client"}
+
+    # The home no longer offers it: it is the client's now, and the brief is marked approved.
+    assert [r for r in dashboard.waiting(world.workspace) if r["kind"] == "post"] == []
+    brief.refresh_from_db()
+    assert brief.status == StudioBrief.Status.APPROVED
+    client.force_login(world.owner)
+    html = client.get(_url("studio:index", world)).content.decode()
+    assert 'name="mode" value="proposed"' not in html
+
+    # A stale page's one-click form still can't approve for the client.
+    StudioBrief.objects.filter(pk=brief.pk).update(status=StudioBrief.Status.READY)
+    brief.refresh_from_db()
+    with pytest.raises(services.StudioActionError, match="client"):
+        services.approve(brief, world.owner, publish_at=timezone.now() + timedelta(days=1))
+    assert set(PlatformPost.objects.filter(post=brief.post).values_list("status", flat=True)) == {"pending_client"}
+
+
+def test_a_brief_is_refused_once_the_budget_is_used(client, world, settings, monkeypatch):
+    from apps.studio import budget
+
+    settings.ANTHROPIC_API_KEY = "sk-ant-test"
+    monkeypatch.setattr(budget, "can_spend", lambda workspace: False)
+    client.force_login(world.owner)
+
+    response = client.post(
+        _url("studio:create", world), {"idea": "Site visit on Saturday", "accounts": [world.linkedin.pk]}, follow=True
+    )
+
+    assert not StudioBrief.objects.exists()
+    assert "AI budget" in response.content.decode()

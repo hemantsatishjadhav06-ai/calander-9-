@@ -391,3 +391,28 @@ def test_the_pages_pass_the_accessibility_sweep(client, world, page):
     audit.finish()
     assert audit.unnamed_buttons == [] and audit.unnamed_controls == []
     assert [m.group(3) for m in FAINT_TEXT.finditer(html) if m.group(3).strip() not in ("•", "·", "&bull;")] == []
+
+
+def test_replanning_a_failed_week_retires_the_failed_plan_and_its_posts(world, agency):
+    from apps.studio import engine
+    from apps.studio.models import StudioBrief
+    from apps.studio.tests.conftest import make_brief
+
+    row = agency_settings(world)
+    agency.fail = {"planner": "Claude is rate-limiting this account right now."}
+    outcome = autopilot.plan_week(row, NEXT_MONDAY)
+    old_job = drive(outcome.week.job)
+    assert old_job.status == AgencyJob.Status.FAILED
+    autopilot.announce_planned_weeks()
+    leftover = make_brief(world, job=old_job, start=False, origin=StudioBrief.Origin.AUTOPILOT)
+    assert leftover.status == StudioBrief.Status.PLANNED
+
+    agency.fail = {}
+    again = autopilot.plan_week(row, NEXT_MONDAY, manual=True)
+
+    assert again.started and again.week.job != old_job
+    old_job.refresh_from_db()
+    leftover.refresh_from_db()
+    assert old_job.status == AgencyJob.Status.CANCELLED
+    assert leftover.status == StudioBrief.Status.DISCARDED
+    assert engine.sweep_stuck() == 0

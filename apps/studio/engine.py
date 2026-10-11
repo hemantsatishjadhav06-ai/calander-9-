@@ -218,11 +218,15 @@ def run_step(job_id: str, revision: int, stage_name: str) -> None:
     if next_stage is None:
         return
     with transaction.atomic():
+        # Back to QUEUED between stages: the next task may wait behind other
+        # work for a while, and the sweep leaves a queued job with a pending
+        # task alone (it would fail a WORKING one as stuck).
         moved = AgencyJob.objects.filter(pk=job.pk, revision=revision, status=AgencyJob.Status.WORKING).update(
-            stage=next_stage, updated_at=timezone.now()
+            stage=next_stage, status=AgencyJob.Status.QUEUED, updated_at=timezone.now()
         )
         if moved:
             job.stage = next_stage
+            job.status = AgencyJob.Status.QUEUED
             enqueue(job, next_stage)
 
 
@@ -304,6 +308,10 @@ def fail_run(run: AgentRun, error: str | Exception) -> None:
     if usage:
         run.model, run.input_tokens, run.output_tokens, run.cache_read_tokens = usage
         fields += ["model", "input_tokens", "output_tokens", "cache_read_tokens"]
+    searches = int(getattr(error, "web_searches", 0) or 0)
+    if searches:
+        run.output = {**(run.output or {}), "web_searches": searches}
+        fields.append("output")
     run.save(update_fields=fields)
 
 
@@ -321,6 +329,16 @@ def call(
     except JobError as exc:
         fail_run(run, exc)
         raise
+    # Written now, before the caller's revision-guarded save: a job that was
+    # cancelled or re-asked during the call is closed as superseded and still
+    # bills what Claude answered.
+    run.model, run.input_tokens, run.output_tokens, run.cache_read_tokens = (
+        result.model,
+        result.input_tokens,
+        result.output_tokens,
+        result.cache_read_tokens,
+    )
+    run.save(update_fields=["model", "input_tokens", "output_tokens", "cache_read_tokens"])
     return run, result
 
 
