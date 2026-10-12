@@ -16,15 +16,16 @@ from datetime import datetime, time, timedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
 
 from apps.members.decorators import require_permission
 
-from . import autopilot, budget, dashboard, llm, reports
+from . import autopilot, budget, chat, dashboard, llm, reports
 from .forms_agency import WEEKDAYS, AgencySettingsForm
-from .models import AgencySettings, AgentRun, AutopilotWeek, StudioBrief
+from .models import AgencyJob, AgencySettings, AgentRun, AutopilotWeek, StudioBrief
 from .views import _perms, _workspace
 
 _APPROVED_POST_STATUSES = ("approved", "pending_client", "scheduled", "publishing", "published", "on_hold")
@@ -56,7 +57,14 @@ def next_plan_at(row: AgencySettings) -> datetime:
 
 def last_run(workspace) -> dict | None:
     """The newest planned week: what was planned, made, approved and changed, and what it cost."""
-    week = AutopilotWeek.objects.filter(workspace=workspace).select_related("job").order_by("-week_start").first()
+    visible_job_ids = chat.web_jobs(AgencyJob.objects.filter(workspace=workspace)).values("pk")
+    week = (
+        AutopilotWeek.objects.filter(workspace=workspace)
+        .filter(Q(job__isnull=True) | Q(job_id__in=visible_job_ids))
+        .select_related("job")
+        .order_by("-week_start")
+        .first()
+    )
     if week is None:
         return None
     job = week.job

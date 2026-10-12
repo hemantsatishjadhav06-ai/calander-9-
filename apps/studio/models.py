@@ -725,6 +725,11 @@ class Conversation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="conversations")
     audience = models.CharField(max_length=20, choices=Audience.choices, default=Audience.INTERNAL)
+    is_private = models.BooleanField(
+        default=False,
+        db_default=False,
+        help_text="Private transport history stays private after disconnection or a role change.",
+    )
     title = models.CharField(max_length=200, blank=True, default="")
     brief = models.ForeignKey(
         StudioBrief, on_delete=models.CASCADE, null=True, blank=True, related_name="conversations"

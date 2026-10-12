@@ -14,7 +14,7 @@ from django.db.models import Count, Q
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
-from . import budget, memory, services, team
+from . import budget, chat, memory, services, team
 from .models import AgencyJob, AgencySettings, AgentRun, StudioBrief
 
 #: The post pipeline's stage → the agent at work during it.
@@ -155,9 +155,9 @@ def at_work(workspace, limit: int = 6) -> list[dict[str, Any]]:
                 "url": reverse("studio:detail", kwargs={"workspace_id": workspace.id, "brief_id": brief.pk}),
             }
         )
-    for job in AgencyJob.objects.filter(workspace=workspace, status__in=AgencyJob.ACTIVE_STATUSES).order_by(
-        "-updated_at"
-    )[: max(0, limit - len(rows))]:
+    for job in chat.web_jobs(
+        AgencyJob.objects.filter(workspace=workspace, status__in=AgencyJob.ACTIVE_STATUSES)
+    ).order_by("-updated_at")[: max(0, limit - len(rows))]:
         rows.append(
             {
                 "agent": team.get(_job_agent(job)),
@@ -168,7 +168,7 @@ def at_work(workspace, limit: int = 6) -> list[dict[str, Any]]:
         )
     if len(rows) < limit:
         for run in (
-            AgentRun.objects.filter(workspace=workspace, status=AgentRun.Status.SUCCEEDED)
+            chat.web_agent_runs(AgentRun.objects.filter(workspace=workspace, status=AgentRun.Status.SUCCEEDED))
             .exclude(summary="")
             .order_by("-finished_at")[: limit - len(rows)]
         ):
@@ -259,8 +259,10 @@ def learned(workspace) -> list[str]:
     """A few plain lines the team learned, newest first."""
     lines: list[str] = []
     # The newest finished job that wrote anything down (a report usually doesn't).
-    for job in AgencyJob.objects.filter(
-        workspace=workspace, kind__in=("learn", "plan", "report"), status=AgencyJob.Status.DONE
+    for job in chat.web_jobs(
+        AgencyJob.objects.filter(
+            workspace=workspace, kind__in=("learn", "plan", "report"), status=AgencyJob.Status.DONE
+        )
     ).order_by("-finished_at")[:5]:
         found = [
             line.strip()

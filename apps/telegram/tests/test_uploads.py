@@ -170,7 +170,9 @@ def test_private_reference_requires_exact_paired_owner(world, role):
     world.chat.chat_id = world.links[role].telegram_user_id
     world.chat.private_user = world.users[role]
     world.chat.save()
-    assert receive(world, role=role).asset.uploaded_by_id == world.users[role].pk
+    shared = message(world, role)
+    shared["caption"] = "/reference shared"
+    assert receive(world, shared, role=role).asset.uploaded_by_id == world.users[role].pk
     TelegramChat.objects.filter(pk=world.chat.pk).update(private_user=world.users["owner"])
     with pytest.raises(ReferenceUploadError, match="different paired"):
         receive(world, message(world, role, message_id=2), role=role)
@@ -500,3 +502,96 @@ def test_storage_error_is_safe_and_database_write_rolls_back(world, monkeypatch)
     with pytest.raises(ReferenceUploadError, match="could not be saved") as error:
         receive(world)
     assert "sensitive" not in str(error.value) and not MediaAsset.objects.exists()
+
+
+def _private_reference(world, role="client"):
+    world.chat.audience = "private"
+    world.chat.chat_type = "private"
+    world.chat.chat_id = world.links[role].telegram_user_id
+    world.chat.private_user = world.users[role]
+    world.chat.save()
+    world.convo.is_private = True
+    world.convo.created_by = world.users[role]
+    world.convo.save(update_fields=["is_private", "created_by"])
+
+
+@pytest.mark.parametrize("caption", [None, "/reference", "/reference sharedish"])
+def test_private_photo_requires_exact_sharing_consent_before_any_io(world, caption):
+    _private_reference(world)
+    payload = message(world, "client")
+    if caption is not None:
+        payload["caption"] = caption
+    api = FileAPI(image_bytes())
+    with pytest.raises(ReferenceUploadError, match="shared brand media library"):
+        receive(world, payload, api=api, role="client")
+    assert api.calls == [] and not MediaAsset.objects.exists()
+    assert not AgencyJob.objects.exists() and not StudioBrief.objects.exists()
+
+
+def test_private_pdf_requires_same_consent_without_downloading(world):
+    _private_reference(world)
+    data = b"%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\n%%EOF"
+    payload = message(world, "client", data, mime="application/pdf", name="private-source.pdf")
+    api = FileAPI(data, path="documents/private.pdf")
+    with pytest.raises(ReferenceUploadError, match="No file was downloaded or saved"):
+        receive(world, payload, api=api, role="client")
+    assert not api.calls and not MediaAsset.objects.exists()
+
+
+def test_private_explicit_shared_photo_records_actual_sender_and_honest_storage_note(world):
+    _private_reference(world)
+    payload = message(world, "client")
+    payload["caption"] = "/reference shared Use this project photo after checking it"
+    uploaded = receive(world, payload, api=FileAPI(image_bytes()), role="client")
+    assert uploaded.asset.uploaded_by_id == world.users["client"].pk
+    assert uploaded.asset.workspace_id == world.ws.pk
+    assert "shared brand media library" in uploaded.warning
+    assert uploaded.asset.authenticity != "verified"
+
+
+def test_private_sharing_consent_never_overrides_mid_download_revocation(world):
+    _private_reference(world)
+    payload = message(world, "client")
+    payload["caption"] = "/reference shared"
+    api = FileAPI(
+        image_bytes(),
+        after_download=lambda: TelegramUserLink.objects.filter(pk=world.links["client"].pk).update(is_active=False),
+    )
+    with pytest.raises(ReferenceUploadError, match="current paired workspace access"):
+        receive(world, payload, api=api, role="client")
+    assert not MediaAsset.objects.exists()
+
+
+def test_private_text_excerpt_needs_no_library_sharing_consent_and_creates_no_asset(world):
+    _private_reference(world)
+    data = b"Private research notes supplied for a question, not a brand asset."
+    payload = message(world, "client", data, mime="text/plain", name="private-notes.txt")
+    uploaded = receive(world, payload, api=FileAPI(data, path="documents/private.txt"), role="client")
+    assert uploaded.kind == "text" and uploaded.asset is None
+    assert "Private research notes" in uploaded.text_excerpt
+    assert "shared brand media library" not in uploaded.warning
+    assert not MediaAsset.objects.exists()
+
+
+def test_stale_cached_group_audience_cannot_bypass_private_reference_consent(world):
+    _private_reference(world)
+    payload = message(world, "client")
+    world.chat.audience = "client"  # The persisted chat remains private.
+    api = FileAPI(image_bytes())
+    with pytest.raises(ReferenceUploadError, match="shared brand media library"):
+        receive(world, payload, api=api, role="client")
+    assert not api.calls and not MediaAsset.objects.exists()
+
+
+@pytest.mark.parametrize(
+    "forward_field", ["forward_origin", "forward_from", "forward_from_chat", "is_automatic_forward"]
+)
+def test_inherited_forwarded_private_caption_is_not_current_persons_sharing_choice(world, forward_field):
+    _private_reference(world)
+    payload = message(world, "client")
+    payload["caption"] = "/reference shared"
+    payload[forward_field] = True if forward_field == "is_automatic_forward" else {"id": 900900}
+    api = FileAPI(image_bytes())
+    with pytest.raises(ReferenceUploadError, match="forwarded caption cannot confirm your choice"):
+        receive(world, payload, api=api, role="client")
+    assert not api.calls and not MediaAsset.objects.exists()

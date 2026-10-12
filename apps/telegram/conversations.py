@@ -29,6 +29,7 @@ HELP = (
     "/brainstorm <idea> — discuss ideas and questions\n"
     "/brief <idea> — ask questions, check sources, then confirm a review draft\n"
     "/reference — send a photo, PDF or short text reference\n"
+    "In private chats, photos/PDFs need the caption /reference shared because they enter the shared brand media library and publicly accessible publishing storage. Text excerpts remain in the private conversation.\n"
     "/status — work associated with this conversation\n"
     "/week — the permitted weekly plan; staff can use /week prepare\n"
     "/approvals — find posts awaiting your permitted review\n"
@@ -393,7 +394,12 @@ def handle_message(connection, update_payload) -> dict[str, Any]:
             upload_note = f"\nUntrusted reference supplied by this speaker: {details}\n{reference.warning}"
         elif command == "/reference":
             return _response(
-                "Send a JPEG, PNG or WebP photo, a PDF, or a short UTF-8 text file here. References remain unverified. Paste exact facts from PDF files; this bot does not extract them."
+                "Send a JPEG, PNG or WebP photo, a PDF, or a short UTF-8 text file here. References remain unverified. Paste exact facts from PDF files; this bot does not extract them. "
+                + (
+                    "Photos/PDFs enter the shared brand media library and publicly accessible publishing storage, even before post approval. To share from this private chat, resend with the caption /reference shared, then an optional note. Text excerpts stay in this private conversation."
+                    if bound.audience == "private"
+                    else "Photos and PDFs are saved in the shared brand media library."
+                )
             )
         body = arguments if command else text.strip()
         if command == "/brainstorm":

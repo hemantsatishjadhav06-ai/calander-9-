@@ -94,7 +94,7 @@ def thread_page(request, workspace_id):
     """Every thread of the workspace — the general one, client threads, threads about posts — with one open."""
     workspace = _staff_workspace(request, workspace_id)
     conversations = list(
-        Conversation.objects.filter(workspace=workspace)
+        chat.web_conversations(workspace)
         .select_related("brief", "post", "blog_post")
         .exclude(last_message_at=None)
         .order_by("-last_message_at")[:60]

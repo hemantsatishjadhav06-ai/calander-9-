@@ -177,10 +177,20 @@ def telegram_member(conversation, user, context, *, locked=False):
             raise ChatError("This private Telegram conversation belongs to another person.")
         if TelegramChat.objects.filter(conversation_id=thread.pk).exclude(pk=current.pk).exists():
             raise ChatError("A private Telegram conversation cannot share group history.")
+        if thread.created_by_id != user.pk:
+            raise ChatError("This private Telegram history belongs to another person.")
     elif current.audience == TelegramChat.Audience.TEAM:
-        if thread.audience != Conversation.Audience.INTERNAL or not internal_member(member):
+        if (
+            is_private_conversation(thread)
+            or thread.audience != Conversation.Audience.INTERNAL
+            or not internal_member(member)
+        ):
             raise ChatError("This Telegram conversation is for the agency team.")
-    elif current.audience != TelegramChat.Audience.CLIENT or thread.audience != Conversation.Audience.CLIENT:
+    elif (
+        current.audience != TelegramChat.Audience.CLIENT
+        or thread.audience != Conversation.Audience.CLIENT
+        or is_private_conversation(thread)
+    ):
         raise ChatError("This Telegram conversation has an invalid audience.")
     if not internal_member(member) and thread.audience != Conversation.Audience.CLIENT:
         raise ChatError("This Telegram conversation is for the agency team.")
@@ -203,13 +213,45 @@ def telegram_author_kind(conversation, user, context, *, locked=False):
 # ---------------------------------------------------------------------------
 
 
+def _private_conversations():
+    return Conversation.objects.filter(Q(is_private=True) | Q(telegram_chats__audience="private"))
+
+
+def is_private_conversation(conversation) -> bool:
+    """Privacy follows the persisted thread, including inactive and former bindings."""
+    return bool(conversation is not None and _private_conversations().filter(pk=conversation.pk).exists())
+
+
+def web_conversations(workspace=None):
+    """Threads supported by the ordinary dashboard/portal, excluding all private history."""
+    rows = Conversation.objects.exclude(pk__in=_private_conversations().values("pk"))
+    return rows.filter(workspace=workspace) if workspace is not None else rows
+
+
+def web_jobs(rows):
+    return rows.exclude(conversation_id__in=_private_conversations().values("pk"))
+
+
+def web_agent_runs(rows):
+    return rows.exclude(job__conversation_id__in=_private_conversations().values("pk"))
+
+
+def _web_lookup(workspace, audience, **target):
+    rows = web_conversations(workspace).filter(**_lookup(workspace, audience, **target))
+    if not any(target.values()):
+        # A Telegram group has its own associated thread, rather than becoming
+        # the workspace-wide general thread by being created first.
+        rows = rows.filter(telegram_chats__isnull=True)
+    return rows
+
+
 def _lookup(workspace, audience: str, **target) -> dict[str, Any]:
     return {"workspace": workspace, "audience": audience, "brief": None, "post": None, "blog_post": None, **target}
 
 
 def _get_or_create(workspace, *, audience: str, created_by=None, title: str = "", **target) -> Conversation:
     lookup = _lookup(workspace, audience, **target)
-    found = Conversation.objects.filter(**lookup).order_by("created_at").first()
+    found = _web_lookup(workspace, audience, **target).order_by("created_at").first()
     if found is not None:
         return found
     from apps.workspaces.models import Workspace
@@ -217,7 +259,7 @@ def _get_or_create(workspace, *, audience: str, created_by=None, title: str = ""
     with transaction.atomic():
         # Two first messages at once must not start two threads: serialise on the workspace row.
         Workspace.objects.select_for_update().filter(pk=workspace.pk).first()
-        found = Conversation.objects.filter(**lookup).order_by("created_at").first()
+        found = _web_lookup(workspace, audience, **target).order_by("created_at").first()
         if found is not None:
             return found
         return Conversation.objects.create(created_by=created_by, title=title[:200], **lookup)
@@ -234,7 +276,7 @@ def general_conversation(workspace, *, audience: str = Conversation.Audience.INT
 
 def find_general(workspace, *, audience: str = Conversation.Audience.INTERNAL) -> Conversation | None:
     """The general thread if anyone has written in it yet (reading a page never creates one)."""
-    return Conversation.objects.filter(**_lookup(workspace, audience)).order_by("created_at").first()
+    return _web_lookup(workspace, audience).order_by("created_at").first()
 
 
 def _target_kwargs(workspace, target, audience: str) -> tuple[dict[str, Any], str]:
@@ -263,13 +305,14 @@ def conversation_for(workspace, target, *, audience: str, created_by=None) -> Co
 def find_conversation(workspace, target, *, audience: str) -> Conversation | None:
     """The thread about ``target`` if it exists (no write)."""
     kwargs, _title = _target_kwargs(workspace, target, audience)
-    return Conversation.objects.filter(**_lookup(workspace, audience, **kwargs)).order_by("created_at").first()
+    return _web_lookup(workspace, audience, **kwargs).order_by("created_at").first()
 
 
 def brief_conversation(brief: StudioBrief) -> Conversation | None:
     """The brief's internal thread, if anyone has written in it yet."""
     return (
-        Conversation.objects.filter(
+        web_conversations()
+        .filter(
             workspace_id=brief.workspace_id,
             audience=Conversation.Audience.INTERNAL,
             brief=brief,
@@ -283,7 +326,7 @@ def brief_conversation(brief: StudioBrief) -> Conversation | None:
 
 def get_conversation(workspace, conversation_id, *, client_only: bool = False) -> Conversation | None:
     """A thread of ``workspace`` by id (only client threads when ``client_only``)."""
-    rows = Conversation.objects.filter(workspace=workspace, pk=conversation_id)
+    rows = web_conversations(workspace).filter(pk=conversation_id)
     if client_only:
         rows = rows.filter(audience=Conversation.Audience.CLIENT)
     return rows.select_related("workspace", "brief", "post", "blog_post").first()
@@ -634,6 +677,8 @@ def post_message(
     from . import engine
 
     body = clean_body(body)
+    if telegram_context is None and is_private_conversation(conversation):
+        raise ChatError("Private Telegram conversations remain in their paired private chat.")
     if telegram_context is not None:
         author_kind, _member = telegram_author_kind(conversation, author, telegram_context)
         if is_internal:
@@ -819,6 +864,8 @@ def mark_read(user, conversation: Conversation | None) -> None:
 
     if conversation is None or user is None or not getattr(user, "is_authenticated", False):
         return
+    if is_private_conversation(conversation):
+        return
     key = _read_key(user.pk, conversation.pk)
     current = WorkspaceSetting.objects.filter(workspace_id=conversation.workspace_id, key=key).first()
     seen = _parse(current.value) if current is not None else None
@@ -852,7 +899,10 @@ def unread_counts(user, workspace, conversations, *, for_client: bool) -> dict[A
         return {}
     marks = _read_marks(user, workspace)
     condition = Q()
+    visible_ids = set(web_conversations(workspace).values_list("pk", flat=True))
     for conversation in conversations:
+        if conversation.pk not in visible_ids:
+            continue
         if conversation.last_message_at is None:
             continue
         mark = marks.get(str(conversation.pk))
@@ -870,7 +920,7 @@ def unread_counts(user, workspace, conversations, *, for_client: bool) -> dict[A
 
 
 def client_conversations(workspace):
-    return Conversation.objects.filter(workspace=workspace, audience=Conversation.Audience.CLIENT)
+    return web_conversations(workspace).filter(audience=Conversation.Audience.CLIENT)
 
 
 def portal_unread_total(user, workspace) -> int:
@@ -953,6 +1003,8 @@ def notify_staff(conversation: Conversation, *, title: str, body: str, exclude=N
     from apps.notifications.engine import notify
     from apps.notifications.models import EventType
 
+    if is_private_conversation(conversation):
+        return 0
     told = 0
     for user in staff_recipients(conversation.workspace):
         if user == exclude or _recently_told(user, since=STAFF_NOTIFY_EVERY, conversation=conversation, kind=kind):
@@ -974,6 +1026,8 @@ def notify_staff(conversation: Conversation, *, title: str, body: str, exclude=N
 
 
 def notify_staff_of_client_message(conversation: Conversation, message: Message) -> int:
+    if is_private_conversation(conversation):
+        return 0
     return notify_staff(
         conversation,
         title=f"{message.sender_name} wrote in the team thread",
@@ -992,7 +1046,7 @@ def notify_clients_of_reply(conversation: Conversation, *, only=None) -> int:
     from apps.notifications.engine import notify
     from apps.notifications.models import EventType
 
-    if conversation.audience != Conversation.Audience.CLIENT:
+    if conversation.audience != Conversation.Audience.CLIENT or is_private_conversation(conversation):
         return 0
     if only is not None:
         author_ids = {only.pk}
@@ -1042,8 +1096,10 @@ def dom_id(conversation: Conversation | None = None, *, brief: StudioBrief | Non
         return f"thread-brief-{brief_id}"
     if conversation is None:
         return "thread-home"
-    if conversation.audience == Conversation.Audience.INTERNAL and not (
-        conversation.post_id or conversation.blog_post_id
+    if (
+        conversation.audience == Conversation.Audience.INTERNAL
+        and not conversation.telegram_chats.exists()
+        and not (conversation.post_id or conversation.blog_post_id)
     ):
         return "thread-home"
     return f"thread-{conversation.pk}"
@@ -1067,6 +1123,10 @@ def thread_context(
     for the general thread (the first message creates any of them). Reading
     never creates a thread; it marks it read for the viewer.
     """
+    if is_private_conversation(conversation):
+        from django.core.exceptions import PermissionDenied
+
+        raise PermissionDenied("Private Telegram conversations remain in their paired private chat.")
     if conversation is not None:
         workspace = conversation.workspace
     elif brief is not None:

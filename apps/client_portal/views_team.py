@@ -66,6 +66,8 @@ def _parse_uuid(value):
 def thread_context(request, conversation, *, post=None, dom_id="team-thread", error="", body="") -> dict:
     """What ``client_portal/partials/team_thread.html`` needs (the conversation may not exist yet)."""
     workspace = request.portal_workspace
+    if chat.is_private_conversation(conversation):
+        raise Http404
     messages = chat.recent_messages(conversation, for_client=True) if conversation is not None else []
     chat.mark_read(request.user, conversation)
     if post is not None:

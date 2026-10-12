@@ -87,6 +87,8 @@ def permitted_chat(chat):
         return False
     if conversation.workspace_id != connection.workspace_id:
         return False
+    if chat.audience in {"client", "team"} and conversation.is_private:
+        return False
     if chat.audience == "client":
         return (
             chat.chat_type in {"group", "supergroup"}
@@ -135,6 +137,7 @@ def _scope(chat):
         "chat_id": chat.chat_id,
         "conversation_id": str(chat.conversation_id),
         "conversation_audience": chat.conversation.audience,
+        "conversation_is_private": chat.conversation.is_private,
         "audience": chat.audience,
         "private_user_id": str(chat.private_user_id) if chat.private_user_id else None,
     }
@@ -363,10 +366,9 @@ def _photo_content(row, chat):
 
 
 def _photo_caption(asset, caption):
-    label = {
-        "illustrative": "Illustrative graphic for review.",
-        "verified": "Owner-verified project photo.",
-    }.get(asset.authenticity, "Image for review; project authenticity is unverified.")
+    from apps.studio.trust import photo_status
+
+    label = photo_status(asset)["label"]
     combined = f"{label}\n{caption}" if caption else label
     return (_chunks(combined, 1024) or [""])[0]
 

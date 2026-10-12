@@ -390,6 +390,22 @@ def answer(job: AgencyJob) -> None:
                 status=Message.ActionStatus.NEEDS_HUMAN,
                 notify_staff=True,
             )
+        if outcome.notify_staff and chat.is_private_conversation(conversation):
+            destination = "client group" if speaker == "client" else "internal team group"
+            sharing_instruction = (
+                f"Share the request yourself in the intended {destination} for a person's review. "
+                "This private chat is not forwarded to the agency."
+            )
+            if outcome.result.get("client_preparation_requested"):
+                outcome.reply = (
+                    creative_brief.summary(outcome.result.get("creative_brief")) + "\n\n" + sharing_instruction
+                )
+                outcome.reply += " A paired agency lead can check the request and confirm draft preparation there; your message has not started or approved a draft."
+            elif outcome.status == Message.ActionStatus.NEEDS_HUMAN:
+                outcome.reply = "This request needs a person's decision. " + sharing_instruction
+            else:
+                outcome.reply += "\n\n" + sharing_instruction
+            outcome.notify_staff = False
         reply = chat.post_agent_message(
             conversation, outcome.reply, job=job, action=outcome.action, action_status=outcome.status
         )

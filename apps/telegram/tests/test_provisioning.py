@@ -642,3 +642,22 @@ def test_disconnect_invalidates_all_unconsumed_action_proofs(hub):
     provisioning.disconnect(conn, user)
     card.refresh_from_db()
     assert card.used_at and card.result == {"ok": False, "reason": "access_revoked"}
+
+
+def test_group_pairing_cannot_activate_persistently_private_history(hub):
+    _, user, conn = hub
+    ticket, nonce = group_ticket(conn, user, "client")
+    history = Conversation.objects.create(workspace=conn.workspace, audience="client", is_private=True)
+    group = TelegramChat.objects.create(
+        connection=conn,
+        chat_id=-100123456,
+        chat_type="supergroup",
+        audience="client",
+        conversation=history,
+        is_active=False,
+    )
+    with pytest.raises(TelegramPermissionDenied):
+        provisioning.consume_chat_pairing(conn, nonce, 909, group.chat_id, "supergroup")
+    group.refresh_from_db()
+    ticket.refresh_from_db()
+    assert not group.is_active and ticket.used_at is None

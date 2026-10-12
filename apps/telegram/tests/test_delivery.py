@@ -369,6 +369,43 @@ def test_photo_transport_ambiguity_is_held_and_safe_error_has_no_provider_url(hu
     asset.file.delete(save=False)
 
 
+@pytest.mark.parametrize("change", ["revoked_verifier", "generated_raw_verified"])
+def test_photo_caption_rechecks_current_attestation_and_generatedness(hub, user, controlled_api, change):
+    from apps.studio import trust
+
+    conn, chat = hub
+    pair(conn, user)
+    asset = photo(conn)
+    asset.authenticity = "verified"
+    asset.verified_by = user
+    asset.verified_at = timezone.now()
+    asset.verified_project = "Attested project"
+    asset.verified_asset_hash = trust.asset_stamp(asset)
+    asset.save(update_fields=["authenticity", "verified_by", "verified_at", "verified_project", "verified_asset_hash"])
+    assert trust.photo_status(asset)["status"] == "verified"
+    row = outbox.queue_photo(chat, asset.pk, source_key="photo:current-attestation")
+    if change == "revoked_verifier":
+        WorkspaceMembership.objects.filter(workspace=conn.workspace, user=user).delete()
+    else:
+        asset.source = "fal.ai"
+        asset.verified_asset_hash = trust.asset_stamp(asset)
+        asset.save(update_fields=["source", "verified_asset_hash"])
+    assert outbox.send_one(row.pk) == "sent"
+    caption = controlled_api.send_photo.call_args.kwargs["caption"]
+    assert "Attested project" not in caption and "verified photo:" not in caption.lower()
+    assert caption.startswith("Unverified photo" if change == "revoked_verifier" else "Illustrative image")
+    asset.file.delete(save=False)
+
+
+def test_historical_private_conversation_cannot_be_rebound_to_any_group(hub):
+    _, chat = hub
+    Conversation.objects.filter(pk=chat.conversation_id).update(is_private=True)
+    assert not outbox.queue_message(chat, "Private client history", source_key="private-history:client")
+    TelegramChat.objects.filter(pk=chat.pk).update(audience="team")
+    Conversation.objects.filter(pk=chat.conversation_id).update(audience="internal")
+    assert not outbox.queue_message(chat, "Private worker history", source_key="private-history:team")
+
+
 def test_async_replies_only_mirror_exact_visible_thread(hub, user, django_capture_on_commit_callbacks):
     conn, chat = hub
     other = Conversation.objects.create(workspace=conn.workspace, audience="client", created_by=user)

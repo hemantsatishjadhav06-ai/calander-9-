@@ -308,8 +308,26 @@ def receive_reference(connection, chat, link, message, *, api=None) -> Reference
         link.user_id,
         link.telegram_user_id,
     )
-    current_connection, _, _, _ = _fresh_scope(binding, message)
+    current_connection, current_chat, _, _ = _fresh_scope(binding, message)
     selected, kind, filename, expected_mime, limit = _selection(message)
+    if current_chat.audience == "private" and kind in {"photo", "document"}:
+        if any(
+            message.get(key) for key in ("forward_origin", "forward_from", "forward_from_chat", "is_automatic_forward")
+        ):
+            raise ReferenceUploadError(
+                "A forwarded caption cannot confirm your choice to use the shared brand media library and publicly accessible publishing storage. "
+                "Resend the file yourself with your own /reference shared caption. No file was downloaded or saved."
+            )
+        caption = message.get("caption")
+        sharing_caption = "/reference shared"
+        if not isinstance(caption, str) or not (
+            caption == sharing_caption or caption.startswith(sharing_caption + " ")
+        ):
+            raise ReferenceUploadError(
+                "Photos and PDFs become part of the shared brand media library and publicly accessible publishing storage, even before post approval. "
+                "To share this file, resend it with the exact caption /reference shared (then an optional note), "
+                "or send it in the intended group. No file was downloaded or saved."
+            )
     file_id = selected.get("file_id")
     if (
         not isinstance(file_id, str)
@@ -392,14 +410,18 @@ def receive_reference(connection, chat, link, message, *, api=None) -> Reference
         raise
     except Exception:
         raise ReferenceUploadError("This reference could not be saved. Ask the team to try again later.") from None
+    warning = (
+        "Unverified PDF saved as a reference only. Paste exact facts into this chat; no PDF text was read or verified."
+        if kind == "document"
+        else "Unverified supplied photo. A current human approver must verify its project and campaign provenance."
+    )
+    warning += " Saved in the shared brand media library and publicly accessible publishing storage."
     return ReferenceUpload(
         asset,
         kind,
         asset.filename,
         asset.mime_type,
-        warning="Unverified PDF saved as a reference only. Paste exact facts into this chat; no PDF text was read or verified."
-        if kind == "document"
-        else "Unverified supplied photo. A current human approver must verify its project and campaign provenance.",
+        warning=warning,
     )
 
 

@@ -344,10 +344,17 @@ def private_chat(connection, link, *, reactivate=False):
             raise TelegramPermissionDenied(
                 "This private chat is disabled. Pair explicitly again in SM Bean before using it."
             )
+        if current and not current.conversation.is_private:
+            Conversation.objects.filter(pk=current.conversation_id).update(is_private=True)
+            current.conversation.is_private = True
         if current and current.conversation.audience == audience and current.is_active:
             return current
         conversation = Conversation.objects.create(
-            workspace=member.workspace, audience=audience, title="Telegram private conversation", created_by=member.user
+            workspace=member.workspace,
+            audience=audience,
+            title="Telegram private conversation",
+            created_by=member.user,
+            is_private=True,
         )
         if current:
             current.conversation = conversation
@@ -471,7 +478,11 @@ def consume_chat_pairing(connection, nonce, telegram_user_id, chat_id, chat_type
         if current_identity is None:
             raise TelegramPermissionDenied("This pairing identity changed during group verification.")
         current = TelegramChat.objects.select_for_update().filter(connection=connection, chat_id=chat_id).first()
-        if current and (current.conversation.workspace_id != member.workspace_id or current.audience == "private"):
+        if current and (
+            current.conversation.workspace_id != member.workspace_id
+            or current.audience == "private"
+            or current.conversation.is_private
+        ):
             raise TelegramPermissionDenied("This group conversation is unavailable in this workspace.")
         if current and current.audience != ticket.audience:
             raise ProvisioningError(
