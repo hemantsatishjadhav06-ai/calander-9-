@@ -140,6 +140,22 @@ def _current_membership(job, conversation, requester):
     from apps.members.models import CustomRole, WorkspaceMembership
     from apps.workspaces.models import Workspace
 
+    telegram_context = (job.input or {}).get("telegram_context")
+    if telegram_context is not None:
+        try:
+            kind, paired_member = chat.telegram_author_kind(conversation, requester, telegram_context, locked=True)
+        except chat.ChatError:
+            return None
+        _lock_current_job(job)
+        if not Message.objects.filter(
+            pk=(job.input or {}).get("message_id"),
+            conversation=conversation,
+            author_id=requester.pk,
+            author_kind=kind,
+            is_internal=False,
+        ).exists():
+            return None
+        return paired_member
     _lock_current_job(job)
     current_thread = (
         Conversation.objects.select_for_update()
@@ -223,13 +239,18 @@ def answer(job: AgencyJob) -> None:
         engine.finish(job, result={"skipped": "This request no longer has an authorized author."})
         return None
     try:
-        author_kind = chat.author_kind_for(requester, conversation)
+        telegram_context = (job.input or {}).get("telegram_context")
+        if telegram_context is not None:
+            author_kind, membership = chat.telegram_author_kind(conversation, requester, telegram_context)
+        else:
+            author_kind = chat.author_kind_for(requester, conversation)
     except chat.ChatError:
         engine.finish(job, result={"skipped": "This request no longer has an authorized author."})
         return None
     if author_kind != trigger.author_kind:
         engine.finish(job, result={"skipped": "The request author's role changed."})
         return None
+    speaker = "client" if author_kind == Message.AuthorKind.CLIENT else "staff"
     if (job.input or {}).get("kind") == "confirm_brief":
         outcome = _confirm(job, conversation, trigger, requester, membership)
         reply = chat.post_agent_message(
@@ -256,8 +277,14 @@ def answer(job: AgencyJob) -> None:
         )
         return None
     allowed = allowed_actions(membership, conversation, target)
+    if telegram_context is not None and speaker == "client":
+        allowed = tuple(action for action in allowed if action in CLIENT_ACTIONS)
     profile = ensure_profile(workspace)
-    guided = speaker == "staff" and conversation.audience == Conversation.Audience.INTERNAL
+    guided = (speaker == "staff" and conversation.audience == Conversation.Audience.INTERNAL) or (
+        telegram_context is not None
+        and conversation.audience == Conversation.Audience.CLIENT
+        and (speaker == "client" or (job.input or {}).get("explicit_assistant_request") is True)
+    )
     context = _guided_context(job, conversation, trigger, requester, profile) if guided else None
     item_context = describe(target, workspace, for_client=for_client)
     if guided and target.brief is not None:
@@ -322,7 +349,22 @@ def answer(job: AgencyJob) -> None:
             conversation, requester=requester, target_brief_id=(job.input or {}).get("target_brief_id") or ""
         )
         allowed = allowed_actions(membership, conversation, target)
-        speaker = "staff" if chat.is_staff_membership(membership) else "client"
+        if telegram_context is not None:
+            try:
+                current_kind, _member = chat.telegram_author_kind(
+                    conversation, requester, telegram_context, locked=True
+                )
+            except chat.ChatError:
+                current_kind = ""
+            if current_kind != trigger.author_kind:
+                engine.end(run, summary="Telegram pairing changed", status=AgentRun.Status.SKIPPED, result=result)
+                engine.finish(job, result={"skipped": "This Telegram pairing changed."})
+                return None
+            speaker = "client" if current_kind == Message.AuthorKind.CLIENT else "staff"
+            if speaker == "client":
+                allowed = tuple(action for action in allowed if action in CLIENT_ACTIONS)
+        else:
+            speaker = "staff" if chat.is_staff_membership(membership) else "client"
         try:
             outcome = perform(
                 job,
@@ -638,9 +680,20 @@ def perform(
         and action in {"answer", "new_post"}
         and (action == "new_post" or out.creative_brief is not None)
     ):
-        return (
+        intake = (
             prepared_intake if prepared_intake is not None else _intake(job, conversation, trigger, out, guided_context)
         )
+        if (job.input or {}).get("telegram_context") is not None and speaker == "client":
+            intake.result["awaiting_confirmation"] = False
+            intake.result["client_preparation_requested"] = True
+            intake.reply = intake.reply.replace(
+                "Use Confirm brief after checking the source facts. This only starts a draft for human approval.",
+                "A paired agency lead must send /brief here to check this request and confirm preparation. Your message does not approve or start a draft.",
+            )
+            if not creative_brief.missing(intake.result.get("creative_brief")):
+                intake.status = Message.ActionStatus.NEEDS_HUMAN
+                intake.notify_staff = True
+        return intake
     if action == "answer":
         if out.needs_human:
             return Outcome(_with_handoff(reply), action, Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
@@ -663,7 +716,14 @@ def perform(
             speaker=speaker,
             requester=requester,
             revision_input=job.input or {},
-            allow_choices=speaker == "staff" and conversation.audience == Conversation.Audience.INTERNAL,
+            allow_choices=speaker == "staff"
+            and (
+                conversation.audience == Conversation.Audience.INTERNAL
+                or (
+                    (job.input or {}).get("telegram_context") is not None
+                    and (job.input or {}).get("explicit_assistant_request") is True
+                )
+            ),
         )
     elif action == "new_post":
         outcome = _new_post(job, conversation.workspace, requester, membership, instructions, reply)
@@ -988,6 +1048,11 @@ def _intake(job, conversation, trigger, out, context) -> Outcome:
             + creative_brief.summary(data)
         )
         reply += f"\nSelected accounts: {names}.\nUse Confirm brief after checking the source facts. This only starts a draft for human approval."
+        if (job.input or {}).get("telegram_context") is not None and trigger.author_kind == Message.AuthorKind.STAFF:
+            reply = reply.replace(
+                "Use Confirm brief after checking the source facts. This only starts a draft for human approval.",
+                "Send /brief to open the current confirmation card after checking these source facts. Its explicit button only starts a draft for human approval.",
+            )
     else:
         reply = creative_brief.questions(data, _channel_choices(context["accounts"]))
         if reference_error:
@@ -1048,8 +1113,16 @@ def _confirm(job, conversation, trigger, requester, membership) -> Outcome:
         "new_post",
         Message.ActionStatus.DECLINED,
     )
+    telegram_guided = False
+    context = (job.input or {}).get("telegram_context")
+    if context is not None and (job.input or {}).get("explicit_assistant_request") is True:
+        try:
+            kind, _member = chat.telegram_author_kind(conversation, requester, context)
+            telegram_guided = kind == Message.AuthorKind.STAFF
+        except chat.ChatError:
+            pass
     if (
-        conversation.audience != Conversation.Audience.INTERNAL
+        (conversation.audience != Conversation.Audience.INTERNAL and not telegram_guided)
         or not chat.is_staff_membership(membership)
         or not requester.is_active
         or trigger.author_kind != Message.AuthorKind.STAFF
@@ -1094,7 +1167,7 @@ def _confirm(job, conversation, trigger, requester, membership) -> Outcome:
         membership = _current_membership(job, conversation, requester)
         if (
             not chat.is_staff_membership(membership)
-            or conversation.audience != Conversation.Audience.INTERNAL
+            or (conversation.audience != Conversation.Audience.INTERNAL and not telegram_guided)
             or not budget.can_spend(conversation.workspace)
         ):
             return denied

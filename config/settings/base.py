@@ -114,6 +114,8 @@ LOCAL_APPS = [
     # AI Studio: a team of Claude agents that turns a small idea into a post
     # (angles, copy, a designed graphic) and hands it to the approval workflow.
     "apps.studio",
+    # Client-specific messaging alongside the canonical agency/approval workflows.
+    "apps.telegram",
     "theme",
 ]
 
@@ -749,6 +751,17 @@ STUDIO_WEB_SEARCH = env.bool("STUDIO_WEB_SEARCH", default=False)
 # Autopilot runs at most this many briefs at once across all workspaces, so
 # the single worker keeps publishing on time and nothing looks stuck.
 AGENCY_MAX_ACTIVE_BRIEFS = env.int("AGENCY_MAX_ACTIVE_BRIEFS", default=3)
+
+# Per-workspace bot credentials are entered by an owner and encrypted in the
+# database. Enable registration only after this release's webhook is reachable.
+TELEGRAM_WEBHOOK_BASE_URL = env("TELEGRAM_WEBHOOK_BASE_URL", default="")
+TELEGRAM_WEBHOOK_READY = env.bool("TELEGRAM_WEBHOOK_READY", default=False)
+TELEGRAM_UPDATE_MAX_BYTES = env.int("TELEGRAM_UPDATE_MAX_BYTES", default=262144)
+# Transient content expires; semantic delivery/audit identities remain.
+TELEGRAM_UPDATE_RETENTION_DAYS = env.int("TELEGRAM_UPDATE_RETENTION_DAYS", default=7)
+TELEGRAM_DELIVERY_RETENTION_DAYS = env.int("TELEGRAM_DELIVERY_RETENTION_DAYS", default=30)
+TELEGRAM_ACTION_RETENTION_DAYS = env.int("TELEGRAM_ACTION_RETENTION_DAYS", default=30)
+TELEGRAM_PAIRING_RETENTION_DAYS = env.int("TELEGRAM_PAIRING_RETENTION_DAYS", default=1)
 
 # Webhook verification
 FACEBOOK_WEBHOOK_VERIFY_TOKEN = env("FACEBOOK_WEBHOOK_VERIFY_TOKEN", default="")

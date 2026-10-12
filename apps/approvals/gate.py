@@ -1,6 +1,6 @@
 """The approval gate: nothing goes out in an enforced workspace unless an
-internal approver approved exactly that content, for exactly that time, in the
-dashboard.
+internal human approver approved exactly that content and time through the
+dashboard or an authenticated, paired, opted-in Telegram review callback.
 
 A workspace opts in with ``Workspace.require_dashboard_approval``. From then on:
 
@@ -8,12 +8,14 @@ A workspace opts in with ``Workspace.require_dashboard_approval``. From then on:
   what will be published — text, title, first comment, media files and their
   order and alt text, per-channel overrides and format, and the destination
   account — plus the publish time the approver saw. Only an internal approver
-  acting in the dashboard can do that (:mod:`apps.approvals.actor`). The Agent
+  acting through the dashboard or a fresh verified Telegram callback can do
+  that (:mod:`apps.approvals.actor`). The Agent
   API, MCP clients, the client portal and the background worker cannot.
 * Entering ``scheduled`` or ``publishing`` requires a stamp that still matches
   the content and the time. An approver who reschedules in the dashboard
   approves the new time as they do it; anyone else moving the time needs a
-  fresh approval.
+  fresh approval. Telegram proofs retain their own audit channel and never
+  masquerade as dashboard sessions.
 * Editing anything the fingerprint covers, or moving the time without an
   approver, withdraws the approval and sends the channel back to review
   (:func:`revalidate_post`, run when the edit commits).
@@ -35,7 +37,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
-from .actor import current_actor, dashboard_approver
+from .actor import current_actor, verified_human_approver
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +196,7 @@ def check_write(pp, loaded_status) -> None:
 
 
 def _stamp_on_approve(pp, workspace) -> None:
-    approver = dashboard_approver(workspace)
+    approver = verified_human_approver(workspace)
     current = fingerprint(pp)
     if approver is None:
         # The client's sign-off in a two-stage workflow confirms an internal
@@ -236,7 +238,7 @@ def _require_for_schedule(pp, workspace) -> None:
     when = effective_publish_at(pp)
     if _same_time(when, pp.approved_publish_at):
         return
-    approver = dashboard_approver(workspace)
+    approver = verified_human_approver(workspace)
     if approver is None or when is None:
         raise ApprovalRequired(
             "The publish time differs from the approved one. An approver must approve the new time in the dashboard."
@@ -348,7 +350,7 @@ def revalidate_post(post_id) -> list:
         elif fingerprint(pp) != pp.approved_fingerprint:
             reason = "the content changed after approval"
         elif pp.status == "scheduled" and not _same_time(effective_publish_at(pp), pp.approved_publish_at):
-            approver = dashboard_approver(post.workspace)
+            approver = verified_human_approver(post.workspace)
             if approver is not None and effective_publish_at(pp) is not None:
                 _approve_time(pp, approver)
                 continue

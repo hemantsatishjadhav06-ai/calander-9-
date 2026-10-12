@@ -343,6 +343,11 @@ def stage_listen(job: AgencyJob) -> str:
     """The performance analyst and the audience listener; either may be skipped or fail without stopping the plan."""
     from ..brand_defaults import ensure_profile
 
+    if (job.input or {}).get("telegram_week_context"):
+        from apps.telegram.weekly import planning_context
+
+        planning_context(job)
+
     workspace = job.workspace
     if not budget.can_spend(workspace):
         raise engine.JobError(budget.over_budget_message(workspace))
@@ -409,6 +414,11 @@ def _record_research(run: AgentRun, research: llm.ResearchResult) -> None:
 def stage_moments(job: AgencyJob) -> str:
     """The moments scout, with a web research turn first when web search is switched on."""
     from ..brand_defaults import ensure_profile
+
+    if (job.input or {}).get("telegram_week_context"):
+        from apps.telegram.weekly import planning_context
+
+        planning_context(job)
 
     workspace = job.workspace
     settings_row = _settings(job)
@@ -574,6 +584,13 @@ def stage_plan(job: AgencyJob) -> str:
     recent = recent_topics(workspace)
     state = job.state or {}
     pillars = [str(p) for p in settings_row.pillars or []]
+    moments_context = _moments_text(state.get("moments"), bool(state.get("researched")))
+    if (job.input or {}).get("telegram_week_context"):
+        from apps.telegram.weekly import planning_context
+
+        # Existing planner notes are already wrapped as untrusted by the role.
+        # This bounded reviewed source/reference evidence never becomes claims.
+        moments_context = planning_context(job) + "\n\n" + moments_context[:1000]
 
     run, result = engine.call(
         job,
@@ -589,7 +606,7 @@ def stage_plan(job: AgencyJob) -> str:
             slots=[{"key": r["key"], "label": r["label"]} for r in slot_rows],
             performance=performance_text(state.get("performance")),
             audience=audience_text(state.get("audience")),
-            moments=_moments_text(state.get("moments"), bool(state.get("researched"))),
+            moments=moments_context,
             recent=recent,
         ),
         effort=strategy.PLANNER_EFFORT,
@@ -660,6 +677,10 @@ def stage_brief(job: AgencyJob) -> None:
     from .. import services
 
     workspace = job.workspace
+    if (job.input or {}).get("telegram_week_context"):
+        from apps.telegram.weekly import planning_context
+
+        planning_context(job)  # Recheck the reviewed evidence before creating briefs.
     settings_row = _settings(job)
     lead, reason = valid_lead(settings_row, workspace)
     if lead is None:

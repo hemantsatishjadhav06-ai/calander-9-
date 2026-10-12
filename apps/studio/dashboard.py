@@ -54,6 +54,7 @@ def tabs(workspace, active: str) -> list[dict[str, Any]]:
         ("memory", "Creative memory", "studio:memory"),
         ("autopilot", "Autopilot", "studio:autopilot"),
         ("thread", "Ask the team", "studio:thread"),
+        ("telegram", "Telegram", "telegram:settings"),
         ("brand", "Brand", "studio:brand"),
         ("trust", "Verified facts", "studio:trust"),
         ("outcomes", "Outcomes", "studio:outcomes"),

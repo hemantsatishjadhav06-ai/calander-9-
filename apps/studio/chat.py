@@ -134,6 +134,70 @@ def author_kind_for(user, conversation: Conversation, *, is_internal: bool = Fal
     raise ChatError("You can't write in this thread.")
 
 
+def telegram_member(conversation, user, context, *, locked=False):
+    """Recheck the paired speaker and exact bound conversation; IDs alone grant no rights."""
+    from django.core.exceptions import PermissionDenied
+
+    from apps.telegram.models import TelegramChat, TelegramUserLink
+    from apps.telegram.permissions import fresh_member, internal_member
+
+    if not isinstance(context, dict) or user is None:
+        raise ChatError("Pair your Telegram account and conversation again.")
+    try:
+        chat_id = uuid.UUID(str(context.get("chat_id", "")))
+        link_id = uuid.UUID(str(context.get("user_link_id", "")))
+    except (ValueError, TypeError, AttributeError):
+        raise ChatError("Pair your Telegram account and conversation again.") from None
+    link = TelegramUserLink.objects.select_related("connection__workspace", "user").filter(pk=link_id).first()
+    if link is None or link.user_id != user.pk:
+        raise ChatError("Your Telegram pairing is unavailable.")
+    try:
+        member = fresh_member(link, locked=locked)
+    except PermissionDenied:
+        raise ChatError("Your current Telegram workspace access is unavailable.") from None
+    if member is None or member.workspace_id != conversation.workspace_id:
+        raise ChatError("This Telegram conversation belongs to another workspace.")
+    chats = TelegramChat.objects.select_for_update(of=("self",)) if locked else TelegramChat.objects.all()
+    current = chats.filter(
+        pk=chat_id,
+        connection_id=link.connection_id,
+        connection__workspace_id=conversation.workspace_id,
+        connection__is_active=True,
+        conversation_id=conversation.pk,
+        is_active=True,
+    ).first()
+    if current is None:
+        raise ChatError("This Telegram conversation is unavailable.")
+    threads = Conversation.objects.select_for_update() if locked else Conversation.objects.all()
+    thread = threads.filter(pk=conversation.pk, workspace_id=member.workspace_id).first()
+    if thread is None or thread.audience != conversation.audience:
+        raise ChatError("This Telegram conversation changed; pair it again.")
+    if current.audience == TelegramChat.Audience.PRIVATE:
+        if current.private_user_id != user.pk or current.chat_type != "private":
+            raise ChatError("This private Telegram conversation belongs to another person.")
+        if TelegramChat.objects.filter(conversation_id=thread.pk).exclude(pk=current.pk).exists():
+            raise ChatError("A private Telegram conversation cannot share group history.")
+    elif current.audience == TelegramChat.Audience.TEAM:
+        if thread.audience != Conversation.Audience.INTERNAL or not internal_member(member):
+            raise ChatError("This Telegram conversation is for the agency team.")
+    elif current.audience != TelegramChat.Audience.CLIENT or thread.audience != Conversation.Audience.CLIENT:
+        raise ChatError("This Telegram conversation has an invalid audience.")
+    if not internal_member(member) and thread.audience != Conversation.Audience.CLIENT:
+        raise ChatError("This Telegram conversation is for the agency team.")
+    return member
+
+
+def telegram_author_kind(conversation, user, context, *, locked=False):
+    from apps.telegram.permissions import internal_member
+
+    member = telegram_member(conversation, user, context, locked=locked)
+    if not internal_member(member):
+        return Message.AuthorKind.CLIENT, member
+    if is_staff_membership(member):
+        return Message.AuthorKind.STAFF, member
+    raise ChatError("Your role cannot request the agency team from Telegram.")
+
+
 # ---------------------------------------------------------------------------
 # Threads
 # ---------------------------------------------------------------------------
@@ -527,12 +591,14 @@ def refusal_text(workspace, reason: str, *, audience: str) -> str:
     )
 
 
-def wants_answer(conversation: Conversation, author_kind: str, *, is_internal: bool) -> bool:
+def wants_answer(
+    conversation: Conversation, author_kind: str, *, is_internal: bool, explicit_assistant_request: bool = False
+) -> bool:
     """Whether the account manager answers this message (see the module docstring)."""
     if is_internal or author_kind not in (Message.AuthorKind.CLIENT, Message.AuthorKind.STAFF):
         return False
     if author_kind == Message.AuthorKind.STAFF:
-        return conversation.audience == Conversation.Audience.INTERNAL
+        return conversation.audience == Conversation.Audience.INTERNAL or explicit_assistant_request
     return True
 
 
@@ -557,6 +623,8 @@ def post_message(
     reference_id: str = "",
     style_mode: str = "",
     target_brief_id: str = "",
+    explicit_assistant_request: bool = False,
+    telegram_context: dict | None = None,
 ) -> Posted:
     """Store ``author``'s message and, when it wants one, ask the account manager to answer.
 
@@ -566,10 +634,27 @@ def post_message(
     from . import engine
 
     body = clean_body(body)
-    author_kind = author_kind_for(author, conversation, is_internal=is_internal)
+    if telegram_context is not None:
+        author_kind, _member = telegram_author_kind(conversation, author, telegram_context)
+        if is_internal:
+            raise ChatError("Telegram messages cannot be internal notes.")
+    else:
+        author_kind = author_kind_for(author, conversation, is_internal=is_internal)
+    if explicit_assistant_request and (
+        author_kind != Message.AuthorKind.STAFF or is_internal or telegram_context is None
+    ):
+        raise ChatError("Only a currently paired agency team member can ask the assistant here.")
     workspace = conversation.workspace
-    guided = author_kind == Message.AuthorKind.STAFF and conversation.audience == Conversation.Audience.INTERNAL
+    guided = author_kind == Message.AuthorKind.STAFF and (
+        conversation.audience == Conversation.Audience.INTERNAL or explicit_assistant_request
+    )
     extra_input: dict[str, Any] = {}
+    if telegram_context is not None:
+        extra_input["telegram_context"] = {
+            "chat_id": str(uuid.UUID(str(telegram_context["chat_id"]))),
+            "user_link_id": str(uuid.UUID(str(telegram_context["user_link_id"]))),
+        }
+        extra_input["explicit_assistant_request"] = bool(explicit_assistant_request)
     if kind == "confirm_brief":
         if not guided or is_internal or not facts_confirmed:
             raise ChatError("Check the brief and source facts before confirming a review draft.")
@@ -591,7 +676,8 @@ def post_message(
             raise ChatError("Choose a draft created in this thread.")
         extra_input["target_brief_id"] = str(target_id)
     if reference_id:
-        if not guided or is_internal:
+        client_reference = telegram_context is not None and author_kind == Message.AuthorKind.CLIENT
+        if (not guided and not client_reference) or is_internal:
             raise ChatError("Choose a photo in the agency team thread.")
         if reference_id != "none":
             from apps.media_library.models import MediaAsset
@@ -613,11 +699,17 @@ def post_message(
     job = None
     note = ""
     with transaction.atomic():
+        if telegram_context is not None:
+            current_kind, _member = telegram_author_kind(conversation, author, telegram_context, locked=True)
+            if current_kind != author_kind:
+                raise ChatError("Your Telegram role changed; send the request again.")
         message = Message.objects.create(
             conversation=conversation, author=author, author_kind=author_kind, body=body, is_internal=is_internal
         )
         _touch(conversation, message.created_at)
-        if wants_answer(conversation, author_kind, is_internal=is_internal):
+        if wants_answer(
+            conversation, author_kind, is_internal=is_internal, explicit_assistant_request=explicit_assistant_request
+        ):
             reason = reply_refusal(workspace)
             if reason:
                 note = refusal_text(workspace, reason, audience=conversation.audience)

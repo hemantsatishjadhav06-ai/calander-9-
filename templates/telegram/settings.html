@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Telegram · {{ workspace.name }}{% endblock %}
+{% block extra_head %}{% if not internal %}<style>.sidebar-new-wrap { display: none; }</style>{% endif %}{% endblock %}
+{% block sidebar_nav %}
+{% if internal %}{{ block.super }}{% else %}
+<a href="{% url 'telegram:settings' workspace_id=workspace.id %}" class="sidebar-nav-item active" aria-current="page">My Telegram connection</a>
+<p class="px-3 py-3 text-sm text-stone-600">Send remarks and references in your paired client chat. The agency shares posts for your sign-off there.</p>
+{% endif %}
+{% endblock %}
+{% block content %}
+<div class="max-w-4xl space-y-5">
+  <h1 class="text-2xl font-semibold">Telegram · {{ workspace.name }}</h1>
+  <p class="text-sm text-stone-700">Use your existing agency conversations, review drafts and delivery receipts in Telegram. Every post still needs final human approval.</p>
+  {% if internal %}{% include "components/agency_tabs.html" %}{% endif %}
+  <section class="rounded-xl border bg-white p-4 space-y-3">
+    <h2 class="font-semibold">Bot connection</h2>
+    {% if connection %}<p>@{{ connection.bot_username }} · {{ connection.webhook_status }}{% if not connection.is_active %} · inactive{% endif %}</p>{% else %}<p>No bot connected yet.</p>{% endif %}
+    {% if can_manage %}
+    <p class="text-sm">Create a separate bot for this workspace in BotFather. Connecting an existing bot does not create Telegram groups. A foreign webhook is never overwritten.</p>
+    <form method="post" action="{% url 'telegram:connect' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
+      {{ connect_form.non_field_errors }}<label class="block">{{ connect_form.token.label }}{{ connect_form.token }}</label>{{ connect_form.token.errors }}
+      <label class="flex gap-2 items-start">{{ connect_form.approvals_enabled }}<span>{{ connect_form.approvals_enabled.label }}. The workspace's exact human review gate must be enabled first.</span></label>
+      <button class="w-full sm:w-auto rounded-lg bg-orange-700 px-4 py-3 text-white" type="submit">Validate and connect bot</button>
+    </form>
+    {% if connection %}<form method="post" action="{% url 'telegram:disconnect' workspace_id=workspace.id %}">{% csrf_token %}<button class="rounded-lg border border-red-300 px-4 py-3 text-red-800" type="submit">Disable Telegram and clear saved token</button></form>{% endif %}
+    {% endif %}
+    <p class="text-sm text-stone-600">The owner must deploy and verify the HTTPS webhook before pairing. A local setup stores the bot inactive and registers no webhook.</p>
+  </section>
+  <section class="rounded-xl border bg-white p-4 space-y-3">
+    <h2 class="font-semibold">Pair your identity</h2>
+    <p class="text-sm">Pair in the bot's private chat. Numeric Telegram identities authorize actions; usernames never do. Your one-use code expires in ten minutes. Keep it private.</p>
+    {% if own_link %}<p>Your numeric Telegram identity is paired.</p><form method="post" action="{% url 'telegram:unpair' workspace_id=workspace.id %}">{% csrf_token %}<button type="submit" class="rounded-lg border px-4 py-3">Disconnect my identity</button></form>{% endif %}
+    {% if pairing_command %}<div class="rounded-lg bg-orange-50 p-3"><p>Send this once in the intended Telegram chat:</p><code class="block break-all select-all mt-2">{{ pairing_command }}</code><p class="text-xs mt-2">Expires {{ expires_at }}. This code is shown only in this response.</p></div>{% endif %}
+    <form method="post" action="{% url 'telegram:pair' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
+      {{ pair_form.non_field_errors }}
+      {% if can_pair_group %}<label class="block">Purpose {{ pair_form.purpose }}</label><label class="block">Audience {{ pair_form.audience }}</label><label class="flex gap-2 items-start">{{ pair_form.group_membership_confirmed }}{{ pair_form.group_membership_confirmed.label }}</label>{% else %}<input type="hidden" name="purpose" value="user"><input type="hidden" name="audience" value="private">{% endif %}
+      <button class="w-full sm:w-auto rounded-lg border border-stone-400 px-4 py-3" type="submit">Create one-use pairing code</button>
+    </form>
+    <p class="text-sm">Group setup requires a personally paired workspace manager who is a Telegram group administrator. Create separate client and team groups; a paired group keeps its audience permanently. Check every group viewer's access. Telegram cannot enumerate passive viewers for us.</p>
+  </section>
+  {% if can_manage %}<section class="rounded-xl border bg-white p-4 space-y-3"><h2 class="font-semibold">Groups and delivery status</h2>
+    {% for chat in chats %}<p class="break-words">{{ chat.title|default:chat.chat_type }} · {{ chat.get_audience_display }} · {% if chat.is_active %}active{% else %}inactive{% endif %}</p>{% if chat.is_active %}<form method="post" action="{% url 'telegram:deactivate_chat' workspace_id=workspace.id chat_id=chat.id %}">{% csrf_token %}<button type="submit" class="rounded-lg border px-4 py-2">Disable this chat</button></form>{% endif %}{% empty %}<p>No groups or private chats paired.</p>{% endfor %}
+    {% for item in deliveries %}<p class="text-sm break-words">Delivery {{ item.status }} · {{ item.source_key }} · {{ item.attempts }} attempt(s) · {{ item.error }}{% if item.native_message_id %} · receipt {{ item.native_message_id }}{% endif %}</p>{% endfor %}
+    {% for item in updates %}<p class="text-sm">Incoming message failed after {{ item.attempts }} attempt(s): {{ item.error }}</p>{% endfor %}
+    <p class="text-sm">Unknown sends require inspection in Telegram before another attempt; the worker does not automatically send duplicates.</p>
+  </section>{% endif %}
+</div>
+{% endblock %}

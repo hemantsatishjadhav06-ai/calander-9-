@@ -61,6 +61,13 @@ def _invalidate(world, claim, reason):
         OrgMembership.objects.filter(user=world.owner, organization=world.org).delete()
     elif reason == "client_verifier":
         WorkspaceMembership.objects.filter(user=world.owner, workspace=world.workspace).update(workspace_role="client")
+    elif reason == "custom_client_verifier":
+        role = CustomRole.objects.create(
+            organization=world.org, name="Client with custom approval permission", permissions={"approve_posts": True}
+        )
+        WorkspaceMembership.objects.filter(user=world.owner, workspace=world.workspace).update(
+            workspace_role="client", custom_role=role
+        )
     elif reason == "foreign_role":
         other = Organization.objects.create(name="Other agency")
         role = CustomRole.objects.create(
@@ -81,6 +88,7 @@ def _invalidate(world, claim, reason):
         "membership_removed",
         "org_removed",
         "client_verifier",
+        "custom_client_verifier",
         "foreign_role",
     ],
 )

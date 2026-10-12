@@ -485,13 +485,12 @@ def draft_inbox_replies_due() -> int:
 
 def _approvers(workspace) -> list:
     """Internal approvers of ``workspace``: approve_posts, active, and not a client."""
+    from apps.approvals.actor import is_internal_approver
     from apps.members.models import WorkspaceMembership
 
     people = []
     for membership in WorkspaceMembership.objects.filter(workspace=workspace).select_related("user", "custom_role"):
-        if membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT and membership.custom_role is None:
-            continue
-        if membership.effective_permissions.get("approve_posts", False) and membership.user.is_active:
+        if is_internal_approver(membership.user, workspace):
             people.append(membership.user)
     return people
 

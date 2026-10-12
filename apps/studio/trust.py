@@ -47,7 +47,7 @@ def verification_people(workspace) -> set:
     for member in WorkspaceMembership.objects.filter(workspace=workspace, user__is_active=True).select_related(
         "custom_role"
     ):
-        invalid = member.workspace_role == "client" and member.custom_role_id is None
+        invalid = member.workspace_role == "client"
         invalid = invalid or bool(member.custom_role and (member.custom_role.permissions or {}).get("client_facing"))
         invalid = invalid or bool(
             member.custom_role and member.custom_role.organization_id != workspace.organization_id
