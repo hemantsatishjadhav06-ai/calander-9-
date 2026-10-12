@@ -78,6 +78,7 @@ class FakeAccountManager:
                 instructions=self.instructions,
                 needs_human=self.needs_human,
                 reason="Test.",
+                creative_brief=None,
             ),
             model="claude-opus-5-5",
             input_tokens=900,
@@ -703,13 +704,15 @@ class TestReviewFixes:
         [reply] = agent_replies(conversation)
         assert reply.action_status == Message.ActionStatus.NEEDS_HUMAN
 
-    def test_one_person_cannot_fan_a_thread_out_into_many_posts(self, world, jobs, fake_team, manager_agent):
+    def test_one_person_cannot_fan_a_thread_out_into_many_posts(
+        self, world, jobs, fake_team, manager_agent, client_user
+    ):
         manager_agent.action = "new_post"
         manager_agent.instructions = "A post about Saturday's site visit"
-        conversation = chat.general_conversation(world.workspace, audience=Conversation.Audience.INTERNAL)
+        conversation = chat.general_conversation(world.workspace, audience=Conversation.Audience.CLIENT)
 
         for _ in range(3):
-            drive(chat.post_message(conversation, world.editor, "Post about the site visit").job)
+            drive(chat.post_message(conversation, client_user, "Post about the site visit").job)
 
         made = StudioBrief.objects.filter(workspace=world.workspace, origin=StudioBrief.Origin.CHAT)
         assert made.count() == 2 and all(b.status == StudioBrief.Status.QUEUED for b in made)

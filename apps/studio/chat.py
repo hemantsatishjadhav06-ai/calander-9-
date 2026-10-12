@@ -37,15 +37,19 @@ thread is deleted beyond a stale key).
 from __future__ import annotations
 
 import logging
+import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from .models import AgencyJob, Conversation, Message, StudioBrief
 
@@ -64,7 +68,7 @@ STAFF_NOTIFY_EVERY = timedelta(minutes=30)
 CLIENT_NOTIFY_EVERY = timedelta(hours=1)
 READ_KEY_PREFIX = "thread.read."
 #: How a client asked from a post card; the account manager reads it.
-REQUEST_KINDS = ("change", "question")
+REQUEST_KINDS = ("change", "question", "confirm_brief")
 
 CLIENT_ROLE = "client"
 
@@ -222,7 +226,7 @@ def get_conversation(workspace, conversation_id, *, client_only: bool = False) -
 
 
 def visible_messages(conversation: Conversation, *, for_client: bool):
-    rows = Message.objects.filter(conversation=conversation).select_related("author")
+    rows = Message.objects.filter(conversation=conversation).select_related("author", "job")
     if for_client:
         rows = rows.filter(is_internal=False)
     return rows
@@ -237,12 +241,244 @@ def recent_messages(conversation: Conversation, *, for_client: bool, limit: int 
 def has_active_job(conversation: Conversation | None) -> bool:
     if conversation is None:
         return False
-    return AgencyJob.objects.filter(
+    answering = AgencyJob.objects.filter(
         workspace_id=conversation.workspace_id,
         conversation=conversation,
         kind=AgencyJob.Kind.CHAT,
         status__in=AgencyJob.ACTIVE_STATUSES,
     ).exists()
+    if answering or conversation.audience != Conversation.Audience.INTERNAL:
+        return answering
+    return linked_briefs(conversation).filter(status__in=StudioBrief.ACTIVE_STATUSES).exists()
+
+
+def linked_briefs(conversation: Conversation):
+    """Posts created from this exact thread; never rebind the general thread."""
+    return (
+        StudioBrief.objects.filter(
+            workspace_id=conversation.workspace_id,
+            origin=StudioBrief.Origin.CHAT,
+            job__workspace_id=conversation.workspace_id,
+            job__conversation=conversation,
+        )
+        .select_related("graphic", "post", "job", "chosen_concept")
+        .prefetch_related("post__platform_posts__social_account")
+    )
+
+
+def _public_link(value):
+    if not isinstance(value, str):
+        return ""
+    try:
+        parsed = urlsplit(value)
+        return (
+            value
+            if parsed.scheme in {"http", "https"} and parsed.hostname and not parsed.username and not parsed.password
+            else ""
+        )
+    except ValueError:
+        return ""
+
+
+def _source_warnings(sources):
+    warnings = []
+    website = sources.get("website") or {}
+    if not isinstance(website, dict) or website.get("status") != "ready":
+        warnings.append("Website evidence is unavailable. Check current brand facts with the owner before continuing.")
+    try:
+        fetched = parse_datetime(str(sources.get("fetched_at") or ""))
+        stale = (
+            fetched is None
+            or timezone.is_naive(fetched)
+            or timezone.now() - fetched > timedelta(minutes=30)
+            or fetched > timezone.now()
+        )
+    except (ValueError, TypeError, OverflowError):
+        stale = True
+    if stale:
+        warnings.append(
+            "Source evidence is stale or has no collection time. Confirmation will require a refreshed source check."
+        )
+    channels = sources.get("channels") or []
+    if isinstance(channels, list) and any(
+        isinstance(channel, dict) and channel.get("source") == "stored_history" for channel in channels
+    ):
+        warnings.append(
+            "Some channels use saved publication history, not a fresh account read. Check dates and claims yourself."
+        )
+    return warnings
+
+
+def _publication_receipts(brief, viewer=None, *, can_reconcile=None):
+    """Readable delivery evidence from exact, same-workspace destinations."""
+    from apps.publisher import delivery
+
+    if brief.post_id is None or brief.post.workspace_id != brief.workspace_id:
+        return []
+    receipts = []
+    if can_reconcile is None:
+        membership = membership_for(viewer, brief.workspace)
+        can_reconcile = is_staff_membership(membership) and bool(membership.effective_permissions.get("approve_posts"))
+        if (
+            membership is not None
+            and membership.custom_role_id
+            and membership.custom_role.organization_id != brief.workspace.organization_id
+        ):
+            can_reconcile = False
+    for row in brief.post.platform_posts.all():
+        account = row.social_account
+        if account.workspace_id != brief.workspace_id:
+            continue
+        extra = row.platform_extra if isinstance(row.platform_extra, dict) else {}
+        state = delivery.state(row)
+        kind = state.get("kind", "")
+        unknown = kind == "unknown"
+        attempted = state.get("destination")
+        attempted = attempted if isinstance(attempted, dict) else {}
+        changed_destination = bool(
+            attempted
+            and (
+                str(attempted.get("account_id", "")) != str(account.pk)
+                or attempted.get("platform") != account.platform
+                or str(attempted.get("native_id", "")) != str(account.account_platform_id or "")
+            )
+        )
+        # Compatibility for attempts made before the durable marker was added.
+        if row.status == "failed" and any(
+            word in (row.publish_error or "").casefold()
+            for word in ("outcome unknown", "may already", "may have been", "check the account")
+        ):
+            unknown = True
+        label = (
+            "Delivery outcome unknown"
+            if unknown
+            else "Expired — needs review"
+            if kind == "expired"
+            else "Recorded after account check"
+            if kind == "reconciled"
+            else row.get_status_display()
+        )
+        reconcile_url = absent_url = ""
+        if can_reconcile and not changed_destination and state.get("attempt_id") and (unknown or kind == "expired"):
+            try:
+                absent_url = reverse(
+                    "studio:publisher_delivery:checked_absent",
+                    kwargs={"workspace_id": brief.workspace_id, "platform_post_id": row.pk},
+                )
+                if unknown:
+                    reconcile_url = reverse(
+                        "studio:publisher_delivery:reconcile_existing",
+                        kwargs={"workspace_id": brief.workspace_id, "platform_post_id": row.pk},
+                    )
+            except NoReverseMatch:
+                pass
+        receipts.append(
+            {
+                "row": row,
+                "account": account,
+                "label": label,
+                "kind": kind,
+                "unknown": unknown,
+                "expired": kind == "expired",
+                "reconciled": kind == "reconciled",
+                "changed_destination": changed_destination,
+                "attempt_native_id": attempted.get("native_id", ""),
+                "publish_at": row.scheduled_at or brief.post.scheduled_at,
+                "time_label": "Scheduled for"
+                if row.status == "scheduled" and not unknown
+                else "Previous or proposed posting time"
+                if row.status in {"draft", "pending_review", "changes_requested", "rejected", "failed"}
+                else "Posting time",
+                "published_at": row.published_at,
+                "native_post_id": row.platform_post_id if row.status == "published" or kind == "reconciled" else "",
+                "url": _public_link(extra.get("permalink") or extra.get("post_url") or extra.get("url"))
+                if row.status == "published" or kind == "reconciled"
+                else "",
+                "error": "Check the native account before any further send. An existing post must be reconciled; do not retry blindly."
+                if unknown
+                else row.publish_error
+                if row.status == "failed"
+                else "",
+                "case_id": state.get("attempt_id", ""),
+                "expected_fingerprint": state.get("content_fingerprint", ""),
+                "reconcile_url": reconcile_url,
+                "absent_url": absent_url,
+            }
+        )
+    return receipts
+
+
+def _creative_message_context(conversation, messages, viewer):
+    """Attach staff-only brief confirmations and current draft previews."""
+    if conversation is None or conversation.audience != Conversation.Audience.INTERNAL:
+        return
+    from . import creative_brief
+
+    latest = creative_brief.latest_intake(conversation, viewer)
+    answering = AgencyJob.objects.filter(
+        workspace_id=conversation.workspace_id,
+        conversation=conversation,
+        kind=AgencyJob.Kind.CHAT,
+        status__in=AgencyJob.ACTIVE_STATUSES,
+    ).exists()
+    briefs = list(linked_briefs(conversation).order_by("-created_at")[:60])
+    if (
+        conversation.brief_id
+        and conversation.brief.workspace_id == conversation.workspace_id
+        and all(item.pk != conversation.brief_id for item in briefs)
+    ):
+        briefs.append(conversation.brief)
+    membership = membership_for(viewer, conversation.workspace)
+    can_reconcile = is_staff_membership(membership) and bool(membership.effective_permissions.get("approve_posts"))
+    if (
+        membership is not None
+        and membership.custom_role_id
+        and membership.custom_role.organization_id != conversation.workspace.organization_id
+    ):
+        can_reconcile = False
+    for brief in briefs:
+        if brief.graphic_id and brief.graphic.workspace_id != conversation.workspace_id:
+            brief.graphic = None
+        brief.publication_receipts = _publication_receipts(brief, can_reconcile=can_reconcile)
+    by_id = {str(brief.pk): brief for brief in briefs}
+    by_job = {brief.job_id: brief for brief in briefs}
+    for message in messages:
+        if message.author_kind != Message.AuthorKind.AGENT or message.job_id is None:
+            continue
+        if message.job.workspace_id != conversation.workspace_id or message.job.conversation_id != conversation.pk:
+            continue
+        result = message.job.result if isinstance(message.job.result, dict) else {}
+        intake = result.get("creative_brief")
+        if isinstance(intake, dict):
+            message.creative_request = intake
+            sources = result.get("sources")
+            message.creative_sources = sources if isinstance(sources, dict) else {}
+            message.source_warnings = _source_warnings(message.creative_sources)
+            website = message.creative_sources.get("website") or {}
+            source_url = website.get("url", "") if isinstance(website, dict) else ""
+            try:
+                parsed_url = urlsplit(source_url)
+                message.website_source_url = (
+                    source_url
+                    if parsed_url.scheme in {"http", "https"}
+                    and parsed_url.hostname
+                    and not parsed_url.username
+                    and not parsed_url.password
+                    else ""
+                )
+            except (TypeError, ValueError):
+                message.website_source_url = ""
+            accounts = result.get("selected_accounts")
+            message.creative_accounts = accounts if isinstance(accounts, list) else []
+            message.can_confirm_brief = bool(
+                latest is not None
+                and message.job_id == latest.pk
+                and message.job.requested_by_id == viewer.pk
+                and result.get("awaiting_confirmation")
+                and not answering
+                and not creative_brief.missing(intake)
+            )
+        message.created_brief = by_id.get(str(result.get("brief_id") or "")) or by_job.get(message.job_id)
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +545,19 @@ def clean_body(body: str) -> str:
     return body
 
 
-def post_message(conversation: Conversation, author, body: str, *, is_internal: bool = False, kind: str = "") -> Posted:
+def post_message(
+    conversation: Conversation,
+    author,
+    body: str,
+    *,
+    is_internal: bool = False,
+    kind: str = "",
+    confirmation_message_id: str = "",
+    facts_confirmed: bool = False,
+    reference_id: str = "",
+    style_mode: str = "",
+    target_brief_id: str = "",
+) -> Posted:
     """Store ``author``'s message and, when it wants one, ask the account manager to answer.
 
     ``kind`` is how a client asked from a post card (``"change"`` or
@@ -320,6 +568,48 @@ def post_message(conversation: Conversation, author, body: str, *, is_internal: 
     body = clean_body(body)
     author_kind = author_kind_for(author, conversation, is_internal=is_internal)
     workspace = conversation.workspace
+    guided = author_kind == Message.AuthorKind.STAFF and conversation.audience == Conversation.Audience.INTERNAL
+    extra_input: dict[str, Any] = {}
+    if kind == "confirm_brief":
+        if not guided or is_internal or not facts_confirmed:
+            raise ChatError("Check the brief and source facts before confirming a review draft.")
+        if reference_id or style_mode or target_brief_id:
+            raise ChatError("Send creative changes as a message first, then confirm the updated brief.")
+        try:
+            confirmation_id = uuid.UUID(str(confirmation_message_id))
+        except (TypeError, ValueError):
+            raise ChatError("Choose a current brief confirmation in this thread.") from None
+        extra_input.update(confirmation_message_id=str(confirmation_id), facts_confirmed=True)
+    if target_brief_id:
+        if not guided or is_internal:
+            raise ChatError("Choose a draft in the agency team thread.")
+        try:
+            target_id = uuid.UUID(str(target_brief_id))
+        except (TypeError, ValueError):
+            raise ChatError("Choose a draft created in this thread.") from None
+        if not linked_briefs(conversation).filter(pk=target_id).exists():
+            raise ChatError("Choose a draft created in this thread.")
+        extra_input["target_brief_id"] = str(target_id)
+    if reference_id:
+        if not guided or is_internal:
+            raise ChatError("Choose a photo in the agency team thread.")
+        if reference_id != "none":
+            from apps.media_library.models import MediaAsset
+
+            try:
+                asset_id = uuid.UUID(str(reference_id))
+            except (TypeError, ValueError):
+                raise ChatError("Choose a photo from this workspace's media library.") from None
+            if not MediaAsset.objects.filter(
+                pk=asset_id, workspace=workspace, media_type=MediaAsset.MediaType.IMAGE
+            ).exists():
+                raise ChatError("Choose a photo from this workspace's media library.")
+            reference_id = str(asset_id)
+        extra_input["reference_id"] = reference_id
+    if style_mode:
+        if not guided or is_internal or style_mode not in {"brand", "fresh"}:
+            raise ChatError("Choose the brand look or a fresh layout in the agency team thread.")
+        extra_input["style_mode"] = style_mode
     job = None
     note = ""
     with transaction.atomic():
@@ -337,7 +627,7 @@ def post_message(conversation: Conversation, author, body: str, *, is_internal: 
                     workspace,
                     AgencyJob.Kind.CHAT,
                     title=f"Reply to {message.sender_name}: {body[:120]}",
-                    input={"message_id": str(message.pk), "kind": kind if kind in REQUEST_KINDS else ""},
+                    input={"message_id": str(message.pk), "kind": kind if kind in REQUEST_KINDS else "", **extra_input},
                     requested_by=author,
                     conversation=conversation,
                 )
@@ -702,6 +992,7 @@ def thread_context(
         return None
 
     messages = recent_messages(conversation, for_client=False) if conversation is not None else []
+    _creative_message_context(conversation, messages, request.user)
     mark_read(request.user, conversation)
     workspace_id = workspace.pk
     messages_url = ""
@@ -739,8 +1030,8 @@ def thread_context(
         placeholder = "e.g. Add an FAQ about stamp duty"
         internal_label = "Note for the team only — no reply from the account manager"
     else:
-        title, subtitle = "Ask the team", "Your account manager answers and gets the right agent on it."
-        placeholder = "Ask a question or request a change…"
+        title, subtitle = "Create with the team", "Brief it here, answer a few questions, then confirm your draft."
+        placeholder = "e.g. Create an Instagram post for our site visits — ask me what you need…"
         internal_label = "Note for the team only — no reply from the account manager"
     named = conversation.title if conversation is not None and conversation.title != title else ""
     if named and (is_client_thread or full_page) and not about_brief and not about_article:
@@ -748,6 +1039,86 @@ def thread_context(
     thread_url = reverse("studio:thread", kwargs={"workspace_id": workspace_id})
     if conversation is not None:
         thread_url += f"?c={conversation.pk}"
+    guided_creation = not is_client_thread and not about_article
+    reference_choices = []
+    if guided_creation:
+        from apps.media_library.models import MediaAsset
+
+        reference_choices = list(
+            MediaAsset.objects.filter(workspace=workspace, media_type=MediaAsset.MediaType.IMAGE)
+            .exclude(source__in=["ai-studio", "fal.ai"])
+            .exclude(tags__contains=["ai"])
+            .select_related("verified_by")
+            .order_by("-created_at")[:24]
+        )
+    draft_choices = (
+        list(linked_briefs(conversation).order_by("-created_at")[:30])
+        if guided_creation and conversation is not None
+        else []
+    )
+    latest_job = (
+        AgencyJob.objects.filter(
+            workspace=workspace, conversation=conversation, requested_by=request.user, kind=AgencyJob.Kind.CHAT
+        )
+        .order_by("-created_at")
+        .first()
+        if conversation is not None
+        else None
+    )
+    latest_input = latest_job.input if latest_job is not None and isinstance(latest_job.input, dict) else {}
+    latest_result = latest_job.result if latest_job is not None and isinstance(latest_job.result, dict) else {}
+    selected_draft_id = request.POST.get(
+        "target_brief_id", latest_input.get("target_brief_id", latest_result.get("brief_id", ""))
+    )
+    selected_draft = next((draft for draft in draft_choices if str(draft.pk) == selected_draft_id), None)
+    if selected_draft is None:
+        selected_draft_id = ""
+        about = brief or (conversation.brief if conversation is not None and conversation.brief_id else None)
+        if about is not None and about.workspace_id == workspace.pk:
+            selected_draft = about
+    selected_reference_id = (
+        request.POST.get("reference_id")
+        or latest_input.get("reference_id")
+        or latest_result.get("reference_id")
+        or (str(selected_draft.source_picture_id) if selected_draft and selected_draft.source_picture_id else "")
+    )
+    selected_style_mode = (
+        request.POST.get("style_mode")
+        or latest_input.get("style_mode")
+        or latest_result.get("style_mode")
+        or ("brand" if selected_draft and selected_draft.style_lock else "fresh" if selected_draft else "")
+    )
+    selected_reference = next((asset for asset in reference_choices if str(asset.pk) == selected_reference_id), None)
+    if selected_reference is None and selected_reference_id not in {"", "none"} and guided_creation:
+        with suppress(TypeError, ValueError):
+            selected_reference = (
+                MediaAsset.objects.filter(
+                    pk=uuid.UUID(str(selected_reference_id)), workspace=workspace, media_type=MediaAsset.MediaType.IMAGE
+                )
+                .exclude(source__in=["ai-studio", "fal.ai"])
+                .exclude(tags__contains=["ai"])
+                .select_related("verified_by")
+                .first()
+            )
+        if selected_reference is not None:
+            reference_choices.append(selected_reference)
+    if selected_reference_id not in {"", "none"} and selected_reference is None:
+        selected_reference_id = ""
+    from . import trust
+
+    for asset in reference_choices:
+        cast(Any, asset).provenance = trust.photo_status(asset)
+    delivery_pending = any(
+        receipt["row"].status in {"scheduled", "publishing"} or receipt["unknown"]
+        for draft in draft_choices
+        for receipt in _publication_receipts(draft)
+    )
+    if selected_draft is not None and selected_draft not in draft_choices:
+        delivery_pending = delivery_pending or any(
+            receipt["row"].status in {"scheduled", "publishing"} or receipt["unknown"]
+            for receipt in _publication_receipts(selected_draft)
+        )
+    working = has_active_job(conversation)
     return {
         "template": PANEL_TEMPLATE,
         "workspace": workspace,
@@ -756,11 +1127,21 @@ def thread_context(
         "dom_id": dom_id(conversation, brief=brief, blog_post=blog_post),
         "send_url": send_url,
         "messages_url": messages_url,
-        "polling": has_active_job(conversation),
+        "polling": working or delivery_pending,
+        "poll_interval": "every 5s" if working else "every 30s",
+        "thread_key": f"{workspace.pk}:{dom_id(conversation, brief=brief, blog_post=blog_post)}",
         "can_post": True,
         "can_post_internal": True,
         "internal_label": internal_label,
         "is_client_thread": is_client_thread,
+        "guided_creation": guided_creation,
+        "reference_choices": reference_choices,
+        "draft_choices": draft_choices,
+        "selected_draft_id": selected_draft_id,
+        "selected_reference_id": selected_reference_id,
+        "selected_reference": selected_reference,
+        "selected_style_mode": selected_style_mode,
+        "can_upload_reference": guided_creation and bool(membership.effective_permissions.get("upload_media")),
         "title": title,
         "subtitle": subtitle,
         "placeholder": placeholder,

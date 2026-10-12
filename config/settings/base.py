@@ -728,15 +728,18 @@ GSC_CLIENT_SECRET = env("GSC_CLIENT_SECRET", default="")
 # once the post is live. Empty: off.
 INDEXNOW_KEY = env("INDEXNOW_KEY", default="")
 
-# AI Studio (apps.studio): the agent team runs on Claude through the Anthropic
-# API. Empty ANTHROPIC_API_KEY: the Studio explains it is not set up and runs
-# nothing. Set it on the web AND worker services — the agents run in the worker.
-# STUDIO_MODEL is the Claude model every agent uses; STUDIO_EFFORT, when set,
+# AI Studio: choose Anthropic (default) or OpenRouter explicitly, and set the
+# matching key on the web AND worker services. Keys are never interchangeable.
+# Empty STUDIO_MODEL selects the provider's default: claude-opus-5-5 for
+# Anthropic, anthropic/claude-sonnet-4.5 for OpenRouter.
+# STUDIO_EFFORT, when set,
 # overrides each agent's own effort level (low | medium | high | xhigh | max).
 # STUDIO_FALLBACKS opts into Anthropic's server-side fallback model when the
 # requested model's safety classifiers decline a request (beta).
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
-STUDIO_MODEL = env("STUDIO_MODEL", default="claude-opus-5-5")
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
+STUDIO_PROVIDER = env("STUDIO_PROVIDER", default="anthropic")
+STUDIO_MODEL = env("STUDIO_MODEL", default="")
 STUDIO_EFFORT = env("STUDIO_EFFORT", default="")
 STUDIO_TIMEOUT = env.float("STUDIO_TIMEOUT", default=300.0)
 STUDIO_FALLBACKS = env.bool("STUDIO_FALLBACKS", default=True)

@@ -92,6 +92,8 @@ def last_run(workspace) -> dict | None:
 
 
 def _context(request, workspace, form=None) -> dict:
+    from .readiness import operational_readiness
+
     row = _settings_row(workspace)
     perms = _perms(request)
     if form is None:
@@ -121,6 +123,8 @@ def _context(request, workspace, form=None) -> dict:
         "budget": budget.monthly_budget(workspace),
         "reports": reports.recent_reports(workspace, limit=3),
         "claude_ready": llm.is_configured(),
+        "configuration_error": llm.configuration_error(),
+        "operational": operational_readiness(workspace),
     }
 
 
@@ -163,7 +167,7 @@ def plan_now(request, workspace_id):
         messages.error(request, "Save the autopilot settings first: the accounts, and whose name the drafts carry.")
         return redirect("studio:autopilot", workspace_id=workspace.id)
     if not llm.is_configured():
-        messages.error(request, "ANTHROPIC_API_KEY is missing on the server, so the team can't plan.")
+        messages.error(request, llm.configuration_error())
         return redirect("studio:autopilot", workspace_id=workspace.id)
     outcome = autopilot.plan_week(row, autopilot.next_week_start(workspace), manual=True)
     if outcome.started:
@@ -184,7 +188,7 @@ def report_now(request, workspace_id):
     """Write last week's client report now (the cycle writes it on Monday morning when autopilot is on)."""
     workspace = _workspace(request, workspace_id)
     if not llm.is_configured():
-        messages.error(request, "ANTHROPIC_API_KEY is missing on the server, so the reporter can't write.")
+        messages.error(request, llm.configuration_error())
         return redirect("studio:autopilot", workspace_id=workspace.id)
     if not budget.can_spend(workspace):
         messages.error(request, budget.over_budget_message(workspace))

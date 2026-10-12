@@ -178,6 +178,21 @@ class MediaAsset(models.Model):
     source = models.CharField(max_length=50, blank=True, default="", help_text="e.g., 'upload', 'unsplash', 'pexels'")
     source_url = models.URLField(blank=True, default="")
     attribution = models.TextField(blank=True, default="")
+    authenticity = models.CharField(
+        max_length=20,
+        choices=[
+            ("unknown", "Unverified"),
+            ("verified", "Owner-verified project photo"),
+            ("illustrative", "Illustrative"),
+        ],
+        default="unknown",
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verified_project = models.CharField(max_length=200, blank=True, default="")
+    verified_asset_hash = models.CharField(max_length=64, blank=True, default="")
 
     # Processing
     processing_status = models.CharField(

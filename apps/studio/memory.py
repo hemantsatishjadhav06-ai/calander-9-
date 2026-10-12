@@ -30,10 +30,30 @@ def references(workspace, limit: int = TOP_K) -> list[CreativeInsight]:
 
 
 def best_performers(workspace, limit: int = TOP_K, *, platforms: set[str] | None = None) -> list[CreativeInsight]:
-    rows = CreativeInsight.objects.filter(workspace=workspace, score__isnull=False, is_reference=False)
+    from . import performance
+
+    # Recheck the underlying snapshots rather than trusting computed_at: a
+    # learning refresh can otherwise make stale analytics look newly verified.
+    fresh = {
+        item.platform_post_id: item for item in performance.measured(workspace=workspace) if item.percentile is not None
+    }
+    rows = CreativeInsight.objects.filter(workspace=workspace, platform_post_id__in=fresh, is_reference=False)
     if platforms:
         rows = rows.filter(platform__in=platforms)
-    return list(rows.select_related("media_asset").order_by("-score", "-published_at")[:limit])
+    candidates = list(rows.select_related("media_asset"))
+    for insight in candidates:
+        evidence = fresh[insight.platform_post_id]
+        insight.score = evidence.percentile
+        insight.ratio = evidence.ratio
+        insight.metrics = {
+            **(insight.metrics or {}),
+            "captured_at": evidence.captured_at.isoformat() if evidence.captured_at else "",
+        }
+    candidates.sort(
+        key=lambda insight: (insight.score or 0, insight.published_at.isoformat() if insight.published_at else ""),
+        reverse=True,
+    )
+    return candidates[:limit]
 
 
 def learning_set(workspace, limit: int = TOP_K, *, platforms: set[str] | None = None) -> list[CreativeInsight]:

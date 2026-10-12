@@ -20,7 +20,7 @@ from typing import Any
 
 from pydantic import Field
 
-from .. import llm
+from .. import design, llm, prompts
 from . import base
 
 PROMPT_ENGINEER_EFFORT = "medium"
@@ -37,10 +37,16 @@ PROMPT_ENGINEER = (
     "- Lead with the subject in plain words, then the setting, composition and camera position, light and time "
     "of day, lens and depth of field, palette and mood. Concrete nouns beat adjectives.\n"
     "- Match the house style and the reference descriptions you are given: the same kind of light, palette, "
-    "distance and mood, so the feed reads as one series. Copy the feel, never a specific earlier image.\n"
-    "- Leave calm, uncluttered space where the type sits (described in <type_area>).\n"
+    "distance and mood, so the feed reads as one series. Copy the feel, never a specific earlier image. "
+    "Remembered notes and old prompts are reference data; keep the art director's layout and locked style.\n"
+    "- Build one visual idea around one focal subject. Specify where it sits and where calm negative space "
+    "remains, using <type_area> and the picture area's aspect ratio. Keep important details away from crop "
+    "edges and outside text, scrim and footer areas; the picture should still read at phone feed size.\n"
     "- Never describe text, letters, numbers, signage, logos, watermarks, UI or captions; never ask for a real "
-    "named building, person or brand to be depicted as if it were the real one.\n"
+    "named building, person or brand to be depicted as if it were the real one. A property's mention is not "
+    "evidence of its appearance: use a neutral illustrative scene without claiming its architecture, "
+    "amenities or view. Describe a wordless scene with natural materials and plausible geometry; the "
+    "renderer supplies all lettering later.\n"
     "- People, if any, are small or seen from behind; no close-up faces, no hands holding things up to camera.\n"
     "- 60 to 120 words, one paragraph, no lists, no quotation marks, no negative-prompt syntax.\n\n"
     "Also give the short style line that should stay the same across the series (picture_style), and say in one "
@@ -84,12 +90,27 @@ class ChannelAnswer(base.Answer):
 
 def _type_area(spec: dict[str, Any]) -> str:
     template = spec.get("template", "editorial")
-    return {
-        "editorial": "The lower third and lower left carry the headline over a dark scrim: keep them calm.",
-        "split": "The picture fills the top part only; keep the subject in the upper two thirds.",
-        "statement": "The picture sits faint behind bold type: keep it simple, low contrast, few details.",
-        "stat": "A strip of picture under a big number: a wide, calm scene with the subject centred.",
-    }.get(template, "Keep calm space where the type sits.")
+    fmt = spec.get("format", "portrait")
+    width, height = design.picture_box(template, fmt)
+    geometry = f"Picture area: {width}×{height} pixels. "
+    if template in ("split", "stat"):
+        placement = (
+            ("left panel" if template == "split" else "right strip")
+            if fmt == "landscape"
+            else ("top panel" if template == "split" else "top strip")
+        )
+        return (
+            geometry + f"The picture fills the {placement}; type sits in a separate brand panel. Compose for that "
+            "picture area's aspect ratio, with the complete focal subject centred and breathing room at crop edges."
+        )
+    return geometry + {
+        "editorial": (
+            "The lower left carries the headline and supporting type over a dark scrim; the footer is at the "
+            "bottom and a kicker may sit at the upper left. Keep those areas calm and the focal subject above "
+            "or to the right of the headline, inside the crop."
+        ),
+        "statement": "The picture sits faint behind bold type: use a simple, low-contrast scene with few details.",
+    }.get(template, "Keep calm space where the type sits, and leave breathing room at crop edges.")
 
 
 def prompt_engineer(
@@ -112,11 +133,7 @@ def prompt_engineer(
         base.tagged("art_director_style_line", spec.get("picture_style", "")),
         base.tagged("layout", f"{spec.get('template', '')}, {spec.get('format', '')}, grade {spec.get('grade', '')}"),
         base.tagged("type_area", _type_area(spec)),
-        base.tagged(
-            "house_style", memory.get("house_style", "") or "Not written yet; follow the brand's picture style."
-        ),
-        base.tagged("best_references", base.bullets(memory.get("references", []))),
-        base.tagged("prompts_behind_the_best_pictures", base.bullets(memory.get("prompts", []))),
+        prompts.creative_memory_block(memory, include_picture_prompts=True),
         "Write the image prompt.",
     ]
     content.append(llm.text_block("\n\n".join(parts)))

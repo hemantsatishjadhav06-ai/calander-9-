@@ -55,6 +55,8 @@ def tabs(workspace, active: str) -> list[dict[str, Any]]:
         ("autopilot", "Autopilot", "studio:autopilot"),
         ("thread", "Ask the team", "studio:thread"),
         ("brand", "Brand", "studio:brand"),
+        ("trust", "Verified facts", "studio:trust"),
+        ("outcomes", "Outcomes", "studio:outcomes"),
     ]
     out = []
     for key, label, name in items:

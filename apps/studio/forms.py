@@ -213,6 +213,12 @@ class BrandProfileForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["facts"].label = "Unverified background notes"
+        self.fields[
+            "facts"
+        ].help_text = (
+            "For owner review. Authorize commercial claims under Verified facts with a source, verifier and expiry."
+        )
         from apps.media_library.models import MediaAsset
 
         logos = MediaAsset.objects.filter(

@@ -15,7 +15,10 @@ platform starts, stops and restarts on its own:
 This command is ``process_tasks`` with those fixed: it maps SIGTERM and SIGINT
 to the same graceful stop (the task in flight finishes; the loop then exits 0),
 releases every lock a previous worker left behind, and re-registers the
-recurring schedules before the first poll. All of ``process_tasks``' options
+recurring schedules before the first poll. A dedicated PostgreSQL session
+lease rejects overlapping single-worker starts before any live task lock can
+be cleared and is checked before every poll. This uses one database connection.
+All of ``process_tasks``' options
 (``--duration``, ``--sleep``, ``--queue``, ``--log-std``) still apply.
 """
 
@@ -24,10 +27,27 @@ import signal
 
 from background_task.management.commands.process_tasks import Command as ProcessTasksCommand
 from background_task.utils import SignalManager
+from django.core.management.base import CommandError
+from django.utils import autoreload
 
-from apps.common.background import ensure_recurring_tasks, reclaim_stale_locks
+from apps.common.background import (
+    WorkerAlreadyRunningError,
+    ensure_recurring_tasks,
+    reclaim_stale_locks,
+    worker_process_lock,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class _LeaseCheckedTasks:
+    def __init__(self, tasks, check_lease):
+        self.tasks = tasks
+        self.check_lease = check_lease
+
+    def run_next_task(self, queue=None):
+        self.check_lease()
+        return self.tasks.run_next_task(queue)
 
 
 class Command(ProcessTasksCommand):
@@ -53,13 +73,26 @@ class Command(ProcessTasksCommand):
         signal.signal(signal.SIGTERM, self.sig_manager.exit_gracefully)
         signal.signal(signal.SIGINT, self.sig_manager.exit_gracefully)
 
-        self.prepare(keep_locks=options.get("keep_locks", False))
-
+        keep_locks = options.get("keep_locks", False)
         if options.get("dev"):
-            # Keep --dev working, but the reloader re-imports this module in a
-            # child process, so the signal handlers above are re-bound there.
-            return super().handle(*args, **options)
-        self.run(*args, **options)
+            if not keep_locks:
+                raise CommandError(
+                    "Use --dev --keep-locks for development; production single-worker locking requires --dev off."
+                )
+            self.prepare(keep_locks=True)
+            return autoreload.run_with_reloader(self.run, *args, **options)
+        try:
+            with worker_process_lock(allow_concurrent=keep_locks) as check_lease:
+                check_lease()
+                original_tasks = self._tasks
+                self._tasks = _LeaseCheckedTasks(original_tasks, check_lease)
+                try:
+                    self.prepare(keep_locks=keep_locks)
+                    self.run(*args, **options)
+                finally:
+                    self._tasks = original_tasks
+        except WorkerAlreadyRunningError as exc:
+            raise CommandError(str(exc)) from exc
 
     @staticmethod
     def prepare(*, keep_locks: bool = False) -> None:

@@ -53,7 +53,9 @@ _SAME_TIME = timedelta(seconds=59)
 
 #: ``platform_extra`` keys the publisher writes back after a publish. They are
 #: results, not inputs, so they are not part of what was approved.
-_RESULT_EXTRA_KEYS = frozenset({"permalink", "url", "post_url", "publish_id", "container_id", "media_id"})
+_RESULT_EXTRA_KEYS = frozenset(
+    {"permalink", "url", "post_url", "publish_id", "container_id", "media_id", "_delivery_state"}
+)
 
 
 class ApprovalRequired(ValueError):
@@ -76,6 +78,7 @@ def _iso(value):
 def fingerprint(pp) -> str:
     """Hash of everything that will be published for this channel."""
     post = pp.post
+    account = pp.social_account
     media = []
     for pm in post.media_attachments.select_related("media_asset").order_by("position", "id"):
         asset = pm.media_asset
@@ -91,6 +94,12 @@ def fingerprint(pp) -> str:
     extra = {k: v for k, v in (pp.platform_extra or {}).items() if k not in _RESULT_EXTRA_KEYS}
     payload = {
         "destination": str(pp.social_account_id),
+        "destination_identity": {
+            "workspace": str(account.workspace_id),
+            "platform": account.platform,
+            "native_id": str(account.account_platform_id or ""),
+            "instance_url": account.instance_url or "",
+        },
         "title": post.title or "",
         "caption": post.caption or "",
         "first_comment": post.first_comment or "",
@@ -193,6 +202,17 @@ def _stamp_on_approve(pp, workspace) -> None:
         if pp.status == "pending_client" and pp.approved_fingerprint == current:
             return
         raise ApprovalRequired("Only an approver signed in to the dashboard can approve content in this workspace.")
+    from apps.studio import trust
+
+    for brief in pp.post.studio_briefs.select_related("workspace", "workspace__organization", "source_picture").filter(
+        status__in=["ready", "approved"]
+    ):
+        if not brief.trust_snapshot:
+            brief.trust_snapshot = trust.capture(brief)
+            brief.save(update_fields=["trust_snapshot", "updated_at"])
+        reason = trust.blocker(brief)
+        if reason:
+            raise ApprovalRequired(reason)
     pp.approved_fingerprint = current
     pp.approved_revision = _current_revision(pp.post)
     pp.approved_by = approver
@@ -238,6 +258,11 @@ def publish_blocker(pp) -> str | None:
 
     Pure check — no actor, no re-stamping: the worker is never an approver.
     """
+    from apps.studio.trust import post_blocker
+
+    trust_error = post_blocker(pp.post)
+    if trust_error:
+        return trust_error
     if not enforced(pp.post.workspace):
         return None
     if not pp.approved_fingerprint:

@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 import httpx
 from dateutil import parser as date_parser
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache, caches
 from django.core.exceptions import PermissionDenied, SuspiciousOperation, ValidationError
@@ -175,6 +176,12 @@ def _remove_deselected_platform_posts(request, post, selected_ids):
     if scope:
         qs = qs.filter(social_account_id=scope)
     doomed = qs.exclude(status__in=PlatformPost.PROTECTED_STATUSES)
+    if post.has_unknown_delivery:
+        messages.error(
+            request,
+            "This post has an unknown delivery outcome. Check the account and reconcile it before removing a destination.",
+        )
+        return
     # A queue entry whose channel row is gone would sit on the queue page
     # forever (the bulk-delete path already does this).
     from apps.calendar.models import QueueEntry
@@ -582,6 +589,12 @@ def compose(request, workspace_id, post_id=None):
     # Load existing post or prepare a blank one
     if post_id:
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
+        if request.method == "POST" and post.has_unknown_delivery:
+            messages.error(
+                request,
+                "Delivery outcome unknown: check the account and use the delivery receipt to reconcile it before editing or retrying.",
+            )
+            return redirect("calendar:calendar", workspace_id=workspace.pk)
         # Enforce edit permissions: authors can edit their own posts,
         # but editing another user's post requires edit_others_posts.
         membership = request.workspace_membership

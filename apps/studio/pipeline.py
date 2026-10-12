@@ -15,12 +15,12 @@ cycle (studio tasks run at a lower priority than publishing):
   generates the picture with fal.ai (or uses the photo the person chose, or none).
 * **render** — the designer sets the graphic (``apps.studio.design``).
 * **review** — the brand reviewer checks facts, rules, craft and consistency.
-  It may send the post back once for another pass; after that its notes go to
-  the approver instead.
+  It may send the post back once for another pass. Unresolved risks stop handoff.
 * **channel** — the channel editor writes the versions Instagram, Facebook,
   Threads... need (skipped when every destination takes the copywriter's text).
-* **qa** — the QA inspector runs plain checks (lengths, hashtags, links, alt
-  text, contrast) and notes anything off for the approver.
+* **qa** — the brand reviewer checks changed channel captions against the
+  exact outgoing text, then the QA inspector runs plain checks (lengths,
+  hashtags, links, alt text, contrast) and notes anything off for the approver.
 * **schedule** — the scheduler proposes the best open time from the account's
   history and posting slots. It only proposes.
 * **handoff** — the producer creates (or updates) the composer post with the
@@ -112,16 +112,53 @@ def run_step(brief_id: str, revision: int, stage: str) -> None:
     with transaction.atomic():
         brief = (
             StudioBrief.objects.select_for_update(of=("self",))
-            .select_related("workspace", "workspace__organization", "author")
+            .select_related("workspace", "workspace__organization", "author", "job")
             .filter(pk=brief_id)
             .first()
         )
-        if brief is None or brief.revision != revision or brief.stage != stage or not brief.is_active:
+        if (
+            brief is None
+            or brief.revision != revision
+            or brief.stage != stage
+            or brief.status != StudioBrief.Status.QUEUED
+        ):
             logger.info("Studio: skipping stale step %s for brief %s (r%s)", stage, brief_id, revision)
             return
+        from . import autopilot
+
+        if (
+            brief.origin == StudioBrief.Origin.AUTOPILOT
+            and brief.job is not None
+            and brief.job.kind == "plan"
+            and brief.job.status == "cancelled"
+        ):
+            brief.status = StudioBrief.Status.DISCARDED
+            brief.error = "The parent plan was cancelled."
+            brief.save(update_fields=["status", "error", "updated_at"])
+            return
+
+        blocker = autopilot.automatic_work_blocker(
+            brief.workspace, job=brief.job, automatic=brief.origin == StudioBrief.Origin.AUTOPILOT
+        )
+        if blocker:
+            brief.error = blocker
+            brief.save(update_fields=["error", "updated_at"])
+            return
+        from . import trust
+
+        if brief.trust_snapshot == {} and stage == "strategy":
+            brief.trust_snapshot = trust.capture(brief)
+            brief.save(update_fields=["trust_snapshot", "updated_at"])
+        trust_error = trust.blocker(brief)
+        if trust_error:
+            brief.status = StudioBrief.Status.FAILED
+            brief.error = trust_error
+            brief.save(update_fields=["status", "error", "updated_at"])
+            return
         brief.status = StudioBrief.Status.WORKING
+        brief.error = ""
         brief.started_at = brief.started_at or timezone.now()
-        brief.save(update_fields=["status", "started_at", "updated_at"])
+        brief.save(update_fields=["status", "started_at", "error", "updated_at"])
 
     if stage in PAID_STAGES and not budget.can_spend(brief.workspace):
         # A post is up to nine paid calls; stop before the next one once the month's budget is used.
@@ -176,15 +213,20 @@ def sweep_stuck() -> int:
     A queued brief whose task is still in the queue is only waiting its turn
     behind other work, not stuck, and is left alone.
     """
+    from . import autopilot
     from .engine import _has_pending_task
 
     cutoff = timezone.now() - STUCK_AFTER
     stuck = [
         brief
-        for brief in StudioBrief.objects.filter(status__in=StudioBrief.ACTIVE_STATUSES, updated_at__lt=cutoff)
+        for brief in StudioBrief.objects.filter(status__in=StudioBrief.ACTIVE_STATUSES, updated_at__lt=cutoff).exclude(
+            error__in=autopilot.PAUSE_REASONS
+        )
         if not (
             brief.status == StudioBrief.Status.QUEUED
-            and _has_pending_task("apps.studio.tasks.run_studio_step", str(brief.pk))
+            and _has_pending_task(
+                "apps.studio.tasks.run_studio_step", str(brief.pk), revision=brief.revision, stage=brief.stage
+            )
         )
     ]
     for brief in stuck:
@@ -194,6 +236,40 @@ def sweep_stuck() -> int:
             "Press Retry to continue from where it stopped.",
         )
     return len(stuck)
+
+
+def resume_paused_briefs(workspace, *, limit: int) -> int:
+    """Resume policy-paused stages once, within room allocated by the agency feeder."""
+    from . import autopilot
+    from .engine import _has_pending_task
+
+    resumed = 0
+    candidates = StudioBrief.objects.filter(
+        workspace=workspace, status=StudioBrief.Status.QUEUED, error__in=autopilot.PAUSE_REASONS
+    ).order_by("created_at", "pk")
+    for candidate in candidates:
+        if resumed >= max(0, limit):
+            break
+        with transaction.atomic():
+            brief = (
+                StudioBrief.objects.select_for_update(of=("self",))
+                .select_related("workspace", "workspace__organization", "job")
+                .filter(pk=candidate.pk, status=StudioBrief.Status.QUEUED, error__in=autopilot.PAUSE_REASONS)
+                .first()
+            )
+            if brief is None or autopilot.automatic_work_blocker(
+                brief.workspace, job=brief.job, automatic=brief.origin == StudioBrief.Origin.AUTOPILOT
+            ):
+                continue
+            pending = _has_pending_task(
+                "apps.studio.tasks.run_studio_step", str(brief.pk), revision=brief.revision, stage=brief.stage
+            )
+            brief.error = ""
+            brief.save(update_fields=["error", "updated_at"])
+            if not pending:
+                enqueue(brief, brief.stage)
+            resumed += 1
+    return resumed
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +300,15 @@ def _end(
 ) -> None:
     run.status = status
     run.summary = summary[:500]
-    run.output = output or {}
+    verified_cost = llm.validated_provider_cost(
+        getattr(result, "provider_cost_usd", None)
+        if result is not None
+        else (run.output or {}).get("provider_cost_usd")
+    )
+    run.output = dict(output or {})
+    run.output.pop("provider_cost_usd", None)
+    if verified_cost is not None:
+        run.output["provider_cost_usd"] = verified_cost
     run.finished_at = timezone.now()
     run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000)
     fields = ["status", "summary", "output", "finished_at", "duration_ms"]
@@ -253,7 +337,12 @@ def _note_usage(run: AgentRun, result: llm.AgentResult) -> llm.AgentResult:
         result.output_tokens,
         result.cache_read_tokens,
     )
-    run.save(update_fields=["model", "input_tokens", "output_tokens", "cache_read_tokens"])
+    fields = ["model", "input_tokens", "output_tokens", "cache_read_tokens"]
+    verified_cost = llm.validated_provider_cost(getattr(result, "provider_cost_usd", None))
+    if verified_cost is not None:
+        run.output = {**(run.output or {}), "provider_cost_usd": verified_cost}
+        fields.append("output")
+    run.save(update_fields=fields)
     return result
 
 
@@ -272,6 +361,11 @@ def _fail_run(run: AgentRun, error: str | Exception) -> None:
     if searches:
         run.output = {**(run.output or {}), "web_searches": searches}
         fields.append("output")
+    verified_cost = llm.validated_provider_cost(getattr(error, "provider_cost_usd", None))
+    if verified_cost is not None:
+        run.output = {**(run.output or {}), "provider_cost_usd": verified_cost}
+        if "output" not in fields:
+            fields.append("output")
     run.save(update_fields=fields)
 
 
@@ -340,8 +434,24 @@ def clean_caption(caption: str) -> str:
     return "\n".join(out).strip()
 
 
+VISUAL_NOTES = (
+    "AI-generated illustrative image.",
+    "Image provenance has not been verified for this project.",
+)
+
+
+def _with_visual_note(caption: str, note: str | None) -> str:
+    """Attach the render's disclosure once, even when a model repeats it."""
+    if note is None:
+        return caption.strip()
+    for sentence in VISUAL_NOTES:
+        caption = re.sub(re.escape(sentence), "", caption, flags=re.IGNORECASE)
+    caption = re.sub(r"\n[ \t]*\n(?:[ \t]*\n)+", "\n\n", caption).strip()
+    return f"{caption}\n\n{note}".strip() if note in VISUAL_NOTES else caption
+
+
 def full_caption(post_copy: dict[str, Any]) -> str:
-    caption = (post_copy.get("caption") or "").strip()
+    caption = _with_visual_note(post_copy.get("caption") or "", post_copy.get("visual_note"))
     tags = " ".join(post_copy.get("hashtags") or [])
     return f"{caption}\n\n{tags}" if tags else caption
 
@@ -448,6 +558,8 @@ def step_copy(brief: StudioBrief) -> str:
 
 
 def step_art(brief: StudioBrief) -> str:
+    from . import memory
+
     profile = ensure_profile(brief.workspace)
     concept = brief.chosen_concept
     if concept is None:
@@ -458,6 +570,7 @@ def step_art(brief: StudioBrief) -> str:
     feedback = _feedback(brief)
     fixes = pending.get("design") or []
     previous = brief.design_spec or None
+    platforms = {account.platform for account in brief.social_accounts.all()}
     run = _begin(brief, AgentRun.Agent.ART_DIRECTOR)
     try:
         result = _note_usage(
@@ -472,6 +585,8 @@ def step_art(brief: StudioBrief) -> str:
                 previous=previous if (feedback or fixes) else None,
                 feedback=feedback,
                 fixes=fixes,
+                creative_memory=memory.prompt_memory(brief.workspace, platforms=platforms),
+                reference_images=memory.reference_images(brief.workspace, platforms=platforms),
             ),
         )
     except StudioError as exc:
@@ -606,15 +721,27 @@ def _look(profile) -> design.Look:
 def step_render(brief: StudioBrief) -> str:
     from apps.media_library.quotas import StorageQuotaExceededError
 
+    from . import trust
+
     profile = ensure_profile(brief.workspace)
     spec = dict(brief.design_spec or {})
     picture = style.read_asset(brief.picture) if (brief.picture_id and spec.get("use_picture")) else None
     run = _begin(brief, AgentRun.Agent.DESIGNER)
     look = _look(profile)
-    try:
-        content = design.render(spec, look, picture)
-    except ValueError:
-        content = design.render(spec, look, None)
+    with design.collect_text_issues() as render_issues:
+        try:
+            content = design.render(spec, look, picture)
+        except ValueError:
+            render_issues.clear()
+            picture = None
+            content = design.render(spec, look, None)
+    visual_note = ""
+    if picture is not None:
+        provenance = trust.photo_status(brief.picture)["status"]
+        if trust.is_generated(brief.picture):
+            visual_note = VISUAL_NOTES[0]
+        elif provenance != "verified":
+            visual_note = VISUAL_NOTES[1]
     try:
         asset = images.save_graphic(brief, content, (brief.post_copy or {}).get("alt_text", ""))
     except StorageQuotaExceededError as exc:
@@ -622,12 +749,26 @@ def step_render(brief: StudioBrief) -> str:
         raise StudioError(
             "The workspace is out of media storage. Delete unused media or ask your admin to raise the limit."
         ) from exc
-    _save(brief, graphic=asset)
+    _save(
+        brief,
+        graphic=asset,
+        post_copy={**(brief.post_copy or {}), "visual_note": visual_note},
+        review_notes={
+            **(brief.review_notes or {}),
+            "render": {"graphic_id": str(asset.pk), "revision": brief.revision, "issues": render_issues},
+        },
+    )
     normalised = design.normalise_spec(spec, look)
     _end(
         run,
         summary=f"Set the graphic: {asset.width}×{asset.height}, {normalised['template']} layout.",
-        output={"asset_id": str(asset.pk), "width": asset.width, "height": asset.height, **normalised},
+        output={
+            "asset_id": str(asset.pk),
+            "width": asset.width,
+            "height": asset.height,
+            "text_issues": render_issues,
+            **normalised,
+        },
         model="",
     )
     return "review"
@@ -643,20 +784,47 @@ def _reference_image(brief: StudioBrief) -> bytes | None:
     return style.read_asset(asset)
 
 
+def _render_issues(brief: StudioBrief, profile=None) -> list[dict[str, Any]]:
+    """Measurements for this graphic, including older briefs made before diagnostics existed."""
+    recorded = (brief.review_notes or {}).get("render") or {}
+    if (
+        isinstance(recorded, dict)
+        and recorded.get("graphic_id") == str(brief.graphic_id)
+        and recorded.get("revision") == brief.revision
+        and isinstance(recorded.get("issues"), list)
+        and all(isinstance(issue, dict) for issue in recorded["issues"])
+    ):
+        return recorded["issues"]
+    # Typography geometry is the same with a brand background. Re-measuring
+    # avoids trusting an old missing report and makes no paid image/model call.
+    profile = profile or ensure_profile(brief.workspace)
+    with design.collect_text_issues() as issues:
+        design.render(brief.design_spec or {}, _look(profile), None)
+    return issues
+
+
 def step_review(brief: StudioBrief) -> str:
     profile = ensure_profile(brief.workspace)
-    graphic = style.read_asset(brief.graphic) if brief.graphic_id else None
-    if graphic is None:
-        raise StudioError("The graphic couldn't be read back from storage. Press Retry.")
+    accounts = [a for a in brief.social_accounts.all() if not a.needs_reconnect]
+    graphic, payload, fingerprint = _publication_material(brief, accounts)
     run = _begin(brief, AgentRun.Agent.REVIEWER)
     try:
         result = _note_usage(
-            run, agents.reviewer(brief, profile, brief.post_copy, brief.design_spec, graphic, _reference_image(brief))
+            run,
+            agents.reviewer(
+                brief,
+                profile,
+                {**(brief.post_copy or {}), "_publication_payload": payload},
+                {**(brief.design_spec or {}), "_render_issues": _render_issues(brief, profile)},
+                graphic,
+                _reference_image(brief),
+            ),
         )
     except StudioError as exc:
         _fail_run(run, exc)
         raise
-    review = result.output.model_dump()
+    review = {"render": (brief.review_notes or {}).get("render", {}), **result.output.model_dump()}
+    review["publication_review"] = _publication_review(result.output, fingerprint)
     review["score"] = max(1, min(10, int(review.get("score") or 0)))
     copy_fixes = [fix for fix in review.get("copy_fixes") or [] if fix.strip()]
     design_fixes = [fix for fix in review.get("design_fixes") or [] if fix.strip()]
@@ -729,11 +897,115 @@ def step_channel(brief: StudioBrief) -> str:
     return "qa"
 
 
+def _publication_material(brief: StudioBrief, accounts) -> tuple[bytes, list[dict[str, str]], str]:
+    graphic = style.read_asset(brief.graphic) if brief.graphic_id else None
+    if graphic is None:
+        raise StudioError("The graphic couldn't be read back from storage. Press Retry.")
+    payload = qa.publication_payload(brief.post_copy or {}, accounts)
+    if len(payload) > qa.MAX_PUBLICATION_DESTINATIONS or (
+        sum(len(row["caption"]) + len(row["first_comment"]) for row in payload) > qa.MAX_PUBLICATION_TEXT_CHARS
+    ):
+        raise StudioError(
+            "The selected publication text is too long for one complete review. Shorten the captions or select "
+            "fewer destinations; the team will not truncate unreviewed text."
+        )
+    fingerprint = qa.publication_fingerprint(payload, brief.design_spec or {}, graphic, brief.revision)
+    return graphic, payload, fingerprint
+
+
+def _publication_review(answer, fingerprint: str) -> dict[str, Any]:
+    return {
+        "fingerprint": fingerprint,
+        "verdict": answer.verdict,
+        "risk_flags": answer.risk_flags,
+        "summary": answer.summary,
+    }
+
+
+def _review_is_clear(review: dict[str, Any], fingerprint: str) -> bool:
+    return (
+        review.get("fingerprint") == fingerprint and review.get("verdict") == "approve" and not review.get("risk_flags")
+    )
+
+
+def _review_final_publication(brief: StudioBrief, profile, accounts) -> str | None:
+    """Reuse unchanged review; channel edits get one final turn and the same single revision limit."""
+    graphic, payload, fingerprint = _publication_material(brief, accounts)
+    notes = brief.review_notes or {}
+    reviewed = notes.get("publication_review") or {}
+    if reviewed.get("fingerprint") != fingerprint:
+        if not budget.can_spend(brief.workspace):
+            raise StudioError(budget.over_budget_message(brief.workspace))
+        run = _begin(brief, AgentRun.Agent.REVIEWER, effort=agents.REVIEWER_EFFORT)
+        try:
+            result = _note_usage(
+                run,
+                agents.reviewer(
+                    brief,
+                    profile,
+                    {**(brief.post_copy or {}), "_publication_payload": payload},
+                    {**(brief.design_spec or {}), "_render_issues": _render_issues(brief, profile)},
+                    graphic,
+                    _reference_image(brief),
+                ),
+            )
+        except StudioError as exc:
+            _fail_run(run, exc)
+            raise
+        answer = result.output
+        reviewed = _publication_review(answer, fingerprint)
+        notes = {**notes, "publication_review": reviewed, "final_review": answer.model_dump()}
+        copy_fixes = [fix for fix in answer.copy_fixes if fix.strip()]
+        design_fixes = [fix for fix in answer.design_fixes if fix.strip()]
+        wants_pass = answer.verdict == "revise" and (copy_fixes or design_fixes or answer.regenerate_picture)
+        if wants_pass and brief.auto_revisions < MAX_AUTO_REVISIONS:
+            notes["pending_fixes"] = {"copy": copy_fixes, "design": design_fixes}
+            _save(
+                brief,
+                review_notes=notes,
+                auto_revisions=brief.auto_revisions + 1,
+                regenerate_picture=answer.regenerate_picture,
+            )
+            _end(
+                run,
+                summary="Final channel review requested the single correction pass.",
+                output=notes["final_review"],
+                result=result,
+            )
+            return "copy" if copy_fixes else "art"
+        _save(brief, review_notes=notes)
+        _end(
+            run,
+            summary="Reviewed the final per-account captions, comments and graphic.",
+            output=notes["final_review"],
+            result=result,
+        )
+    if not _review_is_clear(reviewed, fingerprint):
+        detail = (
+            "; ".join(str(flag) for flag in reviewed.get("risk_flags") or [])[:500] or reviewed.get("summary", "")[:500]
+        )
+        raise StudioError(
+            "The final publication review still needs corrections before handoff. Request changes to fix the "
+            f"caption, claims or design; human approval is still required afterward. {detail}".strip()
+        )
+    return None
+
+
 def step_qa(brief: StudioBrief) -> str:
     profile = ensure_profile(brief.workspace)
     accounts = [a for a in brief.social_accounts.all() if not a.needs_reconnect]
+    next_stage = _review_final_publication(brief, profile, accounts)
+    if next_stage:
+        return next_stage
     run = _begin(brief, AgentRun.Agent.QA_INSPECTOR, model="")
-    report = qa.inspect(brief.post_copy or {}, brief.design_spec or {}, accounts, _look(profile))
+    report = qa.inspect(
+        brief.post_copy or {},
+        brief.design_spec or {},
+        accounts,
+        _look(profile),
+        render_issues=_render_issues(brief, profile),
+        publication_reviewed=True,
+    )
     _save(brief, review_notes={**(brief.review_notes or {}), "qa": report})
     notes = [c["name"] for c in report["checks"] if not c["passed"]]
     summary = f"{report['passed']} of {report['total']} checks pass."
@@ -779,7 +1051,7 @@ def account_overrides(account, caption: str, post_copy: dict[str, Any]) -> tuple
     # The channel editor's version for this network, when there is one.
     channel_text = ((post_copy.get("channels") or {}).get(account.platform) or "").strip()
     if channel_text:
-        caption = channel_text
+        caption = _with_visual_note(channel_text, post_copy.get("visual_note"))
     text = caption
     comment_override = None
     if first_comment and not account.supports_first_comment():
@@ -788,7 +1060,7 @@ def account_overrides(account, caption: str, post_copy: dict[str, Any]) -> tuple
     if account.caption_wire_length(text) > account.char_limit:
         short = (post_copy.get("short_caption") or "").strip()
         if short:
-            text = short
+            text = _with_visual_note(short, post_copy.get("visual_note"))
     return (None if text == original else text), comment_override
 
 
@@ -811,16 +1083,35 @@ def step_handoff(brief: StudioBrief) -> None:
     from apps.composer.models import PlatformPost, Post, PostMedia
     from apps.composer.views import _save_version
 
+    from . import trust
+
+    trust_error = trust.blocker(brief)
+    if trust_error:
+        raise StudioError(trust_error)
+
     if brief.author is None:
         raise StudioError("The person who started this brief no longer has an account here.")
     graphic = brief.graphic
     if graphic is None:
         raise StudioError("There is no graphic to attach. Press Retry.")
+    lost = [issue for issue in _render_issues(brief) if issue.get("field") in design.ESSENTIAL_TEXT]
+    if lost:
+        fields = ", ".join(dict.fromkeys(str(issue["field"]).replace("_", " ") for issue in lost))
+        raise StudioError(
+            f"The graphic could not preserve its {fields}. Ask the team for shorter graphic copy or a roomier layout; "
+            "it must fit in full before it can be sent for approval."
+        )
     accounts = [a for a in brief.social_accounts.all() if not a.needs_reconnect]
     if not accounts:
         raise StudioError(
             "None of the chosen accounts is connected right now. Reconnect it under Settings → Social accounts, "
             "then press Retry."
+        )
+    _graphic_bytes, _payload, fingerprint = _publication_material(brief, accounts)
+    if not _review_is_clear((brief.review_notes or {}).get("publication_review") or {}, fingerprint):
+        raise StudioError(
+            "The final captions, comments or graphic changed after review or have no current clear review. "
+            "Request changes so the team can review the current content before sending it for human approval."
         )
     run = _begin(brief, AgentRun.Agent.PRODUCER)
     post_copy = brief.post_copy or {}

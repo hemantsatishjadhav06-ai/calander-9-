@@ -28,9 +28,11 @@ def run_publish_cycle():
     from apps.publisher.engine import PublishEngine
 
     engine = PublishEngine()
-    published = engine.poll_and_publish()
-    if published:
-        logger.info("Publish cycle completed - %d post(s) published", published)
+    dispatched = engine.poll_and_publish()
+    if dispatched:
+        logger.info(
+            "Publish cycle dispatched %d approved post group(s); inspect delivery receipts for outcomes", dispatched
+        )
 
 
 @background(schedule=0)

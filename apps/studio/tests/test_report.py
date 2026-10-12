@@ -90,25 +90,29 @@ def test_a_quiet_week_is_written_without_the_model(world, agency):
     assert job.runs.get(agent="reporter").status == AgentRun.Status.SKIPPED
 
 
-def test_the_report_refuses_to_start_over_budget(world, agency):
+def test_the_report_preserves_recorded_counts_without_model_work_over_budget(world, agency):
     _week_of_posts(world)
     agency_settings(world, monthly_budget_usd=5)
     overspend(world.workspace)
 
     job = drive(engine.create(world.workspace, "report"))
 
-    assert job.status == AgencyJob.Status.FAILED and "budget" in job.error
+    assert job.status == AgencyJob.Status.DONE
+    assert job.result["went_out"] == {"LinkedIn": 1, "X": 1}
+    assert "recorded counts" in job.result["summary"]
     assert "reporter" not in agency.calls
 
 
-def test_a_failed_reporter_fails_the_job_with_a_sentence(world, agency):
+def test_a_failed_reporter_preserves_a_client_safe_counts_report(world, agency):
     _week_of_posts(world)
     agency.fail = {"reporter": "Claude declined this request."}
 
     job = drive(engine.create(world.workspace, "report"))
 
-    assert job.status == AgencyJob.Status.FAILED and "declined" in job.error
-    assert reports.latest_report(world.workspace) is None
+    assert job.status == AgencyJob.Status.DONE
+    assert "recorded counts" in job.result["summary"]
+    assert reports.latest_report(world.workspace)["went_out"] == {"LinkedIn": 1, "X": 1}
+    assert job.runs.get(agent="reporter").status == AgentRun.Status.FAILED
 
 
 def test_the_client_safe_report_has_only_the_reports_own_words(world, agency):
@@ -131,8 +135,23 @@ def test_the_client_safe_report_has_only_the_reports_own_words(world, agency):
 
     report = reports.latest_report(world.workspace)
 
-    assert report["title"] == "Your week on social: 5–11 October"
-    assert set(report) == {"id", "title", "summary", "sections", "period", "went_out", "created_at"}
+    assert report["title"] == f"Your week on social: {job.result['period']['label']}"
+    assert set(report) == {
+        "id",
+        "title",
+        "summary",
+        "sections",
+        "period",
+        "went_out",
+        "created_at",
+        "operations",
+        "operation_scope",
+        "operations_as_of",
+        "performance_note",
+        "outcomes",
+        "outcome_note",
+        "current_backlog",
+    }
     assert [s["kind"] for s in report["sections"]] == ["went_out", "best", "next"]
     assert "4.2" not in str(report) and "secret" not in str(report)
     assert reports.latest_report(other_ws)["title"] == "Other brand's week"
@@ -211,9 +230,9 @@ def test_staff_can_ask_for_the_report_now_and_clients_cant(client, world, agency
 
 def test_the_autopilot_page_shows_the_latest_report(client, world, agency):
     _week_of_posts(world)
-    drive(engine.create(world.workspace, "report"))
+    job = drive(engine.create(world.workspace, "report"))
     client.force_login(world.owner)
 
     html = client.get(_url("studio:autopilot", world)).content.decode()
 
-    assert "Your week on social: 5–11 October" in html and "The explainer did best." in html
+    assert job.result["title"] in html and "The explainer did best." in html

@@ -26,6 +26,8 @@ class ApprovalAction(models.Model):
         TIME_APPROVED = "time_approved", "Publish Time Approved"
         WITHDRAWN = "approval_withdrawn", "Approval Withdrawn"
         BLOCKED = "publish_blocked", "Publish Blocked"
+        RECONCILED = "delivery_reconciled", "Delivery Reconciled by a Person"
+        RECONCILIATION_CHECKED = "delivery_checked", "Account Checked Before Delivery Retry"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     post = models.ForeignKey(

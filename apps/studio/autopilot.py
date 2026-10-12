@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from django.conf import settings as django_settings
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Count, F, Max, Q
 from django.utils import timezone
 
@@ -42,6 +42,10 @@ MEMORY_PER_CYCLE = 3
 #: The weekly report is written from this hour on Monday (workspace time); a
 #: Monday the worker missed is caught up on Tuesday.
 REPORT_HOUR = 8
+AUTOPILOT_PAUSED = "Autopilot is paused. Re-enable it to continue."
+WORKSPACE_PAUSED = "This workspace is paused because it is archived or its organization is being deleted."
+PLAN_PAUSED = "The parent plan is not complete. Retry or finish the plan to continue."
+PAUSE_REASONS = (AUTOPILOT_PAUSED, WORKSPACE_PAUSED, PLAN_PAUSED)
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +72,37 @@ def autopilot_settings():
         autopilot_enabled=True,
         workspace__in=eligible_workspaces(),
     ).select_related("workspace", "workspace__organization", "lead")
+
+
+def automatic_work_blocker(workspace, *, job=None, automatic: bool = False) -> str:
+    """Live pause policy shared by planning, queued jobs and queued brief stages.
+
+    An explicit manual plan permits one plan while the recurring switch is
+    off. Archive/deletion stops every source of model work. Legacy weekly
+    plan jobs without a manual marker remain automatic.
+    """
+    from .models import AgencyJob, AgencySettings, AutopilotWeek
+
+    if not eligible_workspaces().filter(pk=workspace.pk).exists():
+        return WORKSPACE_PAUSED
+    if automatic and job is not None and job.kind == AgencyJob.Kind.PLAN:
+        parent_status = (
+            AgencyJob.objects.filter(pk=job.pk, workspace=workspace).values_list("status", flat=True).first()
+        )
+        if parent_status != AgencyJob.Status.DONE:
+            return PLAN_PAUSED
+    if job is not None and (job.input or {}).get("manual") is True:
+        return ""
+    weekly_plan = bool(
+        job is not None
+        and job.kind == AgencyJob.Kind.PLAN
+        and ((job.input or {}).get("week_id") or AutopilotWeek.objects.filter(job=job, workspace=workspace).exists())
+    )
+    if (automatic or weekly_plan) and not AgencySettings.objects.filter(
+        workspace=workspace, autopilot_enabled=True
+    ).exists():
+        return AUTOPILOT_PAUSED
+    return ""
 
 
 def local_now(workspace, now: datetime | None = None) -> datetime:
@@ -121,23 +156,28 @@ def plan_week(settings_row, week_start: date, *, manual: bool = False) -> PlanOu
     workspace and week, and it is created under a lock on the workspace's
     settings row, so a double tick (or a person pressing the button as the
     tick runs) starts one plan, not two. The tick records a week it can't
-    plan as SKIPPED with the reason, so it doesn't try again every 15 minutes;
-    a person pressing the button may re-plan a skipped or failed week, and is
-    simply told the reason otherwise.
+    plan as SKIPPED with the reason. Such a week has made no paid plan and is
+    resumed once its configuration/budget recovers. A failed paid plan needs
+    a person's retry; the cycle does not repeat model calls on its own.
     """
     from . import engine
     from .models import AgencyJob, AgencySettings, AutopilotWeek
 
-    workspace = settings_row.workspace
     with transaction.atomic():
         row = (
             AgencySettings.objects.select_for_update(of=("self",))
             .select_related("workspace", "workspace__organization", "lead")
             .get(pk=settings_row.pk)
         )
+        workspace = row.workspace
+        pause = automatic_work_blocker(workspace, automatic=not manual)
+        if pause:
+            return PlanOutcome(False, pause)
         week = AutopilotWeek.objects.filter(workspace=workspace, week_start=week_start).select_related("job").first()
         if week is not None:
-            if not manual:
+            # Recovery is safe only before any plan job was ever started.
+            recoverable = week.status == AutopilotWeek.Status.SKIPPED and week.job_id is None
+            if not manual and not recoverable:
                 return PlanOutcome(False, "", week)
             job = week.job
             retryable = week.status in (AutopilotWeek.Status.SKIPPED, AutopilotWeek.Status.FAILED) and not (
@@ -151,34 +191,55 @@ def plan_week(settings_row, week_start: date, *, manual: bool = False) -> PlanOu
                     "That week is already planned. Brief the team for anything extra.",
                     week,
                 )
-            if job is not None:
-                from .models import AgencyJob, StudioBrief
-
-                # A plan that failed part-way may have made some of its posts; the
-                # new plan replaces them, so they must not be fed to the team too,
-                # and the old plan loses its Retry (a failed job isn't active, so
-                # engine.cancel would leave it alone).
-                now = timezone.now()
-                AgencyJob.objects.filter(pk=job.pk).exclude(status=AgencyJob.Status.DONE).update(
-                    status=AgencyJob.Status.CANCELLED, finished_at=now, updated_at=now
-                )
-                StudioBrief.objects.filter(job=job, status=StudioBrief.Status.PLANNED).update(
-                    status=StudioBrief.Status.DISCARDED, updated_at=timezone.now()
-                )
         blocker = plan_blocker(row)
         if blocker:
             if not manual:
-                AutopilotWeek.objects.create(
-                    workspace=workspace, week_start=week_start, status=AutopilotWeek.Status.SKIPPED, note=blocker[:500]
+                week, _ = AutopilotWeek.objects.update_or_create(
+                    workspace=workspace,
+                    week_start=week_start,
+                    defaults={"status": AutopilotWeek.Status.SKIPPED, "note": blocker[:500]},
                 )
             return PlanOutcome(False, blocker, week)
+        if week is not None and week.job_id:
+            from .models import StudioBrief
+
+            old_job = week.job
+            if old_job is None:
+                return PlanOutcome(
+                    False, "The previous plan is unavailable. Reload the autopilot page before retrying.", week
+                )
+            if (
+                StudioBrief.objects.filter(job=old_job)
+                .exclude(status__in=(StudioBrief.Status.PLANNED, StudioBrief.Status.DISCARDED))
+                .exists()
+            ):
+                return PlanOutcome(
+                    False,
+                    "This plan already has drafts in progress or ready. Retry or revise those drafts instead of replacing the week.",
+                    week,
+                )
+            # Retire untouched partial output only after the new plan can run.
+            # Prepared drafts are preserved above so a re-plan cannot duplicate
+            # their paid work or approval posts.
+            now = timezone.now()
+            AgencyJob.objects.filter(pk=old_job.pk).exclude(status=AgencyJob.Status.DONE).update(
+                status=AgencyJob.Status.CANCELLED, finished_at=now, updated_at=now
+            )
+            StudioBrief.objects.filter(job=old_job, status=StudioBrief.Status.PLANNED).update(
+                status=StudioBrief.Status.DISCARDED, updated_at=now
+            )
         if week is None:
             week = AutopilotWeek.objects.create(workspace=workspace, week_start=week_start)
         job = engine.create(
             workspace,
             AgencyJob.Kind.PLAN,
             title=f"Plan for the week of {week_start:%d %b}",
-            input={"week_start": week_start.isoformat(), "week_id": str(week.pk), "posts": row.posts_per_week},
+            input={
+                "week_start": week_start.isoformat(),
+                "week_id": str(week.pk),
+                "posts": row.posts_per_week,
+                "manual": manual,
+            },
             requested_by=row.lead,
         )
         AutopilotWeek.objects.filter(pk=week.pk).update(
@@ -203,15 +264,26 @@ def plan_due_workspaces(now: datetime | None = None) -> int:
         if not plan_is_due(row, now):
             continue
         week_start = next_week_start(row.workspace, now)
-        if AutopilotWeek.objects.filter(workspace=row.workspace, week_start=week_start).exists():
+        existing = AutopilotWeek.objects.filter(workspace=row.workspace, week_start=week_start).first()
+        if existing is not None and not (existing.status == AutopilotWeek.Status.SKIPPED and existing.job_id is None):
             continue
         try:
             outcome = plan_week(row, week_start)
-        except Exception:
+        except Exception as exc:
+            from apps.common.background import note_task_failure
+
+            note_task_failure(exc)
             logger.exception("Autopilot: could not plan workspace %s", row.workspace_id)
             continue
         started += outcome.started
     return started
+
+
+def resume_paused_jobs() -> int:
+    """Restore a bounded batch of consumed agency tasks after their pause is lifted."""
+    from . import engine
+
+    return engine.resume_paused_jobs(limit=100)
 
 
 # ---------------------------------------------------------------------------
@@ -227,41 +299,89 @@ def feed_planned_briefs() -> int:
     :data:`MAX_ACTIVE_PER_WORKSPACE` per workspace. A workspace over its budget
     waits. Briefs of a plan someone cancelled are dropped.
     """
-    from . import budget, services
-    from .models import AgencyJob, StudioBrief
+    from apps.common.background import _advisory_lock_key
 
-    StudioBrief.objects.filter(status=StudioBrief.Status.PLANNED, job__status=AgencyJob.Status.CANCELLED).update(
-        status=StudioBrief.Status.DISCARDED, updated_at=timezone.now()
-    )
-    cap = int(getattr(django_settings, "AGENCY_MAX_ACTIVE_BRIEFS", 3) or 3)
-    active = StudioBrief.objects.filter(status__in=StudioBrief.ACTIVE_STATUSES)
-    room = cap - active.count()
-    if room <= 0:
-        return 0
-    per_workspace = {
-        row["workspace_id"]: row["n"] for row in active.values("workspace_id").annotate(n=Count("id")).order_by()
-    }
-    candidates = (
-        StudioBrief.objects.filter(status=StudioBrief.Status.PLANNED, workspace__in=eligible_workspaces())
-        .select_related("workspace", "workspace__organization")
-        .order_by(F("proposed_publish_at").asc(nulls_last=True), "created_at")[:100]
-    )
-    started = 0
-    spendable: dict[object, bool] = {}
-    for brief in candidates:
-        if started >= room:
-            break
-        workspace_id = brief.workspace_id
-        if per_workspace.get(workspace_id, 0) >= MAX_ACTIVE_PER_WORKSPACE:
-            continue
-        if workspace_id not in spendable:
-            spendable[workspace_id] = budget.can_spend(brief.workspace)
-        if not spendable[workspace_id]:
-            continue
-        if services.start_planned(brief):
-            started += 1
-            per_workspace[workspace_id] = per_workspace.get(workspace_id, 0) + 1
-    return started
+    from . import budget, pipeline, services
+    from .models import AgencyJob, AgencySettings, StudioBrief
+
+    with transaction.atomic():
+        # A brief's conditional claim prevents one brief being started twice;
+        # this shared lock also prevents two cycles exceeding the global cap
+        # by concurrently claiming different briefs. No model call holds it.
+        if connection.vendor == "postgresql":
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_advisory_xact_lock(%s)", [_advisory_lock_key("agency-brief-feeder")])
+        StudioBrief.objects.filter(status=StudioBrief.Status.PLANNED, job__status=AgencyJob.Status.CANCELLED).update(
+            status=StudioBrief.Status.DISCARDED, updated_at=timezone.now()
+        )
+        cap = int(getattr(django_settings, "AGENCY_MAX_ACTIVE_BRIEFS", 3) or 3)
+        active = StudioBrief.objects.filter(status__in=StudioBrief.ACTIVE_STATUSES).exclude(error__in=PAUSE_REASONS)
+        room = cap - active.count()
+        if room <= 0:
+            return 0
+        per_workspace = {
+            row["workspace_id"]: row["n"] for row in active.values("workspace_id").annotate(n=Count("id")).order_by()
+        }
+        candidates = (
+            StudioBrief.objects.filter(status=StudioBrief.Status.PLANNED, workspace__in=eligible_workspaces())
+            .filter(Q(job__isnull=True) | ~Q(job__kind=AgencyJob.Kind.PLAN) | Q(job__status=AgencyJob.Status.DONE))
+            .filter(
+                ~Q(origin=StudioBrief.Origin.AUTOPILOT)
+                | Q(job__input__manual=True)
+                | Q(workspace__agency_settings__autopilot_enabled=True)
+                # Old explicitly prepared briefs without a plan/settings row
+                # keep their previous behavior; real weekly plans always have
+                # their parent job and settings.
+                | Q(workspace__agency_settings__isnull=True, job__isnull=True)
+            )
+        )
+        paused = StudioBrief.objects.filter(
+            status=StudioBrief.Status.QUEUED, error__in=PAUSE_REASONS, workspace__in=eligible_workspaces()
+        )
+        workspace_ids = set(candidates.values_list("workspace_id", flat=True)) | set(
+            paused.values_list("workspace_id", flat=True)
+        )
+        spendable = set()
+        started = 0
+        for workspace in eligible_workspaces().filter(pk__in=workspace_ids).order_by("pk"):
+            if per_workspace.get(workspace.pk, 0) >= MAX_ACTIVE_PER_WORKSPACE:
+                continue
+            # A concurrent off switch commits before this row lock or waits
+            # until the current short claim has finished. Stages check again.
+            AgencySettings.objects.select_for_update().filter(workspace=workspace).first()
+            if not budget.can_spend(workspace):
+                continue
+            spendable.add(workspace.pk)
+            available = min(room - started, MAX_ACTIVE_PER_WORKSPACE - per_workspace.get(workspace.pk, 0))
+            if available > 0:
+                resumed = pipeline.resume_paused_briefs(workspace, limit=available)
+                started += resumed
+                per_workspace[workspace.pk] = per_workspace.get(workspace.pk, 0) + resumed
+        # Exclude blocked/full workspaces before the candidate bound. A long
+        # backlog in one over-budget brand cannot hide a healthy brand's week.
+        full = [pk for pk, count in per_workspace.items() if count >= MAX_ACTIVE_PER_WORKSPACE]
+        picked = (
+            candidates.filter(workspace_id__in=spendable)
+            .exclude(workspace_id__in=full)
+            .select_related("workspace", "workspace__organization", "job")
+            .order_by(F("proposed_publish_at").asc(nulls_last=True), "created_at")[:100]
+        )
+        for brief in picked:
+            if started >= room:
+                break
+            workspace_id = brief.workspace_id
+            if per_workspace.get(workspace_id, 0) >= MAX_ACTIVE_PER_WORKSPACE:
+                continue
+            # Recheck the parent/off policy in the same claim transaction.
+            automatic = brief.origin == StudioBrief.Origin.AUTOPILOT and (
+                brief.job_id is not None or AgencySettings.objects.filter(workspace=brief.workspace).exists()
+            )
+            if automatic_work_blocker(brief.workspace, job=brief.job, automatic=automatic):
+                continue
+            if services.start_planned(brief):
+                started += 1
+                per_workspace[workspace_id] = per_workspace.get(workspace_id, 0) + 1
+        return started
 
 
 # ---------------------------------------------------------------------------
@@ -339,7 +459,10 @@ def refresh_memory_due(now: datetime | None = None) -> int:
                     continue
                 engine.create(workspace, AgencyJob.Kind.LEARN, title="Refresh creative memory")
             queued += 1
-        except Exception:
+        except Exception as exc:
+            from apps.common.background import note_task_failure
+
+            note_task_failure(exc)
             logger.exception("Autopilot: could not queue a memory refresh for workspace %s", workspace.pk)
     return queued
 
@@ -399,7 +522,10 @@ def notify_week_ready(week, ready: int) -> int:
                 data={"workspace_id": str(workspace.id), "week_id": str(week.pk), "action_url": url},
             )
             sent += 1
-        except Exception:
+        except Exception as exc:
+            from apps.common.background import note_task_failure
+
+            note_task_failure(exc)
             logger.exception("Autopilot: could not notify user %s", user.pk)
     return sent
 
@@ -444,6 +570,31 @@ def announce_planned_weeks() -> int:
         if any(status in busy for status in statuses):
             continue
         ready = sum(1 for status in statuses if status in (StudioBrief.Status.READY, StudioBrief.Status.APPROVED))
+        # The settings may change after this plan was queued. Compare its
+        # output with its captured quota, not today's settings or just the
+        # number of rows that survived planner de-duplication.
+        try:
+            captured_posts = (job.input or {}).get("posts")
+            requested = max(1, min(14, int(captured_posts))) if captured_posts is not None else len(statuses)
+        except (TypeError, ValueError, OverflowError):
+            requested = len(statuses)
+        missing = max(0, requested - len(statuses))
+        incomplete = sum(1 for status in statuses if status == StudioBrief.Status.FAILED)
+        if incomplete or missing:
+            details = []
+            guidance = []
+            if incomplete:
+                details.append(f"{incomplete} failed")
+                guidance.append("Retry the failed drafts to finish them.")
+            if missing:
+                details.append(f"{missing} were not prepared")
+                guidance.append("Brief the team for the missing posts.")
+            AutopilotWeek.objects.filter(pk=week.pk, status=week.status).update(
+                status=AutopilotWeek.Status.FAILED,
+                note=f"{ready} of {requested} posts are ready; {'; '.join(details)}. {' '.join(guidance)}",
+                updated_at=timezone.now(),
+            )
+            continue
         if not ready:
             AutopilotWeek.objects.filter(pk=week.pk, status=AutopilotWeek.Status.PLANNING).update(
                 status=AutopilotWeek.Status.FAILED,
@@ -452,7 +603,7 @@ def announce_planned_weeks() -> int:
             )
             continue
         moved = AutopilotWeek.objects.filter(pk=week.pk, status=week.status).update(
-            status=AutopilotWeek.Status.PLANNED, updated_at=timezone.now()
+            status=AutopilotWeek.Status.PLANNED, note="", updated_at=timezone.now()
         )
         if moved:
             notify_week_ready(week, ready)
@@ -518,12 +669,16 @@ def queue_weekly_reports(now: datetime | None = None) -> int:
             if not budget.can_spend(row.workspace):
                 continue
             queued += queue_report(row.workspace, week_start) is not None
-        except Exception:
+        except Exception as exc:
+            from apps.common.background import note_task_failure
+
+            note_task_failure(exc)
             logger.exception("Autopilot: could not queue the weekly report for workspace %s", row.workspace_id)
     return queued
 
 
 PARTS = (
+    "resume_paused_jobs",
     "plan_due_workspaces",
     "feed_planned_briefs",
     "refresh_memory_due",
@@ -538,7 +693,10 @@ def run_cycle() -> dict[str, int]:
     for name in PARTS:
         try:
             done[name] = int(globals()[name]() or 0)
-        except Exception:
+        except Exception as exc:
+            from apps.common.background import note_task_failure
+
+            note_task_failure(exc)
             logger.exception("Agency cycle: %s failed", name)
             done[name] = -1
     return done

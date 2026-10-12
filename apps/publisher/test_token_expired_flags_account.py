@@ -58,12 +58,13 @@ class TokenExpiredFlagsAccountTest(TransactionTestCase):
         self.assertEqual(self.account.connection_status, SocialAccount.ConnectionStatus.ERROR)
         self.assertIn("Reconnect", self.account.last_error)
 
-    def test_an_ordinary_api_error_still_retries(self):
-        """The change is scoped to the token case; transient failures keep their backoff."""
+    def test_server_error_during_submission_requires_reconciliation(self):
+        """A server can commit a publish before answering 500, so blind retries are unsafe."""
         from providers.exceptions import APIError
 
         self._cycle_with(APIError("platform hiccup", status_code=500))
 
-        self.assertEqual(self.pp.status, PlatformPost.Status.SCHEDULED)
-        self.assertEqual(self.pp.retry_count, 1)
+        self.assertEqual(self.pp.status, PlatformPost.Status.FAILED)
+        self.assertEqual(self.pp.retry_count, 0)
+        self.assertIn("Check the account", self.pp.publish_error)
         self.assertEqual(self.account.connection_status, SocialAccount.ConnectionStatus.CONNECTED)

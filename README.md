@@ -32,7 +32,7 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | **Approval workflows** | Configurable stages (none / optional / internal / internal + client), threaded internal & external comments, reminders, and a full audit trail. |
 | **Unified social inbox** | Comments, mentions, DMs, and reviews from every connected platform in one place, with sentiment analysis, assignments, threaded replies, and historical backfill. |
 | **Analytics** | Per-post and channel-level performance from every connected platform's native API, with KPI cards, 7/30/90-day trend charts, and a sortable all-posts table for views, engagement, follower growth, reach, and watch time. |
-| **AI Agency** | A team of 28 agents in seven departments plans the week, writes and designs posts in the look of your best work, writes SEO blog articles, drafts inbox replies and answers questions in a team thread — staff and clients alike. Everything waits for a person to approve. Needs `ANTHROPIC_API_KEY` (pictures: `FAL_KEY`). See [AI Agency](#ai-agency). |
+| **AI Agency** | A team of 28 agents in seven departments plans the week, writes and designs posts in the look of your best work, writes SEO blog articles, drafts inbox replies and answers questions in a team thread — staff and clients alike. Everything waits for a person to approve. Needs the configured model-provider key (`OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`; pictures: `FAL_KEY`). See [AI Agency](#ai-agency). |
 | **Blog & SEO** | Write posts for the brands' own websites — or have the SEO team write them — with a live SEO score, approve the exact revision, and commit + deploy them through GitHub with a sitemap and RSS feed. Google Search Console rankings per article. Every post gets a designed 1600×900 cover — the title set over its picture in the brand's look — and a "Generate picture" button that paints a wordless image with fal.ai (`FAL_KEY`). |
 | **Media library** | Org- and workspace-scoped libraries with nested folders, auto-generated platform-optimized variants, alt text, and built-in Unsplash stock-photo search in the composer. |
 | **Client portal** | Passwordless 30-day magic-link access so clients can approve or reject posts without creating an account. |
@@ -304,7 +304,9 @@ All platforms with ephemeral filesystems require `STORAGE_BACKEND=s3` - see `.en
 
 **Memory sizing.** Importing the app costs roughly 100 MB before it serves a request, and a warmed Gunicorn worker settles near 200 MB - so the shipped command runs a single threaded worker (`--workers 1 --threads 4`), which fits a 512 MB dyno with room for media handling. Raise `--workers` only when you raise the memory to match; a rule of thumb is 250 MB per worker. Do **not** add `--max-requests`: gthread stops heartbeating at the start of the request that trips the counter, so the arbiter kills the worker mid-request once `--timeout` (30s) passes - which drops whichever upload happened to be that request, and uploads here can be up to 1 GB. The `worker` process needs the same headroom: it downloads videos to disk and streams them to the platform, and if it is killed mid-publish (Heroku's R15, an OOM kill, a deploy) the affected post is failed by the confirmation sweep rather than left in limbo.
 
-**Why the worker runs with `--duration 3600`.** `run_worker` is django-background-tasks' `process_tasks` with three fixes for life as a platform-managed service: it stops gracefully on SIGTERM (the library only listens for SIGTSTP, so a deploy used to kill it mid-task), it releases the task locks a killed worker leaves behind (otherwise `run_publish_cycle` stays locked for an hour after every crash - an hour with no publishing), and it re-registers any recurring schedule the library deleted after repeated failures. Pass `--keep-locks` if you ever run more than one worker replica. Underneath, `process_tasks` is a single non-forking process that runs every task in the same heap and never restarts, so a peak allocation raises RSS permanently - CPython and glibc keep the freed pages in their own arenas. Left alone it ratchets: on a 512 MB Basic dyno it climbed from ~280 MB after a deploy to 566 MB over 15 hours and sat at 110% of quota. `--duration` is checked at the *top* of the run loop, so a task in flight always finishes; the process then exits 0 between tasks and the platform restarts it at its floor. Nothing is lost - a recycle cannot interrupt a publish, and `confirm_pending_publishes` settles anything in flight regardless. Don't go below ~1800s, where Heroku's crash cool-off starts to engage. Other deploy targets keep the plain command: `docker-compose.yml` has no `restart:` policy on the worker, so there a clean exit would simply stop it.
+**Worker recovery and `--duration 3600`.** `run_worker` handles graceful SIGTERM, repairs recurring schedules and reclaims abandoned task locks. A dedicated PostgreSQL session lease rejects overlapping single-worker starts before lock reclamation and uses one extra database connection. Drain the old baseline worker before the first lease-enabled rollout; it does not participate in that lease. `--keep-locks` opts out for a separately validated multi-worker design and must not be used to bypass an overlap error. See [live rollout, strict verification and rollback](docs/LIVE_OPERATIONS.md#checking-the-live-deployment).
+
+`process_tasks` uses a single non-forking heap, so peak allocations can keep RSS high even after work finishes. `--duration` is checked between tasks: under graceful shutdown the task finishes and a platform restart returns the process to its initial memory floor. Configure a restart policy before using a duration limit; targets without one otherwise stop after a clean exit. Platform hard kills can still interrupt delivery, so confirmation and human inspection hold unknown outcomes rather than promising that every interrupted send can be safely repeated. The shipped Heroku setting uses 3600 seconds; avoid very short recycling periods that trigger platform restart cool-offs.
 
 **`MALLOC_ARENA_MAX`.** glibc gives each thread its own arena (up to 64 MB) capped at `8 x nproc`, and containers report the host's core count, so the cap is effectively unbounded. This app has real thread churn - the publisher builds a fresh pool every 15s and boto3's managed transfer adds ten threads per download - and those arenas are never returned to the OS. On Heroku this is already set to 2 by the repo's `.profile`, which applies to web, worker, the release phase and one-off `heroku run` dynos alike; it is written as a default rather than an override, so a config var still wins if you want to tune it. Deploy targets that build from the `Dockerfile` (Render, Railway, docker-compose) do not read `.profile` - set it in their own environment config if the host is memory-tight.
 
@@ -693,12 +695,24 @@ Each post's **Cover** setting chooses between the designed cover (default) and t
 
 **Inbox drafts.** With *Draft replies to comments, messages and reviews* on in Autopilot (or **Draft replies with the team** in the inbox), new comments, mentions, reviews and recent messages get a reply drafted by the community manager or the reviews manager, labelled as such in the inbox. A person sends it; one- and two-star reviews are flagged to the inbox staff.
 
-**Cost control.** Every agent's turn is recorded with tokens and an estimated cost at list prices (Claude Opus 5.5: tens of cents per post, around a dollar per article; fal.ai about $0.03 per picture). Autopilot, the thread and the blog team stop starting new work when the month's estimated spend reaches the workspace's budget, and the agency home shows the meter. The thread has a daily reply cap per workspace. Agent work runs below publishing in the worker's queue, so it never delays a scheduled post by more than one agent's turn.
+**Cost control.** Every agent's turn is recorded with tokens and an estimated cost at known model list prices; fal.ai pictures have a separate estimate. Treat the workspace budget as a soft pre-call threshold, not an exact provider bill or a reserved hard ceiling. Autopilot, the thread and the blog team stop starting new work when the month's estimated spend reaches the workspace's budget, and the agency home shows the meter. The thread has a daily reply cap per workspace. Agent work runs below publishing in the worker's queue, but a running turn cannot be preempted; its duration and retries can delay publishing. Measure that delay before promising a delivery-time guarantee.
 
-Setup — on the web **and** worker services (the agents run in the background worker):
+Setup — on the web **and** worker services (the agents run in the background worker). For OpenRouter:
 
+```text
+STUDIO_PROVIDER=openrouter
+OPENROUTER_API_KEY=                # enter securely in environment settings
+STUDIO_MODEL=anthropic/claude-sonnet-4.5
+STUDIO_WEB_SEARCH=false
 ```
-ANTHROPIC_API_KEY=sk-ant-...        # required; console.anthropic.com
+
+OpenRouter keys belong in `OPENROUTER_API_KEY`. Do not put them in `ANTHROPIC_API_KEY`: the providers use different endpoints and request formats. Empty `STUDIO_MODEL` selects the chosen provider's default. An old explicit Anthropic model ID must be replaced with an OpenRouter namespaced ID when switching providers. Confirm model availability, structured-output/image support and credits in your OpenRouter account. The OpenRouter adapter validates structured answers and retains usage from unusable answers; web research is disabled for this provider. Images still use fal.ai independently.
+
+For direct Anthropic access, use the existing provider:
+
+```text
+STUDIO_PROVIDER=anthropic
+ANTHROPIC_API_KEY=                 # enter securely; console.anthropic.com
 STUDIO_MODEL=claude-opus-5-5        # optional; the Claude model every agent uses
 STUDIO_EFFORT=                      # optional; low|medium|high|xhigh|max for every agent (default: per agent)
 STUDIO_TIMEOUT=300                  # optional; seconds per agent turn
@@ -710,6 +724,12 @@ GSC_CLIENT_ID=                      # optional; Google Search Console rankings (
 GSC_CLIENT_SECRET=
 INDEXNOW_KEY=                       # optional; tells Bing and other IndexNow engines when an article goes live
 ```
+
+For production activation, recovery gaps and the pilot that verifies real delivery after human **Approve & schedule**, see [CTO agency readiness](docs/CTO_AGENCY_READINESS.md). Plain **Approve** does not schedule a post.
+
+**Create in the team thread.** The account manager asks focused questions, gathers the saved brand website and connected Meta channel context, and shows a creative brief for your explicit confirmation before starting a draft. Attach a photo and draw on saved creative memory, then review the graphic and captions in that same conversation. Measured loss of essential graphic text blocks handoff for correction. Finished content still needs human **Approve & schedule**. See [guided post creation](docs/GUIDED_POST_CREATION.md) for the flow and source limitations.
+
+The [Neopolis launch audit](docs/NEOPOLIS_LAUNCH_AUDIT.md) records failure, concurrency and usage regressions plus the required live acceptance pilot. Before its first rollout, drain the old worker and review/reapprove queued approvals: the new worker singleton lease and native-destination approval fingerprint change those operating requirements.
 
 **Google Search Console** (optional): in Google Cloud Console create an OAuth client ID (Web application), enable the *Google Search Console API*, add the redirect URI `{APP_URL}/blog/search-console/callback/`, and set `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` on both services. Then an owner chooses **Connect Google Search Console** on the blog list and picks the property for that website (the Google account must have access to it). Rankings sync daily.
 

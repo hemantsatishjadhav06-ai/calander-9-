@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import uuid
 
+from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -173,7 +174,49 @@ def _send(request, workspace, conversation_getter, *, brief=None, blog_post=None
     try:
         chat.clean_body(body)
         conversation = conversation_getter()
-        posted = chat.post_message(conversation, request.user, body, is_internal=is_internal)
+        reference_id = request.POST.get("reference_id", "")
+        uploaded = request.FILES.get("reference_upload")
+        if uploaded is not None:
+            if (
+                conversation.audience != Conversation.Audience.INTERNAL
+                or is_internal
+                or request.POST.get("kind") == "confirm_brief"
+            ):
+                raise chat.ChatError("Attach the photo in a message before confirming your brief.")
+            if not _perms(request).get("upload_media", False):
+                raise PermissionDenied("You don't have permission to upload media.")
+            from apps.media_library.quotas import StorageQuotaExceededError
+            from apps.media_library.services import create_asset, upload_rejection_message
+            from apps.media_library.tasks import process_media_asset
+
+            try:
+                picture = forms.ImageField().clean(uploaded)
+                if picture.image.format not in {"JPEG", "PNG", "WEBP"}:
+                    raise forms.ValidationError("Use a JPEG, PNG or WebP still photo for this brief.")
+                asset = create_asset(
+                    workspace.organization,
+                    workspace,
+                    picture,
+                    request.user,
+                    title=f"Brief photo: {picture.name}"[:255],
+                    source="studio-brief-photo",
+                )
+            except (StorageQuotaExceededError, forms.ValidationError) as exc:
+                raise chat.ChatError(upload_rejection_message(exc)) from None
+            process_media_asset(str(asset.pk))
+            reference_id = str(asset.pk)
+        posted = chat.post_message(
+            conversation,
+            request.user,
+            body,
+            is_internal=is_internal,
+            kind=request.POST.get("kind", ""),
+            confirmation_message_id=request.POST.get("confirmation_message_id", ""),
+            facts_confirmed=request.POST.get("facts_confirmed") == "1",
+            reference_id=reference_id,
+            style_mode=request.POST.get("style_mode", ""),
+            target_brief_id=request.POST.get("target_brief_id", ""),
+        )
     except chat.ChatError as exc:
         return _after_send(
             request,

@@ -26,11 +26,17 @@
     </div>
 
     {% include "components/agency_tabs.html" %}
+    <section class="mb-5 rounded-xl border border-stone-200 bg-white p-4" aria-label="Operational status">
+        <h2 class="font-semibold">{{ operational.title }}</h2>
+        {% for blocker in operational.blockers %}<p class="mt-1 text-sm text-red-800">{{ blocker }}</p>{% endfor %}
+        {% for warning in operational.warnings %}<p class="mt-1 text-sm text-amber-900">{{ warning }}</p>{% endfor %}
+        <p class="mt-2 text-xs text-stone-600">{{ operational.message }}</p>
+    </section>
 
     {% if not claude_ready %}
     <p class="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
         <span class="font-semibold">The team can't plan yet.</span>
-        The server needs <code class="font-mono text-xs">ANTHROPIC_API_KEY</code> on the web and worker services. Ask your admin to add it.
+        {{ configuration_error }}
     </p>
     {% endif %}
 
@@ -114,7 +120,7 @@
                 <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
                     <div>
                         <label for="{{ form.monthly_budget_usd.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.monthly_budget_usd.label }}</label>
-                        <p class="text-xs text-stone-600">The team starts no new work when it reaches this. This month: ${{ spend|floatformat:2 }} used of ${{ budget|floatformat:0 }}.</p>
+                        <p class="text-xs text-stone-600">Soft limit on estimated and reported AI charges. New work pauses after the recorded total reaches it; in-flight or unreported charges can exceed it. This month: ${{ spend|floatformat:2 }} recorded of ${{ budget|floatformat:2 }}.</p>
                     </div>
                     <div class="w-full sm:w-36">
                         {{ form.monthly_budget_usd }}
@@ -133,6 +139,14 @@
                     </div>
                 </div>
 
+                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
+                    <div><label for="{{ form.backup.id_for_label }}" class="text-sm font-semibold">{{ form.backup.label }}</label><p class="text-xs text-stone-600">Receives deadline alerts before a proposed post becomes overdue. A different current internal approver.</p></div>
+                    <div class="w-full sm:w-64">{{ form.backup }}{{ form.backup.errors }}</div>
+                </div>
+                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
+                    <div><label for="{{ form.delivery_delay_minutes.id_for_label }}" class="text-sm font-semibold">{{ form.delivery_delay_minutes.label }}</label><p class="text-xs text-stone-600">Late approved content is held for fresh review, a future time and human approval. Default: 1,440 minutes (24 hours).</p></div>
+                    <div class="w-full sm:w-44">{{ form.delivery_delay_minutes }}{{ form.delivery_delay_minutes.errors }}</div>
+                </div>
                 <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
                     <div>
                         <label for="{{ form.learn_from_best.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.learn_from_best.label }}</label>

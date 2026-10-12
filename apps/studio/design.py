@@ -24,6 +24,7 @@ import contextlib
 import hashlib
 import io
 import re
+from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -88,6 +89,32 @@ STAT_PORTRAIT, STAT_SQUARE, STAT_SIDE = 0.36, 0.3, 0.4
 
 WHITE: RGB = (255, 255, 255)
 INK: RGB = (17, 24, 39)
+
+# Render diagnostics are local to this turn, including concurrent workers.
+# The public renderer still returns JPEG bytes; callers that need a quality
+# report collect the same layout's measurements while it renders.
+_TEXT_ISSUES: ContextVar[list[dict[str, Any]] | None] = ContextVar("studio_graphic_text_issues", default=None)
+ESSENTIAL_TEXT = frozenset({"headline", "subheadline", "stat_value", "stat_label", "cta_label"})
+
+
+@contextlib.contextmanager
+def collect_text_issues():
+    """Collect actual text loss/overflow from the renderer without changing its output."""
+    issues: list[dict[str, Any]] = []
+    token = _TEXT_ISSUES.set(issues)
+    try:
+        yield issues
+    finally:
+        _TEXT_ISSUES.reset(token)
+
+
+def _text_issue(field: str, reason: str, note: str) -> None:
+    issues = _TEXT_ISSUES.get()
+    if issues is None or not field:
+        return
+    issue = {"field": field, "reason": reason, "note": note, "blocking": field in ESSENTIAL_TEXT}
+    if issue not in issues:
+        issues.append(issue)
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +290,7 @@ def fit_text(
     minimum: int,
     max_height: float | None = None,
     leading: float = 1.1,
+    field: str = "",
 ) -> tuple[ImageFont.FreeTypeFont, list[str]]:
     """The biggest size at which ``text`` fits the box, and its lines.
 
@@ -285,11 +313,14 @@ def fit_text(
     if max_height is not None:
         limit = max(1, min(max_lines, int(max_height // (size * leading))))
     if len(lines) > limit or any(font.getlength(line) > max_width for line in lines):
+        _text_issue(field, "ellipsis", "The text does not fit its layout and was shortened with an ellipsis.")
         lines = lines[:limit]
         last = lines[-1] if lines else ""
         while last and font.getlength(last + "...") > max_width:
             last = last[:-1].rstrip()
         lines[-1] = (last.rstrip(" ,;:–-") + "...") if last else "..."
+    if max_height is not None and len(lines) * size * leading > max_height:
+        _text_issue(field, "overflow", "The text exceeds the vertical space available in this layout.")
     return font, lines
 
 
@@ -352,11 +383,14 @@ def grade_picture(image: Image.Image, grade: str, look: Look) -> Image.Image:
 
 
 def load_picture(picture: bytes, size: tuple[int, int], grade: str, look: Look, centering=(0.5, 0.45)) -> Image.Image:
+    from apps.media_library.services import ImageTooLargeError, open_image
+
     try:
-        with Image.open(io.BytesIO(picture)) as opened:
-            opened.load()
+        # Bound decoding before cover_crop's EXIF transposition or any full
+        # image copy. JPEG drafting preserves enough pixels for this canvas.
+        with open_image(io.BytesIO(picture), draft_size=size) as opened:
             fitted = cover_crop(opened, size)
-    except (OSError, Image.DecompressionBombError) as exc:
+    except (OSError, ImageTooLargeError) as exc:
         raise ValueError(f"The picture could not be read as an image ({exc}).") from exc
     if centering != (0.5, 0.45):
         fitted = ImageOps.fit(fitted, size, method=Image.Resampling.LANCZOS, centering=centering)
@@ -518,9 +552,12 @@ def _chip(canvas: Image.Image, look: Look, m: dict, text: str, *, x: int, y: int
     ascent, descent = font.getmetrics()
     width = _tracked_width(font, text, tracking)
     max_width = canvas.width - x - m["margin"]
+    original = text
     while width + pad_x * 2 > max_width and len(text) > 3:
         text = text[:-1].rstrip()
         width = _tracked_width(font, text, tracking)
+    if text != original:
+        _text_issue("kicker", "truncated", "The kicker was shortened to fit its tag.")
     box = (x, y, round(x + width + pad_x * 2), y + ascent + descent + pad_y * 2 - round(size * 0.2))
     draw.rounded_rectangle(box, radius=round(size * 0.3), fill=look.accent)
     ink = WHITE if contrast(WHITE, look.accent) >= 2.5 else INK
@@ -561,8 +598,11 @@ def _cta(
     if measure:
         return top
     max_width = canvas.width - x - m["margin"] - size
+    original = text
     while font.getlength(text) > max_width and len(text) > 4:
         text = text[:-1].rstrip()
+    if text != original:
+        _text_issue("cta_label", "truncated", "The call to action was shortened to fit its line.")
     tri = size * 0.42
     cy = top + (ascent + descent) / 2 + size * 0.05
     draw.polygon([(x, cy - tri), (x + tri * 1.2, cy), (x, cy + tri)], fill=color)
@@ -610,6 +650,7 @@ def _editorial(size, spec, look, picture) -> Image.Image:
         sub_font, sub_lines = fit_text(
             spec["subheadline"],
             look.font,
+            field="subheadline",
             weight=400,
             max_width=text_width,
             max_lines=lines,
@@ -626,6 +667,7 @@ def _editorial(size, spec, look, picture) -> Image.Image:
     head_font, head_lines = fit_text(
         spec["headline"],
         look.font,
+        field="headline",
         weight=700,
         max_width=text_width,
         max_lines=lines,
@@ -686,6 +728,7 @@ def _panel_stack(canvas, look, m, spec, *, x, top, bottom, width) -> None:
         sub_font, sub_lines = fit_text(
             spec["subheadline"],
             look.font,
+            field="subheadline",
             weight=400,
             max_width=width,
             max_lines=lines,
@@ -698,6 +741,7 @@ def _panel_stack(canvas, look, m, spec, *, x, top, bottom, width) -> None:
     head_font, head_lines = fit_text(
         spec["headline"],
         look.font,
+        field="headline",
         weight=700,
         max_width=width,
         max_lines=lines,
@@ -706,6 +750,8 @@ def _panel_stack(canvas, look, m, spec, *, x, top, bottom, width) -> None:
         max_height=max(minimum * leading, limit - cursor - sub_height),
         leading=leading,
     )
+    if len(head_lines) * _line_height(head_font, leading) + sub_height > limit - cursor:
+        _text_issue("headline", "overflow", "The text block overlaps the call to action or footer in this panel.")
     draw = ImageDraw.Draw(canvas)
     cursor = _draw_lines(draw, head_lines, head_font, x=x, y=cursor, fill=look.text, leading=leading)
     if sub_lines and sub_font is not None:
@@ -789,6 +835,7 @@ def _statement(size, spec, look, picture) -> Image.Image:
         sub_font, sub_lines = fit_text(
             spec["subheadline"],
             look.font,
+            field="subheadline",
             weight=400,
             max_width=text_width,
             max_lines=lines,
@@ -802,6 +849,7 @@ def _statement(size, spec, look, picture) -> Image.Image:
     head_font, head_lines = fit_text(
         spec["headline"],
         look.font,
+        field="headline",
         weight=700,
         max_width=text_width,
         max_lines=lines,
@@ -851,7 +899,15 @@ def _stat(size, spec, look, picture) -> Image.Image:
     start, minimum = m["stat"]
     value = clean_text(spec["stat_value"], look.font)
     stat_font, stat_lines = fit_text(
-        value, look.font, weight=700, max_width=text_width, max_lines=1, start=start, minimum=minimum, leading=1.0
+        value,
+        look.font,
+        weight=700,
+        max_width=text_width,
+        max_lines=1,
+        start=start,
+        minimum=minimum,
+        leading=1.0,
+        field="stat_value",
     )
     ascent, descent = stat_font.getmetrics()
     draw.text(
@@ -866,6 +922,7 @@ def _stat(size, spec, look, picture) -> Image.Image:
         label_font, label_lines = fit_text(
             label,
             look.font,
+            field="stat_label",
             weight=600,
             max_width=text_width,
             max_lines=2,
@@ -875,6 +932,8 @@ def _stat(size, spec, look, picture) -> Image.Image:
         )
         cursor += round(margin * 0.15)
         for line in label_lines:
+            if _tracked_width(label_font, line, label_font.size * 0.1) > text_width:
+                _text_issue("stat_label", "overflow", "The statistic's tracked label is wider than its text area.")
             _tracked(draw, (x, cursor), line, label_font, look.soft_text, label_font.size * 0.1)
             cursor += _line_height(label_font, 1.2)
     bottom = height - m["strip"] - round(margin * 0.7)
@@ -893,6 +952,7 @@ def _stat(size, spec, look, picture) -> Image.Image:
         sub_font, sub_lines = fit_text(
             spec["subheadline"],
             look.font,
+            field="subheadline",
             weight=400,
             max_width=text_width,
             max_lines=s_lines,
@@ -902,11 +962,15 @@ def _stat(size, spec, look, picture) -> Image.Image:
         )
         sub_height = len(sub_lines) * _line_height(sub_font, 1.25) + round(margin * 0.25)
         if limit - cursor - sub_height < m["headline"][1] * leading:
+            _text_issue(
+                "subheadline", "omitted", "The supporting line was omitted because the stat layout has no room."
+            )
             sub_lines, sub_height = [], 0  # no room: the headline matters more
     start, minimum, lines = m["headline"]
     head_font, head_lines = fit_text(
         spec["headline"],
         look.font,
+        field="headline",
         weight=700,
         max_width=text_width,
         max_lines=3,
@@ -915,6 +979,8 @@ def _stat(size, spec, look, picture) -> Image.Image:
         max_height=max(minimum * leading, limit - cursor - sub_height),
         leading=leading,
     )
+    if len(head_lines) * _line_height(head_font, leading) + sub_height > limit - cursor:
+        _text_issue("headline", "overflow", "The statistic's text block overlaps its call to action or footer.")
     cursor = _draw_lines(draw, head_lines, head_font, x=x, y=cursor, fill=look.text, leading=leading)
     if sub_lines and sub_font is not None:
         _draw_lines(draw, sub_lines, sub_font, x=x, y=cursor + round(margin * 0.25), fill=look.soft_text, leading=1.25)
@@ -942,18 +1008,30 @@ def normalise_spec(spec: dict[str, Any], look: Look) -> dict[str, Any]:
     except (TypeError, ValueError):
         overlay = 0.65
     font = look.font
-    headline = clean_text(spec.get("headline") or "", font) or clean_text(look.wordmark, font) or "..."
+    headline = clean_text(spec.get("headline") or "", font)
+    if not headline:
+        _text_issue("headline", "missing", "The graphic has no headline; the renderer substituted the brand name.")
+    headline = headline or clean_text(look.wordmark, font) or "..."
+    cleaned = {
+        "kicker": clean_text(spec.get("kicker") or "", font),
+        "headline": headline,
+        "subheadline": clean_text(spec.get("subheadline") or "", font),
+        "stat_value": clean_text(spec.get("stat_value") or "", font),
+        "stat_label": clean_text(spec.get("stat_label") or "", font),
+        "cta_label": clean_text(spec.get("cta_label") or "", font),
+    }
+    limits = {"kicker": 40, "headline": 160, "subheadline": 220, "stat_value": 12, "stat_label": 60, "cta_label": 60}
+    visible_fields = {"headline", "subheadline", "cta_label"}
+    visible_fields.update({"stat_value", "stat_label"} if template == "stat" else {"kicker"})
+    for field, text in cleaned.items():
+        if field in visible_fields and len(text) > limits[field]:
+            _text_issue(field, "truncated", f"The text exceeds the renderer's {limits[field]}-character limit.")
     return {
         "template": template,
         "format": fmt,
         "grade": grade,
         "overlay": max(0.3, min(0.9, overlay)),
-        "kicker": clean_text(spec.get("kicker") or "", font)[:40],
-        "headline": headline[:160],
-        "subheadline": clean_text(spec.get("subheadline") or "", font)[:220],
-        "stat_value": clean_text(spec.get("stat_value") or "", font)[:12],
-        "stat_label": clean_text(spec.get("stat_label") or "", font)[:60],
-        "cta_label": clean_text(spec.get("cta_label") or "", font)[:60],
+        **{field: text[: limits[field]] for field, text in cleaned.items()},
     }
 
 

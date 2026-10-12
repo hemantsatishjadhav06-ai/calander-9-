@@ -11,7 +11,7 @@
     </nav>
     <div class="mb-6 max-w-2xl">
         <h1 class="text-lg font-semibold text-stone-900">Brand profile</h1>
-        <p class="text-sm text-stone-600 mt-0.5">Everything the team knows about {{ profile.brand_name }}: how it sounds, the facts it may state, and how its graphics look. The agents never state a fact that isn't here or in the idea itself.</p>
+        <p class="text-sm text-stone-600 mt-0.5">How {{ profile.brand_name }} sounds and looks. Saved background notes are unverified. Record source-backed commercial claims and project photos in <a href="{% url 'studio:trust' workspace_id=workspace.pk %}" class="underline">Verified facts</a>; each claim needs a verifier and review expiry.</p>
     </div>
 
     <section aria-labelledby="samples-heading" class="mb-8">
@@ -47,7 +47,7 @@
             </section>
 
             <section aria-labelledby="facts-heading" class="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6">
-                <h2 id="facts-heading" class="text-sm font-semibold text-stone-900 mb-4">What it may say</h2>
+                <h2 id="facts-heading" class="text-sm font-semibold text-stone-900 mb-4">Background notes and rules</h2>
                 <div class="grid md:grid-cols-2 gap-4">
                     <div class="md:col-span-2">{% include "blog/partials/field.html" with field=form.facts %}</div>
                     {% include "blog/partials/field.html" with field=form.dos %}
