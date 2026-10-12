@@ -131,7 +131,7 @@ Historical 11 October backend evidence, retained for provenance:
 Reproduce a current full run from the configured environment, using an isolated database:
 
 ```bash
-DB_NAME=brightbean_agency_integration .venv/bin/pytest -q --disable-warnings --maxfail=3 --reuse-db
+DB_NAME=sm_bean_cto_full STUDIO_PROVIDER=anthropic .venv/bin/pytest -q --disable-warnings --maxfail=5 --reuse-db
 ```
 
 `pyproject.toml` selects `config.settings.test`; PostgreSQL uses a separate `test_` database. External model/image/source/provider boundaries are guarded in tests. The final CTO handoff should contain the cumulative patch, this audit, operating/status guides, browser evidence, synthetic renderer example, authoritative validation JSON and checksums. It must contain no production credentials. This evidence establishes bounded local fault/concurrency/integration/UI behavior, not a production load test or paid-provider launch certification.
