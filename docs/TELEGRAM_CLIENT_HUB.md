@@ -95,3 +95,9 @@ Telegram transient-content retention is configurable: update payloads default to
 Focused weekly tests exercise real PostgreSQL/canonical planning, reviewed source propagation, existing-content volume, duplicate claims, changed evidence, revoked roles, private/client boundaries and default read-only commands. All source/model/provider boundaries are controlled. Final Telegram/full-repository results belong to the root validation record, not overlapping focused totals.
 
 The live acceptance gates remain actual bot/webhook identity, deployed services/migrations, member/admin pairing, model/image/Meta access, verified facts/assets, a completed useful campaign, real human approval and exactly-once native receipt, delivered alerts, realistic costs and a phone/keyboard walkthrough. No fixture, saved networking draft or queued local job establishes that the production Neopolis week was updated.
+
+## Controlled release and Neopolis pilot
+
+Follow the [Railway rollout](TELEGRAM_RAILWAY_ROLLOUT.md) before merging the first singleton-worker release. It controls automatic deployment, drains the preceding worker, freezes writes for backup and migrates through only the web service. Use the [read-only inspector](../tools/telegram_release_inspect.py) and [pending receipt](TELEGRAM_RAILWAY_RELEASE_RECEIPT.json) to record actual evidence. The [Neopolis worksheet](NEOPOLIS_LIVE_PILOT_WORKSHEET.md) covers the 19–25 October 2026 campaign, real Telegram pairing, graphics acceptance and human publication approval.
+
+The tested application source is `6cb392ff35494a0cb3172c95e654663cfe6dfce9` (4,306 passed; one Redis-only check skipped). A later documentation/tooling or merge commit has a different deployment SHA; record that verified SHA and pass it to the inspector with `--expected-deployment-commit`. Source/key presence and local fixtures do not establish live deployment or delivery.
