@@ -30,6 +30,7 @@ class TestProviderRegistry:
             "google_business",
             "mastodon",
             "devto",
+            "x",
         }
         assert set(PROVIDER_REGISTRY.keys()) == expected
 
@@ -229,6 +230,23 @@ class TestErrorForResponse:
         assert isinstance(exc, APIError)
         assert exc.status_code == status
         assert exc.raw_response == {"message": "nope"}
+
+
+def test_worker_lease_is_rechecked_before_each_provider_http_request():
+    from apps.common.background import WorkerLeaseLostError, worker_lease_checks
+
+    provider = get_provider("facebook")
+
+    def lost_lease():
+        raise RuntimeError("worker lease disappeared")
+
+    with (
+        patch("providers.base.httpx.Client") as client,
+        worker_lease_checks(lost_lease),
+        pytest.raises(WorkerLeaseLostError),
+    ):
+        provider._request("POST", "https://graph.facebook.com/example", access_token="test-token")
+    client.assert_not_called()
 
 
 class TestGetPostMetricsBatchDefault:

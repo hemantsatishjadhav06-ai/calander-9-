@@ -1,3 +1,5 @@
+import logging
+
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django import forms
@@ -5,6 +7,8 @@ from django import forms
 from apps.accounts.models import OAuthConnection
 from apps.accounts.signup_policy import may_sign_up
 from apps.common.mail import transactional
+
+logger = logging.getLogger(__name__)
 
 NOT_INVITED_MESSAGE = "This address hasn't been invited yet. Ask your team for an invitation link."
 
@@ -64,6 +68,23 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
             email = address.email
             break
         return may_sign_up(request, email or None) if email else may_sign_up(request)
+
+    def on_authentication_error(self, request, provider, error=None, exception=None, extra_context=None):
+        """Log why a Google sign-in failed; the person only sees "didn't finish".
+
+        A wrong client secret, a redirect URI missing from the Google Cloud
+        client, or an expired state all end on the same page, so without this
+        the reason was nowhere.
+        """
+        logger.warning(
+            "Social sign-in failed: provider=%s error=%s exception=%s",
+            getattr(provider, "id", provider),
+            error,
+            f"{exception.__class__.__name__}: {exception}"[:300] if exception else "",
+        )
+        return super().on_authentication_error(
+            request, provider, error=error, exception=exception, extra_context=extra_context
+        )
 
     def populate_user(self, request, sociallogin, data):
         """Set user.name from Google profile (custom User model has 'name', not first/last)."""

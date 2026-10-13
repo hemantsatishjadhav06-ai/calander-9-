@@ -191,6 +191,9 @@ class PublishContent:
     # Per-item media type ("image" / "video" / "gif" / ...), parallel to
     # ``media_urls``. Filled by the engine from MediaAsset.media_type.
     media_types: list[str] = field(default_factory=list)
+    # Per-item alt text, parallel to ``media_urls`` ("" where there is none).
+    # Filled by the engine from the attachment, falling back to the asset's.
+    media_alt_texts: list[str] = field(default_factory=list)
 
     def is_video(self, index: int = 0) -> bool:
         """Whether media item ``index`` is a video.

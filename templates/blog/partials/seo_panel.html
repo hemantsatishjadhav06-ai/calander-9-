@@ -1,0 +1,36 @@
+{% comment %}
+The editor's live SEO panel: score, Google preview, checks. Re-rendered by POST blog:seo_score as the writer types
+(nothing is saved). Context: report, ring, preview ({crumbs, title, description}).
+{% endcomment %}
+{% if request.htmx %}<p id="seo-live" hx-swap-oob="true" class="sr-only" aria-live="polite">SEO score {{ report.score }} of 100: {{ report.grade }}.</p>{% endif %}
+<div class="space-y-4">
+    <section aria-labelledby="seo-score-heading" class="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+        <h2 id="seo-score-heading" class="sr-only">SEO score</h2>
+        <div class="flex items-center gap-4">
+            {% include "blog/partials/seo_ring.html" %}
+            <div class="min-w-0">
+                <p class="text-base font-semibold {% if report.tone == 'good' %}text-green-800{% elif report.tone == 'fair' %}text-amber-800{% else %}text-red-800{% endif %}">
+                    <span class="sr-only">Score {{ report.score }} of 100: </span>{{ report.grade }}
+                </p>
+                <p class="text-xs text-stone-600 mt-0.5">
+                    {{ report.passed }} of {{ report.checks|length }} checks pass{% if report.to_fix %} · {{ report.to_fix|length }} thing{{ report.to_fix|length|pluralize }} to improve{% endif %}{% if report.words %} · {{ report.words }} words{% endif %}
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section aria-labelledby="seo-preview-heading" class="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+        <h2 id="seo-preview-heading" class="text-xs font-semibold tracking-wide uppercase text-stone-600 mb-2">Google preview</h2>
+        <p class="text-xs text-stone-700 truncate">{{ preview.crumbs|join:" › " }}</p>
+        <p class="mt-0.5 text-lg leading-snug text-blue-800 break-words">{{ preview.title|default:"Your search title appears here" }}</p>
+        <p class="mt-1 text-sm text-stone-700 break-words line-clamp-3">{{ preview.description|default:"Write a search description: the grey text under the link." }}</p>
+        <p class="mt-3 text-xs {% if report.title_fits %}text-stone-600{% else %}text-red-800 font-semibold{% endif %}">
+            The title is {{ report.title_tag|length }} of 60 characters as Google shows it{% if not report.title_fits %} — Google cuts it off; shorten it{% endif %}.
+        </p>
+    </section>
+
+    <section aria-labelledby="seo-checks-heading" class="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+        <h2 id="seo-checks-heading" class="text-xs font-semibold tracking-wide uppercase text-stone-600 mb-3">Checks</h2>
+        {% include "blog/partials/seo_checks.html" %}
+    </section>
+</div>

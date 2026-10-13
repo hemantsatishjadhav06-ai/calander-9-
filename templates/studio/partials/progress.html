@@ -1,0 +1,45 @@
+{% comment %}The team at work. Polled every 3 s while the brief is active; the view answers HX-Refresh when the team is done.{% endcomment %}
+<section id="studio-progress" aria-labelledby="progress-heading" aria-live="polite"
+         class="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6"
+         {% if brief.is_active %}hx-get="{% url 'studio:progress' workspace_id=workspace.id brief_id=brief.id %}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+    <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 id="progress-heading" class="text-sm font-semibold text-stone-900">The team</h2>
+        {% if brief.is_active %}<span class="text-xs text-stone-600">Revision {{ brief.revision }} · usually two to four minutes</span>{% endif %}
+    </div>
+    <ol class="relative space-y-4">
+        {% for row in team %}
+        <li class="flex gap-3">
+            <span class="mt-0.5 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center
+                {% if row.state == 'done' %}bg-green-600 text-white
+                {% elif row.state == 'working' %}bg-indigo-600 text-white
+                {% elif row.state == 'failed' %}bg-red-600 text-white
+                {% elif row.state == 'warning' %}bg-amber-500 text-white
+                {% elif row.state == 'skipped' %}bg-stone-300 text-stone-700
+                {% else %}bg-stone-100 text-stone-500 ring-1 ring-inset ring-stone-300{% endif %}" aria-hidden="true">
+                {% if row.state == 'done' %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                {% elif row.state == 'working' %}<svg class="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".3"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                {% elif row.state == 'failed' %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+                {% elif row.state == 'warning' %}<span class="text-xs font-bold">!</span>
+                {% elif row.state == 'skipped' %}<span class="text-xs font-bold">–</span>
+                {% else %}<span class="text-[10px] font-semibold">{{ forloop.counter }}</span>{% endif %}
+            </span>
+            <div class="min-w-0">
+                <p class="text-sm text-stone-900">
+                    <span class="font-semibold">{{ row.name }}</span>
+                    <span class="text-stone-600">· {{ row.role }}</span>
+                    <span class="sr-only">— {{ row.state }}</span>
+                </p>
+                {% if row.run and row.run.summary %}
+                <p class="text-sm text-stone-700 break-words">{{ row.run.summary }}</p>
+                {% elif row.run and row.run.error %}
+                <p class="text-sm text-red-800 break-words">{{ row.run.error }}</p>
+                {% elif row.state == 'working' %}
+                <p class="text-sm text-indigo-800">Working on it…</p>
+                {% elif row.state == 'queued' %}
+                <p class="text-sm text-stone-600">Waiting for the worker…</p>
+                {% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ol>
+</section>

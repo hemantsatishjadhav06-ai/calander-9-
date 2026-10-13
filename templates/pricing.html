@@ -78,7 +78,7 @@
   <main>
     <div class="head wrap">
       <h1>Free to run yourself. Or let us run it for you.</h1>
-      <p>{{ SITE_NAME }} is open-source (AGPL-3.0). Self-host it for free — every publishing feature, integrations for all 11 platforms, and seats, channels and workspaces that are never metered. Or hand the servers to us.</p>
+      <p>{{ SITE_NAME }} is open-source (AGPL-3.0). Self-host it for free — every publishing feature, integrations for supported platforms, and seats, channels and workspaces that are never metered. Or hand the servers to us.</p>
     </div>
 
     <div class="wrap">
@@ -90,7 +90,7 @@
           <ul class="feats">
             <li>Every publishing, approval &amp; analytics feature</li>
             <li>Unlimited orgs, workspaces, members &amp; channels — never metered</li>
-            <li>Integrations for all 11 platforms (bring your own developer apps)</li>
+            <li>Integrations for supported platforms (bring your own developer apps)</li>
             <li>Community support</li>
           </ul>
           <div class="cta"><a class="btn btn-ghost" href="{% if SOURCE_URL %}{{ SOURCE_URL }}{% else %}{% url 'account_signup' %}{% endif %}"{% if SOURCE_URL %} target="_blank" rel="noopener"{% endif %}>Get the source</a></div>
@@ -128,16 +128,18 @@
           </div>
         </div>
       </div>
-      <p class="note">The software is and stays free and open-source under AGPL-3.0. Managed Cloud and Agency plans pay for hosting, maintenance and support — not for publishing features. The one exception is the optional AI Intelligence add-on, which runs on a paid third-party model and is billed by usage.</p>
+      <p class="note">The software stays free and open-source under AGPL-3.0. Managed Cloud and Agency service fees cover hosting, maintenance and support. External usage is separate: Agency Studio and AI Intelligence make paid model requests; generated pictures use a paid image service. Your operator should explain who supplies and pays for OpenRouter or Anthropic, image-service and platform API credits before you generate content. The Agency monthly budget is a soft usage limit, not a prepaid balance or a guaranteed billing cap.</p>
     </div>
 
     <section class="faq wrap">
       <h2>Common questions</h2>
-      <div class="qa"><h3>Is it really free?</h3><p>Yes. Self-hosting {{ SITE_NAME }} is free forever, and seats, workspaces and channels are never metered. Publishing, scheduling, approvals, the client portal, inbox and analytics are all included. One optional add-on — AI Intelligence — runs on a paid third-party model and is billed by usage; everything else is free.</p></div>
+      <div class="qa"><h3>Is it really free?</h3><p>The self-hosted software is free, and seats, workspaces and channels are never metered. You still pay your own hosting and any external services you enable. Agency Studio and AI Intelligence require model credits; generated pictures require image-service credits. Supplied photos can be used without generating a new picture.</p></div>
+      <div class="qa"><h3>What does the Agency do?</h3><p>It prepares brand content for human review, then delivers the approved content at the approved time to your connected accounts. An AI review or a brief confirmation does not approve publication. Enquiries and site visits can be recorded by your team; post engagement alone does not establish sales or qualified leads.</p></div>
+      <div class="qa"><h3>How does the AI budget work?</h3><p>The Agency records provider-reported model cost when available and otherwise estimates usage from known prices. Failed requests and images can cost money. Calls already in progress, unreported charges and separately billed platform fees can exceed that estimate. Check the provider's balance and invoice for the actual charge; the budget pauses new work once recorded usage reaches the limit.</p></div>
       <div class="qa"><h3>How long does it take to connect my accounts?</h3><p>It depends on the platform. Bluesky, Mastodon and DEV.to connect in minutes. Meta (Facebook/Instagram/Threads), TikTok, LinkedIn and the others need an approved developer app first: self-hosters register their own (we document each step), and on the hosted service they appear as each platform approves ours.</p></div>
       <div class="qa"><h3>What am I paying for on Managed Cloud?</h3><p>Convenience: we host and update the app so you don't run servers. It's free during early access; we'll publish service levels and pricing, with notice, before anything is charged. The code stays open-source.</p></div>
       <div class="qa"><h3>Can I move between self-hosted and managed?</h3><p>It's the same open-source app on both, so nothing you rely on is proprietary. Moving an existing workspace between instances is a database migration we'll help with today; a self-serve export is on the roadmap.</p></div>
-      <div class="qa"><h3>Which platforms are supported?</h3><p>Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business, Mastodon and DEV.to — via each platform's official API.</p></div>
+      <div class="qa"><h3>Which platforms are supported?</h3><p>Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business, Mastodon, DEV.to and X — via each platform's official API. X publishes only: its API is pay-per-use, billed to the developer account behind the app.</p></div>
     </section>
   </main>
 

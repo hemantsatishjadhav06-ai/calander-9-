@@ -215,7 +215,8 @@ class OnboardingTests(OrgBase):
 
 
 class ChecklistActivationTests(OrgBase):
-    def test_a_draft_does_not_count_as_scheduling_a_post(self):
+    def test_a_draft_or_assigned_schedule_does_not_count_as_human_review(self):
+        from apps.approvals.models import ApprovalAction
         from apps.composer.models import PlatformPost, Post
         from apps.social_accounts.models import SocialAccount
 
@@ -224,10 +225,15 @@ class ChecklistActivationTests(OrgBase):
         )
         post = Post.objects.create(workspace=self.ws, author=self.owner, caption="draft")
         pp = PlatformPost.objects.create(post=post, social_account=account, status=PlatformPost.Status.DRAFT)
-        item = next(i for i in get_checklist_items(self.ws) if i["key"] == "create_post")
+        item = next(i for i in get_checklist_items(self.ws) if i["key"] == "review_draft")
         self.assertFalse(item["completed"])
         PlatformPost.objects.filter(pk=pp.pk).update(status=PlatformPost.Status.SCHEDULED)
-        item = next(i for i in get_checklist_items(self.ws) if i["key"] == "create_post")
+        item = next(i for i in get_checklist_items(self.ws) if i["key"] == "review_draft")
+        self.assertFalse(item["completed"])
+        ApprovalAction.objects.create(
+            post=post, user=self.owner, action=ApprovalAction.ActionType.APPROVED, channel="dashboard"
+        )
+        item = next(i for i in get_checklist_items(self.ws) if i["key"] == "review_draft")
         self.assertTrue(item["completed"])
 
     def test_connecting_a_channel_refreshes_the_cached_checklist(self):

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Verified facts · {{ workspace.name }}{% endblock %}
+{% block content %}
+<div class="max-w-5xl">
+  <h1 class="text-2xl font-semibold mb-2">Verified facts and project photos</h1>
+  <p class="text-sm text-stone-700 mb-5">Record who checked each claim, its source and review expiry. These are human attestations; collecting a website does not independently verify a commercial claim. Saved brand background notes remain unverified.</p>
+  {% include "components/agency_tabs.html" %}
+  {% if can_verify %}
+  <form method="post" class="bg-white border rounded-xl p-5 space-y-3 mb-6">
+    {% csrf_token %}
+    {% if selected_claim %}<input type="hidden" name="claim_id" value="{{ selected_claim.pk }}">{% endif %}
+    <h2 class="font-semibold">Verify a claim</h2>
+    {{ form.non_field_errors }}
+    {% for field in form %}<div><label for="{{ field.id_for_label }}" class="text-sm font-medium">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+    <button class="bg-orange-700 text-white rounded-lg px-4 py-2" type="submit">Record verification</button>
+  </form>
+  {% endif %}
+  <section class="space-y-3 mb-7" aria-label="Claim records">
+    {% for claim in claims %}
+    <article class="bg-white border rounded-xl p-4">
+      <p class="font-semibold">{{ claim.claim }}</p>
+      <p class="text-sm mt-1">{% if claim.current %}Current{% else %}Expired, retired or unverified — unavailable for generation{% endif %} · {{ claim.get_category_display }} · Review by {{ claim.valid_until }}</p>
+      <p class="text-xs mt-1">Checked by {{ claim.verified_by.name|default:"unavailable verifier" }} · {{ claim.verified_at }}</p>
+      {% if claim.source_url %}<a href="{{ claim.source_url }}" target="_blank" rel="noopener noreferrer" class="text-sm underline break-all">Source</a>{% endif %}
+      {% if claim.source_note %}<p class="text-sm">{{ claim.source_note }}</p>{% endif %}
+      {% if can_verify %}<a href="?claim={{ claim.pk }}" class="block mt-2 text-sm underline">Review or renew this claim</a>{% endif %}
+      {% if can_verify and claim.is_active %}<form method="post" class="mt-2">{% csrf_token %}<input type="hidden" name="kind" value="retire"><input type="hidden" name="claim_id" value="{{ claim.pk }}"><button class="text-xs underline" type="submit">Retire this claim</button></form>{% endif %}
+    </article>
+    {% empty %}<p>No verified claims yet. Add current source-backed facts before asking the team to state prices, availability, title or registration claims.</p>{% endfor %}
+  </section>
+  <section aria-label="Photo provenance" class="space-y-3">
+    <h2 class="font-semibold">Project photo provenance</h2>
+    {% for row in photos %}
+    <article class="bg-white border rounded-xl p-4">
+      <img src="{% if row.asset.thumbnail %}{{ row.asset.thumbnail.url }}{% else %}{{ row.asset.file.url }}{% endif %}" alt="{{ row.asset.alt_text|default:row.asset.title|default:row.asset.filename }}" class="w-full max-w-sm max-h-72 object-contain mb-3" loading="lazy">
+      <p class="font-semibold">{{ row.asset.title|default:row.asset.filename }}</p><p class="text-sm">{{ row.provenance.label }}</p>
+      {% if can_verify and not row.provenance.source_generated %}
+      <form method="post" class="mt-3 space-y-2">
+        {% csrf_token %}<input type="hidden" name="kind" value="photo"><input type="hidden" name="asset_id" value="{{ row.asset.pk }}">
+        <label class="block text-sm">Project depicted<input name="project" maxlength="200" required class="block border rounded-lg p-2 w-full" value="{{ row.asset.verified_project }}"></label>
+        <label class="block text-sm"><input name="photo_confirmed" type="checkbox" value="1" required> I checked that this file accurately depicts this project and is authorized for this campaign.</label>
+        <button class="border rounded-lg px-3 py-2 text-sm" type="submit">Confirm photo provenance</button>
+      </form>
+      {% endif %}
+    </article>
+    {% empty %}<p class="text-sm">Upload an authentic project photo in the team thread or media library.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

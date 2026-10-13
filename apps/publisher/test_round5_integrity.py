@@ -16,6 +16,7 @@ from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.common.background import WorkerLeaseLostError, worker_lease_checks
 from apps.composer.models import PlatformPost, Post
 from apps.organizations.models import Organization
 from apps.publisher.engine import PublishEngine
@@ -209,7 +210,8 @@ class AcceptedPublishBookkeepingTests(TestCase):
         self.assertTrue(result["success"])
         retry.assert_not_called()
         self.pp.refresh_from_db()
-        self.assertEqual(self.pp.status, PlatformPost.Status.PUBLISHING)
+        self.assertEqual(self.pp.status, PlatformPost.Status.FAILED)
+        self.assertEqual(self.pp.platform_extra["_delivery_state"]["kind"], "unknown")
 
 
 class UnknownPublishOutcomeTests(TestCase):
@@ -245,6 +247,16 @@ class UnknownPublishOutcomeTests(TestCase):
     def test_server_error_during_external_publish_does_not_resend(self):
         self._assert_unknown(APIError("server failed after submission", status_code=503))
 
+    def test_success_without_a_native_receipt_remains_unknown(self):
+        self.provider.publish_post.return_value = PublishResult(platform_post_id="")
+        with patch("apps.publisher.engine._provider_and_access_token", return_value=(self.provider, "token")):
+            result = PublishEngine()._publish_platform_post(self.pp)
+        self.assertTrue(result["outcome_unknown"])
+        self.pp.refresh_from_db()
+        self.assertEqual(self.pp.status, PlatformPost.Status.FAILED)
+        self.assertEqual(self.pp.platform_extra["_delivery_state"]["kind"], "unknown")
+        self.assertIsNone(self.pp.published_at)
+
     def test_rate_limit_rejection_keeps_the_safe_retry(self):
         before = timezone.now()
         result = self._publish_with(RateLimitError("write rejected", retry_after=600))
@@ -267,6 +279,18 @@ class UnknownPublishOutcomeTests(TestCase):
         self.provider.publish_post.assert_not_called()
         self.pp.refresh_from_db()
         self.assertEqual(self.pp.status, PlatformPost.Status.SCHEDULED)
+
+    def test_lease_lost_after_preparation_prevents_provider_publish(self):
+        checker = MagicMock(side_effect=RuntimeError("worker session lost"))
+        with (
+            patch("apps.publisher.engine._provider_and_access_token", return_value=(self.provider, "token")),
+            worker_lease_checks(checker),
+            self.assertRaises(WorkerLeaseLostError),
+        ):
+            PublishEngine()._publish_platform_post(self.pp)
+        self.provider.publish_post.assert_not_called()
+        self.pp.refresh_from_db()
+        self.assertEqual(self.pp.status, PlatformPost.Status.PUBLISHING)
 
 
 class ExtraMediaScopeTests(TestCase):

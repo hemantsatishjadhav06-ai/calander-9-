@@ -1,0 +1,58 @@
+<div class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3" data-creative-brief="{{ m.pk }}">
+    <h3 class="text-sm font-semibold text-stone-900">Your creative brief</h3>
+    <dl class="mt-2 space-y-1 text-xs text-stone-800">
+        {% if m.creative_request.topic %}<div><dt class="inline font-semibold">Topic: </dt><dd class="inline">{{ m.creative_request.topic }}</dd></div>{% endif %}
+        {% if m.creative_request.goal %}<div><dt class="inline font-semibold">Goal: </dt><dd class="inline">{{ m.creative_request.goal }}</dd></div>{% endif %}
+        {% if m.creative_request.audience %}<div><dt class="inline font-semibold">Audience: </dt><dd class="inline">{{ m.creative_request.audience }}</dd></div>{% endif %}
+        {% if m.creative_request.key_message %}<div><dt class="inline font-semibold">Message: </dt><dd class="inline">{{ m.creative_request.key_message }}</dd></div>{% endif %}
+        {% if m.creative_request.call_to_action %}<div><dt class="inline font-semibold">Call to action: </dt><dd class="inline">{{ m.creative_request.call_to_action }}</dd></div>{% endif %}
+        {% if m.creative_request.channels %}<div><dt class="inline font-semibold">Channels: </dt><dd class="inline">{{ m.creative_request.channels|join:", " }}</dd></div>{% endif %}
+        {% if m.creative_accounts %}<div><dt class="inline font-semibold">Destinations: </dt><dd class="inline">{% for account in m.creative_accounts %}{{ account.name }}{% if account.handle %} · @{{ account.handle|cut:"@" }}{% endif %} ({{ account.platform }}){% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>{% endif %}
+        {% if m.creative_request.visual_direction %}<div><dt class="inline font-semibold">Visual direction: </dt><dd class="inline">{{ m.creative_request.visual_direction }}</dd></div>{% endif %}
+        {% if m.creative_request.references %}<div><dt class="inline font-semibold">References: </dt><dd class="inline">{{ m.creative_request.references }}</dd></div>{% endif %}
+        {% if m.creative_request.constraints %}<div><dt class="inline font-semibold">Avoid / include: </dt><dd class="inline">{{ m.creative_request.constraints }}</dd></div>{% endif %}
+    </dl>
+    {% if m.source_warnings %}<div class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3" data-source-warnings><p class="text-sm font-semibold text-amber-950">Check these sources before creating a draft</p><ul class="mt-1 list-disc pl-4 text-xs text-amber-950">{% for warning in m.source_warnings %}<li>{{ warning }}</li>{% endfor %}</ul><p class="mt-2 text-xs text-amber-950">Scraped text is evidence, not independent verification of prices, availability or registration claims.</p></div>{% endif %}
+    {% if m.creative_sources %}
+    <details data-thread-details-key="sources-{{ m.pk }}" class="mt-3 text-xs text-stone-700">
+        <summary class="cursor-pointer font-semibold">Website and channel sources — check the facts</summary>
+        <div class="mt-2 space-y-2">
+            {% if m.creative_sources.fetched_at %}<p>Collected: {{ m.creative_sources.fetched_at }}</p>{% endif %}
+            {% with website=m.creative_sources.website %}
+            <div class="rounded-lg border border-stone-200 bg-white p-2">
+                <p class="font-semibold">Brand website · {{ website.status }}</p>
+                {% if m.website_source_url %}<a href="{{ m.website_source_url }}" target="_blank" rel="noopener noreferrer" class="break-all underline">{{ m.website_source_url }}</a>{% endif %}
+                {% if website.title %}<p class="mt-1 font-semibold">{{ website.title }}</p>{% endif %}
+                {% if website.excerpt %}<p class="mt-1 whitespace-pre-line break-words">{{ website.excerpt }}</p>{% endif %}
+                {% if website.error %}<p class="mt-1">{{ website.error }}</p>{% endif %}
+            </div>
+            {% endwith %}
+            {% for channel in m.creative_sources.channels %}
+            <div class="rounded-lg border border-stone-200 bg-white p-2">
+                <p class="font-semibold">{{ channel.account_name }} · {{ channel.platform }}</p>
+                {% if channel.source %}<p>{{ channel.source }}{% if channel.status %} · {{ channel.status }}{% endif %}</p>{% endif %}
+                {% for post in channel.posts %}<p class="mt-2 whitespace-pre-line break-words">{{ post.caption }}</p><p class="text-stone-600">{{ post.published_at }}</p>{% empty %}<p class="mt-1">No readable recent posts were available.</p>{% endfor %}
+            </div>
+            {% endfor %}
+            {% for note in m.creative_sources.notes %}<p>{{ note }}</p>{% endfor %}
+            <p>Source text can be outdated. Confirm the claims, prices, dates and account choices before continuing.</p>
+        </div>
+    </details>
+    {% endif %}
+    {% if m.can_confirm_brief %}
+    <form method="post" action="{{ thread.send_url }}" class="mt-3" data-confirm-brief="{{ m.pk }}"
+          hx-post="{{ thread.send_url }}" hx-sync="closest [data-agency-thread]:replace" hx-target="#{{ thread.dom_id }}" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
+        {% csrf_token %}
+        {% if thread.full_page %}<input type="hidden" name="full" value="1">{% endif %}
+        <input type="hidden" name="kind" value="confirm_brief">
+        <input type="hidden" name="confirmation_message_id" value="{{ m.pk }}">
+        <input type="hidden" name="body" value="Confirm this brief and create a review draft.">
+        <label class="flex items-start gap-2 text-xs text-stone-800">
+            <input type="checkbox" name="facts_confirmed" value="1" required class="mt-0.5 rounded border-stone-400 text-orange-700">
+            <span>I checked the brief, source facts and account choices.</span>
+        </label>
+        <button type="submit" class="mt-2 rounded-lg bg-orange-700 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-orange-700">Confirm brief &amp; create draft</button>
+        <p class="mt-2 text-xs text-stone-600">This starts creative work. The finished post still needs human approval and scheduling.</p>
+    </form>
+    {% endif %}
+</div>

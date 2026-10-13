@@ -75,6 +75,14 @@ class PortalSecurityTests(TestCase):
         self.workspace.save(update_fields=["is_archived"])
         self._assert_portal_revoked()
 
+    def test_unread_badge_respects_revoked_login_token(self):
+        self._login()
+        self.assertEqual(self.client.get(reverse("client_portal:team_unread")).status_code, 200)
+        revoke_magic_link(self.token.id, self.workspace)
+        response = self.client.get(reverse("client_portal:team_unread"))
+        self.assertRedirects(response, reverse("client_portal:magic_link_expired") + "?reason=signed_out")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
     def test_approval_link_cannot_change_account_or_authorize_oauth(self):
         self._login()
         response = self.client.post(reverse("accounts:settings"), {"action": "update_name", "name": "changed"})

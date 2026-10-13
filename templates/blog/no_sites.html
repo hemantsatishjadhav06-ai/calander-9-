@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}New blog post - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
+        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Blog</a>
+    </nav>
+    <h1 class="text-lg font-semibold text-stone-900 mb-2">No website to publish to</h1>
+    <p class="text-sm text-stone-700">This workspace isn't connected to a website, so there is nowhere to publish a blog post yet. An administrator can connect the Neopolis or More Space site with <code class="text-xs bg-stone-100 px-1 py-0.5 rounded">python manage.py ensure_blog_sites</code>.</p>
+</div>
+{% endblock %}

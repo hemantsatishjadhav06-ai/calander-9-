@@ -1,0 +1,78 @@
+{% load tz %}
+{% comment %}The SEO team's work on one job: the result (when there is one) and every agent's turn, polled while the job runs. Context: workspace, job, timeline, post, report, briefs, can_act.{% endcomment %}
+<div id="team-progress" class="space-y-6"
+     {% if job.is_active %}hx-get="{% url 'blog:team_job' workspace_id=workspace.id job_id=job.id %}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
+    <p class="sr-only" aria-live="polite">{{ job.get_status_display }}</p>
+
+    {% if job.status == 'done' %}
+    <section aria-labelledby="team-result-heading" class="rounded-2xl border border-green-200 bg-green-50 p-5">
+        <h2 id="team-result-heading" class="text-lg text-stone-900 mb-1" style="font-family: var(--font-display)">
+            {% if job.kind == 'repurpose' %}Posts are on their way{% else %}Your draft is ready for approval{% endif %}
+        </h2>
+        {% if job.result.summary %}<p class="text-sm text-stone-800 break-words">{{ job.result.summary }}</p>{% endif %}
+        {% if post and job.kind == 'blog' %}
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+            <a href="{% url 'blog:detail' workspace_id=workspace.id post_id=post.id %}"
+               class="inline-flex items-center px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Open the draft</a>
+            {% if report %}
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white text-stone-800 ring-1 ring-inset ring-stone-200">SEO score {{ report.score }} · {{ report.grade }}</span>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if briefs %}
+        <ul class="mt-4 space-y-2" aria-label="Posts the team started">
+            {% for brief in briefs %}
+            <li>
+                <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=brief.id %}" class="flex items-start justify-between gap-3 bg-white border border-stone-200 rounded-xl px-4 py-3 hover:border-stone-300 focus-visible:outline-2 focus-visible:outline-orange-700">
+                    <span class="text-sm text-stone-900 break-words">{{ brief.title|truncatechars:120 }}</span>
+                    <span class="text-xs font-semibold text-stone-700 whitespace-nowrap">{{ brief.get_status_display }}</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </section>
+    {% elif job.status == 'failed' %}
+    <div role="alert" class="rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
+        <p class="text-sm font-semibold text-red-900 mb-0.5">The team couldn't finish.</p>
+        <p class="text-sm text-red-900 break-words">{{ job.error }}</p>
+        {% if can_act %}
+        <form method="post" action="{% url 'blog:team_retry' workspace_id=workspace.id job_id=job.id %}" class="mt-3">
+            {% csrf_token %}
+            <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Retry from where it stopped</button>
+        </form>
+        {% endif %}
+    </div>
+    {% elif job.status == 'cancelled' %}
+    <p role="status" class="rounded-2xl border border-stone-200 bg-stone-50 px-5 py-4 text-sm text-stone-700">Stopped. Nothing the team made was sent anywhere.</p>
+    {% endif %}
+
+    <section aria-labelledby="team-timeline-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+        <div class="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+            <h2 id="team-timeline-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">How the team is doing it</h2>
+            {% if job.is_active %}<p class="text-xs text-stone-600">Updates by itself. You can leave this page; the team keeps working.</p>{% endif %}
+        </div>
+        <ol class="space-y-4">
+            {% for row in timeline %}
+            <li class="flex items-start gap-3">
+                {% include "components/agent_avatar.html" with agent=row.agent %}
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between gap-2">
+                        <p class="text-sm font-semibold text-stone-900">{{ row.agent.name }}</p>
+                        {% include "components/agent_state.html" with state=row.state %}
+                    </div>
+                    {% if row.run %}
+                    {% if row.run.summary %}<p class="text-sm text-stone-800 mt-0.5 break-words">{{ row.run.summary }}</p>{% elif row.state == 'working' %}<p class="text-sm text-stone-700 mt-0.5">{{ row.agent.does }}</p>{% endif %}
+                    {% if row.run.error and row.state == 'failed' %}<p class="text-sm text-red-800 mt-0.5 break-words">{{ row.run.error }}</p>{% endif %}
+                    {% if row.run.finished_at %}<p class="text-xs text-stone-600 mt-0.5">{{ row.run.seconds }}s · <time datetime="{{ row.run.finished_at|date:'c' }}">{{ row.run.finished_at|timezone:workspace.effective_timezone|date:"H:i" }}</time></p>{% endif %}
+                    {% else %}
+                    <p class="text-xs text-stone-600 mt-0.5">{{ row.agent.does }}</p>
+                    {% endif %}
+                </div>
+            </li>
+            {% empty %}
+            <li class="text-sm text-stone-600">The team hasn't started yet.</li>
+            {% endfor %}
+        </ol>
+    </section>
+</div>

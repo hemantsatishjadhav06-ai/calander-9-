@@ -126,6 +126,7 @@ def _clone_occurrence(source, scheduled_dt):
 
     # Clone platform posts in bulk, preserving per-platform offsets
     source_pps = list(source.platform_posts.all())
+    enforced = bool(getattr(source.workspace, "require_dashboard_approval", False))
     if source_pps:
         new_pps = []
         for pp in source_pps:
@@ -149,7 +150,10 @@ def _clone_occurrence(source, scheduled_dt):
                     # provider defaults and loses the creator's choices.
                     platform_extra=copy.deepcopy(pp.platform_extra) if pp.platform_extra else {},
                     scheduled_at=pp_scheduled,
-                    status="scheduled",
+                    # A new occurrence is new content on a new date: in a
+                    # workspace that requires dashboard approval it waits for
+                    # review instead of going straight onto the schedule.
+                    status="pending_review" if enforced else "scheduled",
                 )
             )
         PlatformPost.objects.bulk_create(new_pps)

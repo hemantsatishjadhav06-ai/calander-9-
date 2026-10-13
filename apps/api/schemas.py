@@ -50,7 +50,11 @@ class AccountSummary(Schema):
     connection_status: str
     char_limit: int = Field(
         2200,
-        description="Maximum caption length the platform accepts. Reject locally before calling /posts.",
+        description=(
+            "Maximum caption length the platform accepts. Reject locally before calling /posts. "
+            'X (``platform == "x"``) counts by weight: every link is 23 characters whatever its length, '
+            "and CJK characters and emoji count two."
+        ),
     )
     escaped_chars: str = Field(
         "",

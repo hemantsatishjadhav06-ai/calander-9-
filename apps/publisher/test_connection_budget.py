@@ -164,6 +164,7 @@ class BudgetArithmeticTest(TransactionTestCase):
         peak = (
             workers * threads  # gunicorn, one connection per thread
             + 1  # the worker's own process_tasks connection
+            + 1  # the worker's dedicated singleton lease connection
             + engine._max_concurrent_posts()
             + engine._max_concurrent_platform_publishes()
         )

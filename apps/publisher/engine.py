@@ -14,6 +14,7 @@ aggregate ``status`` property derived from its children (see
 """
 
 import contextlib
+import contextvars
 import logging
 import math
 import os
@@ -23,6 +24,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
 
+import httpx
 from background_task import background
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -31,6 +33,8 @@ from django.db.models import F, Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from apps.approvals import gate as approval_gate
+from apps.common.background import check_worker_lease, note_task_failure
 from apps.common.db import in_worker_thread, release_idle_connection
 from apps.composer.models import PlatformPost
 from apps.credentials.models import resolve_platform_credentials
@@ -56,9 +60,27 @@ from providers.exceptions import (
 )
 from providers.types import PostType, PublishContent, PublishState
 
+from . import delivery
 from .models import PublishLog, RateLimitState
 
 logger = logging.getLogger(__name__)
+
+
+class _UnconfirmedPublishSubmissionError(ProviderError):
+    """The publishing write may have succeeded; resubmitting could duplicate it."""
+
+    def __init__(self, *, platform_post_id: str = "", asynchronous: bool = False, diagnostic: str = ""):
+        self.platform_post_id = platform_post_id
+        self.asynchronous = asynchronous
+        super().__init__(diagnostic or "The platform did not confirm the publishing outcome.", retryable=False)
+
+
+class _DeliveryPolicyHoldError(ProviderError):
+    """The approved publish time expired before the actual external write."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason, retryable=False)
+
 
 # Retry backoff schedule (in seconds)
 RETRY_BACKOFF = [60, 300, 1800]  # 1min, 5min, 30min
@@ -108,6 +130,15 @@ def _resolve_publish_credentials(account):
             )
     elif platform == "facebook":
         credentials["page_id"] = account.account_platform_id
+    elif platform == "linkedin_company":
+        # The token is the member's and can administer several Pages, so this
+        # names the one the account is: its profile, inbox, statistics and the
+        # first comment (posted as the Page) all depend on it.
+        credentials["organization_id"] = account.account_platform_id
+    elif platform == "x":
+        # Only used to build the post's public URL (x.com/<username>/status/<id>);
+        # X's create-post response doesn't carry the author's handle.
+        credentials["username"] = account.account_handle
     elif platform in ("instagram", "instagram_login"):
         credentials["ig_user_id"] = account.account_platform_id
         # The comment poll and the first-comment reconciliation both match our
@@ -382,7 +413,12 @@ class PublishEngine:
             ):
                 futures = {
                     group_pool.submit(
-                        in_worker_thread, self._publish_post_group, pps[0].post, pps, platform_pool
+                        contextvars.copy_context().run,
+                        in_worker_thread,
+                        self._publish_post_group,
+                        pps[0].post,
+                        pps,
+                        platform_pool,
                     ): post_id
                     for post_id, pps in groups.items()
                 }
@@ -395,7 +431,8 @@ class PublishEngine:
                         # reads to tell whether publishing recovered.
                         if future.result():
                             published_count += 1
-                    except Exception:
+                    except Exception as exc:
+                        note_task_failure(exc)
                         logger.exception("Unexpected error publishing post group %s", post_id)
 
         # Always process retries, even when no new posts are due
@@ -430,13 +467,17 @@ class PublishEngine:
         )
 
     @staticmethod
-    def _is_currently_due(platform_post, now, *, allow_unscheduled=False):
-        """Recheck the current schedule and account under the claim lock."""
+    def _is_due_now(platform_post, now, *, allow_unscheduled=False):
+        """Recheck the publish conditions on the freshly locked row.
+
+        A scheduled row can keep its status while an approver moves its time,
+        or a retry receives a new backoff, after the initial due query.
+        """
         effective_at = platform_post.scheduled_at or platform_post.post.scheduled_at
         return (
             platform_post.status == PlatformPost.Status.SCHEDULED
+            and ((effective_at is None and allow_unscheduled) or (effective_at is not None and effective_at <= now))
             and platform_post.social_account.workspace_id == platform_post.post.workspace_id
-            and (effective_at <= now if effective_at is not None else allow_unscheduled)
             and not (
                 platform_post.retry_count > 0
                 and platform_post.next_retry_at is not None
@@ -476,7 +517,26 @@ class PublishEngine:
 
             due_ids = {pp.id for pp in due_pps}
             now = timezone.now()
-            platform_posts = [pp for pp in locked if pp.id in due_ids and self._is_currently_due(pp, now)]
+            platform_posts = [pp for pp in locked if pp.id in due_ids and self._is_due_now(pp, now)]
+
+            # Approval gate, under the lock and before the claim: in a
+            # workspace that requires dashboard approval, a row whose approval
+            # is missing, or no longer matches its content or time, is taken
+            # out of the publish path with the reason instead of being sent.
+            cleared = []
+            for pp in platform_posts:
+                policy_reason = delivery.hold_reason(pp, now=now)
+                if policy_reason:
+                    kind = "unknown" if delivery.state(pp).get("kind") == "unknown" else "expired"
+                    if delivery.mark(pp, kind=kind, reason=policy_reason, from_status="scheduled"):
+                        self._notify_publish_failed(pp)
+                    continue
+                reason = approval_gate.publish_blocker(pp)
+                if reason:
+                    approval_gate.block_publish(pp, reason)
+                else:
+                    cleared.append(pp)
+            platform_posts = cleared
 
             if not platform_posts:
                 return False
@@ -484,10 +544,17 @@ class PublishEngine:
             # ``updated_at`` is explicit because queryset .update() bypasses
             # auto_now, and the confirmation sweep uses it to tell a publish
             # that is merely slow from one whose worker died mid-flight.
-            PlatformPost.objects.filter(id__in=[pp.id for pp in platform_posts]).update(
-                status=PlatformPost.Status.PUBLISHING,
-                updated_at=timezone.now(),
-            )
+            for pp in platform_posts:
+                pp.platform_extra = {
+                    **(pp.platform_extra or {}),
+                    delivery.STATE_KEY: delivery.snapshot(pp, kind="submitting"),
+                }
+                with delivery.delivery_write():
+                    PlatformPost.objects.filter(pk=pp.pk).update(
+                        status=PlatformPost.Status.PUBLISHING,
+                        platform_extra=pp.platform_extra,
+                        updated_at=timezone.now(),
+                    )
 
         # The transition is committed, and what follows is minutes of media
         # download and platform I/O during which this thread asks the database
@@ -503,14 +570,21 @@ class PublishEngine:
         try:
             with _platform_executor(platform_pool, len(platform_posts)) as executor:
                 futures = {
-                    executor.submit(in_worker_thread, self._publish_platform_post, pp, media_cache=media_cache): pp
+                    executor.submit(
+                        contextvars.copy_context().run,
+                        in_worker_thread,
+                        self._publish_platform_post,
+                        pp,
+                        media_cache=media_cache,
+                    ): pp
                     for pp in platform_posts
                 }
                 for future in as_completed(futures):
                     pp = futures[future]
                     try:
                         future.result()
-                    except Exception:
+                    except Exception as exc:
+                        note_task_failure(exc)
                         logger.exception("Unexpected error publishing PlatformPost %s", pp.id)
         finally:
             media_cache.cleanup()
@@ -568,6 +642,13 @@ class PublishEngine:
         start_time = time.monotonic()
         account = platform_post.social_account
 
+        policy_reason = delivery.hold_reason(platform_post)
+        if policy_reason:
+            kind = "unknown" if delivery.state(platform_post).get("kind") == "unknown" else "expired"
+            if delivery.mark(platform_post, kind=kind, reason=policy_reason):
+                self._notify_publish_failed(platform_post)
+            return {"success": False, "error": policy_reason}
+
         # Check rate limits
         rate_state = RateLimitState.objects.filter(
             social_account=account,
@@ -588,7 +669,16 @@ class PublishEngine:
             )
             return {"success": False, "error": error_msg}
 
-        accepted_result = None
+        # Last look before anything leaves: re-read the row and check its
+        # approval against what is in the database now *and* against the copy
+        # this thread is about to send. An edit that committed between the
+        # due-query and the claim is caught here, not on the platform.
+        reason = self._approval_blocker(platform_post)
+        if reason:
+            approval_gate.block_publish(platform_post, reason, from_status=PlatformPost.Status.PUBLISHING)
+            return {"success": False, "error": reason}
+
+        provider_accepted = False
         try:
             # Get the provider for this platform
             result = self._dispatch_to_provider(platform_post, media_cache=media_cache)
@@ -596,16 +686,24 @@ class PublishEngine:
             duration_ms = int((time.monotonic() - start_time) * 1000)
 
             if result["success"]:
-                # Once the platform accepted the write, a local bookkeeping
-                # failure must never send it again. If persistence fails, the
-                # existing publishing row is left for confirmation/recovery.
-                accepted_result = result
+                # From this point the platform has accepted the post. A local
+                # persistence/logging failure must never trigger another upload.
+                # Unsettled rows remain with the confirmation sweep instead.
+                provider_accepted = True
                 platform_post.platform_post_id = result.get("platform_post_id", "")
                 response_extra = result.get("response")
                 if isinstance(response_extra, dict) and response_extra:
                     platform_post.platform_extra = {
                         **(platform_post.platform_extra or {}),
                         **response_extra,
+                    }
+                evidence = delivery.state(platform_post)
+                if evidence:
+                    platform_post.platform_extra[delivery.STATE_KEY] = {
+                        **evidence,
+                        "kind": "confirming" if result.get("async_publish") else "delivered",
+                        "verification": "provider_response",
+                        "native_post_id": result.get("platform_post_id", ""),
                     }
                 # Captured before the reset below, or every success would log
                 # as attempt 1 and the retry history would vanish.
@@ -637,18 +735,19 @@ class PublishEngine:
                 # wrote back every column as it was read before the upload
                 # (minutes ago for video), and for a row deleted meanwhile it
                 # fell back to an INSERT.
-                platform_post.save(
-                    update_fields=[
-                        "platform_post_id",
-                        "platform_extra",
-                        "retry_count",
-                        "next_retry_at",
-                        "publish_error",
-                        "status",
-                        "published_at",
-                        "updated_at",
-                    ]
-                )
+                with delivery.delivery_write():
+                    platform_post.save(
+                        update_fields=[
+                            "platform_post_id",
+                            "platform_extra",
+                            "retry_count",
+                            "next_retry_at",
+                            "publish_error",
+                            "status",
+                            "published_at",
+                            "updated_at",
+                        ]
+                    )
 
                 if not result.get("async_publish"):
                     # A published post leaves the queue: drop the QueueEntry that
@@ -693,12 +792,28 @@ class PublishEngine:
                 return result
 
         except Exception as e:
-            if accepted_result is not None:
+            if provider_accepted:
+                note_task_failure(e)
+                known_async = bool(
+                    result.get("async_publish")
+                    and result.get("platform_post_id")
+                    and PlatformPost.objects.filter(
+                        pk=platform_post.pk,
+                        status=PlatformPost.Status.PUBLISHING,
+                        platform_post_id=result["platform_post_id"],
+                    ).exists()
+                )
+                if not known_async:
+                    delivery.mark(
+                        platform_post,
+                        kind="unknown",
+                        reason="The platform accepted this request, but its outcome could not be recorded. Check the account before preparing another attempt.",
+                    )
                 logger.exception(
-                    "Platform accepted PlatformPost %s but local bookkeeping failed; no retry was queued",
+                    "Provider accepted PlatformPost %s, but recording its outcome failed; not resubmitting",
                     platform_post.id,
                 )
-                return accepted_result
+                return result
             duration_ms = int((time.monotonic() - start_time) * 1000)
             error_msg = str(e)
 
@@ -710,13 +825,29 @@ class PublishEngine:
             )
 
             user_message = friendly_publish_error(e)
-            if isinstance(e, PublishOutcomeUnknownError):
-                self._fail_permanently(
-                    platform_post,
-                    error_msg,
-                    user_message=PUBLISH_INTERRUPTED_MESSAGE,
-                    reason="platform outcome unknown",
-                )
+            if isinstance(e, _DeliveryPolicyHoldError):
+                if delivery.mark(platform_post, kind="expired", reason=error_msg):
+                    self._notify_publish_failed(platform_post)
+                return {"success": False, "error": error_msg}
+            if isinstance(e, (_UnconfirmedPublishSubmissionError, PublishOutcomeUnknownError)):
+                handle = getattr(e, "platform_post_id", "")
+                asynchronous = getattr(e, "asynchronous", False)
+                if handle:
+                    accepted_fields = {"platform_post_id": handle}
+                    if asynchronous:
+                        accepted_fields.update(
+                            retry_count=0, next_retry_at=None, publish_error="", updated_at=timezone.now()
+                        )
+                    PlatformPost.objects.filter(pk=platform_post.pk, status=PlatformPost.Status.PUBLISHING).update(
+                        **accepted_fields
+                    )
+                    platform_post.platform_post_id = handle
+                    if asynchronous:
+                        # A known asynchronous handle can still be reconciled
+                        # by the existing confirmation sweep, without upload.
+                        return {"success": False, "async_publish": True, "error": error_msg}
+                if delivery.mark(platform_post, kind="unknown", reason=PUBLISH_INTERRUPTED_MESSAGE):
+                    self._notify_publish_failed(platform_post)
                 return {"success": False, "error": error_msg, "outcome_unknown": True}
             # An expired token is the one failure a retry can never fix and
             # that names its own remedy. Three backoff attempts used to run
@@ -747,6 +878,34 @@ class PublishEngine:
             else:
                 self._fail_permanently(platform_post, error_msg, user_message=user_message)
             return {"success": False, "error": error_msg}
+
+    @staticmethod
+    def _approval_blocker(platform_post):
+        """Why *platform_post* must not be sent now, or None."""
+        fresh = (
+            PlatformPost.objects.select_related("post__workspace", "social_account").filter(pk=platform_post.pk).first()
+        )
+        if fresh is None:
+            return "Not published: the post was deleted."
+        if (
+            fresh.social_account.workspace_id != fresh.post.workspace_id
+            or fresh.social_account_id != platform_post.social_account_id
+        ):
+            return "Not published: the destination account changed. Review and schedule the post again."
+        if fresh.social_account.needs_reconnect:
+            return "Not published: reconnect this social account, then review and schedule the post again."
+        # Account health and tokens can change after the claim, including a
+        # sibling upload discovering an expired token. Never dispatch using a
+        # cached connected account or a credential that has since been rotated.
+        platform_post.social_account = fresh.social_account
+        if not approval_gate.enforced(fresh.post.workspace):
+            return None
+        reason = approval_gate.publish_blocker(fresh)
+        if reason:
+            return reason
+        if approval_gate.fingerprint(platform_post) != fresh.approved_fingerprint:
+            return "Not published: the content changed after approval. Review and approve it again."
+        return None
 
     @staticmethod
     def _drop_queue_entry(platform_post):
@@ -797,6 +956,7 @@ class PublishEngine:
         # at upload, so providers can route on what the file *is* rather than on
         # a storage-key extension copied from the client-declared filename.
         media_types = []
+        media_alt_texts = []
         temp_files = []
         # Owned locally only when the caller didn't hand us a post-level cache
         # (the retry path); ``owns_cache`` decides who cleans it up.
@@ -842,6 +1002,7 @@ class PublishEngine:
                     url = f"{app_url}{url}"
                 media_urls.append(url)
                 media_types.append(asset.media_type)
+                media_alt_texts.append(pm.alt_text or asset.alt_text or "")
 
                 if needs_local_media:
                     media_files.append(media_cache.path_for(asset))
@@ -851,6 +1012,7 @@ class PublishEngine:
             extra = {"tags": platform_post.post.tags or []}
             platform_extra = platform_post.platform_extra or {}
             extra.update(platform_extra)
+            extra.pop(delivery.STATE_KEY, None)
 
             # Inject page_id for Facebook from the connected account.
             if platform == "facebook" and "page_id" not in extra:
@@ -915,6 +1077,7 @@ class PublishEngine:
                 media_files=media_files,
                 media_urls=media_urls,
                 media_types=media_types,
+                media_alt_texts=media_alt_texts,
                 post_type=post_type,
                 extra=extra,
                 link_url=link_url,
@@ -928,26 +1091,42 @@ class PublishEngine:
                 post_type.value,
                 len(media_files),
             )
+            provider_returned = False
+            policy_reason = delivery.hold_reason(platform_post)
+            if policy_reason:
+                raise _DeliveryPolicyHoldError(policy_reason)
+            check_worker_lease()
             try:
                 result = provider.publish_post(access_token, content)
+                provider_returned = True
+                if not isinstance(result.platform_post_id, str) or not result.platform_post_id.strip():
+                    raise ValueError("The platform returned no usable publishing receipt.")
+                return {
+                    "success": True,
+                    "platform_post_id": result.platform_post_id,
+                    "url": result.url,
+                    "response": result.extra,
+                    # True when platform_post_id is a handle for work still in
+                    # progress rather than a published post's id.
+                    "async_publish": provider.publish_is_async,
+                }
             except Exception as exc:
-                # Only failures inside the external write have an unknown
-                # outcome. Local media/credential preparation above is safe to
-                # retry. A rate-limit/clean rejection remains definitive.
-                if getattr(exc, "retryable", True) and _is_ambiguous_submission_failure(exc):
-                    raise PublishOutcomeUnknownError(
-                        str(exc), platform=platform, raw_response=getattr(exc, "raw_response", None)
+                unknown_write = (
+                    not isinstance(exc, (httpx.ConnectTimeout, httpx.ConnectError, httpx.PoolTimeout))
+                    and getattr(exc, "retryable", True)
+                    and _is_ambiguous_submission_failure(exc)
+                )
+                if provider_returned or unknown_write:
+                    # The server might have committed the write before dropping
+                    # its response. Only a known rejection or a failure before
+                    # connection is safe for the ordinary automatic retry path.
+                    handle = getattr(result, "platform_post_id", "") if provider_returned else ""
+                    raise _UnconfirmedPublishSubmissionError(
+                        platform_post_id=handle if isinstance(handle, str) else "",
+                        asynchronous=bool(provider.publish_is_async),
+                        diagnostic=str(exc),
                     ) from exc
                 raise
-            return {
-                "success": True,
-                "platform_post_id": result.platform_post_id,
-                "url": result.url,
-                "response": result.extra,
-                # True when platform_post_id is a handle for work still in
-                # progress rather than a published post's id.
-                "async_publish": provider.publish_is_async,
-            }
         finally:
             # Per-child temp files (thumbnail, cover) are ours either way. The
             # shared attachment cache is only ours to drop when we created it.
@@ -1034,6 +1213,10 @@ class PublishEngine:
                 return PostType.REEL
             return PostType.VIDEO
         if first_media_type == "image":
+            return PostType.IMAGE
+        # LinkedIn's Images API takes GIFs (up to 250 frames); without this a
+        # GIF went out as a text post and the GIF was dropped.
+        if first_media_type == "gif" and platform in ("linkedin_personal", "linkedin_company"):
             return PostType.IMAGE
         return PostType.TEXT
 
@@ -1134,10 +1317,18 @@ class PublishEngine:
             if not author:
                 return
             platform = platform_post.social_account.get_platform_display()
+            outcome = delivery.state(platform_post).get("kind")
+            title = (
+                f"{platform} post needs delivery reconciliation"
+                if outcome == "unknown"
+                else f"{platform} post needs a new approved time"
+                if outcome == "expired"
+                else f"{platform} post failed to publish"
+            )
             notify(
                 author,
                 EventType.POST_FAILED,
-                title=f"{platform} post failed to publish",
+                title=title,
                 body=platform_post.publish_error,
                 data={
                     "post_id": str(platform_post.post_id),
@@ -1225,31 +1416,45 @@ class PublishEngine:
 
         for pp in retry_posts:
             try:
-                # Claim on the row's *current* state, not the state read when
-                # the queryset was built: the previous iteration may have spent
-                # minutes uploading a video, during which this row could have
-                # been unscheduled, held or moved. A blind save would have
-                # overwritten that with ``publishing`` and published it.
                 with transaction.atomic():
-                    siblings = list(
+                    # Match the primary claim's sibling lock: a hold must
+                    # serialize with a retry too. Refresh the row after any
+                    # preceding upload, and recheck time, backoff and tenant.
+                    locked = list(
                         PlatformPost.objects.select_for_update(of=("self",))
                         .filter(post_id=pp.post_id)
                         .select_related("social_account", "post__workspace")
-                        .order_by("pk")
                     )
-                    current = next((row for row in siblings if row.pk == pp.pk), None)
-                    claim_at = timezone.now()
+                    if any(row.status == PlatformPost.Status.ON_HOLD for row in locked):
+                        continue
+                    pp = next((row for row in locked if row.pk == pp.pk), None)
+                    now = timezone.now()
                     if (
-                        current is None
-                        or current.retry_count != pp.retry_count
-                        or not self._is_currently_due(current, claim_at, allow_unscheduled=True)
-                        or any(row.status == PlatformPost.Status.ON_HOLD for row in siblings)
+                        pp is None
+                        or not self._is_due_now(pp, now, allow_unscheduled=True)
+                        or not 0 < pp.retry_count <= MAX_RETRIES
+                        or pp.next_retry_at is None
+                        or pp.next_retry_at > now
                     ):
                         continue
-                    PlatformPost.objects.filter(pk=current.pk).update(
-                        status=PlatformPost.Status.PUBLISHING, updated_at=claim_at
-                    )
-                    pp = current
+                    reason = approval_gate.publish_blocker(pp)
+                    if reason:
+                        approval_gate.block_publish(pp, reason)
+                        continue
+                    policy_reason = delivery.hold_reason(pp, now=now)
+                    if policy_reason:
+                        kind = "unknown" if delivery.state(pp).get("kind") == "unknown" else "expired"
+                        if delivery.mark(pp, kind=kind, reason=policy_reason, from_status="scheduled"):
+                            self._notify_publish_failed(pp)
+                        continue
+                    pp.platform_extra = {
+                        **(pp.platform_extra or {}),
+                        delivery.STATE_KEY: delivery.snapshot(pp, kind="submitting"),
+                    }
+                    with delivery.delivery_write():
+                        PlatformPost.objects.filter(id=pp.id).update(
+                            status=PlatformPost.Status.PUBLISHING, platform_extra=pp.platform_extra, updated_at=now
+                        )
                 pp.status = PlatformPost.Status.PUBLISHING
                 result = self._publish_platform_post(pp)
                 if result.get("async_publish"):
@@ -1259,7 +1464,8 @@ class PublishEngine:
                 if result.get("success"):
                     self._sync_parent_published_at(pp.post)
                     self._maybe_schedule_first_comment(pp)
-            except Exception:
+            except Exception as exc:
+                note_task_failure(exc)
                 logger.exception("Error retrying PlatformPost %s", pp.id)
 
     # ------------------------------------------------------------------
@@ -1309,7 +1515,8 @@ class PublishEngine:
                     unconfirmed_before=unconfirmed_before,
                 ):
                     settled += 1
-            except Exception:
+            except Exception as exc:
+                note_task_failure(exc)
                 logger.exception("Error confirming PlatformPost %s", pp.id)
         return settled
 
@@ -1323,12 +1530,8 @@ class PublishEngine:
             # finish this row but us, and only once we're sure it isn't simply
             # still uploading.
             if platform_post.updated_at < stale_before:
-                self._fail_permanently(
-                    platform_post,
-                    "Worker stopped mid-publish; no platform handle was recorded.",
-                    user_message=PUBLISH_INTERRUPTED_MESSAGE,
-                    reason="interrupted",
-                )
+                if delivery.mark(platform_post, kind="unknown", reason=PUBLISH_INTERRUPTED_MESSAGE):
+                    self._notify_publish_failed(platform_post)
                 return True
             return False
 
@@ -1345,12 +1548,8 @@ class PublishEngine:
             # earlier publish of the same row. Claiming success here would tell
             # the user a post went live when it never left the worker.
             if platform_post.updated_at < stale_before:
-                self._fail_permanently(
-                    platform_post,
-                    f"{account.platform} cannot be asked about an in-flight publish.",
-                    user_message=PUBLISH_INTERRUPTED_MESSAGE,
-                    reason="interrupted",
-                )
+                if delivery.mark(platform_post, kind="unknown", reason=PUBLISH_INTERRUPTED_MESSAGE):
+                    self._notify_publish_failed(platform_post)
                 return True
             return False
 
@@ -1428,12 +1627,8 @@ class PublishEngine:
         handle that can reconcile this post later, and it is cleared only when
         the user explicitly re-schedules — the one moment it must not be reused.
         """
-        self._fail_permanently(
-            platform_post,
-            error_msg,
-            user_message=PUBLISH_UNCONFIRMED_MESSAGE,
-            reason="unconfirmed",
-        )
+        if delivery.mark(platform_post, kind="unknown", reason=PUBLISH_UNCONFIRMED_MESSAGE):
+            self._notify_publish_failed(platform_post)
 
     def _mark_confirmed_published(self, platform_post, platform_post_id: str):
         """Finish a publish the platform has confirmed, exactly as the sync path does."""
@@ -1441,7 +1636,28 @@ class PublishEngine:
         platform_post.status = PlatformPost.Status.PUBLISHED
         platform_post.published_at = timezone.now()
         platform_post.publish_error = ""
-        platform_post.save(update_fields=["platform_post_id", "status", "published_at", "publish_error", "updated_at"])
+        evidence = delivery.state(platform_post)
+        if evidence:
+            platform_post.platform_extra = {
+                **(platform_post.platform_extra or {}),
+                delivery.STATE_KEY: {
+                    **evidence,
+                    "kind": "delivered",
+                    "verification": "provider_confirmation",
+                    "native_post_id": platform_post_id,
+                },
+            }
+        with delivery.delivery_write():
+            platform_post.save(
+                update_fields=[
+                    "platform_post_id",
+                    "status",
+                    "published_at",
+                    "publish_error",
+                    "platform_extra",
+                    "updated_at",
+                ]
+            )
 
         self._drop_queue_entry(platform_post)
         self._sync_parent_published_at(platform_post.post)

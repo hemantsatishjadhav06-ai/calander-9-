@@ -1,5 +1,6 @@
 import hashlib
 import ipaddress
+from urllib.parse import urlencode, urlsplit
 
 from django.conf import settings
 from django.core.cache import cache
@@ -62,7 +63,23 @@ class TosAcceptanceMiddleware:
             and request.user.is_authenticated
             and request.user.tos_accepted_at is None
         ):
-            return redirect(reverse("accounts:accept_terms"))
+            url = reverse("accounts:accept_terms")
+            if request.headers.get("HX-Request"):
+                # A 302 here is followed inside htmx's request, and the terms
+                # page lands in whatever the fragment was for (or nowhere, for
+                # hx-swap="none") — a portal message would vanish silently. Ask
+                # htmx to navigate the whole page instead, back to where the
+                # person was once they've accepted.
+                current = request.headers.get("HX-Current-URL", "")
+                path = urlsplit(current).path if current else ""
+                if path and path != "/" and path.startswith("/"):
+                    url += "?" + urlencode({"next": path})
+                return HttpResponse(status=204, headers={"HX-Redirect": url})
+            # Someone who just signed up with Google lands here on the way to
+            # the page they asked for; carry it so accepting takes them there.
+            if request.method == "GET" and request.path != "/":
+                url += "?" + urlencode({"next": request.get_full_path()})
+            return redirect(url)
 
         return self.get_response(request)
 

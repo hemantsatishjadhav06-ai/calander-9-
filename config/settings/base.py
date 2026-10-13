@@ -109,6 +109,13 @@ LOCAL_APPS = [
     "apps.oauth_server",
     "apps.analytics",
     "apps.marketing",
+    # Blog posts for the brands' own websites, committed to their GitHub repos.
+    "apps.blog",
+    # AI Studio: a team of Claude agents that turns a small idea into a post
+    # (angles, copy, a designed graphic) and hands it to the approval workflow.
+    "apps.studio",
+    # Client-specific messaging alongside the canonical agency/approval workflows.
+    "apps.telegram",
     "theme",
 ]
 
@@ -128,6 +135,7 @@ MIDDLEWARE = [
     "apps.accounts.middleware.TosAcceptanceMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "apps.members.middleware.RBACMiddleware",
+    "apps.approvals.actor.ApprovalActorMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "csp.middleware.CSPMiddleware",
@@ -366,15 +374,21 @@ UNSPLASH_ACCESS_KEY = env("UNSPLASH_ACCESS_KEY", default="")
 
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
-        "APP": {
-            "client_id": GOOGLE_AUTH_CLIENT_ID,
-            "secret": GOOGLE_AUTH_CLIENT_SECRET,
-        },
         "SCOPE": ["profile", "email"],
         "AUTH_PARAMS": {"access_type": "online"},
         "VERIFIED_EMAIL": True,
     },
 }
+# allauth lists a provider as soon as it has an app, even one with an empty
+# client ID, so "Sign in with Google" showed on instances without Google
+# credentials and led to Google's "missing client_id" error page. The button
+# appears only once both are set. (Don't also add a Google "Social application"
+# in the Django admin: two apps for one provider make the login page fail.)
+if GOOGLE_AUTH_CLIENT_ID and GOOGLE_AUTH_CLIENT_SECRET:
+    SOCIALACCOUNT_PROVIDERS["google"]["APP"] = {
+        "client_id": GOOGLE_AUTH_CLIENT_ID,
+        "secret": GOOGLE_AUTH_CLIENT_SECRET,
+    }
 
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
@@ -470,6 +484,7 @@ CSP_FORM_ACTION = (
     "https://www.linkedin.com",
     "https://www.pinterest.com",
     "https://www.tiktok.com",
+    "https://x.com",
 )
 CSP_INCLUDE_NONCE_IN = ["script-src"]
 
@@ -586,6 +601,11 @@ _LINKEDIN_LEGACY_CLIENT_SECRET = env("PLATFORM_LINKEDIN_CLIENT_SECRET", default=
 _LINKEDIN_COMPANY_CREDENTIALS = {
     "client_id": env("PLATFORM_LINKEDIN_COMPANY_CLIENT_ID", default="") or _LINKEDIN_LEGACY_CLIENT_ID,
     "client_secret": env("PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET", default="") or _LINKEDIN_LEGACY_CLIENT_SECRET,
+    # Optional: the scopes to ask LinkedIn for, space- or comma-separated, when
+    # the app's Auth tab lists a different set from the Community Management
+    # API defaults in providers/linkedin_company.py. One scope the app doesn't
+    # hold makes LinkedIn refuse the whole sign-in.
+    "_scopes": env("PLATFORM_LINKEDIN_COMPANY_SCOPES", default=""),
 }
 
 # LinkedIn Personal credential resolution + auto-derived OAuth mode:
@@ -601,11 +621,13 @@ if _LINKEDIN_PERSONAL_CLIENT_ID:
         "client_id": _LINKEDIN_PERSONAL_CLIENT_ID,
         "client_secret": env("PLATFORM_LINKEDIN_PERSONAL_CLIENT_SECRET", default=""),
         "_oauth_mode": "oidc",
+        "_scopes": env("PLATFORM_LINKEDIN_PERSONAL_SCOPES", default=""),
     }
 elif _LINKEDIN_COMPANY_CREDENTIALS["client_id"]:
     _LINKEDIN_PERSONAL_CREDENTIALS = {
         **_LINKEDIN_COMPANY_CREDENTIALS,
         "_oauth_mode": "community_management",
+        "_scopes": env("PLATFORM_LINKEDIN_PERSONAL_SCOPES", default=""),
     }
 else:
     # No LinkedIn env vars set. Keep `_oauth_mode` out so the dict carries nothing
@@ -650,6 +672,14 @@ PLATFORM_CREDENTIALS_FROM_ENV = {
     # DEV.to - per-account API key (no OAuth). The key is supplied by the user
     # at connect time, so no app-level credentials apply (same as Bluesky).
     "devto": {},
+    # X (Twitter) - the OAuth 2.0 Client ID / Client Secret of an X developer app
+    # (confidential client, OAuth 2.0 + PKCE). X's API is pay-per-use: every
+    # post, and the periodic health check's profile read, spends credits on the
+    # developer account that owns this app. See the README "X (Twitter)" section.
+    "x": {
+        "client_id": env("PLATFORM_X_CLIENT_ID", default=""),
+        "client_secret": env("PLATFORM_X_CLIENT_SECRET", default=""),
+    },
 }
 
 # Publishing engine
@@ -677,6 +707,67 @@ PUBLISHER_PUBLISH_CONFIRM_TIMEOUT = env.int("PUBLISHER_PUBLISH_CONFIRM_TIMEOUT",
 PUBLISHER_MAX_CONCURRENT_PUBLISHES = env.int("PUBLISHER_MAX_CONCURRENT_PUBLISHES", default=10)
 PUBLISHER_MAX_CONCURRENT_POSTS = env.int("PUBLISHER_MAX_CONCURRENT_POSTS", default=4)
 PUBLISHER_MAX_CONCURRENT_PLATFORM_PUBLISHES = env.int("PUBLISHER_MAX_CONCURRENT_PLATFORM_PUBLISHES", default=6)
+
+# Blog publishing (apps.blog). A fine-grained GitHub personal access token
+# limited to the website repositories (hemantsatishjadhav06-ai/neopolis-site-deploy
+# and hemantsatishjadhav06-ai/morespace-website) with "Contents: read and write"
+# and "Actions: read and write". Approved blog posts are committed with it and
+# the site's deploy workflow dispatched. Empty: publishing refuses with a
+# message saying so, and posts stay approved.
+BLOG_GITHUB_TOKEN = env("BLOG_GITHUB_TOKEN", default="")
+
+# AI pictures for blog posts (apps.blog.ai_images): a fal.ai API key. Empty: the
+# editor's "Generate picture" button is shown disabled with a note saying so.
+# FAL_IMAGE_MODEL is any fal.run text-to-image model that takes prompt +
+# image_size and answers with images[]; flux/dev is the quality/cost middle.
+FAL_KEY = env("FAL_KEY", default="")
+FAL_IMAGE_MODEL = env("FAL_IMAGE_MODEL", default="fal-ai/flux/dev")
+FAL_TIMEOUT = env.float("FAL_TIMEOUT", default=90.0)
+
+# Blog rankings (apps.blog.search_console): a Google OAuth web client with the
+# Search Console API enabled and <APP_URL>/blog/search-console/callback/ as its
+# one authorised redirect URI. Empty: the blog pages say to ask an admin, and
+# nothing reaches Google. Refresh tokens are stored encrypted per website.
+GSC_CLIENT_ID = env("GSC_CLIENT_ID", default="")
+GSC_CLIENT_SECRET = env("GSC_CLIENT_SECRET", default="")
+# IndexNow (Bing, Yandex, Seznam, Naver): 8–128 letters, digits or dashes. When
+# set, every blog publish writes <key>.txt at the site root and pings IndexNow
+# once the post is live. Empty: off.
+INDEXNOW_KEY = env("INDEXNOW_KEY", default="")
+
+# AI Studio: choose Anthropic (default) or OpenRouter explicitly, and set the
+# matching key on the web AND worker services. Keys are never interchangeable.
+# Empty STUDIO_MODEL selects the provider's default: claude-opus-5-5 for
+# Anthropic, anthropic/claude-sonnet-4.5 for OpenRouter.
+# STUDIO_EFFORT, when set,
+# overrides each agent's own effort level (low | medium | high | xhigh | max).
+# STUDIO_FALLBACKS opts into Anthropic's server-side fallback model when the
+# requested model's safety classifiers decline a request (beta).
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
+STUDIO_PROVIDER = env("STUDIO_PROVIDER", default="anthropic")
+STUDIO_MODEL = env("STUDIO_MODEL", default="")
+STUDIO_EFFORT = env("STUDIO_EFFORT", default="")
+STUDIO_TIMEOUT = env.float("STUDIO_TIMEOUT", default=300.0)
+STUDIO_FALLBACKS = env.bool("STUDIO_FALLBACKS", default=True)
+# Lets the moments scout and the SEO strategist search the web (Anthropic's
+# server-side web search tool, billed per search). Off by default.
+STUDIO_WEB_SEARCH = env.bool("STUDIO_WEB_SEARCH", default=False)
+# Autopilot runs at most this many briefs at once across all workspaces, so
+# the single worker keeps publishing on time and nothing looks stuck.
+AGENCY_MAX_ACTIVE_BRIEFS = env.int("AGENCY_MAX_ACTIVE_BRIEFS", default=3)
+
+# Per-workspace bot credentials are entered by an owner and encrypted in the
+# database. Enable registration only after this release's webhook is reachable.
+TELEGRAM_WEBHOOK_BASE_URL = env("TELEGRAM_WEBHOOK_BASE_URL", default="")
+TELEGRAM_WEBHOOK_READY = env.bool("TELEGRAM_WEBHOOK_READY", default=False)
+TELEGRAM_MANAGED_BOTS_ENABLED = env.bool("TELEGRAM_MANAGED_BOTS_ENABLED", default=True)
+TELEGRAM_UPDATE_MAX_BYTES = env.int("TELEGRAM_UPDATE_MAX_BYTES", default=262144)
+# Transient content expires; semantic delivery/audit identities remain.
+TELEGRAM_UPDATE_RETENTION_DAYS = env.int("TELEGRAM_UPDATE_RETENTION_DAYS", default=7)
+TELEGRAM_DELIVERY_RETENTION_DAYS = env.int("TELEGRAM_DELIVERY_RETENTION_DAYS", default=30)
+TELEGRAM_ACTION_RETENTION_DAYS = env.int("TELEGRAM_ACTION_RETENTION_DAYS", default=30)
+TELEGRAM_PAIRING_RETENTION_DAYS = env.int("TELEGRAM_PAIRING_RETENTION_DAYS", default=1)
 
 # Webhook verification
 FACEBOOK_WEBHOOK_VERIFY_TOKEN = env("FACEBOOK_WEBHOOK_VERIFY_TOKEN", default="")

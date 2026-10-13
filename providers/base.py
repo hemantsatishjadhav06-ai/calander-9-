@@ -402,6 +402,9 @@ class SocialProvider(ABC):
                     retryable=False,
                 ) from exc
 
+        from apps.common.background import check_worker_lease
+
+        check_worker_lease()
         with httpx.Client(timeout=timeout) as client:
             # httpx uses `content` for a request body, `data` for form mappings.
             # A file object or byte iterator goes to `content` too, and httpx

@@ -76,6 +76,7 @@ class KeepScheduleTests(TestCase):
         from apps.notifications import tasks as notifications
         from apps.publisher import tasks as publisher
         from apps.social_accounts import tasks as social_accounts
+        from apps.studio import tasks as studio
 
         for proxy in (
             publisher.run_publish_cycle,
@@ -87,6 +88,8 @@ class KeepScheduleTests(TestCase):
             media.run_orphaned_media_sweep,
             accounts.clear_expired_sessions,
             social_accounts.schedule_all_health_checks,
+            studio.sweep_stuck_briefs,
+            studio.run_agency_cycle,
         ):
             with self.subTest(task=proxy.name):
                 # keep_schedule wraps with functools.wraps, which leaves __wrapped__.

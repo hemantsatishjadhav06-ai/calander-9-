@@ -1,0 +1,19 @@
+{% comment %}What the SEO team should change in this article (shown by "Ask the team"). Context: workspace, post; inside an Alpine scope with `asking`.{% endcomment %}
+<div x-show="asking" x-cloak class="mt-4 border-t border-orange-200 pt-4">
+    <form id="ask-seo-team-form" method="post" action="{% url 'blog:team_revise' workspace_id=workspace.id post_id=post.id %}"
+          x-data="{ busy: false }" x-on:submit="busy = true">
+        {% csrf_token %}
+        <label for="ask-seo-team-feedback" class="block text-sm font-semibold text-stone-900 mb-1.5">What should change?</label>
+        <textarea id="ask-seo-team-feedback" name="feedback" rows="3" maxlength="4000" required
+                  aria-describedby="ask-seo-team-help"
+                  placeholder="e.g. Add a section on encumbrance certificates, and make the intro shorter."
+                  class="w-full text-sm px-3 py-2.5 rounded-xl border border-stone-300 bg-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"></textarea>
+        <p id="ask-seo-team-help" class="mt-1 text-xs text-stone-600">The writer revises the article, the fact checker and editors check it again, and it comes back to you for approval.</p>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+            <button type="submit" x-bind:disabled="busy" class="px-4 py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                <span x-show="!busy">Send to the team</span><span x-show="busy" x-cloak>Sending…</span>
+            </button>
+            <button type="button" x-on:click="asking = false" class="text-sm font-medium text-stone-700 underline hover:text-stone-900">Cancel</button>
+        </div>
+    </form>
+</div>

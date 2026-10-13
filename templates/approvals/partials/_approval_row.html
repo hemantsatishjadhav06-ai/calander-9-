@@ -6,7 +6,7 @@ can_approve, display_timezone, and the parent Alpine scope (selectedPosts, diffO
 {% load tz approval_extras %}
 <div class="bg-white border border-stone-200 rounded-xl hover:border-stone-300 transition-colors"
      x-data="{ expanded: false, panel: null, comment: '' }">
-    <div class="flex items-start gap-3 p-4">
+    <div class="flex flex-wrap sm:flex-nowrap items-start gap-3 p-4">
         {% if can_approve and post.is_actionable %}
         <input type="checkbox" :value="'{{ post.id }}'" x-model="selectedPosts" aria-label="Select post"
                class="mt-1.5 w-4 h-4 rounded border-stone-300 cursor-pointer flex-shrink-0" style="accent-color: var(--primary);">
@@ -67,6 +67,31 @@ can_approve, display_timezone, and the parent Alpine scope (selectedPosts, diffO
                     {% endfor %}
                 </div>
                 {% endif %}
+                {% if post.platform_posts.all %}
+                <div class="mb-3 space-y-2" role="group" aria-label="What each destination will publish">
+                    <p class="text-[0.6875rem] font-semibold uppercase tracking-wide text-stone-500">Preview per destination</p>
+                    {% for pp in post.platform_posts.all %}
+                    <div class="border border-stone-200 rounded-lg p-3 bg-white">
+                        <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span class="w-5 h-5 rounded-[5px] flex items-center justify-center">{% include "partials/_platform_icon.html" with platform=pp.social_account.platform size="sm" %}</span>
+                            <span class="text-[0.75rem] font-semibold text-stone-700">{{ pp.social_account.account_name }}</span>
+                            {% if pp.social_account.account_handle %}<span class="text-[0.6875rem] text-stone-500">@{{ pp.social_account.account_handle }}</span>{% endif %}
+                            {% status_badge pp.status %}
+                            {% if pp.platform_extra.post_type %}<span class="text-[0.6875rem] text-stone-500">Format: {{ pp.platform_extra.post_type }}</span>{% endif %}
+                            <span class="ml-auto text-[0.6875rem] tabular-nums {% if pp.is_over_limit %}text-red-700 font-semibold{% else %}text-stone-500{% endif %}" title="Characters as the platform counts them / limit">{{ pp.caption_length }}/{{ pp.char_limit }}</span>
+                        </div>
+                        {% if pp.social_account.field_config.needs_title and pp.effective_title %}<p class="text-[0.8125rem] font-semibold text-stone-800">{{ pp.social_account.field_config.title_label }}: {{ pp.effective_title }}</p>{% endif %}
+                        <p class="text-[0.8125rem] text-stone-600 whitespace-pre-wrap">{{ pp.effective_caption|default:"(no text)" }}</p>
+                        {% if pp.effective_first_comment and pp.social_account.supports_first_comment %}<p class="text-[0.75rem] text-stone-500 mt-1">First comment: {{ pp.effective_first_comment }}</p>{% endif %}
+                        {% with n=post.media_attachments.all|length %}<p class="text-[0.6875rem] text-stone-500 mt-1">{% if n %}{{ n }} media file{{ n|pluralize }} attached{% else %}No media{% if pp.social_account.platform == "instagram" or pp.social_account.platform == "instagram_login" %} — Instagram cannot publish without an image or video{% endif %}{% endif %}</p>{% endwith %}
+                        {% if pp.approved_at %}
+                        <p class="text-[0.6875rem] text-teal-800 mt-1.5">Approved by {{ pp.approved_by.display_name|default:"an approver" }} · {% timezone display_timezone %}{{ pp.approved_at|date:"M j, g:i A" }}{% endtimezone %}{% if pp.approved_revision %} · version {{ pp.approved_revision }}{% endif %}{% if pp.approved_publish_at %} · to publish {% timezone display_timezone %}{{ pp.approved_publish_at|date:"M j, g:i A" }}{% endtimezone %}{% endif %}</p>
+                        {% endif %}
+                        {% if pp.status == "failed" and pp.publish_error %}<p role="alert" class="text-[0.6875rem] text-red-700 mt-1">{{ pp.publish_error }}</p>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 {% if post.visible_comments %}
                 <div class="mb-3 space-y-2">
                     {% for c in post.visible_comments %}
@@ -97,9 +122,14 @@ can_approve, display_timezone, and the parent Alpine scope (selectedPosts, diffO
 
         {# right-hand actions #}
         {% if can_approve and post.is_actionable %}
-        <div class="flex items-center gap-1.5 flex-shrink-0">
-            <button hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-swap="none"
-                    class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-emerald-500 hover:bg-emerald-600 text-white transition-colors">Approve</button>
+        <div class="flex flex-wrap items-center justify-end gap-1.5 w-full sm:w-auto sm:flex-shrink-0">
+            <button hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-swap="none" hx-disabled-elt="this"
+                    class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-emerald-700 hover:bg-emerald-800 text-white transition-colors">Approve</button>
+            {% if post.proposed_publish_at or post.scheduled_at %}
+            <button hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-vals='{"schedule": "1"}' hx-swap="none" hx-disabled-elt="this"
+                    title="Approve this exact content and schedule it for the proposed time"
+                    class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full border border-emerald-600 text-emerald-800 hover:bg-emerald-50 transition-colors">Approve &amp; schedule</button>
+            {% endif %}
             <button @click="panel = panel ? null : 'changes'"
                     class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full border transition-colors"
                     :class="panel ? 'border-stone-300 bg-stone-50 text-stone-700' : 'border-stone-200 text-stone-600 hover:bg-stone-50'">Review</button>

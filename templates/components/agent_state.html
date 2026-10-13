@@ -1,0 +1,10 @@
+{% comment %}A small state pill for an agent or a stage. Context: state ("working", "queued", "done", "failed", "skipped", "pending", "idle").{% endcomment %}
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap
+    {% if state == 'working' %}bg-indigo-50 text-indigo-800
+    {% elif state == 'queued' %}bg-amber-50 text-amber-800
+    {% elif state == 'done' %}bg-green-50 text-green-800
+    {% elif state == 'failed' %}bg-red-50 text-red-800
+    {% else %}bg-stone-100 text-stone-700{% endif %}">
+    <span class="w-1.5 h-1.5 rounded-full {% if state == 'working' %}bg-indigo-700 animate-pulse motion-reduce:animate-none{% elif state == 'queued' %}bg-amber-700{% elif state == 'done' %}bg-green-700{% elif state == 'failed' %}bg-red-700{% else %}bg-stone-500{% endif %}" aria-hidden="true"></span>
+    {% if state == 'working' %}Working{% elif state == 'queued' %}Up next{% elif state == 'done' %}Done{% elif state == 'failed' %}Failed{% elif state == 'skipped' %}Skipped{% elif state == 'pending' %}Waiting{% else %}Idle{% endif %}
+</span>

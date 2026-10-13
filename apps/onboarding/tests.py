@@ -151,3 +151,62 @@ class TestConnectionLinkPageTokens:
         error = client.session["connection_link_error"]
         assert "Page Two" in error
         assert "Page One" not in error
+
+
+@pytest.mark.django_db
+class TestConnectionLinkLinkedInPages:
+    """A LinkedIn Company connection is the Pages, never the admin's own profile."""
+
+    def _callback(self, client, workspace, connection_link, pages):
+        nonce = "nonce-li"
+        state = _sign_connection_link_state(workspace.id, "linkedin_company", connection_link.token, nonce)
+        session = client.session
+        session[CONNECTION_LINK_OAUTH_SESSION_KEY] = {
+            "nonce": nonce,
+            "workspace_id": str(workspace.id),
+            "platform": "linkedin_company",
+            "token": connection_link.token,
+        }
+        session.save()
+
+        provider = MagicMock()
+        provider.exchange_code.return_value = OAuthTokens(
+            access_token="MEMBER-TOKEN", refresh_token="REFRESH", expires_in=5_184_000
+        )
+        provider.get_profile.return_value = AccountProfile(platform_id="person-1", name="The Admin")
+        provider.get_user_pages.return_value = pages
+
+        url = reverse("onboarding:oauth_callback", kwargs={"platform": "linkedin_company"})
+        with patch("apps.onboarding.views._get_provider_for_platform", return_value=provider):
+            return client.get(url, {"code": "auth-code", "state": state})
+
+    def test_each_administered_page_becomes_an_account(self, client, workspace, connection_link):
+        from apps.social_accounts.models import SocialAccount
+
+        response = self._callback(
+            client,
+            workspace,
+            connection_link,
+            [
+                {"id": "98765", "name": "Neopolis Infra", "handle": "neopolis-infra", "access_token": "MEMBER-TOKEN"},
+                {"id": "11111", "name": "More Space", "handle": "", "access_token": "MEMBER-TOKEN"},
+            ],
+        )
+
+        assert response.status_code == 302
+        accounts = SocialAccount.objects.filter(workspace=workspace, platform="linkedin_company")
+        assert sorted(accounts.values_list("account_platform_id", flat=True)) == ["11111", "98765"]
+        assert not accounts.filter(account_platform_id="person-1").exists()
+        page = accounts.get(account_platform_id="98765")
+        assert page.account_name == "Neopolis Infra"
+        assert page.oauth_access_token == "MEMBER-TOKEN"
+        assert page.oauth_refresh_token == "REFRESH"  # LinkedIn tokens refresh; keep it
+        assert page.token_expires_at is not None
+
+    def test_no_pages_is_said_plainly(self, client, workspace, connection_link):
+        from apps.social_accounts.models import SocialAccount
+
+        self._callback(client, workspace, connection_link, [])
+
+        assert not SocialAccount.objects.filter(platform="linkedin_company").exists()
+        assert "No LinkedIn Company Pages" in client.session["connection_link_error"]

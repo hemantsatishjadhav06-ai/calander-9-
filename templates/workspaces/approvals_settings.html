@@ -49,6 +49,23 @@
             {% endfor %}
         </div>
 
+        <label class="flex items-start gap-3 p-4 rounded-lg mb-8" style="border: 1px solid var(--border); background: var(--surface-0);{% if not is_owner %} opacity: 0.85;{% endif %}">
+            {% if not is_owner and workspace.require_dashboard_approval %}<input type="hidden" name="require_dashboard_approval" value="on">{% endif %}
+            <input type="checkbox" name="require_dashboard_approval" id="require_dashboard_approval" class="mt-1"
+                   {% if workspace.require_dashboard_approval %}checked{% endif %}
+                   {% if not is_owner %}disabled aria-describedby="require-approval-owner-only"{% endif %}>
+            <span class="flex-1">
+                <span class="block text-sm font-semibold mb-0.5" style="color: var(--text-primary);">Require dashboard approval of the exact version</span>
+                <span class="block text-xs" style="color: var(--text-secondary);">
+                    Nothing is scheduled or published until an owner or manager approves it here, in the dashboard.
+                    The approval covers the exact text, media, channels, format and time. Any change sends the post back
+                    for approval, the API, MCP clients and automations can only submit for review, and the publisher
+                    re-checks the approval immediately before posting.
+                </span>
+                {% if not is_owner %}<span id="require-approval-owner-only" class="block text-xs mt-1" style="color: var(--text-secondary);">Only a workspace owner can change this.</span>{% endif %}
+            </span>
+        </label>
+
         {% if is_owner_or_manager %}
         <button type="submit"
                 class="btn-neutral px-5 py-2 text-sm font-medium rounded-full cursor-pointer whitespace-nowrap"

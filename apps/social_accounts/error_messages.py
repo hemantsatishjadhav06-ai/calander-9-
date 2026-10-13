@@ -2,7 +2,7 @@
 
 Every string a provider failure can put in front of a user is written here, so
 "what do we actually show people?" is answerable by reading one file. The
-classification is shared and the copy is per-surface: the same four failure
+classification is shared and the copy is per-surface: the same few failure
 shapes need different advice when a health check fails than when a post's first
 comment fails.
 """
@@ -21,6 +21,13 @@ RECONNECT_MESSAGE = "Account connection expired. Please reconnect."
 RATE_LIMIT_MESSAGE = "Rate limit reached. We'll retry this check shortly."
 PLATFORM_UNAVAILABLE_MESSAGE = "The platform is temporarily unavailable. We'll retry shortly."
 GENERIC_MESSAGE = "Connection check failed. Please try reconnecting."
+# HTTP 402: the platform bills API use (X is pay-per-use) and the developer
+# account behind this site's app has run out of credits. Nothing about the
+# connection is wrong, so reconnecting cannot help and the copy must not ask for it.
+PAYMENT_REQUIRED_MESSAGE = (
+    "The platform's developer account is out of API credits. "
+    "Whoever manages this site's app needs to add credits; the connection itself is fine."
+)
 
 FIRST_COMMENT_RECONNECT_MESSAGE = (
     "The account connection expired, so the first comment wasn't added. "
@@ -34,6 +41,10 @@ PUBLISH_RECONNECT_MESSAGE = "The account connection expired, so the post couldn'
 PUBLISH_TEMPORARY_MESSAGE = "The platform was temporarily unavailable. We'll retry shortly."
 PUBLISH_RATE_LIMIT_MESSAGE = "The platform's rate limit was reached. We'll retry shortly."
 PUBLISH_REJECTED_MESSAGE = "The platform rejected this post."
+PUBLISH_PAYMENT_REQUIRED_MESSAGE = (
+    "The platform rejected this post because its developer account is out of API credits. "
+    "Add credits, then publish again."
+)
 PUBLISH_GENERIC_MESSAGE = "Publishing failed. Please try again."
 # The two messages above promise a retry, which is true only while attempts
 # remain. Once the budget is spent the post is permanently failed and the
@@ -85,6 +96,7 @@ _RECONNECT = "reconnect"
 _RATE_LIMITED = "rate_limited"
 _UNAVAILABLE = "unavailable"
 _REJECTED = "rejected"
+_PAYMENT_REQUIRED = "payment_required"
 _UNKNOWN = "unknown"
 
 
@@ -97,6 +109,8 @@ def _classify(exc: Exception) -> str:
         return _RATE_LIMITED
 
     if isinstance(exc, APIError):
+        if exc.status_code == 402:
+            return _PAYMENT_REQUIRED
         if exc.status_code in (401, 403):
             return _RECONNECT
         # ``raw_response["error"]`` is a bare string on OAuth token endpoints
@@ -167,7 +181,17 @@ def friendly_health_check_error(exc: Exception) -> str:
         _RECONNECT: RECONNECT_MESSAGE,
         _RATE_LIMITED: RATE_LIMIT_MESSAGE,
         _UNAVAILABLE: PLATFORM_UNAVAILABLE_MESSAGE,
+        _PAYMENT_REQUIRED: PAYMENT_REQUIRED_MESSAGE,
     }.get(_classify(exc), GENERIC_MESSAGE)
+
+
+def is_payment_required(exc: Exception) -> bool:
+    """Whether ``exc`` is the platform refusing for want of API credits (HTTP 402).
+
+    Lets callers treat it like a spent quota rather than a broken grant: the
+    account stays connected, and the fix is on the developer console.
+    """
+    return _classify(exc) == _PAYMENT_REQUIRED
 
 
 def friendly_first_comment_error(exc: Exception) -> str:
@@ -185,6 +209,7 @@ def friendly_first_comment_error(exc: Exception) -> str:
             _RATE_LIMITED: FIRST_COMMENT_TEMPORARY_MESSAGE,
             _UNAVAILABLE: FIRST_COMMENT_TEMPORARY_MESSAGE,
             _REJECTED: FIRST_COMMENT_REJECTED_MESSAGE,
+            _PAYMENT_REQUIRED: FIRST_COMMENT_REJECTED_MESSAGE,
         },
         FIRST_COMMENT_GENERIC_MESSAGE,
     )
@@ -223,6 +248,7 @@ def classify_webhook_failure(exc: Exception) -> WebhookFailure:
         _RATE_LIMITED: WEBHOOK_TEMPORARY_MESSAGE,
         _UNAVAILABLE: WEBHOOK_TEMPORARY_MESSAGE,
         _REJECTED: WEBHOOK_REJECTED_MESSAGE,
+        _PAYMENT_REQUIRED: WEBHOOK_REJECTED_MESSAGE,
     }.get(kind, WEBHOOK_GENERIC_MESSAGE)
     return WebhookFailure(message=message, needs_reconnect=kind == _RECONNECT)
 
@@ -240,6 +266,7 @@ def friendly_publish_error(exc: Exception) -> str:
             _RATE_LIMITED: PUBLISH_RATE_LIMIT_MESSAGE,
             _UNAVAILABLE: PUBLISH_TEMPORARY_MESSAGE,
             _REJECTED: PUBLISH_REJECTED_MESSAGE,
+            _PAYMENT_REQUIRED: PUBLISH_PAYMENT_REQUIRED_MESSAGE,
         },
         PUBLISH_GENERIC_MESSAGE,
     )

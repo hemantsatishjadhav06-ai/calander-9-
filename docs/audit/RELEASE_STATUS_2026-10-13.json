@@ -1,0 +1,66 @@
+{
+  "record_type": "current_release_validation_status",
+  "prepared_on": "2026-10-13",
+  "release_branch": "codex/sm-bean-oct13-launch",
+  "target_branch": "main",
+  "source_manifest": "Generate a separate immutable manifest from the final full commit SHA; do not substitute historical receipt digests.",
+  "local_validation": {
+    "full_pytest": {
+      "passed": 4676,
+      "skipped": 1,
+      "warnings": 31
+    },
+    "redis_followup": {
+      "passed": 7,
+      "skipped": 0
+    },
+    "chromium": {
+      "passed": 49,
+      "javascript_errors": 0,
+      "failed_requests": 0,
+      "http_5xx": 0,
+      "controlled_providers": true
+    },
+    "node_dom": {
+      "passed": 30
+    },
+    "release_manifest_schema_regressions": {
+      "passed": 27,
+      "overlap_with_full_suite": true
+    },
+    "ruff": "passed",
+    "format": "passed",
+    "mypy": "passed",
+    "migration_drift": "none",
+    "django_checks": "passed",
+    "dependency_audits": "no_known_vulnerabilities_reported",
+    "container_smoke": "passed",
+    "gitleaks_findings": 0
+  },
+  "production": {
+    "project_id": "66526b2a-6a09-43d8-bedb-ecfdd37f8d8a",
+    "secret_bindings_saved": true,
+    "authenticated_inspection": "pending",
+    "public_health": "healthy_database_and_cache",
+    "source_revision_verified": false,
+    "rollout_completed": false,
+    "bot_changed": false,
+    "messages_sent": false,
+    "social_posts_published": false
+  },
+  "trial_bot": {
+    "username": "sammanager06_bot",
+    "identity_verified": true,
+    "can_manage_bots": false,
+    "workspace_connected_by_this_work": false
+  },
+  "neopolis": {
+    "workspace_id_from_uploaded_release": "b1cb458c-cfaf-43cf-8e23-f5e18a9717c7",
+    "week_start": "2026-10-19",
+    "week_end": "2026-10-25",
+    "timezone": "Asia/Kolkata",
+    "live_work_created": false,
+    "live_schedule_changed": false
+  },
+  "note": "Local validation and synthetic browser/container evidence do not establish live creative quality, client approval or native publication. Replace pending production fields only with observed receipts. No secret values or private customer data belong here."
+}

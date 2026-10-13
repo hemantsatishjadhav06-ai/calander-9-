@@ -11,8 +11,10 @@ vars are set (see ``PLATFORM_CREDENTIALS_FROM_ENV``):
   even though ``w_member_social`` is granted). LinkedIn does not issue refresh
   tokens for these scopes; the user reconnects manually every ~60 days.
 * ``community_management`` - the dev app has Community Management API
-  approval. Falls through to the base provider (``/v2/me``, full inbox,
-  first comment, refresh tokens).
+  approval. Falls through to the base provider (``/v2/me``, first comment,
+  refresh tokens). The inbox needs ``r_member_social``, which LinkedIn calls a
+  closed permission outside that product, so it is only read when the
+  deployment says its app holds it (``PLATFORM_LINKEDIN_PERSONAL_SCOPES``).
 """
 
 from __future__ import annotations
@@ -40,8 +42,12 @@ class LinkedInPersonalProvider(LinkedInProvider):
     @property
     def required_scopes(self) -> list[str]:
         if self._is_oidc_mode:
-            return ["openid", "profile", "email", "w_member_social"]
-        return ["r_basicprofile", "w_member_social", "r_member_social"]
+            return self._configured_scopes(["openid", "profile", "email", "w_member_social"])
+        # The member scopes of the Community Management API product. It used to
+        # ask for r_member_social too, which that product doesn't grant, and a
+        # single ungranted scope fails the whole sign-in; w_member_social_feed
+        # is what commenting (the first comment) needs.
+        return self._configured_scopes(["r_basicprofile", "w_member_social", "w_member_social_feed"])
 
     def get_profile(self, access_token: str) -> AccountProfile:
         if not self._is_oidc_mode:
@@ -60,7 +66,9 @@ class LinkedInPersonalProvider(LinkedInProvider):
         )
 
     def get_messages(self, access_token: str, since: datetime | None = None) -> list[InboxMessage]:
-        if not self._is_oidc_mode:
+        # Listing a member's posts needs r_member_social, which only select
+        # apps hold; without it the call is refused, so don't make it.
+        if not self._is_oidc_mode and "r_member_social" in self.required_scopes:
             return super().get_messages(access_token, since)
         return []
 

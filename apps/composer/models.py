@@ -245,6 +245,7 @@ class Post(models.Model):
     caption = models.TextField(blank=True, default="")
     first_comment = models.TextField(blank=True, default="")
     internal_notes = models.TextField(blank=True, default="")
+    delivery_holds = models.JSONField(default=dict, blank=True)
     tags = models.JSONField(default=list, blank=True)
     category = models.ForeignKey(
         ContentCategory,
@@ -278,6 +279,18 @@ class Post(models.Model):
         snippet = (self.caption[:50] + "...") if len(self.caption) > 50 else self.caption
         return f"Post({self.status}): {snippet or '(no caption)'}"
 
+    def save(self, *args, **kwargs):
+        from apps.publisher.delivery import trusted_delivery_write
+
+        if not trusted_delivery_write():
+            stored = (
+                type(self).objects.filter(pk=self.pk).values_list("delivery_holds", flat=True).first()
+                if self.pk
+                else None
+            )
+            self.delivery_holds = stored if isinstance(stored, dict) else {}
+        super().save(*args, **kwargs)
+
     # ------------------------------------------------------------------
     # Derived status (aggregated across PlatformPost children)
     # ------------------------------------------------------------------
@@ -302,6 +315,8 @@ class Post(models.Model):
     @property
     def is_editable(self):
         """Whether the post can be edited in the composer."""
+        if self.has_unknown_delivery:
+            return False
         return self.status in (
             "draft",
             "changes_requested",
@@ -309,6 +324,13 @@ class Post(models.Model):
             "approved",
             "scheduled",
         )
+
+    @property
+    def has_unknown_delivery(self):
+        holds = self.delivery_holds if isinstance(self.delivery_holds, dict) else {}
+        if any(isinstance(h, dict) and h.get("kind") == "unknown" for h in holds.values()):
+            return True
+        return bool(self.pk and self.platform_posts.filter(platform_extra___delivery_state__kind="unknown").exists())
 
     @property
     def is_schedulable(self):
@@ -361,6 +383,13 @@ class PlatformPost(models.Model):
         "retry_count",
         "next_retry_at",
         "publish_error",
+        # Written by the approval gate (apps/approvals/gate.py) when a
+        # transition approves content, or approves a new publish time.
+        "approved_fingerprint",
+        "approved_revision",
+        "approved_by",
+        "approved_at",
+        "approved_publish_at",
     )
 
     # Statuses that must never be removed by *accidental* deletion paths
@@ -499,6 +528,23 @@ class PlatformPost(models.Model):
     retry_count = models.PositiveIntegerField(default=0)
     next_retry_at = models.DateTimeField(blank=True, null=True)
 
+    # The approval this row is publishing under, in workspaces that require
+    # dashboard approval. ``approved_fingerprint`` is a hash of exactly what
+    # goes out (text, media, destination, format); ``approved_publish_at`` is
+    # the time the approver signed off on. Any difference withdraws the
+    # approval, and the publisher re-checks both before calling the platform.
+    approved_fingerprint = models.CharField(max_length=64, blank=True, default="", db_default="")
+    approved_revision = models.PositiveIntegerField(blank=True, null=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    approved_at = models.DateTimeField(blank=True, null=True)
+    approved_publish_at = models.DateTimeField(blank=True, null=True)
+
     # Analytics sync state — the read-side counterpart to the retry budget
     # above, owned solely by ``apps.analytics.tasks``.
     #
@@ -561,7 +607,28 @@ class PlatformPost(models.Model):
         instance._loaded_status = instance.__dict__.get("status")
         return instance
 
+    def _preserve_delivery_state(self):
+        from apps.publisher.delivery import STATE_KEY, trusted_delivery_write
+
+        if trusted_delivery_write():
+            return
+        old = (
+            type(self).objects.filter(pk=self.pk).values_list("platform_extra", flat=True).first() if self.pk else None
+        )
+        old_marker = old.get(STATE_KEY) if isinstance(old, dict) else None
+        extra = dict(self.platform_extra or {})
+        if old_marker is not None:
+            extra[STATE_KEY] = old_marker
+        else:
+            extra.pop(STATE_KEY, None)
+        self.platform_extra = extra
+
     def save(self, *args, **kwargs):
+        from apps.approvals import gate
+
+        self._preserve_delivery_state()
+        # Backstop for writers that set ``status`` without transition_to().
+        gate.check_write(self, getattr(self, "_loaded_status", None))
         super().save(*args, **kwargs)
         # A plain save is authoritative for this instance from here on.
         self._loaded_status = self.status
@@ -579,16 +646,25 @@ class PlatformPost(models.Model):
         Returns False, writing nothing, when the row moved on (or was deleted).
         Callers treat that as a conflict: report it, or skip the row.
         """
+        from apps.approvals import gate
+
+        expected = getattr(self, "_loaded_status", None)
+        if "platform_extra" in fields:
+            self._preserve_delivery_state()
+        if "status" in fields:
+            gate.check_write(self, expected)
         values = {name: getattr(self, name) for name in fields if name != "updated_at"}
         values["updated_at"] = timezone.now()
         rows = type(self).objects.filter(pk=self.pk)
-        expected = getattr(self, "_loaded_status", None)
         if expected is not None:
             rows = rows.filter(status=expected)
         if not rows.update(**values):
             return False
         self.updated_at = values["updated_at"]
         self._loaded_status = self.status
+        # .update() sends no post_save, so run what the signal handler would.
+        gate.record_time_approval_if_any(self)
+        gate.schedule_revalidation(self.post_id)
         return True
 
     def can_transition_to(self, new_status):
@@ -597,12 +673,20 @@ class PlatformPost(models.Model):
         return new_status in allowed
 
     def transition_to(self, new_status):
-        """Transition to a new status, raising ValueError if invalid."""
+        """Transition to a new status, raising ValueError if invalid.
+
+        In a workspace that requires dashboard approval this also enforces the
+        approval gate, raising ``ApprovalRequired`` (a ``ValueError``) when the
+        content may not go where it is headed.
+        """
         if not self.can_transition_to(new_status):
             raise ValueError(
                 f"Invalid status transition: {self.status} → {new_status}. "
                 f"Allowed: {self.VALID_TRANSITIONS.get(self.status, set())}"
             )
+        from apps.approvals import gate
+
+        gate.on_transition(self, new_status)
         self.status = new_status
         if new_status == "published":
             self.published_at = timezone.now()

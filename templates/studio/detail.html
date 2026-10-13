@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% load tz %}
+
+{% block title %}{{ brief.title|truncatechars:60 }} - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl">
+    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
+        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Agency</a>
+        <span aria-hidden="true"> / </span><span>{% if brief.status == 'ready' %}Waiting for approval{% else %}Post{% endif %}</span>
+    </nav>
+
+    <div class="flex flex-wrap items-start justify-between gap-4 mb-6">
+        <div class="min-w-0 max-w-3xl">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+                {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
+                <span class="text-xs text-stone-600">Revision {{ brief.revision }}{% if brief.author %} · by {{ brief.author.display_name }}{% endif %} · {{ brief.created_at|date:"j M Y, H:i" }}</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl text-stone-900 break-words" style="font-family: var(--font-display)">{{ brief.title }}</h1>
+            <p class="text-sm text-stone-600 mt-1 break-words"><span class="font-medium text-stone-700">From the idea:</span> {{ brief.idea }}{% if agents_used %} · made by {{ agents_used }} agents{% if elapsed_minutes %} in {{ elapsed_minutes }} min{% endif %}{% endif %}{% if cost is not None %} · about ${{ cost|floatformat:2 }}{% endif %}</p>
+            {% if brief.get_origin_display and brief.origin != 'manual' %}<p class="text-xs text-stone-600 mt-1">{{ brief.get_origin_display }}{% if brief.requested_by %} — asked for by {{ brief.requested_by.display_name }}{% endif %}</p>{% endif %}
+            {% if brief.feedback and brief.revision > 1 %}<p class="text-sm text-stone-600 mt-1 break-words"><span class="font-medium text-stone-700">Latest notes to the team:</span> {{ brief.feedback }}</p>{% endif %}
+        </div>
+        {% if post %}
+        <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=post.id %}"
+           class="inline-flex items-center px-4 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Open in composer</a>
+        {% endif %}
+    </div>
+
+    {% if brief.is_active %}
+    <div class="max-w-2xl">
+        {% include "studio/partials/progress.html" %}
+        {% if can_discard %}
+        <form method="post" action="{% url 'studio:discard' workspace_id=workspace.id brief_id=brief.id %}" class="mt-4">
+            {% csrf_token %}
+            <button type="submit" class="text-sm text-stone-700 underline hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-orange-700 rounded">Stop and discard</button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% elif brief.status == 'failed' %}
+    <div class="max-w-2xl space-y-4">
+        <div role="alert" class="text-sm text-red-900 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+            <p class="font-semibold mb-0.5">The team couldn't finish.</p>
+            <p class="break-words">{{ brief.error }}</p>
+        </div>
+        {% if can_create %}
+        <div class="flex flex-wrap gap-3">
+            <form method="post" action="{% url 'studio:retry' workspace_id=workspace.id brief_id=brief.id %}">
+                {% csrf_token %}
+                <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Retry from the {{ brief.get_stage_display|lower }}</button>
+            </form>
+            {% if can_discard %}
+            <form method="post" action="{% url 'studio:discard' workspace_id=workspace.id brief_id=brief.id %}">
+                {% csrf_token %}
+                <button type="submit" class="px-5 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Discard</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% include "studio/partials/progress.html" %}
+    </div>
+
+    {% elif brief.status == 'discarded' %}
+    <p class="text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-xl p-4 max-w-2xl">This brief was discarded.</p>
+
+    {% else %}
+    <div class="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
+        <div class="space-y-6 min-w-0">
+            {# ---- The post, as LinkedIn will show it ---- #}
+            <section aria-labelledby="preview-heading" class="bg-white border border-stone-200 rounded-2xl overflow-hidden max-w-xl">
+                <h2 id="preview-heading" class="sr-only">Preview</h2>
+                <div class="flex items-start gap-2.5 px-4 pt-4 pb-3">
+                    {% if preview_account.avatar_url %}
+                    <img src="{{ preview_account.avatar_url }}" alt="" class="w-12 h-12 rounded-full object-cover bg-stone-100">
+                    {% else %}
+                    <div class="w-12 h-12 rounded-full bg-[#0A66C2] flex items-center justify-center text-sm font-bold text-white" aria-hidden="true">{{ preview_account.account_name|default:workspace.name|make_list|first|upper }}</div>
+                    {% endif %}
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-stone-900">{{ preview_account.account_name|default:workspace.name }}</p>
+                        <p class="text-xs text-stone-600">{{ preview_account.get_platform_display|default:"LinkedIn" }} · preview</p>
+                    </div>
+                </div>
+                {% if caption_rest %}
+                <div class="px-4 pb-3 text-sm text-stone-800 leading-relaxed whitespace-pre-line break-words" x-data="{ more: false }">{{ caption_hook }}<span x-show="more" x-cloak>{{ caption_rest }}{% if hashtags %}<span class="block mt-3 text-[#0A66C2] font-medium">{{ hashtags }}</span>{% endif %}</span><button type="button" x-show="!more" x-on:click="more = true" class="text-stone-600 hover:underline">…see more</button></div>
+                {% else %}
+                <div class="px-4 pb-3 text-sm text-stone-800 leading-relaxed whitespace-pre-line break-words">{{ caption_hook }}{% if hashtags %}<span class="block mt-3 text-[#0A66C2] font-medium">{{ hashtags }}</span>{% endif %}</div>
+                {% endif %}
+                {% if brief.graphic %}
+                <img src="{{ brief.graphic.file.url }}" alt="{{ post_copy.alt_text }}" width="{{ brief.graphic.width }}" height="{{ brief.graphic.height }}" class="w-full h-auto bg-stone-100">
+                {% endif %}
+                {% if post_copy.first_comment %}
+                <div class="px-4 py-3 border-t border-stone-200 bg-stone-50">
+                    <p class="text-xs font-semibold text-stone-700 mb-0.5">First comment</p>
+                    <p class="text-sm text-stone-800 whitespace-pre-line break-words">{{ post_copy.first_comment }}</p>
+                </div>
+                {% endif %}
+            </section>
+
+            {% if platform_posts|length > 1 or post_copy.short_caption %}
+            {% for pp in platform_posts %}{% if pp.platform_specific_caption %}
+            <p class="text-sm text-stone-700 max-w-xl"><span class="font-medium">{{ pp.social_account.account_name }} ({{ pp.social_account.get_platform_display }})</span> gets its own version: <span class="whitespace-pre-line">{{ pp.platform_specific_caption }}</span></p>
+            {% endif %}{% endfor %}
+            {% endif %}
+
+            {# ---- Brand reviewer ---- #}
+            {% if review %}
+            <section aria-labelledby="review-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
+                <div class="flex items-center justify-between gap-3 mb-2">
+                    <h2 id="review-heading" class="text-sm font-semibold text-stone-900">Brand reviewer</h2>
+                    <span class="text-sm font-semibold {% if review.score >= 8 %}text-green-800{% elif review.score >= 6 %}text-amber-800{% else %}text-red-800{% endif %}">{{ review.score }}/10</span>
+                </div>
+                <p class="text-sm text-stone-700 mb-3">{{ review.summary }}</p>
+                {% if review.risk_flags %}
+                <div class="mb-3 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <p class="font-semibold mb-1">Check before you approve</p>
+                    <ul class="list-disc pl-5 space-y-0.5">{% for flag in review.risk_flags %}<li>{{ flag }}</li>{% endfor %}</ul>
+                </div>
+                {% endif %}
+                <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+                    {% for check in review.checks %}
+                    <li class="flex gap-2 text-sm">
+                        {% if check.passed %}
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        {% else %}
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" d="M12 8v5m0 3h.01"/></svg>
+                        {% endif %}
+                        <span><span class="font-medium text-stone-900">{{ check.name }}</span><span class="sr-only">{% if check.passed %} (passed){% else %} (needs attention){% endif %}</span>
+                            <span class="text-stone-600">— {{ check.note }}</span></span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if qa.checks %}
+                <h3 class="text-sm font-semibold text-stone-900 mt-5 mb-2">QA inspector <span class="font-normal text-stone-600">· {{ qa.passed }} of {{ qa.total }} checks pass</span></h3>
+                <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+                    {% for check in qa.checks %}
+                    <li class="flex gap-2 text-sm">
+                        {% if check.passed %}
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        {% else %}
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 {% if check.level == 'fail' %}text-red-700{% else %}text-amber-700{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" d="M12 8v5m0 3h.01"/></svg>
+                        {% endif %}
+                        <span><span class="font-medium text-stone-900">{{ check.name }}</span><span class="sr-only">{% if check.passed %} (passed){% else %} (needs attention){% endif %}</span>
+                            <span class="text-stone-600">— {{ check.note }}</span></span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </section>
+            {% endif %}
+
+            {# ---- Art director ---- #}
+            {% if spec %}
+            <section aria-labelledby="art-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
+                <h2 id="art-heading" class="text-sm font-semibold text-stone-900 mb-2">Art director</h2>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+                    <dt class="text-stone-600">Look</dt><dd class="text-stone-900">{{ spec.template|capfirst }} layout · {{ spec.format }} · {{ spec.grade|cut:"_" }}</dd>
+                    {% if reference.label %}<dt class="text-stone-600">Matched to</dt><dd class="text-stone-900">{{ reference.label|capfirst }}</dd>{% endif %}
+                    {% if spec.consistency_notes %}<dt class="text-stone-600">Kept</dt><dd class="text-stone-900">{{ spec.consistency_notes }}</dd>{% endif %}
+                    {% if spec.design_rationale %}<dt class="text-stone-600">Why</dt><dd class="text-stone-900">{{ spec.design_rationale }}</dd>{% endif %}
+                    {% if spec.picture_style %}<dt class="text-stone-600">Picture style</dt><dd class="text-stone-900">{{ spec.picture_style }}</dd>{% endif %}
+                </dl>
+            </section>
+            {% endif %}
+
+            {# ---- Strategist ---- #}
+            {% if concepts %}
+            <section aria-labelledby="angles-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
+                <h2 id="angles-heading" class="text-sm font-semibold text-stone-900 mb-3">Strategist's angles</h2>
+                <ul class="space-y-3">
+                    {% for concept in concepts %}
+                    <li class="rounded-xl border p-4 {% if brief.chosen_concept_id == concept.id %}border-orange-300 bg-orange-50/40{% else %}border-stone-200{% endif %}">
+                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                            <p class="text-sm font-semibold text-stone-900">{{ concept.title }}</p>
+                            {% if brief.chosen_concept_id == concept.id %}<span class="text-xs font-semibold text-orange-900 bg-orange-100 rounded-full px-2 py-0.5">Used</span>
+                            {% elif concept.recommended %}<span class="text-xs font-semibold text-stone-700 bg-stone-100 rounded-full px-2 py-0.5">Recommended</span>{% endif %}
+                            <span class="text-xs text-stone-600">{{ concept.get_post_format_display }}</span>
+                        </div>
+                        <p class="text-sm text-stone-800 italic">“{{ concept.hook }}”</p>
+                        {% if concept.angle %}<p class="text-sm text-stone-700 mt-1">{{ concept.angle }}</p>{% endif %}
+                        {% if concept.rationale %}<p class="text-xs text-stone-600 mt-1">{{ concept.rationale }}</p>{% endif %}
+                        {% if brief.chosen_concept_id != concept.id and can_create %}
+                        <div class="flex flex-wrap gap-3 mt-3">
+                            {% if can_revise %}
+                            <form method="post" action="{% url 'studio:use_angle' workspace_id=workspace.id brief_id=brief.id concept_id=concept.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="px-4 py-1.5 text-sm font-semibold text-orange-900 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-700">Use this angle instead</button>
+                            </form>
+                            {% endif %}
+                            {% if concept.saved_idea_id %}
+                            <span class="text-sm text-stone-600 py-1.5">Saved to ideas</span>
+                            {% else %}
+                            <form method="post" action="{% url 'studio:save_idea' workspace_id=workspace.id brief_id=brief.id concept_id=concept.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="px-4 py-1.5 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Save to ideas</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endif %}
+
+            {# ---- Timeline ---- #}
+            <details class="bg-white border border-stone-200 rounded-2xl p-5" open>
+                <summary class="cursor-pointer text-sm font-semibold text-stone-900 rounded focus-visible:outline-2 focus-visible:outline-orange-700">
+                    How the team made it{% if cost is not None %} <span class="font-normal text-stone-600">· about ${{ cost|floatformat:2 }} in AI usage (estimate)</span>{% endif %}
+                </summary>
+                <ol class="mt-3 space-y-3">
+                    {% for run in runs %}
+                    <li class="flex items-start gap-3 text-sm">
+                        {% include "components/agent_avatar.html" with agent=run.agent_spec size="sm" %}
+                        <div class="min-w-0">
+                            <span class="font-medium text-stone-900">{{ run.agent_name }}</span>
+                            <span class="text-stone-600">· revision {{ run.revision }} · {{ run.get_status_display|lower }}{% if run.duration_ms %} · {{ run.seconds }}s{% endif %}{% if run.output_tokens %} · {{ run.input_tokens|add:run.cache_read_tokens }} in / {{ run.output_tokens }} out tokens{% endif %}</span>
+                            {% if run.summary %}<p class="text-stone-700 break-words">{{ run.summary }}</p>{% endif %}
+                            {% if run.error %}<p class="text-red-800 break-words">{{ run.error }}</p>{% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ol>
+                <p class="mt-3 text-xs text-stone-600">Agents run on {{ setup.model }}; pictures on fal.ai.</p>
+            </details>
+        </div>
+
+        <aside class="space-y-6">
+            {# ---- Approval ---- #}
+            <section aria-labelledby="approval-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+                <h2 id="approval-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">Your decision</h2>
+                <p class="text-xs text-stone-600 mb-3">Nothing goes out until you approve.</p>
+                {% if brief.status == 'ready' and proposed_local %}
+                <div class="rounded-xl bg-orange-50 px-3 py-2.5 mb-4">
+                    <p class="text-sm font-semibold text-orange-800">Proposed: {{ proposed_local|timezone:tzname|date:"D j M, H:i" }} <span class="font-normal text-stone-600">({{ workspace.effective_timezone|default:"UTC" }})</span></p>
+                    {% if scheduler_note %}<p class="text-xs text-stone-700 mt-0.5 break-words">{{ scheduler_note }}</p>{% endif %}
+                </div>
+                {% endif %}
+                {% if platform_posts %}
+                <ul class="space-y-1.5 mb-4">
+                    {% for pp in platform_posts %}
+                    <li class="text-sm">
+                        <span class="font-medium text-stone-900">{{ pp.social_account.account_name|default:pp.social_account.account_handle }}</span>
+                        <span class="text-stone-600">· {{ pp.social_account.get_platform_display }}</span><br>
+                        <span class="text-stone-700">{{ pp.get_status_display }}{% if pp.status == 'scheduled' and pp.scheduled_at %} for {{ pp.scheduled_at|date:"D j M, H:i" }}{% endif %}{% if pp.status == 'published' and pp.published_at %} {{ pp.published_at|date:"j M, H:i" }}{% endif %}</span>
+                        {% if pp.platform_extra.permalink %} · <a class="underline" href="{{ pp.platform_extra.permalink }}" target="_blank" rel="noopener">View<span class="sr-only"> (opens in a new tab)</span></a>{% endif %}
+                        {% if pp.status == 'failed' and pp.publish_error %}<p class="text-red-800 break-words">{{ pp.publish_error }}</p>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                {% if can_approve %}
+                <div class="space-y-3">
+                    {% if proposed_in_future %}
+                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                        {% csrf_token %}<input type="hidden" name="mode" value="proposed">
+                        <button type="submit" x-bind:disabled="busy" class="w-full px-5 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                            <span x-show="!busy">Approve &amp; schedule for {{ proposed_local|timezone:tzname|date:"D H:i" }}</span><span x-show="busy" x-cloak>Approving…</span>
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if can_publish_now %}
+                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                        {% csrf_token %}<input type="hidden" name="mode" value="now">
+                        <button type="submit" x-bind:disabled="busy" class="w-full px-5 py-2.5 text-sm font-semibold {% if proposed_in_future %}text-stone-800 bg-white border border-stone-300 hover:bg-stone-50{% else %}text-white bg-teal-700 hover:bg-teal-800{% endif %} rounded-full disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
+                            <span x-show="!busy">Approve &amp; publish now</span><span x-show="busy" x-cloak>Approving…</span>
+                        </button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" class="rounded-xl border border-stone-200 p-3">
+                        {% csrf_token %}<input type="hidden" name="mode" value="schedule">
+                        <p class="text-xs font-semibold text-stone-700 mb-2">{% if proposed_in_future %}Or pick another time{% else %}Approve and schedule{% endif %} ({{ workspace.effective_timezone|default:"UTC" }})</p>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <label class="sr-only" for="{{ schedule_form.date.id_for_label }}">Date</label>{{ schedule_form.date }}
+                            <label class="sr-only" for="{{ schedule_form.time.id_for_label }}">Time</label>{{ schedule_form.time }}
+                        </div>
+                        <button type="submit" class="w-full px-5 py-2 text-sm font-semibold text-teal-900 bg-teal-50 border border-teal-200 rounded-full hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-teal-700">Approve &amp; schedule</button>
+                        {% if brief.proposed_publish_at %}<p class="mt-1.5 text-xs text-stone-600">Filled in with the scheduler's proposal.</p>{% endif %}
+                    </form>
+                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}">
+                        {% csrf_token %}<input type="hidden" name="mode" value="approve">
+                        <button type="submit" class="text-sm text-stone-800 underline hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-orange-700 rounded">Approve only — schedule it later</button>
+                    </form>
+                </div>
+                {% elif brief.status == 'ready' %}
+                <p class="text-sm text-stone-700">Waiting for an approver (an owner or manager). It's also on the Approvals list.</p>
+                {% elif brief.status == 'approved' %}
+                <p class="text-sm text-green-800">Approved.</p>
+                {% endif %}
+            </section>
+
+            {# ---- Changes ---- #}
+            {% if thread %}
+            {% include thread.template with thread=thread %}
+            {% endif %}
+            {% if can_revise %}
+            <section aria-labelledby="changes-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
+                <h2 id="changes-heading" class="text-sm font-semibold text-stone-900">Send it back with notes</h2>
+                <p class="text-xs text-stone-600 mt-0.5 mb-3">Goes straight to the copywriter and art director.</p>
+                <form method="post" action="{% url 'studio:request_changes' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                    {% csrf_token %}
+                    <label for="{{ feedback_form.feedback.id_for_label }}" class="sr-only">{{ feedback_form.feedback.label }}</label>
+                    {{ feedback_form.feedback }}
+                    <label class="flex items-center gap-2 mt-2 text-sm text-stone-800 cursor-pointer">{{ feedback_form.new_picture }} {{ feedback_form.new_picture.label }}</label>
+                    <button type="submit" x-bind:disabled="busy" class="mt-3 px-4 py-2 text-sm font-semibold text-orange-900 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-orange-700">Send to the team</button>
+                </form>
+                <form method="post" action="{% url 'studio:new_angles' workspace_id=workspace.id brief_id=brief.id %}" class="mt-3">
+                    {% csrf_token %}
+                    <button type="submit" class="text-sm text-stone-800 underline hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-orange-700 rounded">Start over with three new angles</button>
+                </form>
+            </section>
+            {% endif %}
+
+            <section aria-labelledby="files-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
+                <h2 id="files-heading" class="text-sm font-semibold text-stone-900 mb-3">Files</h2>
+                <ul class="space-y-1.5 text-sm">
+                    {% if brief.graphic %}<li><a class="underline" href="{{ brief.graphic.file.url }}" download>Download the graphic</a> <span class="text-stone-600">({{ brief.graphic.width }}×{{ brief.graphic.height }})</span></li>{% endif %}
+                    {% if brief.picture %}<li><a class="underline" href="{{ brief.picture.file.url }}" download>Download the picture without type</a></li>{% endif %}
+                </ul>
+                {% if can_discard %}
+                <form method="post" action="{% url 'studio:discard' workspace_id=workspace.id brief_id=brief.id %}" class="mt-4 pt-4 border-t border-stone-200">
+                    {% csrf_token %}
+                    <button type="submit" class="text-sm text-red-800 underline hover:text-red-900 focus-visible:outline-2 focus-visible:outline-red-700 rounded">Discard this post</button>
+                </form>
+                {% endif %}
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

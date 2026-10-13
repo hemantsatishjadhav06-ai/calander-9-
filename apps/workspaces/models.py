@@ -32,6 +32,11 @@ class Workspace(models.Model):
         choices=ApprovalWorkflowMode.choices,
         default=ApprovalWorkflowMode.NONE,
     )
+    # Every post and blog in this workspace must be approved by an internal
+    # approver, in the dashboard, against the exact revision that goes out.
+    # Edits, new destinations or a new time withdraw the approval; the
+    # publisher re-checks it before anything leaves. See apps/approvals/gate.py.
+    require_dashboard_approval = models.BooleanField(default=False, db_default=False)
     is_archived = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,0 +1,65 @@
+{% load tz %}
+{% comment %}
+One article's Google rankings over the last 28 days (views.ranking_context).
+Context: ranking ({configured, connected, connection, trend, suggestion}), workspace, optional can_manage_search.
+{% endcomment %}
+<section aria-labelledby="ranking-heading" class="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+    <h2 id="ranking-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">Search ranking</h2>
+    {% if ranking.connected %}
+    <p class="text-xs text-stone-600 mt-0.5">
+        From Google Search Console, last 28 days{% if ranking.connection.last_sync_at %} · updated <time datetime="{{ ranking.connection.last_sync_at|date:'c' }}">{{ ranking.connection.last_sync_at|timezone:workspace.effective_timezone|date:"j M, H:i" }}</time>{% endif %}
+    </p>
+    {% with t=ranking.trend %}
+    {% if t.impressions %}
+    <dl class="mt-3 grid grid-cols-3 gap-2">
+        <div class="rounded-lg bg-stone-50 px-3 py-2">
+            <dt class="text-xs text-stone-600">Avg position</dt>
+            <dd class="text-lg font-semibold tabular-nums text-stone-900">{{ t.position|floatformat:1 }}</dd>
+            {% if t.position_change is not None %}
+            <dd class="text-xs tabular-nums {% if t.position_change > 0 %}text-green-800{% elif t.position_change < 0 %}text-red-800{% else %}text-stone-600{% endif %}">
+                {% if t.position_change > 0 %}Up {{ t.position_change|floatformat:1 }}{% elif t.position_change < 0 %}Down {{ t.position_change|floatformat:1|cut:"-" }}{% else %}No change{% endif %}<span class="sr-only"> places since the 28 days before</span>
+            </dd>
+            {% endif %}
+        </div>
+        <div class="rounded-lg bg-stone-50 px-3 py-2">
+            <dt class="text-xs text-stone-600">Clicks</dt>
+            <dd class="text-lg font-semibold tabular-nums text-stone-900">{{ t.clicks }}</dd>
+        </div>
+        <div class="rounded-lg bg-stone-50 px-3 py-2">
+            <dt class="text-xs text-stone-600">Impressions</dt>
+            <dd class="text-lg font-semibold tabular-nums text-stone-900">{{ t.impressions }}</dd>
+        </div>
+    </dl>
+    {% if t.queries %}
+    <table class="mt-3 w-full text-sm">
+        <caption class="sr-only">What people searched for, with this article's average position</caption>
+        <thead class="sr-only"><tr><th scope="col">Search</th><th scope="col">Average position</th></tr></thead>
+        <tbody>
+            {% for q in t.queries %}
+            <tr>
+                <td class="py-1 pr-3 text-stone-800 break-words">{{ q.query }}</td>
+                <td class="py-1 text-right tabular-nums font-semibold text-stone-900 whitespace-nowrap">#{{ q.position|floatformat:1 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+    {% else %}
+    <p class="mt-3 text-sm text-stone-700">Google hasn't shown this article in search results in the last 28 days. New articles usually appear within a few weeks.</p>
+    {% endif %}
+    {% endwith %}
+    {% if ranking.suggestion %}
+    <p class="mt-3 text-sm text-orange-900 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2"><span class="font-semibold">SEO monitor:</span> {{ ranking.suggestion }}</p>
+    {% endif %}
+    {% if ranking.connection.last_error %}
+    <p role="status" class="mt-3 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{{ ranking.connection.last_error }}</p>
+    {% endif %}
+    {% elif ranking.configured %}
+    <p class="text-sm text-stone-700 mt-1">
+        Connect this website to Google Search Console to see how this article ranks.
+        {% if can_manage_search %}<a href="{% url 'blog:list' workspace_id=workspace.id %}#google-search" class="font-medium text-orange-800 underline hover:text-orange-900">Connect it on the Blog page</a>.{% else %}An owner of this workspace can connect it.{% endif %}
+    </p>
+    {% else %}
+    <p class="text-sm text-stone-700 mt-1">Ask your admin to connect Google Search Console to see how this article ranks.</p>
+    {% endif %}
+</section>

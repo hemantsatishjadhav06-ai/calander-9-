@@ -170,6 +170,10 @@ class A11ySweepTests(TestCase):
             "saved_replies": reverse("inbox:saved_replies", kwargs=ws),
             "media": reverse("media_library:index", kwargs=ws),
             "members": reverse("members:list"),
+            # The agency's pages.
+            "agency": reverse("studio:index", kwargs=ws),
+            "agency_team": reverse("studio:team", kwargs=ws),
+            "brand_profile": reverse("studio:brand", kwargs=ws),
         }
 
     def _render(self, name, url):

@@ -1,0 +1,204 @@
+{
+  "scope": "Current local Django and Chromium with isolated synthetic PostgreSQL fixtures, controlled Bot API and account-manager answers; no real Telegram creation, model calls, source reads or publication.",
+  "checks": [
+    {
+      "name": "owner sees staged bot/account/group setup",
+      "passed": true
+    },
+    {
+      "name": "bot token never redisplayed",
+      "passed": true
+    },
+    {
+      "name": "existing active workspace does not offer a new managed creation request",
+      "passed": true
+    },
+    {
+      "name": "group selector only contains client/team",
+      "passed": true
+    },
+    {
+      "name": "owner fresh response has direct personal Telegram Start link",
+      "passed": true
+    },
+    {
+      "name": "personal code and link are absent on later GET",
+      "passed": true
+    },
+    {
+      "name": "group code clearly names intended team group",
+      "passed": true
+    },
+    {
+      "name": "group code is never presented as personal Start link",
+      "passed": true
+    },
+    {
+      "name": "owner mobile page has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "unconnected client bot has disabled personal pairing action",
+      "passed": true
+    },
+    {
+      "name": "incapable manager has clear BotFather fallback",
+      "passed": true
+    },
+    {
+      "name": "manager failure does not reveal token",
+      "passed": true
+    },
+    {
+      "name": "capable controlled manager provides real consent link structure",
+      "passed": true
+    },
+    {
+      "name": "managed request shows pending human confirmation",
+      "passed": true
+    },
+    {
+      "name": "managed creation URL is not redisplayed on GET",
+      "passed": true
+    },
+    {
+      "name": "managed request has inspectable status on GET",
+      "passed": true
+    },
+    {
+      "name": "client has only personal linking controls",
+      "passed": true
+    },
+    {
+      "name": "client page excludes internal weekly preparation",
+      "passed": true
+    },
+    {
+      "name": "client can create personal link without organization membership",
+      "passed": true
+    },
+    {
+      "name": "client mobile page has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "personal link keyboard focus is reachable",
+      "passed": true
+    },
+    {
+      "name": "agency overview explains draft approval boundary",
+      "passed": true
+    },
+    {
+      "name": "guided creative brief is visible in same thread",
+      "passed": true
+    },
+    {
+      "name": "source warnings are presented before preparation",
+      "passed": true
+    },
+    {
+      "name": "source details disclose fact-confirmation limits",
+      "passed": true
+    },
+    {
+      "name": "guided photo and style fields have usable associated labels",
+      "passed": true
+    },
+    {
+      "name": "selected synthetic photo is labeled unverified",
+      "passed": true
+    },
+    {
+      "name": "native browser requires fact checkbox before creative preparation",
+      "passed": true
+    },
+    {
+      "name": "guided thread mobile page has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "guided confirmation remains reachable on mobile",
+      "passed": true
+    },
+    {
+      "name": "all browser routes have zero page errors",
+      "passed": true
+    },
+    {
+      "name": "all browser routes have zero failed requests",
+      "passed": true
+    },
+    {
+      "name": "all browser routes have zero server errors",
+      "passed": true
+    },
+    {
+      "name": "magic link has explicit confirmation before consumption",
+      "passed": true
+    },
+    {
+      "name": "passwordless client reaches its scoped portal",
+      "passed": true
+    },
+    {
+      "name": "Telegram navigation is visible immediately on a client phone",
+      "passed": true
+    },
+    {
+      "name": "magic-link client has personal-only Telegram page",
+      "passed": true
+    },
+    {
+      "name": "magic-link client has one-click personal Telegram link",
+      "passed": true
+    },
+    {
+      "name": "portal pair URL contains only personal Start payload",
+      "passed": true
+    },
+    {
+      "name": "portal phone layout has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "portal tablet navigation has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "portal does not redisplay consumed page pairing code on GET",
+      "passed": true
+    },
+    {
+      "name": "portal session remains confined from full workspace Telegram settings",
+      "passed": true
+    },
+    {
+      "name": "portal recognizes its newly paired own identity",
+      "passed": true
+    },
+    {
+      "name": "portal can disconnect only own Telegram identity",
+      "passed": true
+    },
+    {
+      "name": "revoked magic-link grant cannot reach Telegram pairing page",
+      "passed": true
+    },
+    {
+      "name": "portal and workspace browser paths have zero page errors",
+      "passed": true
+    },
+    {
+      "name": "portal and workspace browser paths have zero failed requests",
+      "passed": true
+    },
+    {
+      "name": "portal and workspace browser paths have zero server errors",
+      "passed": true
+    }
+  ],
+  "page_errors": [],
+  "failed_requests": [],
+  "unexpected_http_errors": []
+}

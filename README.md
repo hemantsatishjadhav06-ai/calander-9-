@@ -15,7 +15,7 @@
 
 ## About SM Bean
 
-SM Bean is an open-source, self-hostable social media management platform built for creators, agencies and SMBs. It does what Sendible, SocialPilot, or ContentStudio do, but free and without per-seat, per-channel, or per-workspace limits. Plan, compose, schedule, approve, publish, and monitor content across Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business Profile, Mastodon, and DEV.to from a single multi-workspace dashboard.
+SM Bean is an open-source, self-hostable social media management platform built for creators, agencies and SMBs. It does what Sendible, SocialPilot, or ContentStudio do, but free and without per-seat, per-channel, or per-workspace limits. Plan, compose, schedule, approve, publish, and monitor content across Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business Profile, Mastodon, DEV.to, and X (publishing only) from a single multi-workspace dashboard.
 
 It's for people managing many client accounts under one roof who'd rather own their social stack than pay $100–300/month to a SaaS vendor. Seats, workspaces and channels are never metered, and publishing, scheduling, approvals, the client portal, inbox and analytics are all included. One optional add-on — AI Intelligence — runs on a paid third-party model and is billed by usage.
 
@@ -32,6 +32,8 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | **Approval workflows** | Configurable stages (none / optional / internal / internal + client), threaded internal & external comments, reminders, and a full audit trail. |
 | **Unified social inbox** | Comments, mentions, DMs, and reviews from every connected platform in one place, with sentiment analysis, assignments, threaded replies, and historical backfill. |
 | **Analytics** | Per-post and channel-level performance from every connected platform's native API, with KPI cards, 7/30/90-day trend charts, and a sortable all-posts table for views, engagement, follower growth, reach, and watch time. |
+| **AI Agency** | A team of 28 agents in seven departments plans the week, writes and designs posts in the look of your best work, writes SEO blog articles, drafts inbox replies and answers questions in a team thread — staff and clients alike. Everything waits for a person to approve. Needs the configured model-provider key (`OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`; pictures: `FAL_KEY`). See [AI Agency](#ai-agency). |
+| **Blog & SEO** | Write posts for the brands' own websites — or have the SEO team write them — with a live SEO score, approve the exact revision, and commit + deploy them through GitHub with a sitemap and RSS feed. Google Search Console rankings per article. Every post gets a designed 1600×900 cover — the title set over its picture in the brand's look — and a "Generate picture" button that paints a wordless image with fal.ai (`FAL_KEY`). |
 | **Media library** | Org- and workspace-scoped libraries with nested folders, auto-generated platform-optimized variants, alt text, and built-in Unsplash stock-photo search in the composer. |
 | **Client portal** | Passwordless 30-day magic-link access so clients can approve or reject posts without creating an account. |
 | **Notifications** | In-app, email, and webhook delivery with per-user preferences for every event type. |
@@ -61,7 +63,7 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | <img src="https://cdn.simpleicons.org/facebook" width="16" height="16"> Facebook | ✓ | ✓ | ✓ | ✓ |
 | <img src="https://cdn.simpleicons.org/instagram" width="16" height="16"> Instagram | ✓ | ✓ | ✓ | ✓ |
 | <img src="https://cdn.simpleicons.org/instagram" width="16" height="16"> Instagram (Direct) | ✓ | ✓ | ✓ | ✓ |
-| <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Personal) | ✓ | ✓ | — | ✓ |
+| <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Personal) | ✓ | —¹ | — | — |
 | <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Company) | ✓ | ✓ | — | ✓ |
 | <img src="https://cdn.simpleicons.org/tiktok" width="16" height="16"> TikTok | ✓ | — | — | ✓ |
 | <img src="https://cdn.simpleicons.org/youtube" width="16" height="16"> YouTube | ✓ | ✓ | — | ✓ |
@@ -71,6 +73,11 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
 | <img src="https://api.iconify.design/logos/google-icon.svg" width="16" height="16"> Google Business Profile | ✓ | — | — | ✓ |
 | <img src="https://cdn.simpleicons.org/mastodon" width="16" height="16"> Mastodon | ✓ | ✓ | — | — |
 | <img src="https://cdn.simpleicons.org/devdotto/000000" width="16" height="16"> DEV.to | ✓ | — | — | — |
+| <img src="https://cdn.simpleicons.org/x/000000" width="16" height="16"> X (Twitter) | ✓ | — | — | — |
+
+¹ Reading a member's own posts and their comments needs `r_member_social`, which LinkedIn grants only to select developers. LinkedIn (Company) Pages get comments, first comments posted as the Page, and post statistics. See [LinkedIn](#linkedin).
+
+X's API is pay-per-use with no free tier: every post and every read is billed to the developer account behind your X app, so SM Bean only publishes to X and never polls it for comments, DMs or analytics. See [X (Twitter)](#x-twitter).
 
 ---
 
@@ -230,6 +237,13 @@ python manage.py run_worker              # start worker
 
 ## Running Tests
 
+The guided-conversation UI has a locked development dependency and a CI check:
+
+```bash
+npm ci --ignore-scripts
+npm run test:ui
+```
+
 ```bash
 pytest
 ```
@@ -257,7 +271,7 @@ ruff format .
 
 ## Production Deployment
 
-Read the [current launch audit and staging acceptance checklist](docs/audit/LAUNCH_READINESS_2026-10-01.md) before opening registration. Code checks do not establish that email, storage or social-platform credentials work on your deployment.
+Read the [13 October release review](docs/audit/LAUNCH_READINESS_2026-10-13.md), [critical user review](docs/audit/USER_REVIEW_2026-10-13.md) and [Neopolis preparation worksheet](docs/audit/NEOPOLIS_WEEK_2026-10-19.md) before opening registration. Code checks do not establish that email, storage or social-platform credentials work on your deployment.
 
 ### Docker Compose on a VPS (recommended)
 
@@ -307,7 +321,9 @@ All platforms with ephemeral filesystems require `STORAGE_BACKEND=s3` - see `.en
 
 **Memory sizing.** Importing the app costs roughly 100 MB before it serves a request, and a warmed Gunicorn worker settles near 200 MB - so the shipped command runs a single threaded worker (`--workers 1 --threads 4`), which fits a 512 MB dyno with room for media handling. Raise `--workers` only when you raise the memory to match; a rule of thumb is 250 MB per worker. Do **not** add `--max-requests`: gthread stops heartbeating at the start of the request that trips the counter, so the arbiter kills the worker mid-request once `--timeout` (30s) passes - which drops whichever upload happened to be that request, and uploads here can be up to 1 GB. The `worker` process needs the same headroom: it downloads videos to disk and streams them to the platform, and if it is killed mid-publish (Heroku's R15, an OOM kill, a deploy) the affected post is failed by the confirmation sweep rather than left in limbo.
 
-**Why the worker runs with `--duration 3600`.** `run_worker` is django-background-tasks' `process_tasks` with three fixes for life as a platform-managed service: it stops gracefully on SIGTERM (the library only listens for SIGTSTP, so a deploy used to kill it mid-task), it releases the task locks a killed worker leaves behind (otherwise `run_publish_cycle` stays locked for an hour after every crash - an hour with no publishing), and it re-registers any recurring schedule the library deleted after repeated failures. Pass `--keep-locks` if you ever run more than one worker replica. Underneath, `process_tasks` is a single non-forking process that runs every task in the same heap and never restarts, so a peak allocation raises RSS permanently - CPython and glibc keep the freed pages in their own arenas. Left alone it ratchets: on a 512 MB Basic dyno it climbed from ~280 MB after a deploy to 566 MB over 15 hours and sat at 110% of quota. `--duration` is checked at the *top* of the run loop, so a task in flight always finishes; the process then exits 0 between tasks and the platform restarts it at its floor. Nothing is lost - a recycle cannot interrupt a publish, and `confirm_pending_publishes` settles anything in flight regardless. Don't go below ~1800s, where Heroku's crash cool-off starts to engage. Other deploy targets keep the plain command: `docker-compose.yml` has no `restart:` policy on the worker, so there a clean exit would simply stop it.
+**Worker recovery and `--duration 3600`.** `run_worker` handles graceful SIGTERM, repairs recurring schedules and reclaims abandoned task locks. A dedicated PostgreSQL session lease rejects overlapping single-worker starts before lock reclamation and uses one extra database connection. Drain the old baseline worker before the first lease-enabled rollout; it does not participate in that lease. `--keep-locks` opts out for a separately validated multi-worker design and must not be used to bypass an overlap error. See [live rollout, strict verification and rollback](docs/LIVE_OPERATIONS.md#checking-the-live-deployment).
+
+`process_tasks` uses a single non-forking heap, so peak allocations can keep RSS high even after work finishes. `--duration` is checked between tasks: under graceful shutdown the task finishes and a platform restart returns the process to its initial memory floor. Configure a restart policy before using a duration limit; targets without one otherwise stop after a clean exit. Platform hard kills can still interrupt delivery, so confirmation and human inspection hold unknown outcomes rather than promising that every interrupted send can be safely repeated. The shipped Heroku setting uses 3600 seconds; avoid very short recycling periods that trigger platform restart cool-offs.
 
 **`MALLOC_ARENA_MAX`.** glibc gives each thread its own arena (up to 64 MB) capped at `8 x nproc`, and containers report the host's core count, so the cap is effectively unbounded. This app has real thread churn - the publisher builds a fresh pool every 15s and boto3's managed transfer adds ten threads per download - and those arenas are never returned to the OS. On Heroku this is already set to 2 by the repo's `.profile`, which applies to web, worker, the release phase and one-off `heroku run` dynos alike; it is written as a default rather than an override, so a config var still wins if you want to tune it. Deploy targets that build from the `Dockerfile` (Render, Railway, docker-compose) do not read `.profile` - set it in their own environment config if the host is memory-tight.
 
@@ -360,6 +376,24 @@ calander-9-/
 ```
 
 > **Settings selection:** The `DJANGO_SETTINGS_MODULE` environment variable controls which settings file Django uses. The defaults are already wired for each context: `manage.py` uses `development`, `wsgi.py`/`asgi.py` use `production`, and `pytest` uses `test` (via `pyproject.toml`). Docker Compose files and platform deploy configs (Heroku, Render) also set it explicitly. You only need to override it manually if you want a non-default module for a specific command, e.g. `DJANGO_SETTINGS_MODULE=config.settings.production python manage.py check --deploy`.
+
+## Sign in with Google
+
+The login and signup pages show **Sign in with Google** / **Sign up with Google** once both `GOOGLE_AUTH_CLIENT_ID` and `GOOGLE_AUTH_CLIENT_SECRET` are set; without them the button stays hidden (it used to show and lead to Google's "missing client_id" page). Someone new who signs in with Google gets an account and their own workspace, accepts the Terms once, and lands on their calendar — or on the page they were trying to open.
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an **OAuth client ID** of type **Web application**.
+2. Add the authorized redirect URI (exactly, with the trailing slash):
+   ```
+   {APP_URL}/accounts/google/login/callback/
+   ```
+3. On the **OAuth consent screen**, add the `email` and `profile` scopes and publish the app (while it is in *Testing*, only listed test users can sign in).
+4. Set the environment variables on the web service and redeploy:
+   ```
+   GOOGLE_AUTH_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+   GOOGLE_AUTH_CLIENT_SECRET=your-client-secret
+   ```
+
+Who may create an account still follows `SIGNUP_MODE` (default `invite_only`): a Google sign-in from an address that has no invitation and isn't on `SIGNUP_ALLOWLIST` (`ana@agency.com` or a whole domain, `@agency.com`) sees the invite-only page and no account is made. Existing users can sign in with Google if the Google address matches their account's email. Don't also add a Google "Social application" in the Django admin while the variables are set: two apps for one provider make the login page fail. When a Google sign-in fails, the person sees "Google sign-in didn't finish" with a way back, and the reason is logged as `Social sign-in failed: …`.
 
 ## Platform Credentials
 
@@ -505,16 +539,32 @@ SM Bean supports two LinkedIn paths. Pick whichever your LinkedIn dev app can ob
    {APP_URL}/social-accounts/callback/linkedin_personal/
    {APP_URL}/social-accounts/callback/linkedin_company/
    ```
-5. Scopes:
-   - **Personal:** `r_basicprofile`, `w_member_social`, `r_member_social`
-   - **Company:** `r_basicprofile`, `w_member_social`, `w_organization_social`, `r_organization_social`, `rw_organization_admin`
+5. Scopes requested (all granted by the Community Management API product):
+   - **Company:** `r_basicprofile`, `w_member_social`, `w_organization_social`, `r_organization_social`, `rw_organization_admin`, `w_organization_social_feed`, `r_organization_social_feed`
+   - **Personal:** `r_basicprofile`, `w_member_social`, `w_member_social_feed`
 6. Set the environment variables:
    ```
    PLATFORM_LINKEDIN_COMPANY_CLIENT_ID=your-client-id
    PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET=your-client-secret
    ```
 
-If you set only the Path B (Company) credentials, SM Bean automatically reuses them for personal connections too - refresh tokens (365-day) and inbox both work. You only need Path A vars if you have a separate Personal-only app.
+If you set only the Path B (Company) credentials, SM Bean automatically reuses them for personal connections too, with 365-day refresh tokens. You only need Path A vars if you have a separate Personal-only app.
+
+What a connected Company Page gets:
+
+- **Connecting** lists every Page you are an *Administrator* of (`/rest/organizationAcls`), with its name and logo; pick the ones to add to the workspace.
+- **Posts** go out as the Page: text, links, a video, or 1–20 images (two or more become one multi-image post), with each image's alt text from the composer. GIFs are posted as images. `#hashtags` stay real, linked hashtags; every other reserved character is escaped so LinkedIn doesn't cut the caption short.
+- **The first comment** (where the link usually goes) and replies from the inbox are posted **by the Page**, not by the admin who connected it. A retried first comment is never doubled.
+- **Inbox** picks up comments on the Page's 20 latest posts, leaving out the Page's own.
+- **Statistics**: impressions, reactions, comments, reposts and clicks per post (organic), up to 20 posts per API call.
+- **Health check** refreshes the Page's name, logo and follower count — and reports the account if the person who connected it is no longer one of its admins.
+
+> **Scopes must match the app.** LinkedIn refuses the whole sign-in when even one requested scope isn't granted to the app (the callback then says so). The app's **Auth** tab on developer.linkedin.com lists the scopes it holds. If yours differs — for example an older app that still holds `r_member_social`, which turns the Personal inbox back on — set the list explicitly, space- or comma-separated:
+> ```
+> PLATFORM_LINKEDIN_COMPANY_SCOPES=r_basicprofile w_member_social w_organization_social r_organization_social rw_organization_admin
+> PLATFORM_LINKEDIN_PERSONAL_SCOPES=r_basicprofile w_member_social r_member_social
+> ```
+> Without `w_organization_social_feed` the Page can't post its first comment, and without `r_organization_social_feed` its inbox stays empty.
 
 > **Note:** "Sign In with LinkedIn using OpenID Connect" / "Share on LinkedIn" and "Community Management API" are **mutually exclusive** on a single LinkedIn app. You need separate apps for Path A and Path B.
 
@@ -597,6 +647,115 @@ No developer app registration needed. Users connect by entering a personal **API
 3. Copy the generated key and paste it when connecting your account in SM Bean
 
 Posts publish as DEV.to articles (title + Markdown body). The key can be revoked at any time from the same settings page.
+
+### X (Twitter)
+
+SM Bean publishes to X through the official X API v2 with OAuth 2.0 (Authorization Code + PKCE). It is **publishing only**: text with up to 4 images, or one video or GIF. Comments, DMs and analytics are deliberately not wired up.
+
+> **X's API is pay-per-use, with no free tier.** Requests are billed to the credits of the developer account that owns the app: each published post (as of October 2026 roughly $0.015, or about $0.20 when the post contains a link), and reads too, including the profile lookup the connection health check makes every six hours. Inbox polling and analytics sync would run unattended and spend those credits, which is why SM Bean doesn't do either for X. When the balance runs out, X refuses posts and they fail with "X rejected the post: the X developer account has no API credits. Add credits at console.x.com." Check current prices on the X developer console before you connect.
+
+1. Sign in to the [X developer console](https://console.x.com/) and create an app
+2. Enable **OAuth 2.0** user authentication for it as a **confidential client** (a web app, not a native/public one) with read and write permission
+3. Add the callback URI:
+   ```
+   {APP_URL}/social-accounts/callback/x/
+   ```
+   If you send clients connection links (onboarding), add `{APP_URL}/onboarding/connect/callback/x/` as well.
+4. Copy the **OAuth 2.0 Client ID** and **Client Secret** (not the API Key / API Secret, which are OAuth 1.0a credentials)
+5. Scopes requested: `tweet.read`, `tweet.write`, `users.read`, `offline.access`, `media.write`
+6. Add API credits to the developer account
+7. Set the environment variables:
+   ```
+   PLATFORM_X_CLIENT_ID=your-oauth2-client-id
+   PLATFORM_X_CLIENT_SECRET=your-oauth2-client-secret
+   ```
+
+Access tokens last two hours and are refreshed automatically; X rotates the refresh token on every refresh. The composer counts X's 280-character limit the way X does: every link counts as 23 characters, and CJK characters and emoji count as two.
+
+### fal.ai (blog cover pictures)
+
+The blog editor's **Generate picture** button asks fal.ai for a wordless 16:9 picture that fits the post, saves it to the media library and selects it as the featured image. The **designed cover** then sets the title, category tag and brand wordmark over it with Pillow (`apps/blog/covers.py`, fonts bundled under `apps/blog/fonts/`), so the website's hero, the index card and the `og:image` all carry the headline — the model is never asked to draw text.
+
+1. Create an API key at [fal.ai/dashboard/keys](https://fal.ai/dashboard/keys) and add credit to the account.
+2. Set the environment variables (on the web **and** worker services):
+   ```
+   FAL_KEY=your-fal-key
+   FAL_IMAGE_MODEL=fal-ai/flux/dev   # optional; fal-ai/flux/schnell is faster, fal-ai/flux-pro/v1.1 finer
+   ```
+3. Without `FAL_KEY` the button is shown disabled with a note; posts still get the designed cover on the brand background, and uploaded pictures work as before.
+
+Each post's **Cover** setting chooses between the designed cover (default) and the plain featured image.
+
+## AI Agency
+
+**Agency** in the sidebar has 28 configured agent roles across seven departments: model-backed roles use the selected Anthropic/OpenRouter provider, image generation uses fal.ai, and rendering and orchestration also use ordinary code. These are software roles, not 28 employees or a guarantee of parallel execution. The workflow plans, writes, designs, checks and proposes times for posts and blog articles, uses available audience/performance evidence, and learns from reviewed creatives. **Nothing it makes goes out until a person approves the exact final version**: every post and article lands in the normal approval queue.
+
+| Department | Agents |
+|---|---|
+| Client services | **Account manager** (answers questions and change requests in the team thread, and hands them to the right agent) · **Client reporter** (the weekly report) |
+| Strategy | **Content strategist** (three angles from one idea) · **Content planner** (next week's posts for your open slots) · **Moments scout** (festivals, seasons, industry dates) |
+| Insights | **Performance analyst** (what worked, against each account's own average) · **Audience listener** (questions, praise and complaints in comments, messages and reviews) · **Creative memory curator** (studies your best creatives and your designer's references and writes down the house style) |
+| Creative | **Copywriter** · **Channel editor** (the version each network needs) · **Art director** · **Prompt engineer** (writes the image prompt from the art director's direction and your best past creatives) · **Illustrator** (fal.ai) · **Graphic designer** (Pillow) |
+| Quality | **Brand reviewer** · **QA inspector** (lengths per network, hashtags, links, alt text, contrast) · **Fact checker** · **Editor-in-chief** |
+| Publishing | **Scheduler** (proposes the best free time from the account's history; never schedules) · **Producer** (creates the draft and submits it for approval) · **Community manager** and **Reviews manager** (draft replies for a person to send; unhappy reviews are flagged) |
+| Blog & SEO | **SEO strategist** · **Outline editor** · **Blog writer** · **SEO editor** · **Repurposer** (turns an article into posts) · **SEO monitor** (scores published articles, reads Google rankings, suggests refreshes) |
+
+**A post**, after the source-backed brief is confirmed: strategist → copywriter → art director → prompt engineer → illustrator → designer → brand reviewer → channel editor → QA inspector → scheduler → producer. It waits on the agency home under *Waiting for you* with a proposed time; a current approver reviews the final copy, visual, destination and time before **Approve & schedule**. Preparation time depends on providers and worker capacity; it is not a delivery deadline.
+
+**Telegram client hub.** Each workspace has its own bot. Clients can link their
+own Telegram account from a passwordless portal session; staff use Agency →
+Telegram for separate team/client groups and permitted brainstorming, references,
+reviews and weekly preparation. A capable manager bot can request a new company
+bot through Telegram's human-consent screen and finish setup automatically;
+ordinary bots use BotFather. See [Telegram setup and boundaries](docs/TELEGRAM_CLIENT_HUB.md).
+
+**Same look as your best work.** With *Match the look of the last post* on (the default), the next graphic copies the layout, canvas, colour treatment and picture style of the last one. **Agency → Creative memory** ranks published creatives against each account's own average, lets you mark any of them — or upload your designer's best work — as *Learn from this*, and keeps a house-style paragraph the curator writes (editable by managers). The art director, the prompt engineer and the reviewer all read it.
+
+**Autopilot** (**Agency → Autopilot**, workspace owners): posts per week, accounts, content pillars, the weekday and hour to plan, blog articles per month and a monthly budget. At the planning time the planner fills next week's open slots and the team makes every post; the lead approver gets one notification when they are all ready. It never approves or schedules — *Nothing goes out without you*.
+
+**Ask the team.** The agency home and every post have a thread with the account manager: ask a question, or ask for a change ("make the headline shorter", "new picture", "write one about Saturday's site visit") and the right agent does it. Staff can leave internal notes clients never see. Clients get the same thread in the client portal (**Talk to the team**, and *Ask a question* / *Request a change* on each post waiting for them), and the portal's **Reports** page shows the weekly report. Their requests still need internal approval.
+
+**Blog & SEO.** **Write with the team** on the blog list turns a topic into a full article: keyword and intent, outline, the article with links to your other articles, a fact check against the brand facts, the search title, description and slug, an editor's final read and a designed cover — then it waits for approval like any article. The editor shows a live **SEO score** (0–100, each check with its fix) and the Google result preview; *Ask the SEO team* and *Improve SEO* send an article back for a revision; *Make social posts* turns an approved article into posts. Published pages get complete Open Graph and Article structured data, related articles, and the blog's `sitemap.xml` and RSS `feed.xml` are written in the same commit. Connect **Google Search Console** on the blog list to see each article's position, clicks and top searches; **Run an SEO check-up** (and a weekly run) has the SEO monitor suggest what to refresh.
+
+**Inbox drafts.** With *Draft replies to comments, messages and reviews* on in Autopilot (or **Draft replies with the team** in the inbox), new comments, mentions, reviews and recent messages get a reply drafted by the community manager or the reviews manager, labelled as such in the inbox. A person sends it; one- and two-star reviews are flagged to the inbox staff.
+
+**Cost control.** Every agent's turn is recorded with tokens and an estimated cost at known model list prices; fal.ai pictures have a separate estimate. Treat the workspace budget as a soft pre-call threshold, not an exact provider bill or a reserved hard ceiling. Autopilot, the thread and the blog team stop starting new work when the month's estimated spend reaches the workspace's budget, and the agency home shows the meter. The thread has a daily reply cap per workspace. Agent work runs below publishing in the worker's queue, but a running turn cannot be preempted; its duration and retries can delay publishing. Measure that delay before promising a delivery-time guarantee.
+
+Setup — on the web **and** worker services (the agents run in the background worker). For OpenRouter:
+
+```text
+STUDIO_PROVIDER=openrouter
+OPENROUTER_API_KEY=                # enter securely in environment settings
+STUDIO_MODEL=anthropic/claude-sonnet-4.5
+STUDIO_WEB_SEARCH=false
+```
+
+OpenRouter keys belong in `OPENROUTER_API_KEY`. Do not put them in `ANTHROPIC_API_KEY`: the providers use different endpoints and request formats. Empty `STUDIO_MODEL` selects the chosen provider's default. An old explicit Anthropic model ID must be replaced with an OpenRouter namespaced ID when switching providers. Confirm model availability, structured-output/image support and credits in your OpenRouter account. The OpenRouter adapter validates structured answers and retains usage from unusable answers; web research is disabled for this provider. Images still use fal.ai independently.
+
+For direct Anthropic access, use the existing provider:
+
+```text
+STUDIO_PROVIDER=anthropic
+ANTHROPIC_API_KEY=                 # enter securely; console.anthropic.com
+STUDIO_MODEL=claude-opus-5-5        # optional; the Claude model every agent uses
+STUDIO_EFFORT=                      # optional; low|medium|high|xhigh|max for every agent (default: per agent)
+STUDIO_TIMEOUT=300                  # optional; seconds per agent turn
+STUDIO_FALLBACKS=true               # optional; retry a falsely declined request on Anthropic's fallback model
+STUDIO_WEB_SEARCH=false             # optional; lets the moments scout and SEO strategist search the web ($0.01 a search)
+AGENCY_MAX_ACTIVE_BRIEFS=3          # optional; posts the autopilot has in the works at once, across workspaces
+FAL_KEY=...                         # optional; pictures (see fal.ai above)
+GSC_CLIENT_ID=                      # optional; Google Search Console rankings (see below)
+GSC_CLIENT_SECRET=
+INDEXNOW_KEY=                       # optional; tells Bing and other IndexNow engines when an article goes live
+```
+
+For production activation, recovery gaps and the pilot that verifies real delivery after human **Approve & schedule**, see [CTO agency readiness](docs/CTO_AGENCY_READINESS.md). Plain **Approve** does not schedule a post.
+
+**Create in the team thread.** The account manager asks focused questions, gathers the saved brand website and connected Meta channel context, and shows a creative brief for your explicit confirmation before starting a draft. Attach a photo and draw on saved creative memory, then review the graphic and captions in that same conversation. Measured loss of essential graphic text blocks handoff for correction. Finished content still needs human **Approve & schedule**. See [guided post creation](docs/GUIDED_POST_CREATION.md) for the flow and source limitations.
+
+The [Neopolis launch audit](docs/NEOPOLIS_LAUNCH_AUDIT.md) records failure, concurrency and usage regressions plus the required live acceptance pilot. Before its first rollout, drain the old worker and review/reapprove queued approvals: the new worker singleton lease and native-destination approval fingerprint change those operating requirements.
+
+**Google Search Console** (optional): in Google Cloud Console create an OAuth client ID (Web application), enable the *Google Search Console API*, add the redirect URI `{APP_URL}/blog/search-console/callback/`, and set `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` on both services. Then an owner chooses **Connect Google Search Console** on the blog list and picks the property for that website (the Google account must have access to it). Rankings sync daily.
 
 ## Inbox: Backfill Historical Messages
 

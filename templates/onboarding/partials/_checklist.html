@@ -1,11 +1,11 @@
 {% if not checklist_dismissed and checklist_items %}
 <div id="onboarding-checklist" x-data="{ open: false }"
      {% if request.workspace %}
-     hx-get="{% url 'onboarding:checklist_partial' workspace_id=request.workspace.id %}"
+     hx-get="{% url 'onboarding:checklist_partial' workspace_id=request.workspace.id %}{% if request.resolver_match.app_name == 'studio' or request.GET.surface == 'agency' %}?surface=agency{% endif %}"
      hx-trigger="ideaChanged from:body"
      hx-swap="outerHTML"
      {% endif %}
-     class="fixed bottom-2 right-2 left-2 sm:left-auto sm:bottom-4 sm:right-4 z-[55] sm:w-[340px]">
+     class="{% if request.resolver_match.app_name == 'studio' or request.GET.surface == 'agency' %}relative mx-3 my-4 max-w-sm{% else %}fixed bottom-2 right-2 left-2 sm:left-auto sm:bottom-4 sm:right-4 z-[55] sm:w-[340px]{% endif %}">
 
     <!-- Collapsed trigger button -->
     <button x-show="!open" x-cloak

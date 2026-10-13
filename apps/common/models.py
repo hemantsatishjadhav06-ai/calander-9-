@@ -99,3 +99,19 @@ class OutboundMailbox(models.Model):
 
     def __str__(self) -> str:
         return self.email
+
+
+class TaskHeartbeat(models.Model):
+    """Shared evidence of actual recurring task execution across web and worker."""
+
+    task_name = models.CharField(max_length=255, unique=True)
+    last_started_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    last_failure_at = models.DateTimeField(null=True, blank=True)
+    state = models.CharField(max_length=20, default="unknown")
+    error = models.CharField(max_length=300, blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "common_task_heartbeat"
