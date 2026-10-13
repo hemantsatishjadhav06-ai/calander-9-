@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pricing — {{ SITE_NAME }}</title>
-  <meta name="description" content="{{ SITE_NAME }} is free and open-source to self-host — every feature, every platform, no per-seat or per-channel fees. Or let us run it for you with Managed Cloud.">
+  <meta name="description" content="{{ SITE_NAME }} is open-source and free to self-host, with no per-seat or per-channel fees. Hosting, AI services and paid platform APIs have separate costs.">
   <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}/pricing/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ SITE_NAME }}">
@@ -68,7 +68,7 @@
     <div class="wrap nav-inner">
       <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>{{ SITE_NAME }}</a>
       <div class="nav-cta">
-        <a class="link" href="/">Features</a>
+        <a class="link" href="{% url 'marketing:features' %}">Features</a>
         <a class="link" href="{% url 'account_login' %}">Sign in</a>
         <a class="btn btn-primary" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Get started{% else %}Request access{% endif %}</a>
       </div>

@@ -47,7 +47,15 @@ task-owned unused build cache was removed.
 
 ## Production observations and open acceptance
 
-PR [10](https://github.com/hemantsatishjadhav06-ai/calander-9-/pull/10) merged into `main` at `e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f`; its tree exactly matches the final CI source. Railway automatic deployment remains held for the controlled migration. The first new web build and one bounded retry failed before an image was created, with only a Metal builder scheduling log. No Docker/application output or cause was established, and the old services remain running. Neither failed attempt is a deployed release. A diagnostic through the accepted `DOCKERFILE/V2` route failed at the same scheduling step. Web build settings were fully restored to their original V3 configuration without deployment. No old service has been stopped. A verified container-image route is being investigated; the cause of source-build initialization failure remains unavailable.
+**Corrected deployment diagnosis:** official snapshot-scoped logs now identify
+Railway rejecting the optional `type=secret` Dockerfile mounts. The earlier
+allocation-only log view omitted the actual parser errors. Four attempts,
+including a direct immutable source upload on another builder, share that error.
+The canonical recipe is being corrected; a generated cloud variant retains
+optional secure CA mounts. No certificate or dependency-hash verification is
+disabled. The earlier unexplained-platform-outage assessment is superseded.
+
+PR [10](https://github.com/hemantsatishjadhav06-ai/calander-9-/pull/10) merged into `main` at `e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f`; its tree exactly matches the final CI source. Railway automatic deployment remains held for the controlled migration. The earlier metadata-only readout showed scheduling messages and no image; the corrected diagnosis above identifies the parser errors it missed. The V2 diagnostic was restored to V3 without deployment. Existing web and worker remain running. No old service has been stopped, and no new image has been activated.
 
 The public SM Bean health endpoint reported healthy database/cache, and the
 landing and login pages responded successfully. These requests do not identify

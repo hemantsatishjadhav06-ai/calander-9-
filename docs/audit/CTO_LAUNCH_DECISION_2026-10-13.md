@@ -1,7 +1,7 @@
 # SM Bean launch decision — 13 October 2026
 
 The repaired application is a tested release candidate. Public launch is blocked:
-Railway has not built or activated the new code, and real client/provider
+Railway has not yet built or activated the corrected code, and real client/provider
 acceptance is incomplete. The existing website remains healthy on its older
 revision. Do not advertise the cumulative fixes as already live.
 
@@ -47,14 +47,14 @@ findings. Eight specialist workstreams and software roles are not a claim that
 
 | Blocker | Exact next action |
 | --- | --- |
-| Railway build initialization | Diagnose the three failed deployment IDs in the [prepared ticket](RAILWAY_BUILD_BLOCKER_2026-10-13.md). All stopped at builder scheduling with no image or Docker/application output. No external ticket was sent. |
+| Railway build recipe | Detailed snapshot logs identified unsupported secret mounts; the earlier unexplained-platform diagnosis was incorrect. Validate the corrected canonical Dockerfile and generated cloud variant, then activate matching reviewed web/worker under the existing gate. [Investigation](RAILWAY_BUILD_BLOCKER_2026-10-13.md). |
 | Provider credential installation | Add `backboard.railway.com` to the existing cloud OpenRouter binding, or securely set the real key in both Railway services. Verify actual service authentication before paid jobs. Add `api.fal.ai` to the existing cloud fal binding for noncharging metadata checks; preserve the working Railway Fal value. |
 | Gmail consent | Sign in with the configured administrator credentials, personally accept Terms, then use [Email operations](https://sm-bean-production-eb50.up.railway.app/ops/email/) → Connect Gmail and complete Google consent. Test actual sending before invitations. Cloud execution cannot operate the user's laptop or supply Google consent. |
 | Client/team access | Send the two authorized invitations through the normal protected flow after deployment and mail setup. Client gets client scope; team member gets internal manager scope. Assign backup only after real acceptance. Addresses are retained privately. |
-| Trial bot and identity | Supply `TELEGRAM_TRIAL_BOT_TOKEN` securely in cloud settings, or enter the token in the encrypted workspace form after activation. Pair actual people and separate client/team groups. `@sammanager06_bot` reports `can_manage_bots=false`; use BotFather or a capable manager with native human consent. |
+| Trial bot and identity | The secure trial binding is saved, and an intended web variable was staged without deployment. Verify its actual runtime authentication, then connect it through the encrypted workspace flow after activation. Pair actual people and separate client/team groups. `@sammanager06_bot` reports `can_manage_bots=false`; use BotFather or a capable manager with native human consent. |
 | Neopolis 19–25 October | Run the real `listen → moments → plan → brief` workers after deployment, operator scope and provider setup. Create five new educational drafts, review actual graphics/copy/costs and retain exact human review before scheduling. No new draft, approved schedule or publication has been created yet. |
 
-The own-container-image fallback was researched. No existing publicly pullable
+The own-container-image fallback was researched before the parser diagnosis. It is not needed to fix the identified recipe incompatibility. No existing publicly pullable
 SM Bean registry image was verified. New GHCR packages default to private;
 temporary workflow credentials do not provide lasting Railway pull access.
 Registry setup and verified image provenance are required before that path can

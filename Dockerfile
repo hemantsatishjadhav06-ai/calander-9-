@@ -4,11 +4,9 @@ FROM ${NODE_IMAGE} AS frontend
 
 WORKDIR /app
 COPY theme/static_src/package*.json theme/static_src/
-# Optional corporate/cloud proxy trust stays a build secret, never an image
-# layer. Certificate and dependency-integrity verification remain enabled.
-RUN --mount=type=secret,id=build_ca_bundle \
-    if [ -f /run/secrets/build_ca_bundle ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca_bundle; fi; \
-    cd theme/static_src && npm ci
+# Keep the canonical recipe compatible with Railway's Dockerfile parser.
+# A generated Dockerfile.cloud adds optional CA-secret mounts for BuildKit.
+RUN cd theme/static_src && npm ci
 COPY templates/ templates/
 COPY apps/ apps/
 COPY theme/ theme/
@@ -35,9 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # tested, each checked against its hash. Regenerate it after editing
 # requirements.txt (see the header of requirements.lock).
 COPY requirements.lock .
-RUN --mount=type=secret,id=build_ca_bundle \
-    if [ -f /run/secrets/build_ca_bundle ]; then export PIP_CERT=/run/secrets/build_ca_bundle; fi; \
-    pip install --no-cache-dir --require-hashes -r requirements.lock
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY . .
 

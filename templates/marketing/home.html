@@ -9,8 +9,8 @@
     <div class="mk-container">
         <div class="mk-hero__inner">
             <span class="mk-eyebrow mk-eyebrow--pill"><span class="mk-dot"></span> Open source · self-hostable · live on {{ LIVE_PLATFORM_NAMES|join:", " }}</span>
-            <h1 class="mk-display">One calendar for every brand you run. <em class="mk-accent">Publish everywhere.</em></h1>
-            <p class="mk-lead">{{ site_name }} is a social media management studio for creators, agencies and small teams. Compose once, publish to {{ LIVE_PLATFORM_NAMES|join:", " }} today (with {{ COMING_SOON_PLATFORM_NAMES|join:", " }} coming as each approves our app), run client approvals, answer every comment from a single inbox, and see what actually worked.</p>
+            <h1 class="mk-display">One calendar for every brand you run. <em class="mk-accent">Publish to your connected channels.</em></h1>
+            <p class="mk-lead">{{ site_name }} is a social media management studio for creators, agencies and small teams. Compose once, publish to {{ LIVE_PLATFORM_NAMES|join:", " }} today (with {{ COMING_SOON_PLATFORM_NAMES|join:", " }} coming as each approves our app), run client approvals, handle supported conversations in one inbox, and review the metrics each platform provides.</p>
             <div class="mk-hero__actions">
                 <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %} {% include "marketing/_icon.html" with name="arrow" %}</a>
                 <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:how_it_works' %}">See how it works</a>
@@ -25,7 +25,7 @@
         <div class="mk-hero__visual reveal">
             <div class="mk-float mk-float--a">
                 <span class="mk-float__icon mk-float__icon--green">{% include "marketing/_icon.html" with name="check" %}</span>
-                <span><strong>Client approved</strong><small>Spring launch · Instagram carousel</small></span>
+                <span><strong>Demo: client approved</strong><small>Spring launch · Instagram carousel</small></span>
             </div>
             <div class="mk-float mk-float--b">
                 <span class="mk-float__stack">
@@ -33,7 +33,7 @@
                     <span>{% include "partials/_platform_icon.html" with platform="instagram" %}</span>
                     <span>{% include "partials/_platform_icon.html" with platform="threads" %}</span>
                 </span>
-                <span><strong>Published to 3 platforms</strong><small>Confirmed by each API · 09:00</small></span>
+                <span><strong>Example publish status</strong><small>Demo data · 09:00</small></span>
             </div>
             <div class="mk-float mk-float--c">
                 <span class="mk-float__icon mk-float__icon--orange">{% include "marketing/_icon.html" with name="clock" %}</span>
@@ -41,17 +41,18 @@
             </div>
             <div class="mk-browser">
                 <div class="mk-browser__bar"><i></i><i></i><i></i><span class="mk-browser__url">{% include "marketing/_icon.html" with name="lock" %} studio · publish · calendar</span></div>
-                <img src="{% static 'img/marketing/calendar.webp' %}" alt="The {{ site_name }} publishing calendar showing scheduled posts across Instagram, YouTube and LinkedIn for a month" width="1283" height="698" fetchpriority="high">
+                <img src="{% static 'img/marketing/calendar.webp' %}" alt="Illustrative {{ site_name }} calendar with demo posts across Instagram, YouTube and LinkedIn" width="1283" height="698" fetchpriority="high">
             </div>
             <div class="mk-hero__fade"></div>
         </div>
+        <p class="mk-small mk-muted">Screens and sample posts on this page use demo data and include coming-soon channels. Check <a href="{% url 'marketing:platforms' %}">Supported platforms</a> for hosted availability.</p>
     </div>
 </section>
 
 <!-- ============================================================ Networks -->
 <section class="mk-strip">
     <div class="mk-container">
-        <p class="mk-strip__label">Publishes through the official API of every network. Your app credentials, your data.</p>
+        <p class="mk-strip__label">Direct official APIs for the networks below. <a href="{% url 'marketing:platforms' %}">See hosted availability and capabilities.</a></p>
         <div class="mk-marquee" aria-label="Supported networks">
             <div class="mk-marquee__track">
                 {% for name, icon in networks %}<span class="mk-chip">{% include "partials/_platform_icon.html" with platform=icon size="md" %} {{ name }}</span>{% endfor %}
@@ -131,8 +132,8 @@
                     </div>
                 </div>
                 <div class="mk-card__icon mk-card__icon--sky">{% include "marketing/_icon.html" with name="inbox" %}</div>
-                <h3 class="mk-h3">One inbox for every reply</h3>
-                <p>Comments, mentions, DMs and reviews from every connected account, with sentiment, assignments and threaded replies. Webhooks deliver in real time; polling and backfill catch anything missed.</p>
+                <h3 class="mk-h3">Supported conversations in one inbox</h3>
+                <p>Read and reply to the comments, mentions, messages and reviews each connected platform supports, with sentiment and assignments. Available conversation types and sync methods vary by platform.</p>
             </article>
 
             <article class="mk-card mk-span-4 reveal" data-delay="2">
@@ -154,7 +155,7 @@
                 </div>
                 <div class="mk-card__icon mk-card__icon--amber">{% include "marketing/_icon.html" with name="chart" %}</div>
                 <h3 class="mk-h3">Numbers from the source</h3>
-                <p>Per-post and channel-level performance pulled from each platform's native API. KPI cards, 7, 30 and 90-day trends, and a sortable table of every post's views, engagement, reach and watch time.</p>
+                <p>Review the post and channel metrics each platform makes available through its API, with KPI cards, trends and sortable reports. Views, engagement, reach and watch time depend on the account and platform.</p>
             </article>
 
             <article class="mk-card mk-span-6 reveal">
@@ -201,10 +202,10 @@
             <p class="mk-lead">A workspace goes from empty to publishing in four steps. The background engine takes care of the rest.</p>
         </div>
         <div class="mk-steps">
-            <div class="mk-step reveal"><span class="mk-step__num">1</span><h3 class="mk-h3">Connect accounts</h3><p>Sign in to each network with its official OAuth flow. Tokens are encrypted at rest and refreshed automatically where the platform allows it.</p></div>
+            <div class="mk-step reveal"><span class="mk-step__num">1</span><h3 class="mk-h3">Connect accounts</h3><p>Follow the platform's connection flow: OAuth login, a Bluesky app password or a DEV.to API key. Credentials are encrypted at rest; tokens refresh automatically where supported.</p></div>
             <div class="mk-step reveal" data-delay="1"><span class="mk-step__num">2</span><h3 class="mk-h3">Plan and compose</h3><p>Capture ideas on the Kanban board, turn them into posts, tailor each platform's version and drop them into slots or queues.</p></div>
             <div class="mk-step reveal" data-delay="2"><span class="mk-step__num">3</span><h3 class="mk-h3">Approve and schedule</h3><p>Route posts through internal and client review. Reminders nudge whoever is holding things up; approved posts wait for their slot.</p></div>
-            <div class="mk-step reveal" data-delay="3"><span class="mk-step__num">4</span><h3 class="mk-h3">Publish and learn</h3><p>The engine publishes each platform in parallel, retries on failure, posts your first comment, then pulls the numbers back in.</p></div>
+            <div class="mk-step reveal" data-delay="3"><span class="mk-step__num">4</span><h3 class="mk-h3">Publish and learn</h3><p>Approved posts become eligible for delivery when their scheduled time arrives. Review each account's result and the available metrics; uncertain outcomes need checking before another attempt.</p></div>
         </div>
         <div class="mk-btn-row reveal" style="margin-top: 36px;">
             <a class="mk-link" href="{% url 'marketing:how_it_works' %}">Read the full walkthrough {% include "marketing/_icon.html" with name="arrow" %}</a>
@@ -219,7 +220,7 @@
         <div class="mk-section-head reveal">
             <span class="mk-eyebrow">Under the hood</span>
             <h2 class="mk-h2">Built like infrastructure, <em class="mk-accent">not like a dashboard.</em></h2>
-            <p class="mk-lead">Every integration talks to the platform's own API with your developer credentials. There is no aggregator in the middle, no vendor holding your tokens, and no surprise when a network changes its rules.</p>
+            <p class="mk-lead">Social connections use the platform's own API without an aggregator. The instance you use stores encrypted credentials; your operator and the platform's permissions, availability and API charges determine what you can connect and publish.</p>
         </div>
         <div class="mk-grid mk-grid--3" style="margin-bottom: 40px;">
             <div class="reveal"><div class="mk-stat">{{ LIVE_PLATFORM_NAMES|length }}<small>networks live today; {{ COMING_SOON_PLATFORM_NAMES|length }} more built and awaiting platform review, all first-party APIs</small></div></div>
@@ -227,8 +228,8 @@
             <div class="reveal" data-delay="2"><div class="mk-stat">90 days<small>of publish audit log for every account</small></div></div>
         </div>
         <div class="mk-grid mk-grid--4">
-            <div class="mk-dark-card reveal"><div class="mk-dark-card__icon">{% include "marketing/_icon.html" with name="zap" %}</div><h3 class="mk-h3">Publishing engine</h3><p>A background worker polls for due posts, publishes platforms in parallel, backs off on rate limits and confirms every post landed.</p></div>
-            <div class="mk-dark-card reveal" data-delay="1"><div class="mk-dark-card__icon mk-dark-card__icon--green">{% include "marketing/_icon.html" with name="refresh" %}</div><h3 class="mk-h3">Webhooks plus polling</h3><p>Meta webhooks push comments, mentions and messages instantly. A five-minute poll and a backfill command cover everything else.</p></div>
+            <div class="mk-dark-card reveal"><div class="mk-dark-card__icon">{% include "marketing/_icon.html" with name="zap" %}</div><h3 class="mk-h3">Publishing engine</h3><p>A background worker handles due posts and records results per account. It backs off on rate limits and retries eligible failures; uncertain delivery is held for review.</p></div>
+            <div class="mk-dark-card reveal" data-delay="1"><div class="mk-dark-card__icon mk-dark-card__icon--green">{% include "marketing/_icon.html" with name="refresh" %}</div><h3 class="mk-h3">Webhooks plus polling</h3><p>Supported Meta conversations arrive through webhooks. Polling and backfill help sync the conversation types each connected platform exposes.</p></div>
             <div class="mk-dark-card reveal" data-delay="2"><div class="mk-dark-card__icon mk-dark-card__icon--sky">{% include "marketing/_icon.html" with name="lock" %}</div><h3 class="mk-h3">Encrypted credentials</h3><p>Platform tokens and app secrets are encrypted in the database. Google SSO, Sentry hooks and a 14-day reversible deletion window round it out.</p></div>
             <div class="mk-dark-card reveal" data-delay="3"><div class="mk-dark-card__icon mk-dark-card__icon--rose">{% include "marketing/_icon.html" with name="server" %}</div><h3 class="mk-h3">Boring, dependable stack</h3><p>Django, PostgreSQL and a Postgres-backed job queue. No Redis or Celery required. Runs on a single small server or a one-click cloud template.</p></div>
         </div>
@@ -243,8 +244,8 @@
     <div class="mk-container">
         <div class="mk-section-head reveal">
             <span class="mk-eyebrow">The deal</span>
-            <h2 class="mk-h2">Every feature, for every user. <em class="mk-accent">No meter running.</em></h2>
-            <p class="mk-lead">Most social tools charge per seat, per channel and per workspace, then gate the useful parts behind a higher tier. {{ site_name }} does not.</p>
+            <h2 class="mk-h2">Open-source tools for your team. <em class="mk-accent">No per-seat or per-channel fees.</em></h2>
+            <p class="mk-lead">The software does not meter seats, channels or workspaces. Hosting, model requests, generated pictures and paid platform APIs have separate costs. See <a href="{% url 'pricing' %}">pricing</a> before enabling external services.</p>
         </div>
         <div class="mk-compare">
             <div class="mk-compare__col mk-compare__col--lo reveal">
@@ -253,7 +254,7 @@
                     <li>{% include "marketing/_icon.html" with name="x" %} Per-seat, per-channel and per-workspace limits</li>
                     <li>{% include "marketing/_icon.html" with name="x" %} Paid tiers and feature gates for approvals, analytics or the inbox</li>
                     <li>{% include "marketing/_icon.html" with name="x" %} An aggregator sitting between you and the platform APIs</li>
-                    <li>{% include "marketing/_icon.html" with name="x" %} Your clients' tokens and content living in someone else's database</li>
+                    <li>{% include "marketing/_icon.html" with name="x" %} A closed platform that prevents you from running your own instance</li>
                 </ul>
             </div>
             <div class="mk-compare__col mk-compare__col--hi reveal" data-delay="1">
@@ -301,7 +302,7 @@ curl -X POST <span class="s">"$APP_URL/api/v1/posts"</span> \
     <div class="mk-container">
         <div class="mk-cta reveal">
             <h2 class="mk-h2">Bring every brand into one studio.</h2>
-            <p class="mk-lead">Create an account and connect your first channel in minutes, or clone the code and run it on your own server.</p>
+            <p class="mk-lead">{% if SIGNUP_OPEN %}Create an account and connect a supported channel, or run the app on your own server.{% else %}Request an invitation to the hosted app, or run the app on your own server.{% endif %}</p>
             <div class="mk-btn-row">
                 <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
                 <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:get_started' %}">Self-host it</a>

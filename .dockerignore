@@ -29,6 +29,7 @@ test_media
 *.sqlite3
 docker-compose*.yml
 Dockerfile
+Dockerfile.cloud
 .dockerignore
 docs
 development_specs

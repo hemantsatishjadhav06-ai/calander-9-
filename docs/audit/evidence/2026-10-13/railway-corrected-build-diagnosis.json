@@ -1,0 +1,30 @@
+{
+  "record_type": "sm_bean_corrected_build_diagnosis",
+  "project": "66526b2a-6a09-43d8-bedb-ecfdd37f8d8a",
+  "environment": "be4c1d8d-84ce-47ce-9e24-56be144551cf",
+  "service": "6ef064fe-9804-4118-95b3-749ab17b795a",
+  "diagnostic_deployment_ids": [
+    "a378721c-6d62-448b-b899-ca2fab612116",
+    "620bc09e-7340-4620-9b30-5618436f937f",
+    "0d6ad38d-76fd-4fa2-967a-12e94a121e6a",
+    "d188b90c-63cc-4e3a-9d5c-b55954b97d18"
+  ],
+  "actual_failure": "Railway Dockerfile parser rejects BuildKit type=secret mounts",
+  "reported_lines": [
+    9,
+    38
+  ],
+  "supported_mount_type_reported": "cache",
+  "source_field": "official CLI v5.66 snapshot-scoped environmentLogs",
+  "prior_buildLogs_api_incomplete": true,
+  "all_four_snapshots_show_same_error": true,
+  "native_cli_archive_digest_matches_operator_body": true,
+  "unexplained_platform_outage_claim_superseded": true,
+  "source_fix_needed": true,
+  "tls_and_package_hash_validation_must_remain": true,
+  "billing_pro_active_payment_method_and_usage_credit_verified": true,
+  "no_project_expiry_or_configured_usage_limit": true,
+  "old_services_unchanged": true,
+  "no_extra_build_requested": true,
+  "public_health_status": 200
+}

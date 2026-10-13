@@ -1,0 +1,76 @@
+{
+  "record_type": "launch_fix_verification",
+  "schema_version": 1,
+  "prepared_on": "2026-10-13",
+  "scope": "Local Docker recipe validation and anonymous local marketing UI; current full CI and new live deployment pending.",
+  "docker_recipe_checks": {
+    "validation": "docker buildx build --check",
+    "recipes": [
+      {
+        "recipe": "Dockerfile",
+        "docker_check_exit": 0
+      },
+      {
+        "recipe": "Dockerfile.cloud",
+        "docker_check_exit": 0
+      }
+    ],
+    "warnings_observed": 0,
+    "full_build_executed": false,
+    "dependency_install_or_runtime_executed": false,
+    "base_image_overrides": {
+      "NODE_IMAGE": "public.ecr.aws/docker/library/node:22-bookworm-slim",
+      "PYTHON_IMAGE": "public.ecr.aws/docker/library/python:3.12-slim-bookworm"
+    },
+    "canonical_secret_mounts_present": false,
+    "generated_variant_drift_check": "passed",
+    "files_sha256": {
+      "Dockerfile": "4845f9c1235a6ceee888bfa639f50bf30393bfca7b488c22986c77c82b61062b",
+      "Dockerfile.cloud": "3aaeac58fa5c39d552654ffff80cb1df4b9a6a28c68f895b3f54b77d669a2fa3",
+      "tools/generate_cloud_dockerfile.py": "0223e613452d6d4c319f325313ffa73ea95b6c731277424ad5a75751018d3c36"
+    }
+  },
+  "local_marketing_validation": {
+    "browser_checks_passed": 73,
+    "browser_checks_failed": 0,
+    "ui_checks_passed": 66,
+    "contrast_checks_passed": 7,
+    "viewport_widths_px": [
+      390,
+      800,
+      1440
+    ],
+    "scenarios": [
+      "desktop",
+      "mobile",
+      "tablet",
+      "javascript_disabled",
+      "external_marketing_script_intentionally_blocked",
+      "reduced_motion"
+    ],
+    "page_exceptions": 0,
+    "unintended_request_failures": 0,
+    "intentional_script_request_aborts": 2,
+    "expected_resource_console_errors": 2,
+    "marketing_pytest_passed": 17,
+    "dom_state_tests_passed": 30,
+    "suite_count_basis": "Completed reviewer run summaries; browser counts independently recomputed from structured check records.",
+    "provider_calls_or_authenticated_actions": false,
+    "source_record_sha256": {
+      "local-ui-review.json": "634b7a9f9e8973925e2ff7e91249d9b36d2bdee4516a5bba64bd4d1154236a81",
+      "local-contrast-review.json": "6e948da8b1184426c63ed1ebef4401b41b8e389baf77b3a90197b3334f358111",
+      "LIVE_PUBLIC_REVIEW.md": "237a8c8e68b33217b02b15f3f60ba7989c0b49bf62c9eb253e145859c7086767"
+    }
+  },
+  "production": {
+    "last_observed_active_source": "05ca828b2be22d4c3a65fbdf67404961e0f13124",
+    "new_fix_deployment_verified": false,
+    "current_full_ci_completed": false,
+    "live_campaign_acceptance_verified_by_these_checks": false
+  },
+  "limits": [
+    "Docker --check validates the recipes without installing dependencies, collecting assets or starting an image.",
+    "Upcoming CI is configured to build both recipes and check cloud-secret absence in its runtime image; those results remain pending.",
+    "Local anonymous browser checks do not certify authenticated workflows, provider credentials, Gmail consent, worker processing or social publication."
+  ]
+}
