@@ -142,7 +142,7 @@ jobs:
   build:
     name: Docker build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: [lint, typecheck, test, ui]
     steps:
       - name: Checkout
@@ -153,14 +153,45 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
-      - name: Build image
+      - name: Check generated cloud Dockerfile
+        run: python tools/generate_cloud_dockerfile.py --check
+
+      - name: Build canonical image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
+          file: Dockerfile
           push: false
-          tags: brightbean:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: brightbean:canonical
+          cache-from: type=gha,scope=canonical
+          cache-to: type=gha,mode=max,scope=canonical
+
+      - name: Build cloud image with CA secret
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: Dockerfile.cloud
+          push: false
+          load: true
+          tags: brightbean:cloud
+          # Secret contents do not affect cache keys. Execute the installation
+          # steps so this verifies mounted CA trust rather than a cached layer.
+          no-cache-filters: frontend,base
+          secret-files: |
+            build_ca_bundle=/etc/ssl/certs/ca-certificates.crt
+          cache-from: type=gha,scope=cloud
+          cache-to: type=gha,mode=max,scope=cloud
+
+      - name: Verify cloud CA secret stays outside the runtime
+        run: |
+          docker run --rm --entrypoint python brightbean:cloud -c '
+          import os
+          from pathlib import Path
+          assert not Path("/run/secrets/build_ca_bundle").exists()
+          assert "PIP_CERT" not in os.environ
+          assert "NODE_EXTRA_CA_CERTS" not in os.environ
+          assert not Path("/app/.env").exists()
+          '
 
   secrets-scan:
     name: Secret scan (gitleaks)

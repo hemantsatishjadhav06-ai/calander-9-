@@ -309,6 +309,29 @@ git pull
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
+### Docker builds with a custom certificate authority
+
+Railway and ordinary Docker deployments use the canonical `Dockerfile`. It
+installs frozen npm dependencies and hash-verified Python dependencies using
+normal TLS verification, without BuildKit secret mounts that Railway's parser
+does not support.
+
+For a BuildKit environment behind a proxy with its own certificate authority,
+use the generated `Dockerfile.cloud` and provide its trusted PEM certificate
+bundle as a build secret:
+
+```bash
+python tools/generate_cloud_dockerfile.py --check
+docker build -f Dockerfile.cloud \
+  --secret id=build_ca_bundle,src=/path/to/trusted-ca-bundle.pem \
+  -t sm-bean:local .
+```
+
+The certificate stays outside the image layers; TLS and dependency verification
+remain enabled. Edit `Dockerfile` when changing the build, then regenerate with
+`python tools/generate_cloud_dockerfile.py`. CI checks for drift and builds both
+recipes, including the cloud recipe with a mounted certificate bundle.
+
 ### Other Platforms
 
 | Platform | Config file | Notes |
@@ -364,7 +387,8 @@ calander-9-/
 │   └── static_src/
 │       ├── src/styles.css     # Tailwind directives
 │       └── tailwind.config.js
-├── Dockerfile
+├── Dockerfile                 # Canonical production build, including Railway
+├── Dockerfile.cloud           # Generated BuildKit variant for optional CA trust
 ├── docker-compose.yml         # Dev: app + worker + postgres
 ├── docker-compose.prod.yml    # Prod override: adds Caddy, uses Gunicorn
 ├── Caddyfile                  # Reverse proxy + auto-HTTPS config

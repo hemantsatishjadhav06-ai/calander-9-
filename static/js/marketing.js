@@ -34,6 +34,7 @@
     window.addEventListener("resize", function () {
       if (window.getComputedStyle(toggle).display === "none") { closeNav(); }
     });
+    root.classList.add("nav-ready");
   }
 
   /* Sticky nav shadow once the page scrolls ------------------------------ */
@@ -61,6 +62,7 @@
     }, { rootMargin: "0px 0px -10% 0px", threshold: 0.1 });
     revealables.forEach(function (el) { observer.observe(el); });
   }
+  root.classList.add("reveal-ready");
 
   /* Copy buttons on code blocks ------------------------------------------ */
   document.querySelectorAll("[data-copy]").forEach(function (button) {

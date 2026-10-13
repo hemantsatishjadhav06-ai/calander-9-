@@ -1,10 +1,18 @@
 {
-  "record_type": "post_merge_launch_blocked_snapshot",
+  "record_type": "launch_execution_in_progress",
   "prepared_on": "2026-10-13",
-  "release_branch": "codex/sm-bean-oct13-launch",
+  "release_branch": "codex/smbean-launch-parser-fix",
   "target_branch": "main",
   "source_manifest": "Schema v2, 16 immutable source anchors, ten required migrations; generate a fresh artifact from the final full commit SHA.",
   "local_validation": {
+    "launch_parser_and_marketing_followup": {
+      "browser_checks_passed": 73,
+      "marketing_tests_passed": 17,
+      "node_dom_tests_passed": 30,
+      "canonical_and_cloud_docker_build_check": "passed",
+      "full_followup_ci": "pending",
+      "live_followup_activation": "pending"
+    },
     "full_pytest": {
       "passed": 4676,
       "skipped": 1,
@@ -89,8 +97,9 @@
       "status": "FAILED",
       "image_created": false,
       "only_log_observed": "scheduling build on Metal builder",
-      "cause_established": false,
-      "old_services_remain_running": true
+      "cause_established": true,
+      "old_services_remain_running": true,
+      "cause": "unsupported_Dockerfile_secret_mounts"
     },
     "observed_existing_source_verified": true,
     "staged_cloud_openrouter_reference_removed": true,
@@ -103,8 +112,9 @@
       "source_commit": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
       "image_created": false,
       "only_log_observed": "scheduling build on Metal builder",
-      "cause_established": false,
-      "old_services_remain_running": true
+      "cause_established": true,
+      "old_services_remain_running": true,
+      "cause": "unsupported_Dockerfile_secret_mounts"
     },
     "configured_administrator_bootstrap": {
       "created_with_normal_django_command": true,
@@ -128,7 +138,8 @@
       "status": "FAILED",
       "image_created": false,
       "web_configuration_restored_to_original_v3": true,
-      "old_services_remain_running": true
+      "old_services_remain_running": true,
+      "cause": "unsupported_Dockerfile_secret_mounts"
     },
     "fresh_post_admin_application_backup_verified": {
       "bytes": 3738004,
@@ -139,7 +150,36 @@
       "paused_writes_pre_migration_backup_still_required": true
     },
     "fresh_post_admin_native_snapshot_verified": true,
-    "container_registry_fallback": "researched_no_existing_public_pullable_image_verified_new_package_requires_visibility_and_provenance_setup"
+    "container_registry_fallback": "researched_no_existing_public_pullable_image_verified_new_package_requires_visibility_and_provenance_setup",
+    "corrected_build_diagnosis": {
+      "established": true,
+      "failure": "Railway Dockerfile parser rejects type=secret mounts",
+      "reported_lines": [
+        9,
+        38
+      ],
+      "log_source": "official CLI snapshot-scoped environmentLogs",
+      "legacy_build_logs_omitted_parser_error": true,
+      "prior_unexplained_platform_outage_claim_superseded": true,
+      "billing_restriction_observed": false,
+      "native_cli_archive_digest_matches_submitted_immutable_source": true
+    },
+    "cli_upload_diagnostic": {
+      "deployment_id": "d188b90c-63cc-4e3a-9d5c-b55954b97d18",
+      "status": "FAILED",
+      "native_archive_digest_verified": true,
+      "same_parser_error": true,
+      "image_created": false,
+      "old_services_preserved": true
+    },
+    "telegram_trial_variable_stage": {
+      "web_only": true,
+      "skip_deploys": true,
+      "name_only_readback": true,
+      "active_and_latest_deployments_unchanged": true,
+      "runtime_auth_verified": false,
+      "webhook_changed": false
+    }
   },
   "trial_bot": {
     "username": "sammanager06_bot",
@@ -162,7 +202,7 @@
     "requested_identities_have_existing_accounts": false,
     "invitations_sent": false
   },
-  "note": "Post-merge snapshot: final code CI passed; public source rollout blocked before Docker/application logs. Existing services preserved. Actual generated outputs and human/provider acceptance remain pending. Follow-up documentation does not alter the tested application code. Never include secret values or private customer data.",
+  "note": "Current launch execution: detailed snapshot logs identified a target-specific Dockerfile parser error; prior unexplained-platform-failure diagnosis is superseded. Production recipe and marketing corrections are under validation. Final activation and real client/provider acceptance remain pending. Never include secret values or private customer data.",
   "provider_verification": {
     "cloud_openrouter": "cloud_proxy_authenticated_positive_credits",
     "cloud_fal": "opaque_proxy_reference_api_fal_ai_401_outside_binding_does_not_establish_key_validity",

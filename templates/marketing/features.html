@@ -8,7 +8,8 @@
         <div class="mk-page-hero__inner">
             <span class="mk-eyebrow">Features</span>
             <h1 class="mk-h1">Everything a social team does in a week, <em class="mk-accent">in one tab.</em></h1>
-            <p class="mk-lead">From the first idea to the last reply. Every feature below is available to every user on every workspace. There is no premium tier.</p>
+            <p class="mk-lead">Plan, review and publish from one workspace. Your role determines access; platform capabilities and hosted availability determine which connections, conversations and metrics you can use. See <a href="{% url 'marketing:platforms' %}">Supported platforms</a>.</p>
+            <p class="mk-small mk-muted">Screens and sample conversations below use demo data and include coming-soon channels.</p>
         </div>
     </div>
 </section>
@@ -123,12 +124,12 @@
             </div>
             <div class="mk-feature__copy">
                 <span class="mk-eyebrow mk-eyebrow--orange">Unified social inbox</span>
-                <h2 class="mk-h2">Every conversation, one queue</h2>
-                <p>Comments, mentions, direct messages and reviews from every connected platform arrive in a single inbox. Triage by sentiment, assign to a teammate, reply in a thread, and never wonder whether a comment was missed.</p>
+                <h2 class="mk-h2">Supported conversations, one queue</h2>
+                <p>Handle the comments, mentions, direct messages and reviews each connected platform supports in a single inbox. Triage by sentiment, assign to a teammate and send supported replies in a thread. Conversation types and sync coverage vary by platform.</p>
                 <ul class="mk-bullets">
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Sentiment analysis and assignments</strong> so the unhappy customer gets a human first.</span></li>
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Threaded replies</strong> sent through the platform's own API, with draft replies you can hand off.</span></li>
-                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Real-time webhooks</strong> for Facebook, Instagram and Threads, a polling fallback for the rest, and a backfill command to import history.</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Webhooks and polling</strong> for supported conversation types, with backfill where the platform exposes history.</span></li>
                 </ul>
             </div>
         </div>
@@ -144,7 +145,7 @@
             <div class="mk-feature__copy">
                 <span class="mk-eyebrow mk-eyebrow--orange">Analytics</span>
                 <h2 class="mk-h2">Reporting straight from the platforms</h2>
-                <p>No estimates, no scraping. Each connected account's native insights API feeds KPI cards and trend charts over 7, 30 or 90 days, and a sortable table shows how every single post performed.</p>
+                <p>Native platform metrics feed KPI cards, trend charts and sortable post reports where available. Metric coverage and reporting history vary by account and platform.</p>
                 <ul class="mk-bullets">
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Channel-level metrics:</strong> followers, reach, views, watch time and engagement rate with period-over-period change.</span></li>
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Per-post metrics</strong> with the platform-specific breakdown behind each number.</span></li>
@@ -211,7 +212,7 @@
             <div class="mk-card reveal"><div class="mk-card__icon mk-card__icon--sky">{% include "marketing/_icon.html" with name="bell" %}</div><h3 class="mk-h3">Notifications your way</h3><p>In-app, email and webhook delivery for every event type: approvals, failures, mentions, reminders. Each person tunes their own preferences.</p></div>
             <div class="mk-card reveal" data-delay="1"><div class="mk-card__icon mk-card__icon--rose">{% include "marketing/_icon.html" with name="palette" %}</div><h3 class="mk-h3">White-label friendly</h3><p>Per-workspace logo and colours so the client portal and emails look like yours. Brand tokens are CSS variables, swappable without a rebuild.</p></div>
             <div class="mk-card reveal" data-delay="2"><div class="mk-card__icon mk-card__icon--green">{% include "marketing/_icon.html" with name="shield" %}</div><h3 class="mk-h3">Security and operations</h3><p>Encrypted tokens and credentials, Google SSO, Sentry error reporting, rate-limited auth endpoints and a 14-day reversible grace period on organisation deletion.</p></div>
-            <div class="mk-card reveal"><div class="mk-card__icon mk-card__icon--orange">{% include "marketing/_icon.html" with name="zap" %}</div><h3 class="mk-h3">Publishing that self-heals</h3><p>Automatic retries with exponential backoff, per-account rate-limit tracking, delayed first comments and a 90-day publish log for every attempt.</p></div>
+            <div class="mk-card reveal"><div class="mk-card__icon mk-card__icon--orange">{% include "marketing/_icon.html" with name="zap" %}</div><h3 class="mk-h3">Delivery you can review</h3><p>Results are recorded per account. Eligible failures retry with backoff; uncertain delivery and expired posting times pause for human review. First comments are available where supported.</p></div>
             <div class="mk-card reveal" data-delay="1"><div class="mk-card__icon mk-card__icon--indigo">{% include "marketing/_icon.html" with name="terminal" %}</div><h3 class="mk-h3">API and MCP built in</h3><p>Workspace-scoped keys with fine-grained permissions, rate limits, idempotent writes, OpenAPI docs and an MCP server for AI agents.</p></div>
             <div class="mk-card reveal" data-delay="2"><div class="mk-card__icon mk-card__icon--amber">{% include "marketing/_icon.html" with name="cloud" %}</div><h3 class="mk-h3">Runs where you want</h3><p>Hosted, or self-hosted with Docker Compose, Railway, Render or Heroku. SQLite for a laptop, PostgreSQL for production, S3 for media.</p></div>
         </div>

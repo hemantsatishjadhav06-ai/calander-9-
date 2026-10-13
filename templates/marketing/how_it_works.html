@@ -29,8 +29,8 @@
                 <div class="mk-tl__num">2</div>
                 <div class="mk-tl__body">
                     <h3 class="mk-h3">Connect channels with the platform's own login</h3>
-                    <p>Every connector uses the official OAuth flow (or, for Bluesky, Mastodon and DEV.to, an app password, instance URL or API key). Tokens are encrypted before they touch the database and refreshed automatically where the platform issues refresh tokens. Health is checked continuously, and a broken connection shows up in the sidebar before it can fail a post.</p>
-                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="link" %} 13 connectors</span><span class="mk-tag">{% include "marketing/_icon.html" with name="lock" %} Encrypted at rest</span><span class="mk-tag">{% include "marketing/_icon.html" with name="refresh" %} Auto-refresh</span></div>
+                    <p>Connections use the platform's official OAuth login, a Bluesky app password or a DEV.to API key. Mastodon starts with your instance URL before authorization. Credentials are encrypted in the database and tokens refresh where supported. Review connection warnings before a campaign; a connection can also fail when a post is sent.</p>
+                    <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="link" %} {{ networks|length }} networks</span><span class="mk-tag">{% include "marketing/_icon.html" with name="lock" %} Encrypted at rest</span><span class="mk-tag">{% include "marketing/_icon.html" with name="refresh" %} Refresh where supported</span></div>
                 </div>
             </div>
             <div class="mk-tl reveal">
@@ -60,8 +60,8 @@
             <div class="mk-tl reveal">
                 <div class="mk-tl__num">6</div>
                 <div class="mk-tl__body">
-                    <h3 class="mk-h3">The engine publishes and confirms</h3>
-                    <p>A background worker picks up due posts, publishes each platform in parallel through its API, and marks per-platform status as it goes. Failures retry with backoff, rate limits are respected per account, the first comment is posted two minutes after the post, and a confirmation sweep makes sure nothing is left in limbo. The details are below.</p>
+                    <h3 class="mk-h3">Publish and review delivery results</h3>
+                    <p>A background worker sends approved due posts and records each account's result. Eligible failures retry with backoff; supported first comments follow after publication. If an outcome is uncertain, delivery pauses for a person to check the actual account and reconcile it before retrying.</p>
                     <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="zap" %} Parallel dispatch</span><span class="mk-tag">{% include "marketing/_icon.html" with name="refresh" %} Retries 1m · 5m · 30m</span></div>
                 </div>
             </div>
@@ -69,7 +69,7 @@
                 <div class="mk-tl__num">7</div>
                 <div class="mk-tl__body">
                     <h3 class="mk-h3">Replies land in the inbox</h3>
-                    <p>Comments, mentions, messages and reviews flow into the unified inbox as they happen. Sentiment is scored, messages can be assigned, and replies go back out through the same API. Historical conversations can be imported with one command.</p>
+                    <p>The conversation types supported by each connected platform sync into the unified inbox through webhooks or polling. Assign conversations, review sentiment and send supported replies through the platform's API. Availability and history vary by platform.</p>
                     <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="inbox" %} Webhooks + polling</span><span class="mk-tag">{% include "marketing/_icon.html" with name="smile" %} Sentiment</span></div>
                 </div>
             </div>
@@ -77,7 +77,7 @@
                 <div class="mk-tl__num">8</div>
                 <div class="mk-tl__body">
                     <h3 class="mk-h3">Measure and repeat</h3>
-                    <p>Analytics pull each account's native insights: followers, reach, views, watch time, engagement. Compare 7, 30 and 90-day windows, sort every post by what matters, and feed the winners back into the idea board.</p>
+                    <p>Review the native metrics available for each connected account, such as followers, reach, views, watch time and engagement. Compare reporting periods and use the results to plan the next draft. Metric coverage varies by platform.</p>
                     <div class="mk-tl__tags"><span class="mk-tag">{% include "marketing/_icon.html" with name="chart" %} Native insights APIs</span><span class="mk-tag">{% include "marketing/_icon.html" with name="terminal" %} Same data via API</span></div>
                 </div>
             </div>
@@ -96,14 +96,14 @@
         </div>
         <div class="mk-pipeline reveal">
             <div class="mk-pipe"><div class="mk-pipe__k">Every 15 s</div><div class="mk-pipe__t">Poll for due posts</div><div class="mk-pipe__d">Any platform post whose scheduled time has passed and whose status is still "scheduled".</div></div>
-            <div class="mk-pipe"><div class="mk-pipe__k">Claim</div><div class="mk-pipe__t">Mark as publishing</div><div class="mk-pipe__d">The transition is atomic, so two workers can never publish the same post twice.</div></div>
+            <div class="mk-pipe"><div class="mk-pipe__k">Claim</div><div class="mk-pipe__t">Mark as publishing</div><div class="mk-pipe__d">An atomic claim keeps workers from handling the same due post concurrently.</div></div>
             <div class="mk-pipe mk-pipe--hot"><div class="mk-pipe__k">Dispatch</div><div class="mk-pipe__t">Publish in parallel</div><div class="mk-pipe__d">Each platform gets its own thread. Media is downloaded once and streamed to the API.</div></div>
-            <div class="mk-pipe"><div class="mk-pipe__k">On failure</div><div class="mk-pipe__t">Back off and retry</div><div class="mk-pipe__d">Rate limits are tracked per account; other errors retry on a schedule before the post is marked failed.<div class="mk-retry"><span>+1 min</span><span>+5 min</span><span>+30 min</span></div></div></div>
-            <div class="mk-pipe"><div class="mk-pipe__k">Afterwards</div><div class="mk-pipe__t">Confirm and comment</div><div class="mk-pipe__d">A sweep confirms every publish actually landed; the first comment posts two minutes later; the attempt is logged for 90 days.</div></div>
+            <div class="mk-pipe"><div class="mk-pipe__k">On failure</div><div class="mk-pipe__t">Back off or hold for review</div><div class="mk-pipe__d">Rate limits and eligible failures retry within the approved posting window. Uncertain results and expired times need human review.<div class="mk-retry"><span>+1 min</span><span>+5 min</span><span>+30 min</span></div></div></div>
+            <div class="mk-pipe"><div class="mk-pipe__k">Afterwards</div><div class="mk-pipe__t">Record the result</div><div class="mk-pipe__d">Provider confirmations are checked where available; supported first comments follow publication. Review the delivery receipt, and check the actual account when the result is uncertain.</div></div>
         </div>
         <div class="mk-grid mk-grid--3" style="margin-top: 40px;">
             <div class="mk-dark-card reveal"><div class="mk-dark-card__icon">{% include "marketing/_icon.html" with name="globe" %}</div><h3 class="mk-h3">First-party APIs only</h3><p>Facebook Graph, Instagram, LinkedIn, TikTok Content Posting, YouTube Data, Pinterest, Threads, Bluesky AT Protocol, Google Business Profile, Mastodon, DEV.to and the X API v2. Your app credentials, your rate limits, your data.</p></div>
-            <div class="mk-dark-card reveal" data-delay="1"><div class="mk-dark-card__icon mk-dark-card__icon--green">{% include "marketing/_icon.html" with name="inbox" %}</div><h3 class="mk-h3">Inbox sync</h3><p>Meta webhooks deliver Page and Instagram comments, mentions and messages in real time. A five-minute poll covers platforms without webhooks, and a backfill command imports up to 30 days of history after a fix.</p></div>
+            <div class="mk-dark-card reveal" data-delay="1"><div class="mk-dark-card__icon mk-dark-card__icon--green">{% include "marketing/_icon.html" with name="inbox" %}</div><h3 class="mk-h3">Inbox sync</h3><p>Meta webhooks deliver supported Page and Instagram conversations. Polling and backfill help sync other supported conversation types; coverage and history depend on the platform.</p></div>
             <div class="mk-dark-card reveal" data-delay="2"><div class="mk-dark-card__icon mk-dark-card__icon--sky">{% include "marketing/_icon.html" with name="key" %}</div><h3 class="mk-h3">Credentials</h3><p>Platform app keys come from environment variables or, per organisation, from the admin. Account tokens are stored with field-level encryption. Revoking an API key takes effect immediately.</p></div>
         </div>
     </div>
@@ -133,7 +133,7 @@
     <div class="mk-container">
         <div class="mk-cta reveal">
             <h2 class="mk-h2">Try the whole loop with a real account.</h2>
-            <p class="mk-lead">Connect a channel, schedule a post for five minutes from now, and watch it land.</p>
+            <p class="mk-lead">Connect an available channel, review and schedule a post, then check its delivery receipt and the actual account.</p>
             <div class="mk-btn-row">
                 <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
                 <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:features' %}">Browse the features</a>
