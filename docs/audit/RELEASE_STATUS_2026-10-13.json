@@ -1,5 +1,5 @@
 {
-  "record_type": "pre_rollout_validation_snapshot",
+  "record_type": "post_merge_launch_blocked_snapshot",
   "prepared_on": "2026-10-13",
   "release_branch": "codex/sm-bean-oct13-launch",
   "target_branch": "main",
@@ -9,7 +9,7 @@
       "passed": 4676,
       "skipped": 1,
       "warnings": 31,
-      "scope": "Before final OAuth repair; updated full GitHub CI runs on PR10."
+      "scope": "Before final OAuth repair; final full GitHub CI completed successfully on PR10."
     },
     "redis_followup": {
       "passed": 7,
@@ -47,6 +47,16 @@
     "oauth_storage_focused": {
       "passed": 153,
       "new_seeded_and_end_to_end_tests": 15
+    },
+    "github_final_ci": {
+      "passed": 4731,
+      "skipped": 1,
+      "subtests_passed": 194,
+      "warnings": 1388,
+      "duration_seconds": 761.91,
+      "all_six_jobs": "passed",
+      "source_commit": "31ae13fc22483759a0f79053417003ac9d9ba4c2",
+      "run_url": "https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/38391832886"
     }
   },
   "production": {
@@ -61,7 +71,9 @@
     "social_posts_published": false,
     "observed_existing_source_commit": "05ca828b2be22d4c3a65fbdf67404961e0f13124",
     "autodeploy_held": true,
-    "safe_configuration_staged_without_restart": true,
+    "configuration_staged_without_restart": true,
+    "staged_cloud_openrouter_reference_requires_raw_key_correction": false,
+    "staged_cloud_reference_active_in_running_services": false,
     "stable_encryption_storage_and_fal_preserved": true,
     "native_postgres_backup_record_verified": true,
     "repeatable_read_application_backup_verified": {
@@ -71,7 +83,63 @@
     },
     "anonymous_backup_access_denied": true,
     "mailbox_connected": false,
-    "owner_email_verified": false
+    "owner_email_verified": false,
+    "initial_new_web_build": {
+      "deployment_id": "a378721c-6d62-448b-b899-ca2fab612116",
+      "status": "FAILED",
+      "image_created": false,
+      "only_log_observed": "scheduling build on Metal builder",
+      "cause_established": false,
+      "old_services_remain_running": true
+    },
+    "observed_existing_source_verified": true,
+    "staged_cloud_openrouter_reference_removed": true,
+    "openrouter_key_installed_in_railway": false,
+    "openrouter_cleanup_preserved_all_other_variables": true,
+    "openrouter_cleanup_triggered_deployments": false,
+    "bounded_new_web_retry": {
+      "deployment_id": "620bc09e-7340-4620-9b30-5618436f937f",
+      "status": "FAILED",
+      "source_commit": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
+      "image_created": false,
+      "only_log_observed": "scheduling build on Metal builder",
+      "cause_established": false,
+      "old_services_remain_running": true
+    },
+    "configured_administrator_bootstrap": {
+      "created_with_normal_django_command": true,
+      "source_commit": "05ca828b2be22d4c3a65fbdf67404961e0f13124",
+      "password_login_reached_human_terms_gate": true,
+      "terms_accepted_by_automation": false,
+      "email_verified_by_automation": false,
+      "original_company_owner_and_memberships_preserved": true,
+      "neopolis_role_granted": false
+    },
+    "native_postgres_daily_backup": {
+      "configured": true,
+      "retention_seconds": 518400,
+      "cron_utc": "46 17 * * *",
+      "manual_snapshot_and_prior_backups_preserved": true
+    },
+    "alternative_build_route": {
+      "deployment_id": "0d6ad38d-76fd-4fa2-967a-12e94a121e6a",
+      "actual_builder": "DOCKERFILE",
+      "actual_build_environment": "V2",
+      "status": "FAILED",
+      "image_created": false,
+      "web_configuration_restored_to_original_v3": true,
+      "old_services_remain_running": true
+    },
+    "fresh_post_admin_application_backup_verified": {
+      "bytes": 3738004,
+      "csv_tables": 110,
+      "manifest_tables": 110,
+      "isolation": "REPEATABLE READ READ ONLY",
+      "writes_were_live": true,
+      "paused_writes_pre_migration_backup_still_required": true
+    },
+    "fresh_post_admin_native_snapshot_verified": true,
+    "container_registry_fallback": "researched_no_existing_public_pullable_image_verified_new_package_requires_visibility_and_provenance_setup"
   },
   "trial_bot": {
     "username": "sammanager06_bot",
@@ -89,13 +157,28 @@
     "active_workspace_confirmed": true,
     "next_week_existing_post_count": 0,
     "current_member_count": 1,
-    "backup_approver_configured": false
+    "backup_approver_configured": false,
+    "client_and_backup_addresses_supplied": true,
+    "requested_identities_have_existing_accounts": false,
+    "invitations_sent": false
   },
-  "note": "Snapshot before final deployment. Final CI, deployed source/schema/runtime, actual generated outputs and human acceptance need separate observed receipts. Never include secret values or private customer data.",
+  "note": "Post-merge snapshot: final code CI passed; public source rollout blocked before Docker/application logs. Existing services preserved. Actual generated outputs and human/provider acceptance remain pending. Follow-up documentation does not alter the tested application code. Never include secret values or private customer data.",
   "provider_verification": {
-    "cloud_openrouter": "authenticated_positive_credits",
-    "cloud_fal": "rejected_401",
-    "existing_railway_fal": "model_metadata_accepted_billing_scope_unavailable",
+    "cloud_openrouter": "cloud_proxy_authenticated_positive_credits",
+    "cloud_fal": "opaque_proxy_reference_api_fal_ai_401_outside_binding_does_not_establish_key_validity",
+    "cloud_fal_allowed_hosts": [
+      "fal.run",
+      "queue.fal.run"
+    ],
+    "cloud_references_are_portable_raw_keys": false,
+    "staged_railway_openrouter_value": "opaque_reference_removed_missing_real_key",
+    "existing_railway_fal": "raw_key_model_metadata_accepted_http_200_billing_scope_unavailable",
     "paid_generation_verified": false
+  },
+  "git_main_merge": {
+    "pull_request": "https://github.com/hemantsatishjadhav06-ai/calander-9-/pull/10",
+    "merged": true,
+    "merge_commit": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
+    "same_tree_as_final_ci_source": true
   }
 }

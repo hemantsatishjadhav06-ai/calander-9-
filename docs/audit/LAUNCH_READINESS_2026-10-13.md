@@ -24,7 +24,8 @@ not establish current production behavior.
 
 | Check | Observed result |
 | --- | --- |
-| Integrated PostgreSQL suite before the final OAuth repair | Local: **4,676 passed, 1 skipped**, 31 warnings; 513.68 seconds. First GitHub CI: **4,679 passed, 1 skipped**, plus 194 subtests. The additional final repair is covered below and the updated PR runs the full CI suite again. |
+| Integrated PostgreSQL suite before the final OAuth repair | Local: **4,676 passed, 1 skipped**, 31 warnings; 513.68 seconds. First GitHub CI: **4,679 passed, 1 skipped**, plus 194 subtests. The final full CI result is recorded in the next row. |
+| Final full GitHub CI | **4,731 passed, 1 skipped**, plus **194 subtests**; 1,388 warnings in 761.91 seconds. All six jobs passed at `31ae13fc22483759a0f79053417003ac9d9ba4c2`: PostgreSQL tests, Docker, UI, lint, types and secret scan. [CI run](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/38391832886). |
 | Browser review | **49 checks passed** using Chromium, including real local passwordless portal sessions, revocation, personal pairing, managed consent UI, guided briefs and phone/tablet layouts. No JavaScript errors, failed requests or HTTP 5xx were observed. Telegram/model responses in this review were controlled fixtures. |
 | DOM state tests | **30 passed** from the locked root npm dependencies. |
 | Lint, formatting and types | Ruff passed; 746 Python files formatted; mypy passed across 861 source files. |
@@ -34,7 +35,7 @@ not establish current production behavior.
 | OAuth storage repair | **153 focused PostgreSQL tests passed**, including 15 new seeded migration/legacy authentication, rotation, replay and revocation regressions; migration drift, types, formatting and deployment checks passed. |
 | Current release inspector | **64 focused regressions passed**, including manifest v2 tamper checks, current schema, actual read-only PostgreSQL counts and hidden-row refusal. |
 | Redis integration | **7 passed, 0 skipped**, including the default suite's skipped case, real cache round trips and filmstrip alias separation. Isolated Redis prefixes/test database were cleaned. |
-| Production container | Passed: PostgreSQL/Redis health, secure login, authenticated calendar/agency/Telegram pages, collected assets, wrong-secret webhook 403, all migrations including Telegram 0002, worker success heartbeats, one lease, overlapping worker rejection and graceful lease release. Unprivileged runtime, immutable code and writable media checked. Internal network and synthetic records; no provider/public-bot calls. |
+| Production container before final OAuth/tooling repair | Passed: PostgreSQL/Redis health, secure login, authenticated calendar/agency/Telegram pages, collected assets, wrong-secret webhook 403, all migrations including Telegram 0002, worker success heartbeats, one lease, overlapping worker rejection and graceful lease release. Unprivileged runtime, immutable code and writable media checked. Internal network and synthetic records; no provider/public-bot calls. Final Docker CI build also passed; final Railway image boot remains unrun. |
 | Secret scan | Official checksum-verified Gitleaks 8.24.3: no findings in available Git history or current source. |
 
 The default suite uses isolated memory caches, so its Redis-specific filmstrip
@@ -46,6 +47,8 @@ task-owned unused build cache was removed.
 
 ## Production observations and open acceptance
 
+PR [10](https://github.com/hemantsatishjadhav06-ai/calander-9-/pull/10) merged into `main` at `e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f`; its tree exactly matches the final CI source. Railway automatic deployment remains held for the controlled migration. The first new web build and one bounded retry failed before an image was created, with only a Metal builder scheduling log. No Docker/application output or cause was established, and the old services remain running. Neither failed attempt is a deployed release. A diagnostic through the accepted `DOCKERFILE/V2` route failed at the same scheduling step. Web build settings were fully restored to their original V3 configuration without deployment. No old service has been stopped. A verified container-image route is being investigated; the cause of source-build initialization failure remains unavailable.
+
 The public SM Bean health endpoint reported healthy database/cache, and the
 landing and login pages responded successfully. These requests do not identify
 the deployed source or exercise authenticated workflows. The confirmed Railway
@@ -53,8 +56,14 @@ project is `66526b2a-6a09-43d8-bedb-ecfdd37f8d8a`; authenticated project control
 was initially unavailable. After the user saved secret bindings, authenticated
 inspection confirmed the SM Bean production web and worker at the older
 `05ca828b2be22d4c3a65fbdf67404961e0f13124` source. Both automatic deployments
-were held. Explicit hosts, trusted worker proxy, OpenRouter provider/model/key
-and inactive Telegram setup were staged without restarting the old services.
+were held. Explicit hosts, trusted worker proxy, OpenRouter provider/model and
+inactive Telegram setup were staged without restarting the old services. The
+initially staged OpenRouter credential was an opaque cloud proxy reference,
+not a portable raw API key. That new entry has now been removed from both
+services with a staged patch that did not trigger deployment. Every other
+rendered variable was preserved. The key is still missing in Railway, so paid
+Studio generation remains blocked pending secure installation and verification.
+The old services remain running with their existing configuration.
 Matching existing encryption, database, cache, storage and fal values were
 preserved. The previous wildcard host configuration would fail the new release's
 deployment check; the staged configuration passes it.
@@ -62,23 +71,38 @@ deployment check; the staged configuration passes it.
 A native PostgreSQL snapshot and a repeatable-read application backup were
 created and independently verified. The latter contains 110 CSV tables and a
 matching manifest. Storage authentication, TLS, temporary-object cleanup and
-anonymous backup-access denial were checked. A bounded, fail-closed operator
+anonymous backup-access denial were checked. Native daily PostgreSQL backups
+are now configured with six-day retention; the manual snapshot and prior backups
+were preserved. A bounded, fail-closed operator
 gate permits migration only after the old services are removed and database
 work is drained. These observations precede the final rollout; final deployed
 source/runtime receipts must be recorded separately.
 
-OpenRouter authentication and positive credits were verified without generation.
-The newly supplied cloud fal key was rejected, while the existing Railway key
-was accepted for model metadata and preserved. Its billing scope does not expose
-credits; actual inference still needs a real workflow. Replace the cloud fal
-binding securely before using it outside the existing production services.
+OpenRouter authentication and positive credits were verified through the cloud
+proxy without generation. Cloud secret references work only through their
+configured proxy bindings and must not be copied into Railway as raw keys.
+The cloud `FAL_KEY` reference is scoped to `fal.run` and `queue.fal.run`. The
+earlier `api.fal.ai` HTTP 401 was outside that binding and does not establish the
+underlying Fal key's validity. Preserve the existing Railway raw Fal key: it
+returned HTTP 200 for model metadata. Its billing scope does not expose credits;
+actual inference still needs a real workflow.
+
+The intended administrator was absent despite configured credentials. A normal
+Django `createsuperuser` bootstrap created only that new account and its default
+private organization/workspace. Current owner and all preexisting memberships
+were preserved. A live password login reached the human Terms gate; automation
+did not accept Terms, verify email or grant Neopolis access. The operator can
+now personally enter the Gmail consent flow from Email operations.
 
 Production has no connected Gmail mailbox/refresh token, and Neopolis has only
 one current member with no agency settings or backup approver. Invitations,
 password resets and emailed client links therefore need a genuine mailbox
 connection. The owner's email is unverified; mandatory verification was not
 enabled blindly. Public launch requires that human setup, actual delivery and a
-distinct current backup. Error-tracking service and admin IP restriction also
+distinct current backup. The user has supplied two real invitation addresses;
+neither currently has an account or membership. Invite them through the normal
+flow after mailbox connection, retain client/team role boundaries, and assign
+backup only after acceptance. Error-tracking service and admin IP restriction
 remain operator configuration choices; production deployment checks expose them.
 
 The trial `@sammanager06_bot` passed a read-only identity check and reported
@@ -89,9 +113,9 @@ encrypted workspace form. Telegram group creation and passive group membership
 remain human/admin responsibilities. Replace the token shared in chat before
 production use.
 
-Before merging into an automatically deployed `main`, establish Railway rollout
-control, drain the old worker, pause writes, take and verify the backup, migrate
-once and deploy matching web/worker source with existing encryption keys intact.
+Automatic deployment was held before merging into `main`. Before activating the
+release, drain the old worker, pause writes, verify the backup, migrate once and
+deploy matching web/worker source with existing encryption keys intact.
 See the [controlled rollout](../TELEGRAM_RAILWAY_ROLLOUT.md). Record exact source,
 deployment and runtime receipts; public health alone is insufficient.
 
@@ -103,6 +127,9 @@ shared storage, provider permissions, actual costs and held-send recovery. This
 review does not establish those commercial or external-service outcomes.
 
 ## Critical user review and Neopolis
+
+The current [CTO launch decision](CTO_LAUNCH_DECISION_2026-10-13.md) consolidates
+the business review and exact remaining actions.
 
 The [50-criterion user review](USER_REVIEW_2026-10-13.md) records the interface,
 security, privacy, creative-quality and operating gaps, with browser evidence.

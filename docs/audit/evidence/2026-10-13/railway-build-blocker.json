@@ -1,0 +1,94 @@
+{
+  "project": "66526b2a-6a09-43d8-bedb-ecfdd37f8d8a",
+  "environment": "be4c1d8d-84ce-47ce-9e24-56be144551cf",
+  "service": "6ef064fe-9804-4118-95b3-749ab17b795a",
+  "source_commit": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
+  "diagnostic_attempts": [
+    {
+      "deployment": {
+        "id": "a378721c-6d62-448b-b899-ca2fab612116",
+        "projectId": "66526b2a-6a09-43d8-bedb-ecfdd37f8d8a",
+        "environmentId": "be4c1d8d-84ce-47ce-9e24-56be144551cf",
+        "serviceId": "6ef064fe-9804-4118-95b3-749ab17b795a",
+        "status": "FAILED",
+        "createdAt": "2026-10-13T12:13:00.758Z",
+        "statusUpdatedAt": "2026-10-13T12:13:09.612Z",
+        "diagnosis": null,
+        "deploymentStopped": true,
+        "source_commit": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
+        "builder": "DOCKERFILE",
+        "build_environment": "V3",
+        "dockerfile_path": "/Dockerfile"
+      },
+      "buildLogs": [
+        {
+          "message": "scheduling build on Metal builder \"builder-ijrmto\"",
+          "severity": "info",
+          "timestamp": "2026-10-13T12:13:07.101321267Z"
+        }
+      ],
+      "deploymentLogs": [],
+      "image_present": false
+    },
+    {
+      "deployment": {
+        "id": "620bc09e-7340-4620-9b30-5618436f937f",
+        "projectId": "66526b2a-6a09-43d8-bedb-ecfdd37f8d8a",
+        "environmentId": "be4c1d8d-84ce-47ce-9e24-56be144551cf",
+        "serviceId": "6ef064fe-9804-4118-95b3-749ab17b795a",
+        "status": "FAILED",
+        "createdAt": "2026-10-13T12:35:10.369Z",
+        "statusUpdatedAt": "2026-10-13T12:35:16.863Z",
+        "diagnosis": null,
+        "deploymentStopped": true,
+        "source_commit": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
+        "builder": "DOCKERFILE",
+        "build_environment": "V3",
+        "dockerfile_path": "/Dockerfile"
+      },
+      "buildLogs": [
+        {
+          "message": "scheduling build on Metal builder \"builder-ijrmto\"",
+          "severity": "info",
+          "timestamp": "2026-10-13T12:35:13.960464336Z"
+        }
+      ],
+      "deploymentLogs": [],
+      "image_present": false
+    },
+    {
+      "deployment": {
+        "id": "0d6ad38d-76fd-4fa2-967a-12e94a121e6a",
+        "projectId": "66526b2a-6a09-43d8-bedb-ecfdd37f8d8a",
+        "environmentId": "be4c1d8d-84ce-47ce-9e24-56be144551cf",
+        "serviceId": "6ef064fe-9804-4118-95b3-749ab17b795a",
+        "status": "FAILED",
+        "createdAt": "2026-10-13T12:41:26.787Z",
+        "statusUpdatedAt": "2026-10-13T12:41:32.390Z",
+        "diagnosis": null,
+        "deploymentStopped": true,
+        "source_commit": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
+        "builder": "DOCKERFILE",
+        "build_environment": "V2",
+        "dockerfile_path": "/Dockerfile"
+      },
+      "buildLogs": [
+        {
+          "message": "scheduling build on Metal builder \"builder-ijrmto\"",
+          "severity": "info",
+          "timestamp": "2026-10-13T12:41:29.672539401Z"
+        }
+      ],
+      "deploymentLogs": [],
+      "image_present": false
+    }
+  ],
+  "observed_failure_stage": "platform build scheduling; Docker/application stage not observed",
+  "causal_platform_diagnosis_unavailable": true,
+  "old_services_preserved": true,
+  "final_build_route_restored": "V3",
+  "autodeploy_held_both": true,
+  "gate_not_released": true,
+  "provider_paid_generation_held": true,
+  "no_external_ticket_sent": true
+}

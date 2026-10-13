@@ -1,0 +1,10 @@
+{
+  "operation": "configured_admin_normal_login",
+  "terms_accepted_by_test": false,
+  "google_consent_started_by_test": false,
+  "login_form_http_200": true,
+  "csrf_form_present": true,
+  "password_login_redirected": true,
+  "human_terms_gate_http_200": true,
+  "configured_credentials_usable": true
+}
