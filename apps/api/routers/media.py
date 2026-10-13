@@ -16,9 +16,12 @@ that hasn't finished async processing.
 
 from __future__ import annotations
 
+import hashlib
+import logging
 import uuid
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from ninja import File, Form, Query, Router
@@ -40,6 +43,7 @@ from apps.media_library.models import MediaAsset
 from apps.media_library.services import create_asset
 
 router = Router(tags=["media"])
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +81,12 @@ def _parse_iso_datetime(value: str, field: str):
     """An ISO-8601 datetime, or a 422 naming the field — never a 500 from the ORM."""
     from django.utils.dateparse import parse_datetime
 
-    parsed = parse_datetime(value)
+    try:
+        parsed = parse_datetime(value)
+    except ValueError:
+        # Well-formed strings with impossible calendar dates raise rather
+        # than returning None (for example February 30).
+        parsed = None
     if parsed is None:
         raise HttpError(422, f"{field} must be an ISO-8601 datetime")
     return parsed
@@ -111,19 +120,36 @@ def upload(
     enforce_http_rate_limits(request, is_write=True)
     _require_perm(request, "upload_media")
 
-    # Idempotency: hash the relevant params (NOT the file body — too
-    # large, and a retry sending the same key with the same file is the
-    # common case anyway).
+    workspace = request.workspace
+    folder = None
+    if folder_id is not None:
+        from apps.media_library.models import MediaFolder
+
+        # Resolve references before claiming a retry key; a failed lookup must
+        # not leave a permanent "in flight" upload behind.
+        folder = get_object_or_404(MediaFolder.objects.filter(workspace=workspace), id=folder_id)
+
+    effective_key = idempotency_key or request.headers.get("Idempotency-Key") or None
+    # Equal names and lengths do not imply equal files. Hash incrementally so
+    # large video retries do not require another in-memory copy of the body.
+    digest = None
+    if effective_key:
+        content_hash = hashlib.sha256()
+        for chunk in file.chunks():
+            content_hash.update(chunk)
+        file.seek(0)
+        digest = content_hash.hexdigest()
+
     fp_payload = {
         "filename": file.name,
         "size": file.size,
+        "sha256": digest,
         "alt_text": alt_text,
         "title": title,
         "folder_id": str(folder_id) if folder_id else None,
         "tags": tags,
     }
     fingerprint = fingerprint_request(request.method or "POST", request.path, fp_payload)
-    effective_key = idempotency_key or request.headers.get("Idempotency-Key") or None
     try:
         disposition, replay_status, replay_body = claim_idempotency_slot(
             api_key=request.api_key,
@@ -141,60 +167,51 @@ def upload(
             "An identical upload with this idempotency_key is still in flight; retry shortly.",
         )
 
-    workspace = request.workspace
-    folder = None
-    if folder_id is not None:
-        from apps.media_library.models import MediaFolder
-
-        # Scoped to the key's workspace, as the cookie-auth upload view is —
-        # org-wide scoping let a key file an asset into another workspace's
-        # folder tree.
-        folder = get_object_or_404(
-            MediaFolder.objects.filter(workspace=workspace),
-            id=folder_id,
-        )
-
+    asset = None
     try:
-        asset = create_asset(
-            organization=workspace.organization,
-            workspace=workspace,
-            uploaded_file=file,
-            uploaded_by=request.user if not request.user.is_anonymous else None,
-            folder=folder,
-            alt_text=alt_text,
-            title=title,
-            tags=_parse_tags_csv(tags),
-        )
+        # The task queue is database-backed. Persist the asset, its task and
+        # the retry response together so workers only see committed uploads.
+        with transaction.atomic():
+            asset = create_asset(
+                organization=workspace.organization,
+                workspace=workspace,
+                uploaded_file=file,
+                uploaded_by=request.user if not request.user.is_anonymous else None,
+                folder=folder,
+                alt_text=alt_text,
+                title=title,
+                tags=_parse_tags_csv(tags),
+            )
+            from apps.media_library.tasks import process_media_asset
+
+            process_media_asset(str(asset.id))
+            body = MediaAssetResponse.from_asset(asset)
+            status_code = 201
+            log_audit_entry(
+                request,
+                action=f"media.upload.{status_code}",
+                target_id=asset.id,
+                status_code=status_code,
+            )
+            finalize_idempotent_response(
+                api_key=request.api_key,
+                idempotency_key=effective_key,
+                status_code=status_code,
+                body=body.model_dump(mode="json"),
+            )
     except ValidationError as exc:
         release_idempotent_claim(api_key=request.api_key, idempotency_key=effective_key)
         raise HttpError(422, _flatten_validation_error(exc)) from exc
     except Exception:
+        # File storage is outside the database transaction: remove bytes whose
+        # asset row was rolled back, allowing a clean retry after queue failure.
+        if asset is not None and asset.file:
+            try:
+                asset.file.delete(save=False)
+            except Exception:
+                logger.exception("Failed to clean up rolled-back media upload %s", asset.id)
         release_idempotent_claim(api_key=request.api_key, idempotency_key=effective_key)
         raise
-
-    # Mirror the cookie-auth UI's behavior: queue async processing for
-    # thumbnails, dimensions, duration, and platform-specific variants.
-    # See [apps/media_library/views.py:162]. Without this, processing_status
-    # stays at ``pending`` forever and dependent fields stay at their zero
-    # defaults.
-    from apps.media_library.tasks import process_media_asset
-
-    process_media_asset(str(asset.id))
-
-    body = MediaAssetResponse.from_asset(asset)
-    status_code = 201
-    log_audit_entry(
-        request,
-        action=f"media.upload.{status_code}",
-        target_id=asset.id,
-        status_code=status_code,
-    )
-    finalize_idempotent_response(
-        api_key=request.api_key,
-        idempotency_key=effective_key,
-        status_code=status_code,
-        body=body.model_dump(mode="json"),
-    )
     return Status(status_code, body)
 
 

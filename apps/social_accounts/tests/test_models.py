@@ -1,12 +1,14 @@
 """Tests for social_accounts models."""
 
 from datetime import timedelta
+from unittest.mock import MagicMock
 
 import pytest
 from django.db import IntegrityError
 from django.utils import timezone
 
 from apps.social_accounts.models import MastodonAppRegistration, SocialAccount
+from providers.types import OAuthTokens
 
 
 @pytest.fixture
@@ -114,6 +116,34 @@ class TestSocialAccount:
 
     def test_needs_reconnect_connected(self, social_account):
         assert social_account.needs_reconnect is False
+
+    def test_refresh_adopts_a_recent_short_lived_rotation(self, social_account):
+        stale = SocialAccount.objects.get(pk=social_account.pk)
+        social_account.oauth_access_token = "already-rotated"
+        social_account.oauth_refresh_token = "rotated-refresh"
+        social_account.token_expires_at = timezone.now() + timedelta(hours=1)
+        social_account.save(update_fields=["oauth_access_token", "oauth_refresh_token", "token_expires_at"])
+        provider = MagicMock()
+
+        assert stale.refresh_oauth_token(provider) == "already-rotated"
+
+        provider.refresh_token.assert_not_called()
+        assert stale.oauth_refresh_token == "rotated-refresh"
+
+    def test_refresh_keeps_current_refresh_token_when_provider_omits_rotation(self, social_account):
+        stale = SocialAccount.objects.get(pk=social_account.pk)
+        social_account.oauth_refresh_token = "current-refresh"
+        social_account.token_expires_at = timezone.now() - timedelta(minutes=1)
+        social_account.save(update_fields=["oauth_refresh_token", "token_expires_at"])
+        provider = MagicMock()
+        provider.refresh_token.return_value = OAuthTokens(access_token="new-access", expires_in=3600)
+
+        stale.refresh_oauth_token(provider)
+
+        provider.refresh_token.assert_called_once_with("current-refresh")
+        social_account.refresh_from_db()
+        assert social_account.oauth_refresh_token == "current-refresh"
+        assert stale.oauth_refresh_token == "current-refresh"
 
     def test_cascade_delete_workspace(self, social_account, workspace):
         """Deleting workspace should cascade delete accounts."""

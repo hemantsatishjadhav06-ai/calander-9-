@@ -170,6 +170,16 @@ def create_asset(
     if errors:
         raise ValidationError(errors)
 
+    max_title_length = MediaAsset._meta.get_field("title").max_length
+    if max_title_length is not None and len(title or "") > max_title_length:
+        raise ValidationError("Title must contain at most 255 characters.")
+    if workspace is not None and workspace.organization_id != organization.id:
+        raise ValidationError("Workspace does not belong to this organization.")
+    if folder is not None and (
+        folder.organization_id != organization.id or folder.workspace_id != getattr(workspace, "id", None)
+    ):
+        raise ValidationError("Folder does not belong to this media library.")
+
     enforce_storage_quota(organization, getattr(uploaded_file, "size", 0) or 0)
 
     sniffed_mime = sniff_mime(uploaded_file) or ""
@@ -461,6 +471,17 @@ def _check_post_references(asset):
 
 class ImageTooLargeError(Exception):
     """An image would cost more memory to decode than we are willing to spend."""
+
+
+def validate_image_edit_dimensions(width, height):
+    """Check an edit's output before Pillow allocates its pixel buffer."""
+    if width <= 0 or height <= 0:
+        raise ValidationError("Image dimensions must be positive.")
+    max_pixels = getattr(settings, "MEDIA_LIBRARY_MAX_IMAGE_PIXELS", 30_000_000)
+    if width * height > max_pixels:
+        raise ImageTooLargeError(
+            f"Edited image is {width}x{height}; the limit is {max_pixels / 1_000_000:g} megapixels."
+        )
 
 
 @contextlib.contextmanager
@@ -759,8 +780,12 @@ def apply_image_edits(file_path_or_file, operations):
         if crop:
             left = int(crop["x"])
             top = int(crop["y"])
-            right = left + int(crop["width"])
-            bottom = top + int(crop["height"])
+            crop_width, crop_height = int(crop["width"]), int(crop["height"])
+            validate_image_edit_dimensions(crop_width, crop_height)
+            right = left + crop_width
+            bottom = top + crop_height
+            if left < 0 or top < 0 or right > src.width or bottom > src.height:
+                raise ValidationError("Crop must fit inside the original image.")
             img = src.crop((left, top, right, bottom))
         else:
             img = src
@@ -780,7 +805,9 @@ def apply_image_edits(file_path_or_file, operations):
         # Apply resize
         resize = operations.get("resize")
         if resize:
-            img = img.resize((int(resize["width"]), int(resize["height"])), Image.LANCZOS)
+            resize_width, resize_height = int(resize["width"]), int(resize["height"])
+            validate_image_edit_dimensions(resize_width, resize_height)
+            img = img.resize((resize_width, resize_height), Image.LANCZOS)
 
         # Save to buffer. Inside the ``with`` on purpose: when ``operations`` is
         # empty, ``img`` IS the opened image, and leaving the block closes its

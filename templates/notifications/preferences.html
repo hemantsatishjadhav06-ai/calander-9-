@@ -21,6 +21,15 @@
 
     <form method="post" action="{% url 'notifications:preferences' %}">
         {% csrf_token %}
+        {% if quiet_form.errors %}
+        <div role="alert" class="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p class="font-semibold">Check your quiet hours settings.</p>
+            {% for field in quiet_form %}
+            {% for error in field.errors %}<p>{{ field.label }}: {{ error }}</p>{% endfor %}
+            {% endfor %}
+            {{ quiet_form.non_field_errors }}
+        </div>
+        {% endif %}
 
         {# Channel toggles matrix #}
         <div class="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-[0_1px_2px_rgba(23,20,18,0.05)] mb-5">
@@ -47,6 +56,7 @@
                         <input
                             type="checkbox"
                             name="{{ toggle.field_name }}"
+                            aria-label="{{ row.event_label }}: {{ toggle.label }}"
                             {% if toggle.enabled %}checked{% endif %}
                             class="sr-only peer"
                         >
@@ -59,7 +69,7 @@
         </div>
 
         {# Quiet hours & digest #}
-        <div class="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-[0_1px_2px_rgba(23,20,18,0.05)] mb-5" x-data="{ quietEnabled: {{ quiet_hours.is_enabled|yesno:'true,false' }} }">
+        <div class="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-[0_1px_2px_rgba(23,20,18,0.05)] mb-5" x-data="{ quietEnabled: {{ quiet_form.quiet_hours_enabled.value|yesno:'true,false' }} }">
             <div class="px-5 py-4 border-b border-stone-100 bg-stone-50/50">
                 <h3 class="text-[13px] font-semibold text-stone-900">Quiet Hours & Digest</h3>
                 <p class="text-xs text-stone-500 mt-0.5">Suppress non-critical notifications during specific hours.</p>
@@ -76,7 +86,8 @@
                         <input
                             type="checkbox"
                             name="quiet_hours_enabled"
-                            {% if quiet_hours.is_enabled %}checked{% endif %}
+                            aria-label="Enable quiet hours"
+                            {% if quiet_form.quiet_hours_enabled.value %}checked{% endif %}
                             class="sr-only peer"
                             x-model="quietEnabled"
                         >
@@ -85,7 +96,7 @@
                 </div>
 
                 {# Time range - shown when quiet hours enabled #}
-                <div x-show="quietEnabled" x-collapse class="space-y-4 pl-0">
+                <div x-show="quietEnabled" class="space-y-4 pl-0">
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label for="quiet-start" class="block text-xs font-semibold text-stone-600 mb-1.5">Start time</label>
@@ -93,7 +104,7 @@
                                 type="time"
                                 name="quiet_hours_start"
                                 id="quiet-start"
-                                value="{{ quiet_hours.start_time|default_if_none:'' }}"
+                                value="{{ quiet_form.quiet_hours_start.value|default_if_none:'' }}"
                                 class="form-datetime"
                             >
                         </div>
@@ -103,7 +114,7 @@
                                 type="time"
                                 name="quiet_hours_end"
                                 id="quiet-end"
-                                value="{{ quiet_hours.end_time|default_if_none:'' }}"
+                                value="{{ quiet_form.quiet_hours_end.value|default_if_none:'' }}"
                                 class="form-datetime"
                             >
                         </div>
@@ -114,7 +125,7 @@
                             type="text"
                             name="quiet_hours_timezone"
                             id="quiet-tz"
-                            value="{{ quiet_hours.timezone }}"
+                            value="{{ quiet_form.quiet_hours_timezone.value|default_if_none:'' }}"
                             placeholder="e.g. America/New_York"
                             class="w-full text-[13px] text-stone-700 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-500 transition-all duration-150 font-mono"
                         >
@@ -135,7 +146,8 @@
                         <input
                             type="checkbox"
                             name="digest_mode"
-                            {% if quiet_hours.digest_mode %}checked{% endif %}
+                            aria-label="Daily email digest"
+                            {% if quiet_form.digest_mode.value %}checked{% endif %}
                             class="sr-only peer"
                         >
                         <div class="w-9 h-5 bg-stone-200 rounded-full peer peer-checked:bg-orange-500 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-200 transition-colors duration-200 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-4"></div>

@@ -37,6 +37,32 @@ def _register(client: Client, body: dict):
 
 @pytest.mark.django_db
 class TestDynamicClientRegistration:
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            "https://[broken/callback",
+            "https://example.com:invalid/callback",
+            "https://example.com/callback https://other.example/callback",
+            "https://example.com/callback#fragment",
+            "https://user:password@example.com/callback",
+            "https://example.com/\\callback",
+            "https://example.com/callback\nhttps://other.example/",
+        ],
+    )
+    def test_malformed_redirect_is_rejected_without_creating_client(self, uri):
+        from oauth2_provider.models import get_application_model
+
+        response = _register(Client(), {"redirect_uris": [uri]})
+        assert response.status_code == 400
+        assert response.json()["error"] == "invalid_redirect_uri"
+        assert not get_application_model().objects.exists()
+
+    @pytest.mark.parametrize("grant_types", [[{}], [[]], [None], ["authorization_code", {}]])
+    def test_malformed_grant_metadata_returns_client_error(self, grant_types):
+        response = _register(Client(), {"redirect_uris": [CLAUDE_REDIRECT], "grant_types": grant_types})
+        assert response.status_code == 400
+        assert response.json()["error"] == "invalid_client_metadata"
+
     def test_register_public_client(self):
         r = _register(
             Client(),
@@ -85,6 +111,20 @@ class TestDynamicClientRegistration:
         r = _register(c, {"redirect_uris": [CLAUDE_REDIRECT]})  # 11th is blocked
         assert r.status_code == 429
         assert r.json()["error"] == "temporarily_unavailable"
+
+    def test_clients_behind_trusted_proxy_do_not_share_per_ip_limit(self):
+        from django.core.cache import cache
+        from django.test import override_settings
+
+        cache.clear()
+        with override_settings(BB_TRUSTED_PROXIES=("10.0.0.0/8",)):
+            first = Client(REMOTE_ADDR="10.0.0.1", HTTP_X_FORWARDED_FOR="203.0.113.11")
+            second = Client(REMOTE_ADDR="10.0.0.1", HTTP_X_FORWARDED_FOR="203.0.113.12")
+            for _ in range(10):
+                assert _register(first, {"redirect_uris": [CLAUDE_REDIRECT]}).status_code == 201
+            assert _register(first, {"redirect_uris": [CLAUDE_REDIRECT]}).status_code == 429
+            assert _register(second, {"redirect_uris": [CLAUDE_REDIRECT]}).status_code == 201
+        cache.clear()
 
 
 @pytest.mark.django_db

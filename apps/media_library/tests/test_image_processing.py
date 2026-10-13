@@ -184,6 +184,34 @@ class ExtractImageMetadataTest(SimpleTestCase):
 
 
 class ApplyImageEditsTest(SimpleTestCase):
+    def test_resize_cannot_allocate_an_output_over_the_pixel_limit(self):
+        from unittest.mock import patch
+
+        with (
+            override_settings(MEDIA_LIBRARY_MAX_IMAGE_PIXELS=1_000_000),
+            patch.object(Image.Image, "resize") as resize,
+            self.assertRaises(ImageTooLargeError),
+        ):
+            apply_image_edits(_jpeg(100, 100), {"resize": {"width": 10_000, "height": 10_000}})
+        resize.assert_not_called()
+
+    def test_crop_cannot_expand_to_an_unbounded_pixel_buffer(self):
+        from unittest.mock import patch
+
+        with (
+            override_settings(MEDIA_LIBRARY_MAX_IMAGE_PIXELS=1_000_000),
+            patch.object(Image.Image, "crop") as crop,
+            self.assertRaises(ImageTooLargeError),
+        ):
+            apply_image_edits(_jpeg(100, 100), {"crop": {"x": 0, "y": 0, "width": 10**9, "height": 10**9}})
+        crop.assert_not_called()
+
+    def test_crop_must_fit_inside_the_source(self):
+        from django.core.exceptions import ValidationError
+
+        with self.assertRaises(ValidationError):
+            apply_image_edits(_jpeg(100, 100), {"crop": {"x": 50, "y": 0, "width": 100, "height": 100}})
+
     def test_no_operations_still_returns_a_file(self):
         """Regression: the save used to sit outside the open context.
 

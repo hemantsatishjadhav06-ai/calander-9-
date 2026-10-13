@@ -7,6 +7,7 @@ Public views (no auth): connection link page, OAuth flow, done notification.
 import logging
 import secrets
 from datetime import timedelta
+from smtplib import SMTPException
 
 from csp.decorators import csp_update
 from django.conf import settings
@@ -14,7 +15,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core import signing
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
+from django.core.validators import validate_email
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -171,6 +174,11 @@ def send_link_email(request, workspace_id, link_id):
     if not email:
         messages.error(request, "Email address is required.")
         return redirect("social_accounts:list", workspace_id=workspace_id)
+    try:
+        validate_email(email)
+    except ValidationError:
+        messages.error(request, "Enter a valid email address.")
+        return redirect("social_accounts:list", workspace_id=workspace_id)
 
     if not link.is_active:
         messages.error(request, "This connection link is no longer active.")
@@ -201,7 +209,12 @@ def send_link_email(request, workspace_id, link_id):
     # message by returning 0 rather than raising. Telling someone the link was
     # sent when it was not is how they end up waiting for an email that is never
     # coming.
-    if not msg.send(fail_silently=False):
+    try:
+        sent = msg.send(fail_silently=False)
+    except (SMTPException, OSError):
+        logger.exception("Failed to send a connection link email")
+        sent = 0
+    if not sent:
         messages.error(
             request,
             "We could not send that link right now. Please try again shortly.",
@@ -319,11 +332,12 @@ def connection_oauth_start(request, token):
     if platform not in configured_platforms:
         return redirect("onboarding:connection_page", token=token)
 
-    # Bluesky and Mastodon use their own forms on the connection page
+    # Session and instance-auth providers use their own forms on the connection page
     # (not standard OAuth via this endpoint), so reject them here.
     if platform in (
         PlatformCredential.Platform.BLUESKY,
         PlatformCredential.Platform.MASTODON,
+        PlatformCredential.Platform.DEVTO,
     ):
         return redirect("onboarding:connection_page", token=token)
 
@@ -602,6 +616,8 @@ def connection_bluesky_connect(request, token):
     link = _get_connection_link_or_none(token)
     if not link or not link.is_active:
         return render(request, "onboarding/connection_expired.html", status=400)
+    if not _check_rate_limit(token):
+        return HttpResponse("Too many connection attempts. Please try again later.", status=429)
 
     handle = request.POST.get("handle", "").strip()
     app_password = request.POST.get("app_password", "").strip()
@@ -640,6 +656,37 @@ def connection_bluesky_connect(request, token):
     return redirect("onboarding:connection_page", token=token)
 
 
+@require_POST
+def connection_devto_connect(request, token):
+    """Connect DEV.to using the client's own API key, without an OAuth redirect."""
+    link = _get_connection_link_or_none(token)
+    if not link or not link.is_active:
+        return render(request, "onboarding/connection_expired.html", status=400)
+    if not _check_rate_limit(token):
+        return HttpResponse("Too many connection attempts. Please try again later.", status=429)
+
+    api_key = request.POST.get("api_key", "").strip()
+    if not api_key:
+        request.session["connection_link_error"] = "A DEV.to API key is required."
+        return redirect("onboarding:connection_page", token=token)
+
+    try:
+        provider = _get_provider_for_platform(PlatformCredential.Platform.DEVTO, link.workspace.organization_id)
+        profile = provider.get_profile(api_key)
+        account = _create_or_update_account(
+            workspace_id=str(link.workspace_id),
+            platform=PlatformCredential.Platform.DEVTO,
+            profile=profile,
+            access_token=api_key,
+        )
+        ConnectionLinkUsage.objects.get_or_create(connection_link=link, social_account=account)
+    except Exception:
+        logger.exception("Connection link DEV.to connection failed")
+        request.session["connection_link_error"] = "Failed to connect DEV.to account. Check your API key."
+
+    return redirect("onboarding:connection_page", token=token)
+
+
 @csp_update(FORM_ACTION="'self' https:")
 @require_POST
 def connection_mastodon_start(request, token):
@@ -647,6 +694,8 @@ def connection_mastodon_start(request, token):
     link = _get_connection_link_or_none(token)
     if not link or not link.is_active:
         return render(request, "onboarding/connection_expired.html", status=400)
+    if not _check_rate_limit(token):
+        return HttpResponse("Too many connection attempts. Please try again later.", status=429)
 
     instance_url = _normalize_mastodon_instance_url(request.POST.get("instance_url", ""))
     if not instance_url:

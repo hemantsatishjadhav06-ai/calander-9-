@@ -294,6 +294,13 @@ def comment_attachment(request, workspace_id, post_id, comment_id):
         post=post,
         deleted_at__isnull=True,
     )
+    from apps.members.models import WorkspaceMembership
+
+    if request.workspace_membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT and (
+        comment.visibility != PostComment.Visibility.EXTERNAL
+        or (comment.parent_comment_id and comment.parent_comment.visibility != PostComment.Visibility.EXTERNAL)
+    ):
+        raise Http404("Comment not found.")
 
     if not comment.attachment:
         raise Http404("This comment has no attachment.")

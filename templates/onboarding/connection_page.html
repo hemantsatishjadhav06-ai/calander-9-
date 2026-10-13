@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "onboarding/base.html" %}
 {% load static %}
 
 {% block title %}Connect your accounts - {{ org.name }}{% endblock %}
@@ -37,7 +37,7 @@
 
     <!-- Error message -->
     {% if error %}
-    <div style="
+    <div role="alert" style="
         background: var(--error-50);
         border: 1px solid rgba(239,68,68,0.15);
         border-radius: var(--radius-lg);
@@ -93,7 +93,7 @@
             <div style="flex: 1; min-width: 0;">
                 <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary);">{{ label }}</div>
                 <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 1px;">
-                    {% if value == 'facebook' %}Pages &amp; Groups
+                    {% if value == 'facebook' %}Pages
                     {% elif value == 'instagram' %}Business &amp; Creator
                     {% elif value == 'linkedin_personal' %}Personal profile
                     {% elif value == 'linkedin_company' %}Company pages
@@ -104,6 +104,7 @@
                     {% elif value == 'bluesky' %}AT Protocol
                     {% elif value == 'google_business' %}Local posts
                     {% elif value == 'mastodon' %}Federated social
+                    {% elif value == 'devto' %}Articles &amp; Markdown
                     {% endif %}
                 </div>
             </div>
@@ -128,8 +129,8 @@
             {% else %}
             {% if value == 'bluesky' %}
             <!-- Bluesky: inline form (no OAuth) -->
-            <div x-data="{ showForm: false }" style="flex-shrink: 0;">
-                <button @click="showForm = !showForm"
+            <div x-data="{ showForm: false }" @keydown.escape.window="showForm = false" style="flex-shrink: 0;">
+                <button type="button" :aria-expanded="showForm" aria-controls="connection-bluesky-form" @click="showForm = !showForm"
                         class="btn-primary-hover"
                         style="
                     display: inline-flex; align-items: center; gap: 6px;
@@ -149,7 +150,7 @@
                     display: flex; align-items: center; justify-content: center;
                     background: rgba(0,0,0,0.4); padding: 16px;
                 " @click.self="showForm = false">
-                    <form method="post" action="{% url 'onboarding:connection_bluesky' token=link.token %}" style="
+                    <form id="connection-bluesky-form" role="dialog" aria-modal="true" aria-labelledby="connection-bluesky-title" x-trap.noscroll="showForm" method="post" action="{% url 'onboarding:connection_bluesky' token=link.token %}" style="
                         background: var(--surface-0);
                         border-radius: var(--radius-xl);
                         padding: 24px;
@@ -157,7 +158,7 @@
                         box-shadow: var(--shadow-xl);
                     ">
                         {% csrf_token %}
-                        <h3 style="font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Connect Bluesky</h3>
+                        <h3 id="connection-bluesky-title" style="font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Connect Bluesky</h3>
                         <div style="margin-bottom: 12px;">
                             <label for="bsky-handle" style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">Handle</label>
                             <input type="text" id="bsky-handle" name="handle" placeholder="you.bsky.social" required style="
@@ -202,8 +203,8 @@
             </div>
             {% elif value == 'mastodon' %}
             <!-- Mastodon: instance URL form -->
-            <div x-data="{ showForm: false }" style="flex-shrink: 0;">
-                <button @click="showForm = !showForm"
+            <div x-data="{ showForm: false }" @keydown.escape.window="showForm = false" style="flex-shrink: 0;">
+                <button type="button" :aria-expanded="showForm" aria-controls="connection-mastodon-form" @click="showForm = !showForm"
                         class="btn-primary-hover"
                         style="
                     display: inline-flex; align-items: center; gap: 6px;
@@ -223,7 +224,7 @@
                     display: flex; align-items: center; justify-content: center;
                     background: rgba(0,0,0,0.4); padding: 16px;
                 " @click.self="showForm = false">
-                    <form method="post" action="{% url 'onboarding:connection_mastodon' token=link.token %}" style="
+                    <form id="connection-mastodon-form" role="dialog" aria-modal="true" aria-labelledby="connection-mastodon-title" x-trap.noscroll="showForm" method="post" action="{% url 'onboarding:connection_mastodon' token=link.token %}" style="
                         background: var(--surface-0);
                         border-radius: var(--radius-xl);
                         padding: 24px;
@@ -231,7 +232,7 @@
                         box-shadow: var(--shadow-xl);
                     ">
                         {% csrf_token %}
-                        <h3 style="font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Connect Mastodon</h3>
+                        <h3 id="connection-mastodon-title" style="font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Connect Mastodon</h3>
                         <div style="margin-bottom: 16px;">
                             <label for="mastodon-instance-url" style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">Instance URL</label>
                             <input type="text" id="mastodon-instance-url" name="instance_url" placeholder="mastodon.social" required style="
@@ -261,6 +262,8 @@
                     </form>
                 </div>
             </div>
+            {% elif value == 'devto' %}
+            {% include "onboarding/partials/_devto_connection_form.html" %}
             {% else %}
             <!-- Standard OAuth platforms -->
             <form method="post" action="{% url 'onboarding:connection_oauth_start' token=link.token %}" style="flex-shrink: 0;">

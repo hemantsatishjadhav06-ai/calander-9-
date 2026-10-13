@@ -1,11 +1,13 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
+from apps.accounts.uploads import validate_profile_image
+from apps.common.validators import clean_display_name
 from apps.members.decorators import require_org_role
 from apps.members.models import OrgMembership, WorkspaceMembership
 
@@ -24,7 +26,7 @@ def workspace_list(request):
 @require_org_role(OrgMembership.OrgRole.ADMIN)
 def workspace_create(request):
     """Create a new workspace in the user's organization."""
-    name = request.POST.get("name", "").strip()
+    name = clean_display_name(request.POST.get("name", ""), max_length=100)
     if not name:
         return redirect("dashboard")
 
@@ -111,7 +113,7 @@ def workspace_settings(request, workspace_id):
         if not is_owner_or_manager:
             raise PermissionDenied("Only workspace owners and managers can change workspace settings.")
 
-        name = request.POST.get("name", "").strip()
+        name = clean_display_name(request.POST.get("name", ""), max_length=100)
 
         if name:
             workspace.name = name
@@ -134,6 +136,12 @@ def workspace_settings(request, workspace_id):
             max_size = 2 * 1024 * 1024
             if icon.size > max_size:
                 messages.error(request, "Logo must be under 2 MB.")
+                return redirect("workspaces:settings", workspace_id=workspace.id)
+
+            try:
+                icon = validate_profile_image(icon)
+            except ValidationError as exc:
+                messages.error(request, " ".join(exc.messages))
                 return redirect("workspaces:settings", workspace_id=workspace.id)
 
             # Delete old icon before saving new one

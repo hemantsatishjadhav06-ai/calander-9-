@@ -25,6 +25,7 @@ from datetime import timedelta
 
 from background_task import background
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Q
 from django.db.models.functions import Coalesce
@@ -46,7 +47,13 @@ from apps.social_accounts.error_messages import (
     friendly_publish_error,
 )
 from providers import get_provider
-from providers.exceptions import ProviderError, RateLimitError, TokenExpiredError
+from providers.exceptions import (
+    ProviderError,
+    PublishError,
+    PublishOutcomeUnknownError,
+    RateLimitError,
+    TokenExpiredError,
+)
 from providers.types import PostType, PublishContent, PublishState
 
 from .models import PublishLog, RateLimitState
@@ -422,6 +429,21 @@ class PublishEngine:
             .order_by("effective_at")[: _max_concurrent_publishes()]
         )
 
+    @staticmethod
+    def _is_currently_due(platform_post, now, *, allow_unscheduled=False):
+        """Recheck the current schedule and account under the claim lock."""
+        effective_at = platform_post.scheduled_at or platform_post.post.scheduled_at
+        return (
+            platform_post.status == PlatformPost.Status.SCHEDULED
+            and platform_post.social_account.workspace_id == platform_post.post.workspace_id
+            and (effective_at <= now if effective_at is not None else allow_unscheduled)
+            and not (
+                platform_post.retry_count > 0
+                and platform_post.next_retry_at is not None
+                and platform_post.next_retry_at > now
+            )
+        )
+
     def _publish_post_group(self, post, due_pps, platform_pool=None):
         """Publish a group of due PlatformPosts belonging to the same Post.
 
@@ -443,16 +465,18 @@ class PublishEngine:
             # request_hold()'s UPDATE on an approved sibling blocks on the locked
             # row until we commit, and we re-check on_hold here under the lock.
             locked = list(
-                PlatformPost.objects.select_for_update()
+                PlatformPost.objects.select_for_update(of=("self",))
                 .filter(post_id=post.id)
                 .select_related("social_account", "post__workspace")
+                .order_by("pk")
             )
 
             if any(pp.status == PlatformPost.Status.ON_HOLD for pp in locked):
                 return False
 
             due_ids = {pp.id for pp in due_pps}
-            platform_posts = [pp for pp in locked if pp.id in due_ids and pp.status == PlatformPost.Status.SCHEDULED]
+            now = timezone.now()
+            platform_posts = [pp for pp in locked if pp.id in due_ids and self._is_currently_due(pp, now)]
 
             if not platform_posts:
                 return False
@@ -564,6 +588,7 @@ class PublishEngine:
             )
             return {"success": False, "error": error_msg}
 
+        accepted_result = None
         try:
             # Get the provider for this platform
             result = self._dispatch_to_provider(platform_post, media_cache=media_cache)
@@ -571,6 +596,10 @@ class PublishEngine:
             duration_ms = int((time.monotonic() - start_time) * 1000)
 
             if result["success"]:
+                # Once the platform accepted the write, a local bookkeeping
+                # failure must never send it again. If persistence fails, the
+                # existing publishing row is left for confirmation/recovery.
+                accepted_result = result
                 platform_post.platform_post_id = result.get("platform_post_id", "")
                 response_extra = result.get("response")
                 if isinstance(response_extra, dict) and response_extra:
@@ -664,6 +693,12 @@ class PublishEngine:
                 return result
 
         except Exception as e:
+            if accepted_result is not None:
+                logger.exception(
+                    "Platform accepted PlatformPost %s but local bookkeeping failed; no retry was queued",
+                    platform_post.id,
+                )
+                return accepted_result
             duration_ms = int((time.monotonic() - start_time) * 1000)
             error_msg = str(e)
 
@@ -675,6 +710,14 @@ class PublishEngine:
             )
 
             user_message = friendly_publish_error(e)
+            if isinstance(e, PublishOutcomeUnknownError):
+                self._fail_permanently(
+                    platform_post,
+                    error_msg,
+                    user_message=PUBLISH_INTERRUPTED_MESSAGE,
+                    reason="platform outcome unknown",
+                )
+                return {"success": False, "error": error_msg, "outcome_unknown": True}
             # An expired token is the one failure a retry can never fix and
             # that names its own remedy. Three backoff attempts used to run
             # anyway, then the post failed with "try again" while the channel
@@ -692,11 +735,14 @@ class PublishEngine:
                 self._fail_permanently(platform_post, error_msg, user_message=user_message)
                 return {"success": False, "error": error_msg}
             if getattr(e, "retryable", True):
+                retry_at = getattr(e, "resets_at", None)
+                if retry_at is None and isinstance(e, RateLimitError) and e.retry_after is not None:
+                    retry_at = timezone.now() + timedelta(seconds=max(1, e.retry_after))
                 self._schedule_retry(
                     platform_post,
                     error_msg,
                     user_message=user_message,
-                    retry_at=getattr(e, "resets_at", None),
+                    retry_at=retry_at,
                 )
             else:
                 self._fail_permanently(platform_post, error_msg, user_message=user_message)
@@ -821,38 +867,35 @@ class PublishEngine:
             # Pop link_url from extra and set on PublishContent directly
             link_url = extra.pop("link_url", None)
 
-            # Resolve thumbnail_asset_id → temp file path for providers that
-            # need to upload a custom thumbnail (YouTube).
-            thumb_asset_id = extra.pop("thumbnail_asset_id", None)
-            if thumb_asset_id:
+            # Treat thumbnails/covers as workspace media too. The extras arrive
+            # from multiple editor/API paths and cannot authorize an asset by id.
+            for asset_key, file_key, label in (
+                ("thumbnail_asset_id", "thumbnail_file", "thumbnail"),
+                ("cover_image_asset_id", "cover_image_file", "cover image"),
+            ):
+                asset_id = extra.pop(asset_key, None)
+                if not asset_id:
+                    continue
                 from apps.media_library.models import MediaAsset
 
                 try:
-                    thumb_asset = MediaAsset.objects.get(id=thumb_asset_id)
-                    if thumb_asset.file:
-                        suffix = os.path.splitext(thumb_asset.filename)[1] or ".jpg"
+                    asset = MediaAsset.objects.for_workspace_with_shared(
+                        platform_post.post.workspace_id,
+                        platform_post.post.workspace.organization_id,
+                    ).get(id=asset_id)
+                    if asset.file:
+                        suffix = os.path.splitext(asset.filename)[1] or ".jpg"
                         tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)  # noqa: SIM115
                         tmp.close()
                         temp_files.append(tmp.name)
-                        download_to_path(thumb_asset.file, tmp.name)
-                        extra["thumbnail_file"] = tmp.name
-                except MediaAsset.DoesNotExist:
-                    logger.warning("Thumbnail asset %s not found", thumb_asset_id)
-
-            # Resolve cover_image_asset_id → temp file (Pinterest video pins)
-            cover_asset_id = extra.pop("cover_image_asset_id", None)
-            if cover_asset_id:
-                try:
-                    cover_asset = MediaAsset.objects.get(id=cover_asset_id)
-                    if cover_asset.file:
-                        suffix = os.path.splitext(cover_asset.filename)[1] or ".jpg"
-                        tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)  # noqa: SIM115
-                        tmp.close()
-                        temp_files.append(tmp.name)
-                        download_to_path(cover_asset.file, tmp.name)
-                        extra["cover_image_file"] = tmp.name
-                except MediaAsset.DoesNotExist:
-                    logger.warning("Cover image asset %s not found", cover_asset_id)
+                        download_to_path(asset.file, tmp.name)
+                        extra[file_key] = tmp.name
+                except (MediaAsset.DoesNotExist, ValidationError, ValueError):
+                    raise PublishError(
+                        f"The selected {label} is not available in this workspace. Choose it again before publishing.",
+                        platform=platform,
+                        retryable=False,
+                    ) from None
 
             post_type = self._resolve_post_type(
                 platform=platform,
@@ -885,7 +928,17 @@ class PublishEngine:
                 post_type.value,
                 len(media_files),
             )
-            result = provider.publish_post(access_token, content)
+            try:
+                result = provider.publish_post(access_token, content)
+            except Exception as exc:
+                # Only failures inside the external write have an unknown
+                # outcome. Local media/credential preparation above is safe to
+                # retry. A rate-limit/clean rejection remains definitive.
+                if getattr(exc, "retryable", True) and _is_ambiguous_submission_failure(exc):
+                    raise PublishOutcomeUnknownError(
+                        str(exc), platform=platform, raw_response=getattr(exc, "raw_response", None)
+                    ) from exc
+                raise
             return {
                 "success": True,
                 "platform_post_id": result.platform_post_id,
@@ -1027,6 +1080,7 @@ class PublishEngine:
         ).update(
             status=PlatformPost.Status.FAILED,
             publish_error=publish_error,
+            next_retry_at=None,
             updated_at=timezone.now(),
         )
 
@@ -1060,6 +1114,7 @@ class PublishEngine:
 
         platform_post.status = PlatformPost.Status.FAILED
         platform_post.publish_error = publish_error
+        platform_post.next_retry_at = None
         self._notify_publish_failed(platform_post)
 
     @staticmethod
@@ -1169,19 +1224,32 @@ class PublishEngine:
         )
 
         for pp in retry_posts:
-            if pp.post.platform_posts.filter(status=PlatformPost.Status.ON_HOLD).exists():
-                continue
             try:
                 # Claim on the row's *current* state, not the state read when
                 # the queryset was built: the previous iteration may have spent
                 # minutes uploading a video, during which this row could have
                 # been unscheduled, held or moved. A blind save would have
                 # overwritten that with ``publishing`` and published it.
-                claimed = PlatformPost.objects.filter(
-                    id=pp.id, status=PlatformPost.Status.SCHEDULED, retry_count=pp.retry_count
-                ).update(status=PlatformPost.Status.PUBLISHING, updated_at=timezone.now())
-                if not claimed:
-                    continue
+                with transaction.atomic():
+                    siblings = list(
+                        PlatformPost.objects.select_for_update(of=("self",))
+                        .filter(post_id=pp.post_id)
+                        .select_related("social_account", "post__workspace")
+                        .order_by("pk")
+                    )
+                    current = next((row for row in siblings if row.pk == pp.pk), None)
+                    claim_at = timezone.now()
+                    if (
+                        current is None
+                        or current.retry_count != pp.retry_count
+                        or not self._is_currently_due(current, claim_at, allow_unscheduled=True)
+                        or any(row.status == PlatformPost.Status.ON_HOLD for row in siblings)
+                    ):
+                        continue
+                    PlatformPost.objects.filter(pk=current.pk).update(
+                        status=PlatformPost.Status.PUBLISHING, updated_at=claim_at
+                    )
+                    pp = current
                 pp.status = PlatformPost.Status.PUBLISHING
                 result = self._publish_platform_post(pp)
                 if result.get("async_publish"):
@@ -1413,7 +1481,7 @@ class PublishEngine:
 
 
 def _is_ambiguous_submission_failure(exc) -> bool:
-    """True when the comment may or may not have been created on the platform.
+    """True when the post/comment may or may not have been created on the platform.
 
     A clean 4xx is the platform refusing the request outright, so nothing was
     created and retrying is safe. A timeout, a dropped connection, or a 5xx

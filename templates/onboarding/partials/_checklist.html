@@ -1,5 +1,5 @@
 {% if not checklist_dismissed and checklist_items %}
-<div id="onboarding-checklist" x-data="{ open: true }"
+<div id="onboarding-checklist" x-data="{ open: false }"
      {% if request.workspace %}
      hx-get="{% url 'onboarding:checklist_partial' workspace_id=request.workspace.id %}"
      hx-trigger="ideaChanged from:body"

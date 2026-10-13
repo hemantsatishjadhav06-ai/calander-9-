@@ -575,9 +575,9 @@ django==5.2.17 \
     #   django-stubs-ext
     #   django-tailwind
     #   sentry-sdk
-django-allauth==65.19.4 \
-    --hash=sha256:7ea5f0057f91fa25f9ca7814f84aed63a66096b43df073fbdf1ef0167bc92f1d \
-    --hash=sha256:a4f13476ad460ab1098af6be41ae72ed1d07498dd4514e05b9daef09a6c1cabd
+django-allauth==65.19.7 \
+    --hash=sha256:8899377f38afabf10445c9ee2f808a730304ca8aecc540657d51a8b3928283d6 \
+    --hash=sha256:c7749551b659ca954e483f6f634cd0c262d65dd8144f5219b3a31cba0426e981
     # via -r requirements.txt
 django-background-tasks==1.2.8 \
     --hash=sha256:1ed5816f8d60f0ed436cd0435405e55e7b91e825fd69bcdada2d605ee1a97056 \
@@ -875,9 +875,9 @@ mypy-extensions==1.1.0 \
     --hash=sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505 \
     --hash=sha256:52e68efc3284861e772bbcd66823fde5ae21fd2fdb51c62a211403730b916558
     # via mypy
-oauthlib==3.3.1 \
-    --hash=sha256:0f0f8aa759826a193cf66c12ea1af1637f87b9b4622d46e866952bb022e538c9 \
-    --hash=sha256:88119c938d2b8fb88561af5f6ee0eec8cc8d552b7bb1f712743136eb7523b7a1
+oauthlib==4.0.0 \
+    --hash=sha256:624c28c13a0a59cabf9747dfa52af63be3e512a7f2714df16e91b5b3a145e6cd \
+    --hash=sha256:efb274799819440f95b4ab3b818869f1ce9ae26c5beacba0201d1a1b76b54f86
     # via
     #   django-allauth
     #   django-oauth-toolkit

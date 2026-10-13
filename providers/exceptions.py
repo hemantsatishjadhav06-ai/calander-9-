@@ -95,6 +95,13 @@ class PublishError(ProviderError):
     """Post publishing failed."""
 
 
+class PublishOutcomeUnknownError(ProviderError):
+    """A publish may have reached the platform; automatically resending is unsafe."""
+
+    def __init__(self, message: str, **kwargs):
+        super().__init__(message, retryable=False, **kwargs)
+
+
 class APIError(ProviderError):
     """Generic API error from the platform."""
 

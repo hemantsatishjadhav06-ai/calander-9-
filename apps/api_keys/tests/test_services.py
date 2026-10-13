@@ -138,6 +138,31 @@ def foreign_social_account(db, other_workspace):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("reason", ["inactive_issuer", "archived_workspace"])
+def test_cached_key_loses_access_when_issuer_or_workspace_disabled(workspace, workspace_owner, social_account, reason):
+    from django.core.cache import cache
+
+    cache.clear()
+    issued = services.issue_api_key(
+        workspace=workspace,
+        social_accounts=[social_account],
+        issued_by=workspace_owner.user,
+        name="disable-test",
+        permissions=["create_posts"],
+    )
+    assert services.verify_token(issued.plaintext_token) is not None
+    if reason == "inactive_issuer":
+        user = workspace_owner.user
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+    else:
+        workspace.is_archived = True
+        workspace.save(update_fields=["is_archived"])
+    assert services.verify_token(issued.plaintext_token) is None
+    cache.clear()
+
+
+@pytest.mark.django_db
 class TestTokenFormat:
     def test_round_trip(self, workspace, workspace_owner, social_account):
         """A freshly issued token parses back to the same lookup_prefix."""

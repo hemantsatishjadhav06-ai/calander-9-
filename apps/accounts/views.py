@@ -3,12 +3,18 @@ import logging
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
+
+from apps.common.validators import clean_display_name
+
+from .uploads import validate_profile_image
 
 logger = logging.getLogger(__name__)
 
@@ -159,26 +165,11 @@ def _handle_photo_update(request, user):
         messages.error(request, "Photo must be under 2 MB.")
         return
 
-    # Validate minimum dimensions (180x180)
-    #
-    # PIL is imported here rather than at module scope because config.urls
-    # imports this module for ``health_check``, so a top-level import loaded
-    # Pillow's _imaging extension into every web AND worker process at boot,
-    # whether or not an avatar was ever touched. Matches how the rest of the
-    # codebase imports PIL (apps.media_library.services, apps.intelligence.views).
-    from PIL import Image
-
     try:
-        with Image.open(avatar) as img:
-            width, height = img.size
-        if width < 180 or height < 180:
-            messages.error(request, "Photo must be at least 180×180 pixels.")
-            return
-    except Exception:
-        messages.error(request, "Could not read image file.")
+        avatar = validate_profile_image(avatar, minimum_dimension=180)
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
         return
-    finally:
-        avatar.seek(0)  # Reset file pointer after reading
 
     # Delete old avatar before saving new one
     if user.avatar:
@@ -191,7 +182,7 @@ def _handle_photo_update(request, user):
 
 def _handle_name_update(request, user):
     """Handle name change."""
-    name = request.POST.get("name", "").strip()
+    name = clean_display_name(request.POST.get("name", ""), max_length=255)
     if not name:
         messages.error(request, "Name cannot be empty.")
         return
@@ -219,12 +210,15 @@ def _handle_password_update(request, user):
         messages.error(request, "New password cannot be empty.")
         return
 
-    if len(password) < 8:
-        messages.error(request, "New password must be at least 8 characters.")
-        return
-
     if password != password_confirm:
         messages.error(request, "New passwords do not match.")
+        return
+
+    try:
+        validate_password(password, user=user)
+    except ValidationError as exc:
+        for error in exc.messages:
+            messages.error(request, error)
         return
 
     user.set_password(password)

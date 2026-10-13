@@ -143,6 +143,18 @@ class TestMcpOAuthChallenge:
         r = c.post(MCP_URL, data=json.dumps(_rpc("ping")), content_type="application/json")
         assert r.status_code == 401
 
+    def test_disabling_user_immediately_invalidates_existing_oauth_token(self):
+        user, _ws, _sa = _make_user_with_workspace(
+            "disabled-oauth@example.com", WorkspaceMembership.WorkspaceRole.OWNER
+        )
+        raw = _mint_oauth_token(user)
+        c = _SecureClient(HTTP_AUTHORIZATION=f"Bearer {raw}")
+        assert _post(c, _rpc("ping"))[0] == 200
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+        response = c.post(MCP_URL, data=json.dumps(_rpc("ping")), content_type="application/json")
+        assert response.status_code == 401
+
     def test_token_for_user_without_workspace_returns_401(self):
         # New users get a default workspace via a post_save signal, so simulate
         # an offboarded user (token still live) by clearing their memberships —

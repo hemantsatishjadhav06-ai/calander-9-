@@ -50,7 +50,7 @@
         <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <p class="text-[13px] font-semibold text-stone-900 leading-snug">{{ n.title }}</p>
+                    <p class="text-[13px] font-semibold text-stone-900 leading-snug">{% if n.data.action_url %}<a href="{{ n.data.action_url }}" class="hover:underline">{{ n.title }}</a>{% else %}{{ n.title }}{% endif %}</p>
                     {% if n.body %}
                     <p class="text-[13px] text-stone-500 leading-relaxed mt-0.5 line-clamp-2">{{ n.body }}</p>
                     {% endif %}
@@ -67,8 +67,10 @@
                 {% if not n.is_read %}
                 <button
                     hx-post="{% url 'notifications:mark_as_read' n.id %}"
-                    hx-target="closest div.group"
-                    hx-swap="outerHTML"
+                    hx-target="#notification-history-list"
+                    hx-swap="innerHTML"
+                    hx-include="#notification-filters"
+                    hx-vals='{"page": "{{ page }}"}'
                     class="text-[11px] font-semibold text-orange-700 hover:text-orange-800 ml-auto opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 cursor-pointer"
                 >
                     Mark read

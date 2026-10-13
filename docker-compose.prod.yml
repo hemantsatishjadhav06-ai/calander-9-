@@ -5,18 +5,33 @@ services:
     env_file:
       - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/brightbean
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to the postgres service with the same POSTGRES_PASSWORD}
+      MEDIA_STORAGE_PERSISTENT: "true"
     depends_on:
       postgres:
         condition: service_healthy
 
   app:
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 2
+    # Retain the Dockerfile's deployment checks and memory-safe Gunicorn defaults.
+    ports: !reset []
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os, urllib.request, urllib.parse; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/health/', headers={'Host': urllib.parse.urlsplit(os.environ['APP_URL']).netloc}), timeout=10)"
+      interval: 30s
+      timeout: 12s
+      retries: 3
+      start_period: 30s
     volumes:
       - media_data:/app/media
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to the postgres service with the same POSTGRES_PASSWORD}
+      MEDIA_STORAGE_PERSISTENT: "true"
+      MEDIA_ROOT: /app/media
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -26,13 +41,19 @@ services:
     volumes:
       - media_data:/app/media
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to the postgres service with the same POSTGRES_PASSWORD}
+      MEDIA_STORAGE_PERSISTENT: "true"
+      MEDIA_ROOT: /app/media
     depends_on:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
 
   postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong POSTGRES_PASSWORD and encode it in DATABASE_URL}
     restart: unless-stopped
 
   caddy:
@@ -47,12 +68,12 @@ services:
       # Read-only so Caddy can serve uploads but never write into MEDIA_ROOT.
       - media_data:/app/media:ro
     environment:
-      # Set CADDY_MEDIA_ROOT=/var/empty in .env when STORAGE_BACKEND=s3: the
-      # named volume outlives the switch, and Caddy cannot read Django's
-      # SERVE_MEDIA. See the Caddyfile.
-      - CADDY_MEDIA_ROOT=${CADDY_MEDIA_ROOT:-/app/media}
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN to the public hostname for automatic HTTPS}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      CADDY_MEDIA_ROOT: /app/media
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

@@ -175,6 +175,7 @@ if REDIS_URL:
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": REDIS_URL,
+            "OPTIONS": {"socket_connect_timeout": 3, "socket_timeout": 3},
         },
         # Shared and out of the web process entirely; Redis's own eviction
         # policy bounds it, so no MAX_ENTRIES here (LocMem-only anyway).
@@ -182,6 +183,7 @@ if REDIS_URL:
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": REDIS_URL,
             "KEY_PREFIX": "filmstrip",
+            "OPTIONS": {"socket_connect_timeout": 3, "socket_timeout": 3},
         },
     }
 else:
@@ -210,6 +212,8 @@ DATABASES = {
 # at most five persistent connections per container.
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
+if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
+    DATABASES["default"].setdefault("OPTIONS", {}).setdefault("connect_timeout", 5)
 
 # Custom user model
 AUTH_USER_MODEL = "accounts.User"
@@ -252,6 +256,7 @@ STORAGES = {
 
 # Media files
 STORAGE_BACKEND = env("STORAGE_BACKEND")
+MEDIA_STORAGE_PERSISTENT = env.bool("MEDIA_STORAGE_PERSISTENT", default=False)
 if STORAGE_BACKEND.lower() == "s3":
     # Object storage hands out its own presigned URLs; this process never
     # serves MEDIA_ROOT, so the env var is deliberately ignored here.

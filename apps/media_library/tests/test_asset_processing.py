@@ -129,21 +129,28 @@ def test_large_jpeg_completes_with_real_dimensions_and_a_thumbnail(asset):
 
 
 @pytest.mark.django_db
-def test_unreadable_file_completes_without_a_thumbnail(asset):
-    """Unreadable stays a soft failure, unlike over-limit.
-
-    Only "too large" propagates. "Pillow could not read this" keeps the
-    pre-existing best-effort behaviour: the asset completes with no thumbnail
-    and zero dimensions. Pinned here so the distinction stays deliberate.
-    """
+def test_unreadable_file_is_not_marked_ready_to_publish(asset):
+    """Corrupt uploads cannot enter the completed-media reuse list."""
     media = asset(b"this is not an image", filename="broken.png")
 
     process_media_asset.now(str(media.id))
 
     media.refresh_from_db()
-    assert media.processing_status == MediaAsset.ProcessingStatus.COMPLETED
+    assert media.processing_status == MediaAsset.ProcessingStatus.FAILED
     assert not media.thumbnail
     assert (media.width, media.height) == (0, 0)
+
+
+@pytest.mark.django_db
+def test_image_with_valid_header_but_truncated_body_is_marked_failed(asset):
+    data = _png_bytes(100, 100)
+    # IHDR is intact, so Pillow can read the dimensions without decoding the
+    # missing IDAT body. A successful metadata probe is not a usable image.
+    media = asset(data[:41])
+    process_media_asset.now(str(media.id))
+    media.refresh_from_db()
+    assert media.processing_status == MediaAsset.ProcessingStatus.FAILED
+    assert not media.thumbnail
 
 
 @pytest.mark.django_db
@@ -238,3 +245,25 @@ def test_rejected_edit_preserves_the_shared_source_file(asset, user):
     media.refresh_from_db()
     assert media.file.name
     assert default_storage.exists(media.file.name)
+
+
+@pytest.mark.django_db
+def test_failed_image_edit_drops_its_placeholder_version(asset, user):
+    from unittest.mock import patch
+
+    from django.core.exceptions import ValidationError
+    from django.core.files.storage import default_storage
+
+    from apps.media_library.services import create_version
+    from apps.media_library.tasks import process_image_edit
+
+    media = asset(_png_bytes(100, 100))
+    original = create_version(asset=media, file=media.file, change_description="Original", created_by=user)
+    editing = create_version(asset=media, file=media.file, change_description="Bad crop", created_by=user)
+    source_name = media.file.name
+    with patch("apps.media_library.tasks.apply_image_edits", side_effect=ValidationError("Invalid crop")):
+        process_image_edit.now(str(editing.id), {"crop": {"x": 0, "y": 0, "width": 1000, "height": 1000}})
+    media.refresh_from_db()
+    assert not MediaAssetVersion.objects.filter(pk=editing.pk).exists()
+    assert media.current_version_id == original.id
+    assert default_storage.exists(source_name)

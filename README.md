@@ -88,11 +88,12 @@ After deploying, set these environment variables in your platform's dashboard:
 | `SECRET_KEY` | Auto-generated | Django secret key. Set automatically by the deploy button. |
 | `ENCRYPTION_KEY_SALT` | Auto-generated | Encryption salt. Set automatically by the deploy button. |
 | `DATABASE_URL` | Auto-provisioned | PostgreSQL connection string. Set automatically. |
+| `REDIS_URL` | Yes in production | Shared Redis cache for rate limits and cache consistency across web/worker processes. Provisioned by the updated platform manifests. |
 | `ALLOWED_HOSTS` | Yes | Your app's domain, e.g. `your-app.herokuapp.com` |
 | `APP_URL` | Yes | Full public URL, e.g. `https://your-app.herokuapp.com` |
 | `STORAGE_BACKEND` | No | Set to `s3` for S3/R2 storage. Default: `local`. Heroku, Render, and Railway have ephemeral filesystems, so uploaded files are lost on redeploy without S3. |
 | `SERVE_MEDIA` | No | Only used with `STORAGE_BACKEND=local`. Default: `true`, so Django serves uploads at `/media/`. Those files are served **unauthenticated** — anyone with the path can fetch them. That is required in this mode: Instagram, Threads, Facebook, Pinterest, Google Business and dev.to fetch attachment URLs server-side when publishing, so `/media/` must be publicly reachable. Only the media library, avatars and workspace icons are exposed this way (`PUBLIC_MEDIA_PREFIXES` in `config/urls.py`); comment attachments go through a permission-checked view. Set to `false` only when a reverse proxy or CDN serves those prefixes on the same public path instead. |
-| `CADDY_MEDIA_ROOT` | No | docker-compose only. Where Caddy reads uploads from. Default: `/app/media`. Set to `/var/empty` when `STORAGE_BACKEND=s3` — the `media_data` volume survives the switch and Caddy cannot see `SERVE_MEDIA`, so it would otherwise keep serving whatever uploads were left behind. |
+| `CADDY_MEDIA_ROOT` | No | Where Caddy reads local uploads; production Compose uses `/app/media`. Caddy serves only public media prefixes and disables local media serving when `STORAGE_BACKEND=s3`, including uploads left on an old volume. |
 | `S3_ENDPOINT_URL` | If using S3 | S3-compatible endpoint URL |
 | `S3_ACCESS_KEY_ID` | If using S3 | S3 access key |
 | `S3_SECRET_ACCESS_KEY` | If using S3 | S3 secret key |
@@ -256,7 +257,12 @@ ruff format .
 
 ## Production Deployment
 
+Read the [current launch audit and staging acceptance checklist](docs/audit/LAUNCH_READINESS_2026-10-01.md) before opening registration. Code checks do not establish that email, storage or social-platform credentials work on your deployment.
+
 ### Docker Compose on a VPS (recommended)
+
+Use Docker Compose 2.24 or later. Production configuration keeps application,
+PostgreSQL and Redis ports private and exposes only Caddy on ports 80 and 443.
 
 ```bash
 # On your server:
@@ -265,18 +271,22 @@ cd calander-9-
 cp .env.example .env
 # Edit .env:
 #   SECRET_KEY=<generate a random 50+ char string>
+#   ENCRYPTION_KEY_SALT=<generate a separate stable random string>
 #   DEBUG=false
+#   APP_DOMAIN=yourdomain.com
 #   ALLOWED_HOSTS=yourdomain.com
 #   APP_URL=https://yourdomain.com
-#   DATABASE_URL=postgres://postgres:<strong-password>@postgres:5432/brightbean
+#   POSTGRES_PASSWORD=<strong-password>
+#   DATABASE_URL=postgres://postgres:<URL-encoded-strong-password>@postgres:5432/brightbean
+# Configure real transactional email before inviting users.
 
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-docker compose exec app python manage.py createsuperuser
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec app python manage.py createsuperuser
 ```
 
-This starts 5 containers: app (Gunicorn), worker, PostgreSQL, Caddy (auto-HTTPS), and a one-shot migrate container that runs database migrations automatically on startup. Edit the `Caddyfile` with your domain.
+This starts six services: app (Gunicorn), worker, PostgreSQL, Redis, Caddy (auto-HTTPS), and a one-shot migration service. Caddy reads `APP_DOMAIN`; editing the Caddyfile is unnecessary. Database and cache health checks complete before migrations and application startup.
 
-With the default `STORAGE_BACKEND=local`, Caddy serves uploaded media directly from the `media_data` volume at `/media/`, so large images and video never occupy a Gunicorn worker thread and byte-range requests (video seeking) work. Django's own `/media/` route stays available as the fallback for deployments without this proxy.
+With the default `STORAGE_BACKEND=local`, Caddy serves public uploaded media directly from the durable `media_data` volume shared by web and worker, with byte-range requests for video seeking. Private comment attachments use permission-checked application views. If you switch to S3/R2, Caddy disables local media serving, including old uploads remaining on the volume; the bucket/CDN serves public assets instead.
 
 To update:
 
