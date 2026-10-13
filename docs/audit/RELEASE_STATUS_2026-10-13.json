@@ -1,14 +1,15 @@
 {
-  "record_type": "current_release_validation_status",
+  "record_type": "pre_rollout_validation_snapshot",
   "prepared_on": "2026-10-13",
   "release_branch": "codex/sm-bean-oct13-launch",
   "target_branch": "main",
-  "source_manifest": "Generate a separate immutable manifest from the final full commit SHA; do not substitute historical receipt digests.",
+  "source_manifest": "Schema v2, 16 immutable source anchors, ten required migrations; generate a fresh artifact from the final full commit SHA.",
   "local_validation": {
     "full_pytest": {
       "passed": 4676,
       "skipped": 1,
-      "warnings": 31
+      "warnings": 31,
+      "scope": "Before final OAuth repair; updated full GitHub CI runs on PR10."
     },
     "redis_followup": {
       "passed": 7,
@@ -25,8 +26,8 @@
       "passed": 30
     },
     "release_manifest_schema_regressions": {
-      "passed": 27,
-      "overlap_with_full_suite": true
+      "passed": 64,
+      "includes_real_postgresql_readonly_counts": true
     },
     "ruff": "passed",
     "format": "passed",
@@ -35,18 +36,42 @@
     "django_checks": "passed",
     "dependency_audits": "no_known_vulnerabilities_reported",
     "container_smoke": "passed",
-    "gitleaks_findings": 0
+    "gitleaks_findings": 0,
+    "github_initial_ci": {
+      "passed": 4679,
+      "skipped": 1,
+      "subtests_passed": 194,
+      "all_six_jobs": "passed",
+      "source_commit": "7e472a69ae8d0c57bdbbe4b7d7196b07bed0cc63"
+    },
+    "oauth_storage_focused": {
+      "passed": 153,
+      "new_seeded_and_end_to_end_tests": 15
+    }
   },
   "production": {
     "project_id": "66526b2a-6a09-43d8-bedb-ecfdd37f8d8a",
     "secret_bindings_saved": true,
-    "authenticated_inspection": "pending",
+    "authenticated_inspection": "confirmed_sm_bean_web_and_worker",
     "public_health": "healthy_database_and_cache",
     "source_revision_verified": false,
     "rollout_completed": false,
     "bot_changed": false,
     "messages_sent": false,
-    "social_posts_published": false
+    "social_posts_published": false,
+    "observed_existing_source_commit": "05ca828b2be22d4c3a65fbdf67404961e0f13124",
+    "autodeploy_held": true,
+    "safe_configuration_staged_without_restart": true,
+    "stable_encryption_storage_and_fal_preserved": true,
+    "native_postgres_backup_record_verified": true,
+    "repeatable_read_application_backup_verified": {
+      "csv_tables": 110,
+      "manifest_tables": 110,
+      "bytes": 3721984
+    },
+    "anonymous_backup_access_denied": true,
+    "mailbox_connected": false,
+    "owner_email_verified": false
   },
   "trial_bot": {
     "username": "sammanager06_bot",
@@ -60,7 +85,17 @@
     "week_end": "2026-10-25",
     "timezone": "Asia/Kolkata",
     "live_work_created": false,
-    "live_schedule_changed": false
+    "live_schedule_changed": false,
+    "active_workspace_confirmed": true,
+    "next_week_existing_post_count": 0,
+    "current_member_count": 1,
+    "backup_approver_configured": false
   },
-  "note": "Local validation and synthetic browser/container evidence do not establish live creative quality, client approval or native publication. Replace pending production fields only with observed receipts. No secret values or private customer data belong here."
+  "note": "Snapshot before final deployment. Final CI, deployed source/schema/runtime, actual generated outputs and human acceptance need separate observed receipts. Never include secret values or private customer data.",
+  "provider_verification": {
+    "cloud_openrouter": "authenticated_positive_credits",
+    "cloud_fal": "rejected_401",
+    "existing_railway_fal": "model_metadata_accepted_billing_scope_unavailable",
+    "paid_generation_verified": false
+  }
 }

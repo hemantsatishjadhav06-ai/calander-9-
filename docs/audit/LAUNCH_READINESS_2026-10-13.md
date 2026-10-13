@@ -17,20 +17,22 @@ not establish current production behavior.
 | Content and approval | Final review is bound to the actual revision, destination, time, sources and scoped visual bytes. Unreadable or replaced cover/thumbnail media requires renewed review. Unsupported numbered commercial claims are blocked. |
 | Scheduling and delivery | Proposed slots account for occupied targets. Unknown delivery outcomes remain held for inspection; missing native receipts do not become “Published”. Telegram retry delays retain their actual duration. |
 | Paid work and workers | Worker lease checks protect social, bot, model, image and research calls. A worker that loses its dedicated PostgreSQL lease stops making external requests. Preparation consent and final post approval remain separate. |
-| Reproducible setup | Locked DOM-test dependencies, a CI UI job and an updated Tailwind dependency fix make UI checks reproducible. The current source manifest is generated from immutable committed Git blobs and includes the managed-bot migration/schema gate. |
+| OAuth storage | A deliberate migration verifies existing access/refresh lookup checksums before clearing reusable plaintext. Existing client-held credentials continue to authenticate and rotate; new issuance stores checksums. Refresh grace is explicitly zero. Old issuer processes must be drained, and old private backups retain their original contents. |
+| Reproducible setup | Locked DOM-test dependencies, a CI UI job and an updated Tailwind dependency fix make UI checks reproducible. Manifest v2 anchors 16 immutable committed source files, requires ten release migrations and verifies managed-bot schema and zero plaintext OAuth-token counts. |
 
 ## Current verification
 
 | Check | Observed result |
 | --- | --- |
-| Clean full PostgreSQL suite | **4,676 passed, 1 skipped**, 31 warnings; 513.68 seconds. |
+| Integrated PostgreSQL suite before the final OAuth repair | Local: **4,676 passed, 1 skipped**, 31 warnings; 513.68 seconds. First GitHub CI: **4,679 passed, 1 skipped**, plus 194 subtests. The additional final repair is covered below and the updated PR runs the full CI suite again. |
 | Browser review | **49 checks passed** using Chromium, including real local passwordless portal sessions, revocation, personal pairing, managed consent UI, guided briefs and phone/tablet layouts. No JavaScript errors, failed requests or HTTP 5xx were observed. Telegram/model responses in this review were controlled fixtures. |
 | DOM state tests | **30 passed** from the locked root npm dependencies. |
-| Lint, formatting and types | Ruff passed; 743 Python files formatted; mypy passed across 858 source files. |
+| Lint, formatting and types | Ruff passed; 746 Python files formatted; mypy passed across 861 source files. |
 | Migration and Django checks | No migration drift; application system checks passed. |
 | Dependency audits | No known vulnerabilities reported by pip-audit against the frozen Python lock or npm audit for the root and theme locks at review time. |
 | CSS/static assets | Tailwind build and production collectstatic passed. |
-| Current release inspector | **27 focused regressions passed**, including strict manifest checks and the managed-bot migration/schema requirement. |
+| OAuth storage repair | **153 focused PostgreSQL tests passed**, including 15 new seeded migration/legacy authentication, rotation, replay and revocation regressions; migration drift, types, formatting and deployment checks passed. |
+| Current release inspector | **64 focused regressions passed**, including manifest v2 tamper checks, current schema, actual read-only PostgreSQL counts and hidden-row refusal. |
 | Redis integration | **7 passed, 0 skipped**, including the default suite's skipped case, real cache round trips and filmstrip alias separation. Isolated Redis prefixes/test database were cleaned. |
 | Production container | Passed: PostgreSQL/Redis health, secure login, authenticated calendar/agency/Telegram pages, collected assets, wrong-secret webhook 403, all migrations including Telegram 0002, worker success heartbeats, one lease, overlapping worker rejection and graceful lease release. Unprivileged runtime, immutable code and writable media checked. Internal network and synthetic records; no provider/public-bot calls. |
 | Secret scan | Official checksum-verified Gitleaks 8.24.3: no findings in available Git history or current source. |
@@ -48,10 +50,36 @@ The public SM Bean health endpoint reported healthy database/cache, and the
 landing and login pages responded successfully. These requests do not identify
 the deployed source or exercise authenticated workflows. The confirmed Railway
 project is `66526b2a-6a09-43d8-bedb-ecfdd37f8d8a`; authenticated project control
-was initially unavailable. The user subsequently saved Railway, OpenRouter and
-fal secret bindings, which became available to the running environment.
-Authenticated live inspection and rollout are the next stage; existing Railway
-variables must be inspected and preserved rather than presumed missing.
+was initially unavailable. After the user saved secret bindings, authenticated
+inspection confirmed the SM Bean production web and worker at the older
+`05ca828b2be22d4c3a65fbdf67404961e0f13124` source. Both automatic deployments
+were held. Explicit hosts, trusted worker proxy, OpenRouter provider/model/key
+and inactive Telegram setup were staged without restarting the old services.
+Matching existing encryption, database, cache, storage and fal values were
+preserved. The previous wildcard host configuration would fail the new release's
+deployment check; the staged configuration passes it.
+
+A native PostgreSQL snapshot and a repeatable-read application backup were
+created and independently verified. The latter contains 110 CSV tables and a
+matching manifest. Storage authentication, TLS, temporary-object cleanup and
+anonymous backup-access denial were checked. A bounded, fail-closed operator
+gate permits migration only after the old services are removed and database
+work is drained. These observations precede the final rollout; final deployed
+source/runtime receipts must be recorded separately.
+
+OpenRouter authentication and positive credits were verified without generation.
+The newly supplied cloud fal key was rejected, while the existing Railway key
+was accepted for model metadata and preserved. Its billing scope does not expose
+credits; actual inference still needs a real workflow. Replace the cloud fal
+binding securely before using it outside the existing production services.
+
+Production has no connected Gmail mailbox/refresh token, and Neopolis has only
+one current member with no agency settings or backup approver. Invitations,
+password resets and emailed client links therefore need a genuine mailbox
+connection. The owner's email is unverified; mandatory verification was not
+enabled blindly. Public launch requires that human setup, actual delivery and a
+distinct current backup. Error-tracking service and admin IP restriction also
+remain operator configuration choices; production deployment checks expose them.
 
 The trial `@sammanager06_bot` passed a read-only identity check and reported
 `can_manage_bots=false`. No live webhook was changed, child bot created,

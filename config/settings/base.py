@@ -842,10 +842,12 @@ OAUTH2_PROVIDER = {
     # family rather than issuing from it. ROTATE_REFRESH_TOKEN above is what
     # makes a replay detectable in the first place.
     "REFRESH_TOKEN_REUSE_PROTECTION": True,
-    # NOT enabled: COMPLIANT_BCP_RFC9700_TOKEN_STORAGE. It hashes tokens at
-    # rest, which is the right end state, but it cannot read the tokens already
-    # stored — every live MCP connection would break and have to reconnect. It
-    # belongs in a deliberate migration, not in a deploy.
+    # DOT 3.4.1 resolves existing tokens by their SHA-256 checksum, so the
+    # oauth_server migration can redact legacy plaintext without reconnects.
+    # New issuance stores only that indexed checksum. A refresh grace period
+    # needs the old plaintext response and is incompatible with redaction.
+    "COMPLIANT_BCP_RFC9700_TOKEN_STORAGE": True,
+    "REFRESH_TOKEN_GRACE_PERIOD_SECONDS": 0,
 }
 
 

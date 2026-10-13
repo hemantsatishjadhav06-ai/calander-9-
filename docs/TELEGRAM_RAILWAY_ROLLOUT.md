@@ -12,10 +12,12 @@ Use the [current launch report](audit/LAUNCH_READINESS_2026-10-13.md) and
 [current release status](audit/RELEASE_STATUS_2026-10-13.json) for the 13 October
 review and observed rollout evidence.
 
-The public SM Bean health, landing and login pages are reachable. The Railway
-GraphQL endpoint is reachable. Railway, OpenRouter and fal secret bindings were
-saved after local verification; authenticated service IDs, deployment controls
-and deployed source must still be recorded by the live rollout. The user-confirmed target project is
+The public SM Bean health, landing and login pages are reachable. Authenticated
+inspection confirmed both existing services at `05ca828b` and held their automatic
+deployments. Matching encryption/storage credentials were preserved; safe host,
+proxy and OpenRouter configuration was staged without restarting them. Native
+PostgreSQL and consistent application backups were verified. Final deployed
+source/runtime receipts must still be recorded by the live rollout. The user-confirmed target project is
 `66526b2a-6a09-43d8-bedb-ecfdd37f8d8a`. Restrict changes to its SM Bean web and
 worker services; do not operate on the separate calander-6 project. The current
 cloud bindings do not establish that the services use the same credentials.
@@ -65,11 +67,12 @@ for production. Do not place a pre-deploy command in the shared `railway.toml`;
 both services would execute it. Do not put `/health/` in that shared file either:
 the worker serves no HTTP. Put `/health/` on the web service's own healthcheck.
 
-Apply the full migration graph. The current inspector requires nine cumulative
+Apply the full migration graph. The current inspector requires ten cumulative
 release migrations, including `telegram.0001_initial`,
 `telegram.0002_telegrammanagedbotreservation` and
-`studio.0005_private_transport_history`. It checks migration records, the actual
-private-history column and all 18 columns of the managed-bot reservation table;
+`studio.0005_private_transport_history` and `oauth_server.0001_redact_token_plaintext`.
+It checks migration records, the actual private-history column, all 18 columns
+of the managed-bot reservation table and zero nonblank OAuth-token counts;
 a migration record alone does not prove that schema is usable. Deploy web and worker from the same recorded
 merge/source SHA. Preserve the existing `SECRET_KEY` and `ENCRYPTION_KEY_SALT`
 and share the same existing values across services. Changing them breaks
@@ -135,7 +138,12 @@ python /app/tools/telegram_release_inspect.py --project /app \
 Replace both SHA placeholders with the same actual full commit. The inspector
 checks the manifest structure, committed source hashes and
 `RAILWAY_GIT_COMMIT_SHA` before importing application code. Fresh-manifest mode
-requires Telegram migration `0002` and its real reservation schema. Omitting
+uses schema v2 and 16 anchors, including the current settings and new security
+migrations. It requires Telegram migration `0002` and its real reservation
+schema, OAuth checksum-only storage with zero refresh grace, and zero nonblank
+raw access/refresh token counts. Drain old token issuers before collecting those
+counts; existing client-held tokens continue to authenticate by checksum.
+Historical backups retain their original data and must remain private. Omitting
 the manifest intentionally selects the historical `6cb392f` expectations and
 is unsuitable for this release. Do not rewrite the old anchor digests or disable
 verification to accept a new commit.

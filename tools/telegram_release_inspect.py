@@ -39,7 +39,17 @@ SOURCE_ANCHORS = {
     "apps/telegram/outbox.py": "16194bfa6248040462070aa7f0a2140f737c2464c64ae44bdf8c16161e1f4191",
     "apps/telegram/views.py": "eb02932f8af28af28be30d1961efc6810856dd0a6d8c2e276e7dd49a8fb64c4d",
 }
-SOURCE_MANIFEST_VERSION = 1
+CURRENT_SOURCE_ANCHORS = (
+    *SOURCE_ANCHORS,
+    "config/settings/base.py",
+    "apps/telegram/managed.py",
+    "apps/telegram/provisioning.py",
+    "apps/telegram/webhooks.py",
+    "apps/telegram/models.py",
+    "apps/telegram/migrations/0002_telegrammanagedbotreservation.py",
+    "apps/oauth_server/migrations/0001_redact_token_plaintext.py",
+)
+SOURCE_MANIFEST_VERSION = 2
 SOURCE_MANIFEST_TYPE = "sm_bean_release_source_manifest"
 REQUIRED_MIGRATIONS = [
     ("approvals", "0005_alter_approvalaction_action"),
@@ -51,7 +61,15 @@ REQUIRED_MIGRATIONS = [
     ("studio", "0005_private_transport_history"),
     ("telegram", "0001_initial"),
 ]
-CURRENT_RELEASE_MIGRATIONS = [*REQUIRED_MIGRATIONS, ("telegram", "0002_telegrammanagedbotreservation")]
+CURRENT_RELEASE_MIGRATIONS = [
+    *REQUIRED_MIGRATIONS,
+    ("telegram", "0002_telegrammanagedbotreservation"),
+    ("oauth_server", "0001_redact_token_plaintext"),
+]
+OAUTH_TOKEN_TABLES = {
+    "access": "oauth2_provider_accesstoken",
+    "refresh": "oauth2_provider_refreshtoken",
+}
 MANAGED_RESERVATION_COLUMNS = {
     "id",
     "workspace_id",
@@ -87,7 +105,7 @@ def validate_source_manifest(data: Any) -> dict:
         if not isinstance(data[field], str) or not re.fullmatch(r"[0-9a-f]{40}", data[field]):
             raise ValueError("Source manifest must name a full lowercase Git commit and tree SHA")
     anchors = data["source_anchors"]
-    if not isinstance(anchors, dict) or set(anchors) != set(SOURCE_ANCHORS):
+    if not isinstance(anchors, dict) or set(anchors) != set(CURRENT_SOURCE_ANCHORS):
         raise ValueError("Source manifest must cover exactly the required runtime source anchors")
     if any(not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest) for digest in anchors.values()):
         raise ValueError("Source manifest must contain full lowercase SHA-256 digests")
@@ -121,6 +139,53 @@ def managed_reservation_columns(db_connection: Any) -> set[str]:
             "AND table_name='telegram_managed_bot_reservation'"
         )
         return {row[0] for row in cursor.fetchall()}
+
+
+def oauth_storage_config_ready(configuration: Any) -> bool:
+    """Require the effective DOT settings, without coercing unsafe values."""
+    grace = configuration.REFRESH_TOKEN_GRACE_PERIOD_SECONDS
+    return configuration.COMPLIANT_BCP_RFC9700_TOKEN_STORAGE is True and type(grace) is int and grace == 0
+
+
+def oauth_token_storage_evidence(db_connection: Any) -> dict:
+    """Count exposed plaintext only; never retrieve credentials or checksums."""
+    evidence: dict[str, Any] = {"schema_ready": False, "counts": None, "row_visibility_complete": False}
+    with db_connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT c.table_name, c.column_name, t.table_type FROM information_schema.columns c "
+            "JOIN information_schema.tables t ON t.table_schema=c.table_schema AND t.table_name=c.table_name "
+            "WHERE c.table_schema='public' AND c.table_name IN (%s, %s)",
+            list(OAUTH_TOKEN_TABLES.values()),
+        )
+        columns: dict[str, set[str]] = {name: set() for name in OAUTH_TOKEN_TABLES.values()}
+        for table, column, kind in cursor.fetchall():
+            if table in columns and kind == "BASE TABLE":
+                columns[table].add(column)
+        missing = {
+            label: sorted({"token", "token_checksum"} - columns[table])
+            for label, table in OAUTH_TOKEN_TABLES.items()
+            if {"token", "token_checksum"} - columns[table]
+        }
+        evidence["missing_columns"] = missing
+        if missing:
+            return evidence
+        evidence["schema_ready"] = True
+        # Counts cannot certify all rows if the inspecting role sees an RLS
+        # subset. Fail closed rather than interpreting a filtered zero as safe.
+        cursor.execute(
+            "SELECT row_security_active('public.oauth2_provider_accesstoken'::regclass), "
+            "row_security_active('public.oauth2_provider_refreshtoken'::regclass)"
+        )
+        if any(cursor.fetchone()):
+            return evidence
+        evidence["row_visibility_complete"] = True
+        counts = {}
+        for label, table in OAUTH_TOKEN_TABLES.items():
+            # Names are fixed constants, not manifest/settings/user input.
+            cursor.execute(f'SELECT COUNT(*) FROM "public"."{table}" WHERE "token" IS DISTINCT FROM %s', [""])
+            counts[label] = cursor.fetchone()[0]
+        evidence["counts"] = counts
+        return evidence
 
 
 def main() -> int:
@@ -159,6 +224,8 @@ def main() -> int:
         parser.error("--workspace must be a valid workspace UUID")
     if not re.fullmatch(r"[0-9a-f]{40}", args.expected_deployment_commit):
         parser.error("--expected-deployment-commit must be a full lowercase Git SHA")
+    if not args.source_manifest and args.expected_deployment_commit != EXPECTED_COMMIT:
+        parser.error("A nonhistorical deployment commit requires a current --source-manifest")
     report = {
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "service": args.service,
@@ -167,7 +234,9 @@ def main() -> int:
         "reviewed_source_tree": reviewed_tree,
         "source_manifest_sha256": manifest_sha256,
         "source_manifest_origin": "explicit_manifest" if args.source_manifest else "embedded_historical",
+        "source_manifest_schema_version": SOURCE_MANIFEST_VERSION if args.source_manifest else None,
         "managed_bot_schema_required": bool(args.source_manifest),
+        "oauth_token_storage_required": bool(args.source_manifest),
         "expected_deployment_commit": args.expected_deployment_commit,
         "workspace_id": args.workspace,
         "target_week_start": "2026-10-19",
@@ -227,6 +296,7 @@ def main() -> int:
         from django.db.migrations.executor import MigrationExecutor
         from django.db.migrations.recorder import MigrationRecorder
         from django.utils import timezone as django_timezone
+        from oauth2_provider.settings import oauth2_settings
 
         from apps.approvals.actor import is_internal_approver
         from apps.common.background import _advisory_lock_key, task_health
@@ -253,6 +323,10 @@ def main() -> int:
             bool(settings.SECRET_KEY) and bool(getattr(settings, "ENCRYPTION_KEY_SALT", None)),
         )
         check("config.openrouter_saved", llm.provider_name() == "openrouter" and llm.is_configured())
+        oauth_config_ok = True
+        if args.source_manifest:
+            oauth_config_ok = oauth_storage_config_ready(oauth2_settings)
+            check("config.oauth_token_storage", oauth_config_ok)
         report["checks"].append(
             {
                 "check": "config.graphics_key_saved",
@@ -290,6 +364,7 @@ def main() -> int:
             pending = executor.migration_plan(executor.loader.graph.leaf_nodes())
             check("db.no_pending_migrations", not pending, pending_count=len(pending))
             managed_schema_ok = True
+            oauth_storage_ok = True
             if args.source_manifest:
                 columns = managed_reservation_columns(connection)
                 absent_columns = sorted(MANAGED_RESERVATION_COLUMNS - columns)
@@ -300,7 +375,14 @@ def main() -> int:
                     table_present=bool(columns),
                     missing_columns=absent_columns,
                 )
-            if missing or pending or not managed_schema_ok:
+                evidence = oauth_token_storage_evidence(connection)
+                check("db.oauth_token_schema", evidence["schema_ready"], missing_columns=evidence["missing_columns"])
+                check("db.oauth_token_row_visibility", evidence["row_visibility_complete"])
+                oauth_storage_ok = bool(
+                    evidence["counts"] is not None and all(count == 0 for count in evidence["counts"].values())
+                )
+                check("db.oauth_plaintext_redacted", oauth_storage_ok, nonblank_token_counts=evidence["counts"])
+            if missing or pending or not managed_schema_ok or not oauth_config_ok or not oauth_storage_ok:
                 return finish()
             with connection.cursor() as cursor:
                 cursor.execute(

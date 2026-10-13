@@ -30,7 +30,7 @@ def git_read(project: Path, *args: str) -> bytes:
 
 def generate_source_manifest(project: Path, reviewed_commit: str) -> dict:
     from tools.telegram_release_inspect import (
-        SOURCE_ANCHORS,
+        CURRENT_SOURCE_ANCHORS,
         SOURCE_MANIFEST_TYPE,
         SOURCE_MANIFEST_VERSION,
         validate_source_manifest,
@@ -42,7 +42,7 @@ def generate_source_manifest(project: Path, reviewed_commit: str) -> dict:
         raise ValueError("--source-commit must identify a commit, not a tree, tag, or blob")
     tree = git_read(project, "rev-parse", "--verify", f"{reviewed_commit}^{{tree}}").decode().strip()
     anchors = {}
-    for path in SOURCE_ANCHORS:
+    for path in CURRENT_SOURCE_ANCHORS:
         metadata = git_read(project, "ls-tree", reviewed_commit, "--", path).decode().split()
         if not metadata or metadata[0] not in ("100644", "100755") or metadata[1] != "blob":
             raise ValueError("Committed release source is missing a regular runtime anchor file")
