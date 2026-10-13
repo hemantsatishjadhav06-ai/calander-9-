@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_team
+from . import views, views_team, views_telegram
 
 app_name = "client_portal"
 
@@ -15,6 +15,10 @@ urlpatterns = [
     path("published/", views.portal_published, name="published"),
     path("activity/", views.portal_activity, name="activity"),
     path("reports/", views.portal_reports, name="reports"),
+    # Personal pairing stays inside the client's token-scoped portal.
+    path("telegram/", views_telegram.telegram_settings, name="telegram"),
+    path("telegram/pair/", views_telegram.telegram_pair, name="telegram_pair"),
+    path("telegram/unpair/", views_telegram.telegram_unpair, name="telegram_unpair"),
     # Talk to the team (views_team.py)
     path("team/", views_team.portal_team, name="team"),
     path("team/send/", views_team.portal_team_send, name="team_send"),

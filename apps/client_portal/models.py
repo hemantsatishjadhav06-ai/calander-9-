@@ -61,4 +61,4 @@ class MagicLinkToken(models.Model):
 
     @property
     def is_valid(self):
-        return not self.is_expired
+        return not self.is_expired and not self.is_consumed

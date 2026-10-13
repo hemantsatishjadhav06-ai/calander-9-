@@ -3,7 +3,8 @@
 Runs inside the production container (the release step calls it after
 ``migrate``) and prints one line per check — PASS, FAIL, BLOCKED (needs the
 owner: a credential, a connection, a payment) or INFO — so every deploy log
-says what actually works. It never fails the release.
+says what actually works. The default command reports without failing the
+release; ``--strict`` fails when a critical launch check does not pass.
 
 It is safe on production by construction:
 
@@ -28,7 +29,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 from django.utils import timezone
 
@@ -43,8 +44,13 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--skip-accounts", action="store_true", help="Skip the read-only account API calls.")
         parser.add_argument("--json", action="store_true", help="Also print a JSON summary line.")
+        parser.add_argument(
+            "--strict",
+            action="store_true",
+            help="Fail the launch gate when a critical check fails or remains unverified.",
+        )
 
-    def handle(self, *args, skip_accounts=False, json=False, **options):
+    def handle(self, *args, skip_accounts=False, json=False, strict=False, **options):
         self.results = []
         checks = [
             self.check_config,
@@ -59,11 +65,19 @@ class Command(BaseCommand):
             checks.append(self.check_accounts)
         checks.append(self.check_blog)
         checks.append(self.check_agency)
+        if strict:
+            checks.append(self.check_launch_evidence)
+            if skip_accounts:
+                self.record(
+                    "BLOCKED", "launch.account_identity", "Read-only live account identity verification was skipped."
+                )
         for check in checks:
             try:
                 check()
             except Exception as exc:  # a broken check is a failed check, not a failed release
-                self.record("FAIL", check.__name__, f"check crashed: {type(exc).__name__}: {exc}")
+                self.record(
+                    "FAIL", check.__name__, f"check crashed: {type(exc).__name__}; inspect protected application logs"
+                )
         counts = {k: sum(1 for r in self.results if r[0] == k) for k in ("PASS", "FAIL", "BLOCKED", "INFO")}
         self.stdout.write(
             f"live_verify: summary {counts['PASS']} passed, {counts['FAIL']} failed, "
@@ -73,6 +87,59 @@ class Command(BaseCommand):
             self.stdout.write(
                 "live_verify: json " + _json([{"result": r, "check": c, "detail": d} for r, c, d in self.results])
             )
+        if strict:
+            failures = [
+                check
+                for result, check, _detail in self.results
+                if result in {"FAIL", "BLOCKED"} and self._critical(check)
+            ]
+            if failures:
+                raise CommandError("Critical launch verification failed or remains unverified: " + ", ".join(failures))
+
+    @staticmethod
+    def _critical(check: str) -> bool:
+        if check.startswith(("blog.", "credentials.x", "credentials.linkedin", "credentials.threads", "webhooks.")):
+            return False
+        if check.startswith("accounts.") and check.rsplit(".", 1)[-1] in {
+            "x",
+            "linkedin_company",
+            "linkedin_personal",
+            "threads",
+            "youtube",
+            "tiktok",
+            "pinterest",
+        }:
+            return False
+        return check.startswith(
+            (
+                "config.",
+                "db.",
+                "storage.",
+                "worker.",
+                "brand.",
+                "agency.",
+                "credentials.facebook",
+                "credentials.instagram",
+                "accounts.",
+                "launch.",
+                "isolation.",
+                "gate.",
+                "workflow.",
+                "publish.",
+                "login.",
+                "dashboard.",
+                "check_config",
+                "check_database",
+                "check_storage",
+                "check_worker",
+                "check_brands",
+                "check_credentials",
+                "check_accounts",
+                "check_agency",
+                "check_launch",
+                "check_isolation",
+            )
+        )
 
     # ------------------------------------------------------------------
 
@@ -124,7 +191,9 @@ class Command(BaseCommand):
         self.record("PASS" if ok else "FAIL", "storage.round_trip", "write/read/delete in media storage")
 
     def check_worker(self):
-        from background_task.models import CompletedTask, Task
+        from background_task.models import Task
+
+        from apps.common.background import task_health
 
         recurring = set(Task.objects.filter(repeat__gt=0).values_list("task_name", flat=True))
         wanted = {n for n in recurring if n.endswith(("run_publish_cycle", "poll_and_publish", "publish_cycle"))}
@@ -133,8 +202,67 @@ class Command(BaseCommand):
             "worker.schedules",
             f"{len(recurring)} recurring tasks registered" + (f", publisher: {sorted(wanted)}" if wanted else ""),
         )
-        recent = CompletedTask.objects.filter(run_at__gte=timezone.now() - timedelta(minutes=30)).count()
-        self.record("PASS" if recent else "FAIL", "worker.heartbeat", f"{recent} tasks completed in the last 30 min")
+        for key, health in task_health().items():
+            self.record(
+                "PASS" if health["healthy"] else "BLOCKED",
+                f"worker.success.{key}",
+                f"{health['message']} Last success: {health['last_success_at'] or 'never'}",
+            )
+
+    def check_launch_evidence(self):
+        """Require actual saved processing evidence; this does not call a billable model."""
+        from apps.composer.models import PlatformPost
+        from apps.studio import autopilot, llm
+        from apps.studio.models import AgentRun
+
+        rows = list(autopilot.autopilot_settings())
+        self.record(
+            "PASS" if rows else "BLOCKED",
+            "launch.active_agency",
+            f"{len(rows)} eligible workspace(s) have automatic generation enabled",
+        )
+        cutoff = timezone.now() - timedelta(hours=24)
+        for row in rows:
+            blocker = autopilot.plan_blocker(row)
+            self.record(
+                "BLOCKED" if blocker else "PASS",
+                f"launch.configuration.{row.workspace_id}",
+                blocker or "Lead, connected destinations and budget are available.",
+            )
+            model_turn = AgentRun.objects.filter(
+                workspace=row.workspace, status=AgentRun.Status.SUCCEEDED, model=llm.model_id(), finished_at__gte=cutoff
+            ).exists()
+            self.record(
+                "PASS" if model_turn else "BLOCKED",
+                f"launch.model_evidence.{row.workspace_id}",
+                "A successful model turn is recorded in the last 24 hours."
+                if model_turn
+                else "No successful turn for the configured model is recorded; key presence alone is not runtime verification.",
+            )
+            delivered = (
+                PlatformPost.objects.filter(
+                    post__workspace=row.workspace,
+                    status=PlatformPost.Status.PUBLISHED,
+                    published_at__gte=cutoff,
+                    social_account__in=row.accounts.all(),
+                )
+                .exclude(platform_post_id="")
+                .filter(
+                    platform_extra___delivery_state__verification__in=[
+                        "provider_response",
+                        "provider_confirmation",
+                        "human_attestation",
+                    ]
+                )
+                .exists()
+            )
+            self.record(
+                "PASS" if delivered else "BLOCKED",
+                f"launch.delivery_evidence.{row.workspace_id}",
+                "A recent delivery receipt or human account inspection is recorded; inspect its native account and permalink."
+                if delivered
+                else "No recent recorded delivery for the selected accounts; complete the human-approved production pilot.",
+            )
 
     def check_brands(self):
         from apps.members.models import WorkspaceMembership
@@ -285,22 +413,29 @@ class Command(BaseCommand):
                 self.record(
                     "FAIL",
                     label,
-                    f"{account.account_name}: read-only API call failed: {type(exc).__name__}: {exc}"[:400],
+                    f"{account.account_name}: read-only API call failed ({type(exc).__name__}); reconnect or inspect protected provider logs",
                 )
 
     def check_agency(self):
         """The AI agency: its keys, its schedules, and the rule that agents never approve."""
         from background_task.models import Task
 
-        from apps.studio import guards, team
+        from apps.studio import guards, llm, team
 
         self.record("INFO", "agency.team", f"{len(team.AGENTS)} agents in {len(team.DEPARTMENTS)} departments")
-        claude = bool((getattr(settings, "ANTHROPIC_API_KEY", "") or "").strip())
+        configured = llm.is_configured()
+        provider = llm.provider_name()
         self.record(
-            "PASS" if claude else "BLOCKED",
-            "agency.anthropic_key",
-            "set" if claude else "ANTHROPIC_API_KEY is not set on this service: the agents cannot run",
+            "PASS" if configured else "BLOCKED",
+            f"agency.{provider}_key" if provider in {"anthropic", "openrouter"} else "agency.provider",
+            f"configured; model={llm.model_id()} (presence only, no paid API call)"
+            if configured
+            else llm.configuration_error(),
         )
+        if provider == "openrouter" and getattr(settings, "STUDIO_WEB_SEARCH", False):
+            self.record(
+                "INFO", "agency.web_research", "disabled: OpenRouter uses supplied brand facts; no live web research"
+            )
         fal = bool((getattr(settings, "FAL_KEY", "") or "").strip())
         self.record(
             "PASS" if fal else "INFO", "agency.fal_key", "set" if fal else "not set: graphics use the brand background"
@@ -353,7 +488,11 @@ class Command(BaseCommand):
                     f"HTTP {resp.status_code}, push={perms.get('push')}",
                 )
             except Exception as exc:
-                self.record("FAIL", f"blog.github.{site.repo}", f"{type(exc).__name__}: {exc}")
+                self.record(
+                    "FAIL",
+                    f"blog.github.{site.repo}",
+                    f"{type(exc).__name__}; inspect repository access and protected logs",
+                )
 
     def check_blog_seo(self, sites):
         """Search Console and IndexNow: configured or not, each website's connection, the SEO schedules."""

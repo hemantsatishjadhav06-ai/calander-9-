@@ -1,8 +1,12 @@
-"""Calling Claude for the Studio's agents.
+"""Provider-aware calls for the Studio's agents.
 
-Every agent is one Messages API request that must answer with JSON matching a
-Pydantic model (structured outputs, ``output_config.format``), so the
-pipeline never parses free text. The request:
+Anthropic remains the default. ``STUDIO_PROVIDER=openrouter`` uses an
+OpenAI-compatible adapter with its own key and namespaced model ID; no
+Anthropic-only parameters or credentials cross between providers.
+
+Every agent must answer with JSON matching a Pydantic model, regardless of
+provider, so the pipeline never trusts free text. The direct Anthropic
+Messages API request uses structured outputs (``output_config.format``) and:
 
 * uses ``settings.STUDIO_MODEL`` (default ``claude-opus-5-5``) with its
   thinking left on — it is adaptive and cannot be switched off on that model —
@@ -27,11 +31,14 @@ import io
 import logging
 import time
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from typing import Any
 
 import pydantic
 from django.conf import settings
+
+from apps.common.background import check_worker_lease
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +53,14 @@ MAX_TOKENS = 16000
 IMAGE_MAX_SIDE = 1024
 
 
-#: List prices in US dollars per million tokens (input, output, cache read), as
-#: published for each model in October 2026. Only used to show an estimate.
+#: Local USD-per-million-token estimation rates (input, output, cache read).
+#: This is not a live provider rate card; valid reported costs take precedence.
 PRICES = {
     "claude-opus-5-5": (4.0, 20.0, 0.20),
     "claude-sonnet-5-5": (2.0, 10.0, 0.20),
     "claude-haiku-5-5": (0.10, 0.50, 0.01),
     "claude-fable-5-1": (10.0, 50.0, 0.25),
+    "anthropic/claude-sonnet-4.5": (3.0, 15.0, 0.30),
 }
 #: A rough per-picture price for fal.ai's FLUX models at about 1.2 megapixels.
 PICTURE_PRICE = 0.03
@@ -70,23 +78,91 @@ WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_use
 WEB_SEARCH_PRICE = 0.01
 
 
-def estimate_cost(runs) -> float | None:
-    """Roughly what ``runs`` (AgentRun rows) cost, or None when a model has no known price."""
+def validated_provider_cost(value: Any) -> str | None:
+    """Normalize reported USD, rejecting malformed or excessive numeric metadata.
+
+    This is a per-request provider report, not an independently reconciled
+    invoice. The numeric limits protect arithmetic from hostile metadata;
+    they are not a model price or a spending limit. Zero is a valid report.
+    """
+    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+        return None
+    try:
+        raw = str(value).strip()
+    except (ValueError, OverflowError):
+        return None
+    if not raw or len(raw) > 64:
+        return None
+    try:
+        cost = Decimal(raw)
+    except InvalidOperation:
+        return None
+    exponent = cost.as_tuple().exponent
+    if (
+        not cost.is_finite()
+        or cost < 0
+        or cost.adjusted() > 12
+        or not isinstance(exponent, int)
+        or exponent < -18
+        or len(cost.as_tuple().digits) > 32
+    ):
+        return None
+    if not cost:
+        return "0"
+    rendered = format(cost, "f")
+    return rendered.rstrip("0").rstrip(".") if "." in rendered else rendered
+
+
+def _positive_count(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def cost_for_run(run, *, unknown_model_fallback: bool = False) -> Decimal | None:
+    """Reported provider cost, otherwise a token/picture/search estimate.
+
+    Unknown-model fallback uses the highest *component* rates in our small
+    price table. It cannot bound the price of an arbitrary unknown model.
+    """
     from .team import PICTURE_AGENTS
 
-    total = 0.0
-    for run in runs:
-        if run.agent in PICTURE_AGENTS:
-            total += PICTURE_PRICE if run.status == "succeeded" else 0.0
-            continue
-        if not (run.input_tokens or run.output_tokens):
-            continue
-        price = PRICES.get(run.model)
-        if price is None:
+    metadata = run.output if isinstance(run.output, dict) else {}
+    reported = validated_provider_cost(metadata.get("provider_cost_usd"))
+    if reported is not None:
+        return Decimal(reported)
+    if run.agent in PICTURE_AGENTS:
+        return Decimal(str(PICTURE_PRICE)) if run.status == "succeeded" else Decimal(0)
+    counts = tuple(_positive_count(value) for value in (run.input_tokens, run.output_tokens, run.cache_read_tokens))
+    searches = Decimal(str(WEB_SEARCH_PRICE)) * _positive_count(metadata.get("web_searches"))
+    if not any(counts):
+        return searches
+    price = PRICES.get(run.model)
+    if price is None:
+        if not unknown_model_fallback:
             return None
-        total += (run.input_tokens * price[0] + run.output_tokens * price[1] + run.cache_read_tokens * price[2]) / 1e6
-        total += WEB_SEARCH_PRICE * int((run.output or {}).get("web_searches", 0) or 0)
-    return total
+        price = (
+            max(rates[0] for rates in PRICES.values()),
+            max(rates[1] for rates in PRICES.values()),
+            max(rates[2] for rates in PRICES.values()),
+        )
+    return (
+        sum((Decimal(str(rate)) * count for rate, count in zip(price, counts, strict=True)), Decimal(0))
+        / Decimal(1_000_000)
+        + searches
+    )
+
+
+def estimate_cost(runs) -> float | None:
+    """Reported/estimated total, or None for an unpriced model without reported cost."""
+    total = Decimal(0)
+    for run in runs:
+        cost = cost_for_run(run)
+        if cost is None:
+            return None
+        total += cost
+    return float(total)
 
 
 class StudioAgentError(Exception):
@@ -98,10 +174,18 @@ class StudioAgentError(Exception):
     spend can be recorded against the budget.
     """
 
-    def __init__(self, message: str, *, usage: tuple[str, int, int, int] | None = None, web_searches: int = 0):
+    def __init__(
+        self,
+        message: str,
+        *,
+        usage: tuple[str, int, int, int] | None = None,
+        web_searches: int = 0,
+        provider_cost_usd: str | None = None,
+    ):
         super().__init__(message)
         self.usage = usage
         self.web_searches = web_searches
+        self.provider_cost_usd = validated_provider_cost(provider_cost_usd)
 
 
 class NotConfiguredError(StudioAgentError):
@@ -117,14 +201,34 @@ class AgentResult[T: pydantic.BaseModel]:
     cache_read_tokens: int
     duration_ms: int
     fallback_used: bool = False
+    provider_cost_usd: str | None = None
+
+
+def provider_name() -> str:
+    return (getattr(settings, "STUDIO_PROVIDER", "anthropic") or "anthropic").strip().lower()
+
+
+def configuration_error() -> str:
+    """An actionable setup message, without ever exposing a credential."""
+    provider = provider_name()
+    if provider not in {"anthropic", "openrouter"}:
+        return "STUDIO_PROVIDER must be anthropic or openrouter on the web and worker services."
+    key_name = "OPENROUTER_API_KEY" if provider == "openrouter" else "ANTHROPIC_API_KEY"
+    if not (getattr(settings, key_name, "") or "").strip():
+        return f"The AI Studio needs {key_name} on the SM Bean web and worker services. Ask your admin to add it."
+    if provider == "openrouter" and "/" not in model_id():
+        return "OpenRouter needs a namespaced STUDIO_MODEL, such as anthropic/claude-sonnet-4.5."
+    return ""
 
 
 def is_configured() -> bool:
-    return bool((getattr(settings, "ANTHROPIC_API_KEY", "") or "").strip())
+    return not configuration_error()
 
 
 def model_id() -> str:
-    return (getattr(settings, "STUDIO_MODEL", "") or DEFAULT_MODEL).strip()
+    configured = (getattr(settings, "STUDIO_MODEL", "") or "").strip()
+    default = "anthropic/claude-sonnet-4.5" if provider_name() == "openrouter" else DEFAULT_MODEL
+    return configured or default
 
 
 def effort_for(default: str) -> str:
@@ -138,8 +242,14 @@ def _client(api_key: str, timeout: float):
     import anthropic
 
     # The SDK retries connection errors, 408, 409, 429 and 5xx twice with
-    # backoff on its own; anything still failing after that is reported.
-    return anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=2)
+    # backoff on its own. Fence those internal retries too, not only the
+    # top-level Studio turn, when the single-worker session lease was lost.
+    http_client = anthropic.DefaultHttpxClient(event_hooks={"request": [_check_request_lease]})
+    return anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=2, http_client=http_client)
+
+
+def _check_request_lease(_request) -> None:
+    check_worker_lease()
 
 
 def get_client():
@@ -154,13 +264,24 @@ def image_block(content: bytes, *, max_side: int = IMAGE_MAX_SIDE) -> dict[str, 
     """A base64 JPEG image block, downscaled so its long edge is at most ``max_side``."""
     from PIL import Image, ImageOps
 
-    with Image.open(io.BytesIO(content)) as opened:
-        image = ImageOps.exif_transpose(opened)
-        if image.mode != "RGB":
-            image = image.convert("RGB")
-        image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
-        out = io.BytesIO()
-        image.save(out, format="JPEG", quality=85)
+    from apps.media_library.services import ImageTooLargeError, open_image
+
+    try:
+        # Draft JPEGs and enforce the decode budget before EXIF transposition
+        # loads and copies pixels. Non-JPEGs retain the full-size pixel guard.
+        with open_image(io.BytesIO(content), draft_size=(max_side, max_side)) as opened:
+            image = ImageOps.exif_transpose(opened)
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            image.save(out, format="JPEG", quality=85)
+    except ImageTooLargeError as exc:
+        raise StudioAgentError(
+            "This photo is too large to process safely. Resize it and choose the smaller photo."
+        ) from exc
+    except (OSError, ValueError) as exc:
+        raise StudioAgentError("This photo could not be read. Choose a valid JPEG, PNG or WebP image.") from exc
     data = base64.standard_b64encode(out.getvalue()).decode("ascii")
     return {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": data}}
 
@@ -213,7 +334,9 @@ def _fallback_used(response) -> bool:
 
 
 def web_search_enabled() -> bool:
-    return bool(getattr(settings, "STUDIO_WEB_SEARCH", False))
+    # Anthropic's server-side web tool is not an OpenRouter chat parameter.
+    # Keep research off until there is a separately verified adapter for it.
+    return provider_name() == "anthropic" and bool(getattr(settings, "STUDIO_WEB_SEARCH", False))
 
 
 def run_agent[T: pydantic.BaseModel](
@@ -225,17 +348,21 @@ def run_agent[T: pydantic.BaseModel](
     effort: str,
     max_tokens: int = MAX_TOKENS,
 ) -> AgentResult[T]:
-    """Ask Claude for one agent's turn and return its validated answer.
+    """Ask the configured provider for one turn and return its validated answer.
 
     ``system`` is the agent's instructions followed by the brand block (the
     last block carries the cache breakpoint); ``content`` is this turn's user
     message — text and image blocks. ``max_tokens`` above the usual ceiling
-    streams the response.
+    streams the response. The OpenRouter adapter maps these content blocks
+    and the output schema to its native OpenAI-compatible request.
     """
     if not is_configured():
-        raise NotConfiguredError(
-            "The AI Studio needs ANTHROPIC_API_KEY on the SM Bean web and worker services "
-            "(an API key from console.anthropic.com). Ask your admin to add it."
+        raise NotConfiguredError(configuration_error())
+    if provider_name() == "openrouter":
+        from . import openrouter
+
+        return openrouter.run_agent(
+            agent=agent, system=system, content=content, output_type=output_type, effort=effort, max_tokens=max_tokens
         )
     import anthropic
 
@@ -255,6 +382,7 @@ def run_agent[T: pydantic.BaseModel](
     started = time.monotonic()
     try:
         messages = get_client().beta.messages
+        check_worker_lease()
         if max_tokens > STREAM_ABOVE_TOKENS:
             with messages.stream(**request) as stream:
                 response = stream.get_final_message()
@@ -323,8 +451,10 @@ def research(*, agent: str, system: list[dict[str, Any]], question: str, effort:
     A long search can pause its turn (``stop_reason == "pause_turn"``); the turn is
     resumed by sending the assistant's content back, a few times at most.
     """
+    if provider_name() != "anthropic":
+        raise StudioAgentError("Web research is unavailable through OpenRouter. Use supplied, verified brand facts.")
     if not is_configured():
-        raise NotConfiguredError("Web research needs ANTHROPIC_API_KEY.")
+        raise NotConfiguredError(configuration_error())
     import anthropic
 
     messages: list[dict[str, Any]] = [{"role": "user", "content": [text_block(question)]}]
@@ -342,6 +472,7 @@ def research(*, agent: str, system: list[dict[str, Any]], question: str, effort:
     started = time.monotonic()
     for _attempt in range(MAX_RESEARCH_CONTINUATIONS + 1):
         try:
+            check_worker_lease()
             response = get_client().messages.create(**request, messages=messages)
         except anthropic.APIError as exc:
             logger.warning("Studio %s: research call failed: %s", agent, exc)

@@ -4,11 +4,11 @@ Polls itself every 5 seconds while the account manager is answering, then stops 
 response without hx-trigger replaces this element).
 {% endcomment %}
 {% load tz %}
-<div id="{{ thread.dom_id }}-messages" role="log" aria-live="polite" aria-label="Messages in {{ thread.title|lower }}"
+<div id="{{ thread.dom_id }}-messages" data-thread-log role="log" aria-live="off" tabindex="-1" aria-label="Messages in {{ thread.title|lower }}"
      class="mt-3 space-y-2.5 {% if thread.full_page %}max-h-[60vh]{% else %}max-h-96{% endif %} overflow-y-auto pr-1"
-     x-data x-init="$el.scrollTop = $el.scrollHeight"
-     {% if thread.polling and thread.messages_url %}hx-get="{{ thread.messages_url }}" hx-trigger="every 5s" hx-target="this" hx-select="unset" hx-swap="outerHTML"{% endif %}>
+     {% if thread.polling and thread.messages_url %}hx-get="{{ thread.messages_url }}" hx-trigger="{{ thread.poll_interval }}" hx-sync="closest [data-agency-thread]:drop" hx-target="this" hx-select="unset" hx-swap="outerHTML"{% endif %}>
     {% for m in thread.messages %}
+    <div data-thread-message-id="{{ m.pk }}">
     {% if m.author_kind == 'system' %}
     <p class="text-xs text-center px-2 py-1 break-words {% if m.is_internal %}text-amber-900 bg-amber-50 border border-amber-200 rounded-lg{% else %}text-stone-600{% endif %}">
         {% if m.is_internal %}<span class="font-semibold">Internal note · </span>{% endif %}{{ m.body }}
@@ -21,12 +21,14 @@ response without hx-trigger replaces this element).
         </p>
         <p class="text-sm text-stone-800 mt-0.5 whitespace-pre-line break-words">{{ m.body }}</p>
         {% if m.action_status == 'started' %}
-        <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-800">The team is on it</span>{% if m.job_id %} <a href="{% url 'studio:job' workspace_id=thread.workspace.id job_id=m.job_id %}" class="text-xs text-stone-700 underline">See the job<span class="sr-only"> behind this reply</span></a>{% endif %}</p>
+        <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-800">The team is on it</span>{% if m.created_brief %} <a href="{% url 'studio:detail' workspace_id=thread.workspace.id brief_id=m.created_brief.pk %}" class="text-xs text-stone-700 underline">Creative progress and next action</a>{% elif m.job_id %} <a href="{% url 'studio:job' workspace_id=thread.workspace.id job_id=m.job_id %}" class="text-xs text-stone-700 underline">See the job<span class="sr-only"> behind this reply</span></a>{% endif %}</p>
         {% elif m.action_status == 'needs_human' %}
         <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800">Waiting for a person</span></p>
         {% elif m.action_status == 'declined' %}
         <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-700">Not possible right now</span></p>
         {% endif %}
+        {% if m.creative_request %}{% include "studio/partials/thread_creative_brief.html" %}{% endif %}
+        {% if m.created_brief %}{% include "studio/partials/thread_draft.html" with draft=m.created_brief %}{% endif %}
     </div>
     {% elif m.is_internal %}
     <div class="ml-6 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
@@ -46,13 +48,14 @@ response without hx-trigger replaces this element).
         <p class="text-sm text-stone-800 mt-0.5 whitespace-pre-line break-words">{{ m.body }}</p>
     </div>
     {% endif %}
+    </div>
     {% empty %}
-    <p class="text-sm text-stone-600 py-3">{% if thread.is_client_thread %}No messages with the client yet.{% else %}Ask a question, or say what you'd like changed. The account manager answers in a minute or two and gets the right agent on it.{% endif %}</p>
+    <p class="text-sm text-stone-600 py-3">{% if thread.is_client_thread %}No messages with the client yet.{% else %}Tell us what you want to post. The team asks focused questions, shows a brief and source facts for your confirmation, then brings the copy and graphic back here for review.{% endif %}</p>
     {% endfor %}
     {% if thread.polling %}
     <p class="flex items-center gap-2 text-xs text-stone-700">
         <span class="w-1.5 h-1.5 rounded-full bg-indigo-700 animate-pulse motion-reduce:animate-none" aria-hidden="true"></span>
-        The account manager is writing a reply…
+        {% if thread.poll_interval == 'every 30s' %}Checking scheduled delivery and platform results…{% else %}The account manager is writing a reply, or the creative team is preparing your draft…{% endif %}
     </p>
     {% endif %}
 </div>

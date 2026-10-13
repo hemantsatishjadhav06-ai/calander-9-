@@ -4,6 +4,11 @@ Production: **https://sm-bean-production-eb50.up.railway.app** (Railway project
 `sm-bean`, service `sm-bean` + `sm-bean-worker`, Postgres, Redis, bucket
 `sm-bean-media`). Deploys from `main` of `hemantsatishjadhav06-ai/calander-9-`.
 
+Updated 12 October 2026. The operating changes below are prepared locally;
+their deployment to Railway and a real-provider pilot remain unverified.
+Railway credentials and an authenticated production session are unavailable.
+No actual production post was approved or published during this work.
+
 ## The two brand workspaces
 
 | | Neopolis | More Space |
@@ -25,7 +30,12 @@ picked (masked). Set `BRAND_APPROVER_EMAIL` on the `sm-bean` service to pin it.
 Draft → **Awaiting approval** (`pending_review`) → **Approved** → **Scheduled** →
 Publishing → **Published** or **Failed**.
 
-* Only an owner/manager **signed in to the dashboard** can approve. The Agent
+The Agency conversation also distinguishes **Delivery outcome unknown** and
+**Expired — needs review**. Those are durable holds, not ordinary retryable
+failures. Human recovery requires account inspection and is bound to the exact
+attempt/content; it does not send a post.
+
+* Only a currently authorized internal approver **signed in to the dashboard** can approve. The Agent
   API, MCP clients, the client portal and background jobs can create drafts and
   submit them for review — never approve, never schedule unapproved content.
 * An approval covers the exact text, title, first comment, media files (and
@@ -60,7 +70,10 @@ Publishing → **Published** or **Failed**.
 
 * **Publish → Calendar** shows scheduled posts; **Drafts** lists drafts with
   their *Proposed* time (the seven-day plan); **Queue** lists what is scheduled;
-  **Sent** lists published and failed posts with the error and a retry option.
+  **Sent** lists published and failed posts. Inspect the Agency per-account
+  receipt before recovery. An uncertain outcome requires checking the native
+  account, while an expired time requires fresh review and future approval;
+  neither permits an ordinary automatic resend.
 * Dragging a post on the calendar as the approver approves the new time.
 
 ### Messages, comments and results
@@ -98,19 +111,24 @@ departments (see **Agency → Team**). Everything they make waits for an owner o
 manager under **Waiting for you** — nothing is approved, scheduled or
 published by an agent, in any workspace.
 
-* **One post from one line**: type the idea at the top of the agency home and
-  press **Brief the team**. Two to four minutes later it is waiting with a
-  proposed time; **Approve & schedule for <time>** is one click.
-* **Same look as the best work**: *Match the look of the last post* is on by
-  default. **Agency → Creative memory** shows which past creatives worked best
-  for each account; mark the designer's best ones (or upload them) as
-  *Learn from this* and the art director and prompt engineer follow them.
+* **Guided post creation**: use **Start guided post** on the agency home. Answer
+  focused questions, inspect website/channel evidence, verified facts and photo
+  provenance, then explicitly confirm the brief before creative work starts.
+  Review the finished revision before **Approve & schedule**. Generation and
+  delivery times are not guaranteed; **Publish now** acknowledges queueing.
+* **Creative direction and memory**: choose brand/fresh style and keep, replace
+  or clear the selected photo while revising. **Creative memory** separates
+  designer-selected references from fresh measured performers. Measured rankings
+  require recent successful captures and mature same-account history; a chosen
+  design reference is inspiration, not evidence of results.
 * **Autopilot** (**Agency → Autopilot**, workspace owners): set posts per
   week, the accounts, the content pillars and when to plan (Friday 16:00 by
   default, workspace time). The planner fills next week's open slots, the team
   makes every post, and the lead approver gets one notification when they are
-  ready. Set a monthly budget; the team stops starting new work when the
-  month's estimate reaches it.
+  ready. Assign a different eligible backup for deadline reminders, checked
+  every 15 minutes. Set a monthly soft budget; the team stops starting new work
+  when recorded/estimated spend reaches it, but in-flight and external charges
+  are not reserved or guaranteed to stay below an invoice ceiling.
 * **Ask the team**: on the agency home and on every post. Ask a question or
   for a change and the account manager gets the right agent on it. Tick
   *Internal note* for a note clients never see. Clients have the same thread
@@ -149,12 +167,20 @@ published by an agent, in any workspace.
    on the service, then in the Meta app → Webhooks subscribe
    `…/webhooks/facebook/` with the same token (Page: feed, messages; Instagram:
    comments, messages).
-5. **The agency** — set `ANTHROPIC_API_KEY` (console.anthropic.com) on **both**
-   `sm-bean` and `sm-bean-worker`; the agents run in the worker. `FAL_KEY` is
-   already set on both, so graphics get painted pictures. The agency home says
-   on its page what is missing. Then in each brand workspace open **Agency →
-   Autopilot**, choose the accounts, posts per week, pillars and a monthly
-   budget, and switch it on.
+5. **The agency** — for OpenRouter, set `STUDIO_PROVIDER=openrouter`,
+   `OPENROUTER_API_KEY` securely, `STUDIO_MODEL=anthropic/claude-sonnet-4.5`,
+   and `STUDIO_WEB_SEARCH=false` on **both** `sm-bean` and `sm-bean-worker`.
+   Confirm the model is available to this OpenRouter account and has credits.
+   Do not put an OpenRouter key in `ANTHROPIC_API_KEY`. Direct Anthropic remains
+   available with `STUDIO_PROVIDER=anthropic` and `ANTHROPIC_API_KEY`.
+   The agents run in the worker. Verify `FAL_KEY` and actual image-service
+   access, or supply an owner-attested project photo and inspect the explicit
+   background fallback. Historical key presence does not establish current
+   credits or successful generation. Enter current **Verified facts** with
+   sources and expiry, and attest authentic project assets to their current
+   file/project. Then open **Agency → Autopilot**, choose accounts, posts per
+   week, pillars, lead, backup, soft budget and maximum delivery delay, and
+   switch it on. The On badge is a saved setting, not live certification.
 6. **LinkedIn Company Pages** — at developer.linkedin.com create an app tied to
    a Company Page, add the **Community Management API** product (LinkedIn
    reviews it), and list the redirect URLs
@@ -179,10 +205,13 @@ published by an agent, in any workspace.
    each brand's blog list choose **Connect Google Search Console** with a Google
    account that can see that website's property.
 
+For the reviewed automation gaps, required activation evidence and real-platform
+pilot, see [CTO agency readiness](CTO_AGENCY_READINESS.md).
+
 ## Checking the live deployment
 
-Every release runs `python manage.py release --setup-brands --verify` before the
-new code takes traffic. The deploy log of the `sm-bean` service then contains
+The configured release uses `python manage.py release --setup-brands --verify`
+before new code takes traffic. The deploy log of the `sm-bean` service contains
 `live_verify:` lines — PASS / FAIL / BLOCKED (waiting on the owner) — covering
 configuration, storage, the worker, both brand workspaces, every connected
 account's identity (read-only API calls), workspace isolation, and the full
@@ -190,23 +219,64 @@ approval → publish path on a throwaway fixture that is rolled back (provider
 stubbed; nothing is posted). Run it any time with
 `python manage.py live_verify`.
 
+**Default verification is best effort:** FAIL/BLOCKED output does not by itself
+stop the release. Opt in to the critical launch gate with:
+
+```bash
+python manage.py live_verify --strict
+python manage.py release --setup-brands --strict-verify
+```
+
+These are alternatives: `--strict-verify` implies verification and stops on
+critical failed/unverified checks. Strict verification requires task-specific
+recent success, an eligible active agency and recent recorded model/delivery
+evidence; skipping account checks remains blocked. Optional blog/X/LinkedIn
+setup is separate from the critical Meta pilot. A human-attested receipt is
+recorded evidence, not an independent provider lookup. Inspect its verification
+type, native account and permalink. Fixture checks and strict success do not
+certify real graphics, credits, a delivery SLA or the complete live pilot.
+
+Before the first singleton-lease rollout, pause and drain the old baseline
+worker: that code does not participate in the new lease. Reserve one extra
+PostgreSQL connection for the worker's dedicated session lease. Deploy the same
+reviewed code to both services, apply every new migration and start one
+`python manage.py run_worker` process with an appropriate restart policy.
+An overlapping new worker must fail before clearing task locks. `--keep-locks`
+opts out of the singleton lease; do not use it as an overlap workaround without
+a separately tested multi-worker plan. Verify publisher, agency and confirmation
+success individually after restart, and obtain fresh approvals for affected
+queued content/destinations. See [CTO readiness](CTO_AGENCY_READINESS.md).
+
 ## Rollback
 
 The release step takes a database backup **before** migrating
 (`backups/db-<timestamp>.tar.gz` in the media bucket; the log names it).
 
-1. **Code only (normal case):** Railway → `sm-bean` → Deployments → the previous
-   successful deployment → **Rollback**; do the same for `sm-bean-worker`. This
-   release's migrations only *add* columns (nullable or with database
-   defaults) and the AI Studio's own tables, so the previous code runs against
-   the migrated database as is. Posts the Studio already handed over stay
-   ordinary posts.
-2. **Turn the gate off without a deploy:** Settings → Approvals → untick
-   *Require dashboard approval* (owner only). Posts keep their approvals.
-3. **Data restore (only if data was damaged):** with the matching code deployed,
-   run on the web service
-   `python manage.py restore_database backups/db-<timestamp>.tar.gz --yes-wipe-data`.
-   This replaces current data with the backup.
-4. **Websites:** Netlify → the site → Deploys → pick the previous deploy →
-   **Publish deploy**. Blog posts can also be removed by reverting their commit
-   in the website repository and re-running its publish workflow.
+Do not assume older code is safe merely because it can read the migrated
+database. Reverting to `05ca828` removes source/expiry guards, durable
+uncertain-delivery holds and the worker lease. Never turn approval enforcement
+off as a recovery shortcut.
+
+1. **Pause and drain first:** stop automatic generation and drain/stop the worker
+   before changing either service. Keep approval enforcement on. Record every
+   in-flight, unknown, expired and held destination with its native identity,
+   attempt and content. Inspect accounts before any retry; stopping a process
+   does not prove a platform write failed.
+2. **Choose a reviewed compatible rollback:** prefer a fix or version retaining
+   the new guards. Verify both services, migration compatibility and unresolved
+   parent-post holds. Keep older code's publisher disabled if it cannot enforce
+   those holds. Do not clear them, bulk-restamp approvals, or allow automatic
+   resend to restore a green status.
+3. **Preserve data:** additive schema does not justify destructive reverse
+   migrations. Keep claim/outcome/heartbeat/hold records and audit history.
+   Restore a database only for confirmed damage under a separately approved
+   recovery plan, after taking a current backup and accounting for external
+   social writes since the selected backup. A restore replaces current data and
+   cannot undo already published posts; never run it as a routine code rollback.
+4. **Resume deliberately:** inspect held/unknown outcomes through the human
+   recovery controls, review current facts/content and approve fresh future
+   times where needed. Restart one compatible worker and confirm each required
+   task's success. Complete a controlled delivery check before unattended work.
+5. **Websites:** a reviewed previous Netlify deploy or website commit can restore
+   site content. Verify the resulting live canonical URL and existing social
+   links; reverting a site does not reconcile or remove social publications.

@@ -42,7 +42,7 @@ def generate_magic_link(workspace, client_user, created_by):
         workspace_role=WorkspaceMembership.WorkspaceRole.CLIENT,
     ).first()
 
-    if not membership:
+    if not membership or not client_user.is_active or workspace.is_archived:
         raise ValueError("User does not have client role in this workspace.")
 
     # The previously issued tokens are NOT invalidated yet. They used to be
@@ -122,7 +122,7 @@ def peek_magic_link(token_string):
     except MagicLinkToken.DoesNotExist:
         return None
 
-    if token.is_expired or token.is_consumed:
+    if token.is_expired or token.is_consumed or not _token_access_is_current(token):
         return None
 
     return token
@@ -142,7 +142,22 @@ def magic_link_problem(token_string):
         return "used"
     if token.is_expired:
         return "expired"
+    if not _token_access_is_current(token):
+        return "invalid"
     return None
+
+
+def _token_access_is_current(token):
+    """A link never outlives its client's access or turns into a staff login."""
+    return (
+        token.user.is_active
+        and not token.workspace.is_archived
+        and WorkspaceMembership.objects.filter(
+            user_id=token.user_id,
+            workspace_id=token.workspace_id,
+            workspace_role=WorkspaceMembership.WorkspaceRole.CLIENT,
+        ).exists()
+    )
 
 
 def consume_magic_link(token_string):
@@ -157,11 +172,11 @@ def consume_magic_link(token_string):
     except MagicLinkToken.DoesNotExist:
         return None, None, False
 
-    if token.is_expired:
+    if token.is_expired or not _token_access_is_current(token):
         return None, None, False
 
     # Atomic single-use: only the request that flips is_consumed False->True wins.
-    consumed = MagicLinkToken.objects.filter(pk=token.pk, is_consumed=False).update(
+    consumed = MagicLinkToken.objects.filter(pk=token.pk, is_consumed=False, expires_at__gt=timezone.now()).update(
         is_consumed=True,
         last_used_at=timezone.now(),
     )
@@ -180,7 +195,7 @@ def revoke_magic_link(token_id, workspace):
     ).update(expires_at=timezone.now())
 
 
-def create_portal_session(request, user, workspace):
+def create_portal_session(request, user, workspace, *, token):
     """Create a portal session for the client user.
 
     Logs in the user and sets portal-specific session variables.
@@ -188,5 +203,6 @@ def create_portal_session(request, user, workspace):
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     request.session["is_portal_session"] = True
     request.session["portal_workspace_id"] = str(workspace.id)
+    request.session["portal_token_id"] = str(token.id)
     # 30-day session
     request.session.set_expiry(30 * 24 * 60 * 60)

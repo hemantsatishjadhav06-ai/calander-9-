@@ -74,6 +74,7 @@ urlpatterns = [
     path("workspace/<uuid:workspace_id>/analytics/", include("apps.analytics.urls")),
     path("webhooks/", include("apps.inbox.webhook_urls")),
     path("webhooks/", include("apps.common.webhook_urls")),
+    path("webhooks/telegram/", include("apps.telegram.urls_webhooks")),
     # Agent API (Phase 2) — programmatic access for external AI agents.
     # Authenticated via scoped bearer tokens issued from the Organization
     # → API Keys page. OpenAPI docs at /api/v1/docs. ``agent_api.urls``
@@ -120,6 +121,7 @@ urlpatterns = [
     ),
     # AI Studio: the agent team that turns a small idea into a post for approval
     path("workspace/<uuid:workspace_id>/studio/", include("apps.studio.urls")),
+    path("workspace/<uuid:workspace_id>/agency/telegram/", include("apps.telegram.urls")),
     # Client Portal (Stream F)
     path("portal/", include("apps.client_portal.urls")),
     path("notifications/", include("apps.notifications.urls")),

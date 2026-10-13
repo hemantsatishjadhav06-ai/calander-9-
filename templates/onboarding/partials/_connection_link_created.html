@@ -12,12 +12,13 @@
     </div>
 
     <!-- Copyable link -->
-    <div style="display: flex; gap: 8px; align-items: center;" x-data="{ copied: false }">
+    <div style="display: flex; gap: 8px; align-items: center;" x-data="{ copied: false, copyFailed: false }">
         <input
             type="text"
             value="{{ link_url }}"
             readonly
             id="connection-link-url"
+            x-ref="connectionLink"
             aria-label="Connection link"
             style="
                 flex: 1;
@@ -31,7 +32,8 @@
             "
         >
         <button
-            @click="navigator.clipboard.writeText('{{ link_url }}'); copied = true; setTimeout(() => copied = false, 2000)"
+            type="button"
+            @click="copyFailed = false; if (navigator.clipboard) { navigator.clipboard.writeText($refs.connectionLink.value).then(() => { copied = true; setTimeout(() => copied = false, 2000); }).catch(() => { $refs.connectionLink.select(); copyFailed = true; }); } else { $refs.connectionLink.select(); copyFailed = true; }"
             style="
                 padding: 9px 14px;
                 font-size: 0.8125rem; font-weight: 600;
@@ -45,6 +47,7 @@
             <span x-show="copied" x-cloak style="color: var(--success-700);">Copied!</span>
         </button>
     </div>
+    <p x-show="copyFailed" x-cloak role="status" style="font-size: 0.75rem; margin-top: 8px;">Select and copy the link manually.</p>
 
     <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 8px;">
         Expires {{ link.expires_at|date:"M j, Y" }}. Share this link with your client so they can connect their social accounts.

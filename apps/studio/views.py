@@ -94,13 +94,17 @@ def _detail_redirect(brief):
 
 
 def _setup(workspace) -> dict:
+    from .readiness import operational_readiness
+
     accounts = studio_accounts(workspace)
     return {
         "claude_ready": llm.is_configured(),
+        "configuration_error": llm.configuration_error(),
         "pictures_ready": images.is_configured(),
         "has_accounts": bool(accounts),
         "has_linkedin": any(a.platform.startswith("linkedin") for a in accounts),
         "model": llm.model_id(),
+        "operational": operational_readiness(workspace),
     }
 
 
@@ -170,28 +174,54 @@ def index(request, workspace_id):
 @ratelimit(key="user", rate="10/m", method="POST", block=True)
 @require_POST
 def create(request, workspace_id):
+    from . import chat
+
     workspace = _workspace(request, workspace_id)
     form = BriefForm(request.POST, workspace=workspace)
+    # The interview can ask for destinations; the legacy endpoint still
+    # validates explicit account/photo choices before they enter the thread.
+    if not request.POST.getlist("accounts"):
+        form.fields.pop("accounts")
     if not llm.is_configured():
-        messages.error(request, "The AI Studio isn't set up yet: ANTHROPIC_API_KEY is missing on the server.")
+        messages.error(request, "Your AI team needs setup. Ask the workspace owner to check Agency readiness.")
         return redirect("studio:index", workspace_id=workspace.id)
     if not budget.can_spend(workspace):
         messages.error(request, budget.over_budget_message(workspace))
         return redirect("studio:index", workspace_id=workspace.id)
     if not form.is_valid():
         return render(request, "studio/index.html", _index_context(request, workspace, form), status=400)
-    brief = services.create_brief(
-        workspace,
-        request.user,
-        idea=form.cleaned_data["idea"],
-        notes=form.cleaned_data["notes"],
-        goal=form.cleaned_data["goal"],
-        accounts=form.cleaned_data["accounts"],
-        style_lock=form.cleaned_data["style_lock"],
-        source_picture=form.cleaned_data["source_picture"],
+    parts = ["Create a post and ask me for any missing information.\n" + form.cleaned_data["idea"]]
+    if form.cleaned_data["notes"]:
+        parts.append("My direction and constraints: " + form.cleaned_data["notes"])
+    if form.cleaned_data["goal"]:
+        parts.append("My goal: " + form.cleaned_data["goal"])
+    accounts = form.cleaned_data.get("accounts", [])
+    if accounts:
+        parts.append(
+            "My chosen destinations: "
+            + "; ".join(f"{a.account_name or a.account_handle} ({a.platform}), account {a.pk}" for a in accounts)
+        )
+    picture = form.cleaned_data["source_picture"]
+    body = "\n\n".join(parts)
+    try:
+        chat.clean_body(body)
+        conversation = chat.general_conversation(workspace, created_by=request.user)
+        posted = chat.post_message(
+            conversation,
+            request.user,
+            body,
+            reference_id=str(picture.pk) if picture is not None else "",
+            style_mode="brand" if request.POST.get("style_lock") else "",
+        )
+    except chat.ChatError as exc:
+        form.add_error(None, str(exc))
+        return render(request, "studio/index.html", _index_context(request, workspace, form), status=400)
+    messages.info(
+        request,
+        posted.note
+        or "Your request is in Ask the team. Answer the questions, check the source facts, then confirm before a draft is generated.",
     )
-    messages.success(request, "The team is on it. This usually takes two to four minutes.")
-    return _detail_redirect(brief)
+    return redirect(chat.staff_thread_url(conversation))
 
 
 def _team_progress(brief):
@@ -248,7 +278,7 @@ def _detail_context(request, workspace, brief, *, feedback_form=None, schedule_f
     runs = list(brief.runs.all().order_by("started_at"))
     review = brief.review_notes or {}
     post_copy = brief.post_copy or {}
-    caption = post_copy.get("caption", "")
+    caption = brief.caption
     first_account = (
         platform_posts[0].social_account if platform_posts else next(iter(brief.social_accounts.all()), None)
     )
@@ -456,7 +486,7 @@ def save_idea(request, workspace_id, brief_id, concept_id):
 def retry(request, workspace_id, brief_id):
     workspace, brief = _get_brief(request, workspace_id, brief_id)
     if not llm.is_configured():
-        messages.error(request, "ANTHROPIC_API_KEY is missing on the server, so the team can't run.")
+        messages.error(request, llm.configuration_error())
         return _detail_redirect(brief)
     if not budget.can_spend(workspace):
         messages.error(request, budget.over_budget_message(workspace))

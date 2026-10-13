@@ -114,6 +114,8 @@ LOCAL_APPS = [
     # AI Studio: a team of Claude agents that turns a small idea into a post
     # (angles, copy, a designed graphic) and hands it to the approval workflow.
     "apps.studio",
+    # Client-specific messaging alongside the canonical agency/approval workflows.
+    "apps.telegram",
     "theme",
 ]
 
@@ -181,6 +183,7 @@ if REDIS_URL:
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": REDIS_URL,
+            "OPTIONS": {"socket_connect_timeout": 3, "socket_timeout": 3},
         },
         # Shared and out of the web process entirely; Redis's own eviction
         # policy bounds it, so no MAX_ENTRIES here (LocMem-only anyway).
@@ -188,6 +191,7 @@ if REDIS_URL:
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": REDIS_URL,
             "KEY_PREFIX": "filmstrip",
+            "OPTIONS": {"socket_connect_timeout": 3, "socket_timeout": 3},
         },
     }
 else:
@@ -216,6 +220,8 @@ DATABASES = {
 # at most five persistent connections per container.
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
+if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
+    DATABASES["default"].setdefault("OPTIONS", {}).setdefault("connect_timeout", 5)
 
 # Custom user model
 AUTH_USER_MODEL = "accounts.User"
@@ -258,6 +264,7 @@ STORAGES = {
 
 # Media files
 STORAGE_BACKEND = env("STORAGE_BACKEND")
+MEDIA_STORAGE_PERSISTENT = env.bool("MEDIA_STORAGE_PERSISTENT", default=False)
 if STORAGE_BACKEND.lower() == "s3":
     # Object storage hands out its own presigned URLs; this process never
     # serves MEDIA_ROOT, so the env var is deliberately ignored here.
@@ -728,15 +735,18 @@ GSC_CLIENT_SECRET = env("GSC_CLIENT_SECRET", default="")
 # once the post is live. Empty: off.
 INDEXNOW_KEY = env("INDEXNOW_KEY", default="")
 
-# AI Studio (apps.studio): the agent team runs on Claude through the Anthropic
-# API. Empty ANTHROPIC_API_KEY: the Studio explains it is not set up and runs
-# nothing. Set it on the web AND worker services — the agents run in the worker.
-# STUDIO_MODEL is the Claude model every agent uses; STUDIO_EFFORT, when set,
+# AI Studio: choose Anthropic (default) or OpenRouter explicitly, and set the
+# matching key on the web AND worker services. Keys are never interchangeable.
+# Empty STUDIO_MODEL selects the provider's default: claude-opus-5-5 for
+# Anthropic, anthropic/claude-sonnet-4.5 for OpenRouter.
+# STUDIO_EFFORT, when set,
 # overrides each agent's own effort level (low | medium | high | xhigh | max).
 # STUDIO_FALLBACKS opts into Anthropic's server-side fallback model when the
 # requested model's safety classifiers decline a request (beta).
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
-STUDIO_MODEL = env("STUDIO_MODEL", default="claude-opus-5-5")
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
+STUDIO_PROVIDER = env("STUDIO_PROVIDER", default="anthropic")
+STUDIO_MODEL = env("STUDIO_MODEL", default="")
 STUDIO_EFFORT = env("STUDIO_EFFORT", default="")
 STUDIO_TIMEOUT = env.float("STUDIO_TIMEOUT", default=300.0)
 STUDIO_FALLBACKS = env.bool("STUDIO_FALLBACKS", default=True)
@@ -746,6 +756,18 @@ STUDIO_WEB_SEARCH = env.bool("STUDIO_WEB_SEARCH", default=False)
 # Autopilot runs at most this many briefs at once across all workspaces, so
 # the single worker keeps publishing on time and nothing looks stuck.
 AGENCY_MAX_ACTIVE_BRIEFS = env.int("AGENCY_MAX_ACTIVE_BRIEFS", default=3)
+
+# Per-workspace bot credentials are entered by an owner and encrypted in the
+# database. Enable registration only after this release's webhook is reachable.
+TELEGRAM_WEBHOOK_BASE_URL = env("TELEGRAM_WEBHOOK_BASE_URL", default="")
+TELEGRAM_WEBHOOK_READY = env.bool("TELEGRAM_WEBHOOK_READY", default=False)
+TELEGRAM_MANAGED_BOTS_ENABLED = env.bool("TELEGRAM_MANAGED_BOTS_ENABLED", default=True)
+TELEGRAM_UPDATE_MAX_BYTES = env.int("TELEGRAM_UPDATE_MAX_BYTES", default=262144)
+# Transient content expires; semantic delivery/audit identities remain.
+TELEGRAM_UPDATE_RETENTION_DAYS = env.int("TELEGRAM_UPDATE_RETENTION_DAYS", default=7)
+TELEGRAM_DELIVERY_RETENTION_DAYS = env.int("TELEGRAM_DELIVERY_RETENTION_DAYS", default=30)
+TELEGRAM_ACTION_RETENTION_DAYS = env.int("TELEGRAM_ACTION_RETENTION_DAYS", default=30)
+TELEGRAM_PAIRING_RETENTION_DAYS = env.int("TELEGRAM_PAIRING_RETENTION_DAYS", default=1)
 
 # Webhook verification
 FACEBOOK_WEBHOOK_VERIFY_TOKEN = env("FACEBOOK_WEBHOOK_VERIFY_TOKEN", default="")
@@ -820,10 +842,12 @@ OAUTH2_PROVIDER = {
     # family rather than issuing from it. ROTATE_REFRESH_TOKEN above is what
     # makes a replay detectable in the first place.
     "REFRESH_TOKEN_REUSE_PROTECTION": True,
-    # NOT enabled: COMPLIANT_BCP_RFC9700_TOKEN_STORAGE. It hashes tokens at
-    # rest, which is the right end state, but it cannot read the tokens already
-    # stored — every live MCP connection would break and have to reconnect. It
-    # belongs in a deliberate migration, not in a deploy.
+    # DOT 3.4.1 resolves existing tokens by their SHA-256 checksum, so the
+    # oauth_server migration can redact legacy plaintext without reconnects.
+    # New issuance stores only that indexed checksum. A refresh grace period
+    # needs the old plaintext response and is incompatible with redaction.
+    "COMPLIANT_BCP_RFC9700_TOKEN_STORAGE": True,
+    "REFRESH_TOKEN_GRACE_PERIOD_SECONDS": 0,
 }
 
 

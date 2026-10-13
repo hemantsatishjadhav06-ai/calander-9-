@@ -125,10 +125,12 @@ def propose(
     zone = _zone(workspace)
     start = max(after or timezone.now(), timezone.now() + LEAD_TIME)
     taken = taken_times(workspace, exclude_brief=exclude_brief, exclude_post_id=exclude_post_id)
+    # A post targets every selected account. A slot on one account is usable
+    # only when the other destinations are also free at that time.
+    occupied = taken | {when for account in accounts for when in _occupied_datetimes(account)}
     best: Proposal | None = None
     for account in accounts:
         try:
-            occupied = _occupied_datetimes(account) | taken
             candidates = [c for c in _next_slot_datetimes(account, start, count=60) if c not in occupied]
         except Exception:
             logger.exception("Scheduler: could not read posting slots for account %s", account.pk)
@@ -150,11 +152,11 @@ def propose(
     if best is not None:
         return best
 
-    local = (timezone.now() + LEAD_TIME).astimezone(zone)
+    local = start.astimezone(zone)
     candidate = local.replace(hour=10, minute=0, second=0, microsecond=0)
     if candidate <= local:
         candidate += timedelta(days=1)
-    while candidate.weekday() >= 5 or candidate in taken:
+    while candidate.weekday() >= 5 or candidate in occupied:
         candidate += timedelta(days=1)
     return Proposal(
         candidate, f"{_DAYS[candidate.weekday()]} 10:00 — no posting slots are set up, so a weekday morning."

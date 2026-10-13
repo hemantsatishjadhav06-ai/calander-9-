@@ -138,7 +138,11 @@ def stage_rank(job: AgencyJob) -> str:
             "source": CreativeInsight.Source.STUDIO if design else CreativeInsight.Source.EXTERNAL,
             "score": item.percentile,
             "ratio": item.ratio,
-            "metrics": {"metric": item.metric, "value": item.value},
+            "metrics": {
+                "metric": item.metric,
+                "value": item.value,
+                "captured_at": item.captured_at.isoformat() if item.captured_at else "",
+            },
             "features": features,
             "caption": caption[:4000],
             "published_at": item.published_at,
@@ -165,6 +169,11 @@ def stage_rank(job: AgencyJob) -> str:
         platform_post__isnull=False,
         published_at__lt=timezone.now() - performance.LOOKBACK,
     ).delete()[0]
+    # Stale evidence cannot keep its former performance rank. The person's
+    # reference mark and visual description survive an analytics outage.
+    CreativeInsight.objects.filter(workspace=workspace, platform_post__isnull=False).exclude(
+        platform_post_id__in=[item.platform_post_id for item in items]
+    ).update(score=None, ratio=None)
     engine.update_state(job, ranked=ranked, scored=scored)
     if ranked:
         summary = (
@@ -221,13 +230,9 @@ def _candidates(workspace) -> tuple[list[CreativeInsight], list[CreativeInsight]
         .select_related("media_asset")
         .order_by("-created_at")
     )
-    top = list(
-        CreativeInsight.objects.filter(
-            workspace=workspace, is_reference=False, score__isnull=False, media_asset__isnull=False
-        )
-        .select_related("media_asset")
-        .order_by("-score", "-published_at")[:TOP_FOR_CURATOR]
-    )
+    from .. import memory
+
+    top = [i for i in memory.best_performers(workspace, limit=TOP_FOR_CURATOR) if i.media_asset_id]
     show = [i for i in references if i.described_at is None][:MAX_REFERENCES] + [
         i for i in top if i.described_at is None
     ]
@@ -252,11 +257,10 @@ def _viewable(content: bytes) -> bool:
 def learned_lines(workspace, notes: str = "") -> list[str]:
     """A few plain lines for the agency home's "What the team learned" (``dashboard.learned``)."""
     lines = []
-    best = (
-        CreativeInsight.objects.filter(workspace=workspace, is_reference=False, ratio__isnull=False)
-        .order_by("-ratio", "-published_at")
-        .first()
-    )
+    from .. import memory
+
+    ranked = memory.best_performers(workspace, limit=TOP_FOR_CURATOR)
+    best = max(ranked, key=lambda insight: insight.ratio or 0) if ranked else None
     if best is not None and best.ratio and best.ratio >= 1.2:
         from ..reports import network_name
 

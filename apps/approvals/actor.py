@@ -1,10 +1,11 @@
 """Who is acting on content right now.
 
 The approval gate needs to know whether a change comes from a person in the
-dashboard or from something else: the Agent API, an MCP client, the client
-portal, or the background worker. Only a person in the dashboard who holds an
-internal approver role may approve content, or approve a change to when it
-goes out. Everything else may prepare drafts and ask for review, nothing more.
+dashboard, a verified paired Telegram callback, the Agent API, an MCP client,
+the client portal, or the background worker. Internal human approvers may
+approve exact reviewed content and times through the dashboard or through an
+authenticated, opted-in, one-use Telegram review. Automation only prepares
+drafts and asks for review; clients only complete the client sign-off stage.
 
 ``ApprovalActorMiddleware`` records the channel for every request. Code that
 runs outside a request (the worker, management commands, tests) sees the
@@ -22,6 +23,7 @@ DASHBOARD = "dashboard"
 API = "api"
 PORTAL = "portal"
 SYSTEM = "system"
+TELEGRAM = "telegram"
 
 # Paths that never act as the dashboard, whatever cookie came with them.
 # ``/api/`` serves both the Agent API and the MCP endpoint; ``/oauth/`` is the
@@ -37,6 +39,7 @@ _NON_DASHBOARD_PREFIXES = (
 class Actor:
     user: Any | None
     channel: str
+    telegram_proof: tuple | None = None
 
     @property
     def is_dashboard(self) -> bool:
@@ -95,14 +98,23 @@ def is_internal_approver(user, workspace) -> bool:
     """
     if user is None or not getattr(user, "is_authenticated", False) or workspace is None:
         return False
+    from apps.accounts.models import User
     from apps.members.models import WorkspaceMembership
+
+    if not User.objects.filter(pk=user.pk, is_active=True).exists():
+        return False
 
     membership = (
         WorkspaceMembership.objects.filter(user=user, workspace=workspace).select_related("custom_role").first()
     )
     if membership is None:
         return False
-    if membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT and membership.custom_role is None:
+    if membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT:
+        return False
+    if membership.custom_role and (
+        membership.custom_role.organization_id != workspace.organization_id
+        or (membership.custom_role.permissions or {}).get("client_facing")
+    ):
         return False
     return bool(membership.effective_permissions.get("approve_posts", False))
 
@@ -113,3 +125,33 @@ def dashboard_approver(workspace):
     if actor.is_dashboard and is_internal_approver(actor.user, workspace):
         return actor.user
     return None
+
+
+@contextmanager
+def acting_as_telegram(action, *, nonce: str, telegram_user_id: int, chat_id: int, bot_id: int):
+    """Use a validated one-use callback; the channel remains explicitly Telegram.
+
+    This context alone is insufficient: the approval gate rechecks the active
+    pairing, action, opt-in and exact reviewed content before every stamp.
+    """
+    from apps.studio.guards import forbid_in_agent_work
+
+    forbid_in_agent_work("act as a verified Telegram approver")
+    proof = (action.pk, nonce, telegram_user_id, chat_id, bot_id)
+    token = _current.set(Actor(user=action.user_link.user, channel=TELEGRAM, telegram_proof=proof))
+    try:
+        yield
+    finally:
+        _current.reset(token)
+
+
+def verified_human_approver(workspace):
+    """A dashboard approver or a fresh, paired, explicitly opted-in Telegram human."""
+    actor = current_actor()
+    if actor.channel != TELEGRAM:
+        return dashboard_approver(workspace)
+    if actor.telegram_proof is None:
+        return None
+    from apps.telegram.actions import verified_approver
+
+    return verified_approver(workspace, actor)

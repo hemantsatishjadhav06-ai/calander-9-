@@ -183,6 +183,30 @@ class TestReadOnlyEndpoints:
 
 @pytest.mark.django_db
 class TestCreatePost:
+    def test_duplicate_media_ids_do_not_partially_update_a_post(self, client_with_token, social_account, workspace):
+        from apps.composer.models import PostMedia
+        from apps.media_library.models import MediaAsset
+
+        asset = MediaAsset.objects.create(
+            organization=workspace.organization,
+            workspace=workspace,
+            filename="existing.png",
+            file="existing.png",
+            media_type="image",
+        )
+        post = Post.objects.create(workspace=workspace, caption="Original")
+        PlatformPost.objects.create(post=post, social_account=social_account, status="draft")
+        original = PostMedia.objects.create(post=post, media_asset=asset, position=0)
+        response = client_with_token.patch(
+            f"/api/v1/posts/{post.id}",
+            data=json.dumps({"caption": "Changed", "media_asset_ids": [str(asset.id), str(asset.id)]}),
+            content_type="application/json",
+        )
+        assert response.status_code == 422, response.content
+        post.refresh_from_db()
+        assert post.caption == "Original"
+        assert list(post.media_attachments.values_list("id", flat=True)) == [original.id]
+
     def test_create_draft(self, client_with_token, social_account):
         r = client_with_token.post(
             "/api/v1/posts/",
@@ -323,6 +347,46 @@ class TestInternalNotesVisibility:
 
 @pytest.mark.django_db
 class TestIdempotency:
+    def test_finalize_failure_rolls_back_the_post_before_retry(self, client_with_token, social_account):
+        from unittest.mock import patch
+
+        from apps.api.models import IdempotencyRecord
+
+        body = {
+            "social_account_id": str(social_account.id),
+            "caption": "Retry me once.",
+            "action": "schedule",
+            "scheduled_at": (timezone.now() + timedelta(hours=1)).isoformat(),
+            "idempotency_key": "response-failure",
+        }
+        with (
+            patch("apps.api.routers.posts.finalize_idempotent_response", side_effect=RuntimeError("cache failed")),
+            pytest.raises(RuntimeError, match="cache failed"),
+        ):
+            client_with_token.post("/api/v1/posts/", data=json.dumps(body), content_type="application/json")
+        assert not Post.objects.exists()
+        assert not PlatformPost.objects.exists()
+        assert not IdempotencyRecord.objects.filter(key="response-failure").exists()
+
+        retry = client_with_token.post("/api/v1/posts/", data=json.dumps(body), content_type="application/json")
+        assert retry.status_code == 201, retry.content
+        assert Post.objects.count() == 1
+        assert PlatformPost.objects.filter(status="scheduled").count() == 1
+
+    def test_a_database_audit_failure_does_not_abort_post_creation(self, client_with_token, social_account):
+        from unittest.mock import patch
+
+        # Invalid inet data fails inside PostgreSQL, marking its transaction
+        # aborted unless the audit helper rolls back its own savepoint.
+        with patch("apps.api.middleware._client_ip", return_value="invalid IP"):
+            response = client_with_token.post(
+                "/api/v1/posts/",
+                data=json.dumps({"social_account_id": str(social_account.id), "caption": "Audited best-effort."}),
+                content_type="application/json",
+            )
+        assert response.status_code == 201, response.content
+        assert Post.objects.count() == 1
+
     def test_same_key_same_body_replays(self, client_with_token, social_account):
         body = {
             "social_account_id": str(social_account.id),

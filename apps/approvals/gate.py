@@ -1,6 +1,6 @@
 """The approval gate: nothing goes out in an enforced workspace unless an
-internal approver approved exactly that content, for exactly that time, in the
-dashboard.
+internal human approver approved exactly that content and time through the
+dashboard or an authenticated, paired, opted-in Telegram review callback.
 
 A workspace opts in with ``Workspace.require_dashboard_approval``. From then on:
 
@@ -8,12 +8,14 @@ A workspace opts in with ``Workspace.require_dashboard_approval``. From then on:
   what will be published — text, title, first comment, media files and their
   order and alt text, per-channel overrides and format, and the destination
   account — plus the publish time the approver saw. Only an internal approver
-  acting in the dashboard can do that (:mod:`apps.approvals.actor`). The Agent
+  acting through the dashboard or a fresh verified Telegram callback can do
+  that (:mod:`apps.approvals.actor`). The Agent
   API, MCP clients, the client portal and the background worker cannot.
 * Entering ``scheduled`` or ``publishing`` requires a stamp that still matches
   the content and the time. An approver who reschedules in the dashboard
   approves the new time as they do it; anyone else moving the time needs a
-  fresh approval.
+  fresh approval. Telegram proofs retain their own audit channel and never
+  masquerade as dashboard sessions.
 * Editing anything the fingerprint covers, or moving the time without an
   approver, withdraws the approval and sends the channel back to review
   (:func:`revalidate_post`, run when the edit commits).
@@ -30,12 +32,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import uuid
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .actor import current_actor, dashboard_approver
+from .actor import current_actor, verified_human_approver
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +57,9 @@ _SAME_TIME = timedelta(seconds=59)
 
 #: ``platform_extra`` keys the publisher writes back after a publish. They are
 #: results, not inputs, so they are not part of what was approved.
-_RESULT_EXTRA_KEYS = frozenset({"permalink", "url", "post_url", "publish_id", "container_id", "media_id"})
+_RESULT_EXTRA_KEYS = frozenset(
+    {"permalink", "url", "post_url", "publish_id", "container_id", "media_id", "_delivery_state"}
+)
 
 
 class ApprovalRequired(ValueError):
@@ -73,9 +79,63 @@ def _iso(value):
     return value.isoformat() if value else None
 
 
+def _referenced_media(pp) -> dict:
+    """Bind separately published thumbnails/covers to their current bytes.
+
+    The publisher resolves these IDs outside PostMedia. Missing, unreadable or
+    foreign references retain an explicit unavailable marker, never an old
+    cached identity; human approval rejects that marker.
+    """
+    from apps.media_library.models import MediaAsset
+
+    identities = {}
+    visible = MediaAsset.objects.for_workspace_with_shared(pp.post.workspace_id, pp.post.workspace.organization_id)
+    limit = getattr(settings, "MEDIA_LIBRARY_MAX_IMAGE_SIZE", 20 * 1024 * 1024)
+    for key in ("thumbnail_asset_id", "cover_image_asset_id"):
+        value = (pp.platform_extra or {}).get(key)
+        if not value:
+            continue
+        unavailable = {"asset": str(value), "unavailable": True}
+        try:
+            asset_id = uuid.UUID(str(value))
+        except (ValueError, TypeError, AttributeError):
+            identities[key] = unavailable
+            continue
+        asset = visible.filter(pk=asset_id).first()
+        if asset is None or not asset.file:
+            identities[key] = unavailable
+            continue
+        digest, total = hashlib.sha256(), 0
+        try:
+            with asset.file.open("rb") as source:
+                for chunk in source.chunks():
+                    total += len(chunk)
+                    if total > limit:
+                        break
+                    digest.update(chunk)
+        except Exception:
+            identities[key] = unavailable
+            continue
+        if total == 0 or total > limit:
+            identities[key] = unavailable
+            continue
+        identities[key] = {
+            "asset": str(asset.pk),
+            "workspace": str(asset.workspace_id),
+            "organization": str(asset.organization_id),
+            "file": asset.file.name,
+            "version": str(asset.current_version_id),
+            "media_type": asset.media_type,
+            "bytes": total,
+            "sha256": digest.hexdigest(),
+        }
+    return identities
+
+
 def fingerprint(pp) -> str:
     """Hash of everything that will be published for this channel."""
     post = pp.post
+    account = pp.social_account
     media = []
     for pm in post.media_attachments.select_related("media_asset").order_by("position", "id"):
         asset = pm.media_asset
@@ -91,6 +151,12 @@ def fingerprint(pp) -> str:
     extra = {k: v for k, v in (pp.platform_extra or {}).items() if k not in _RESULT_EXTRA_KEYS}
     payload = {
         "destination": str(pp.social_account_id),
+        "destination_identity": {
+            "workspace": str(account.workspace_id),
+            "platform": account.platform,
+            "native_id": str(account.account_platform_id or ""),
+            "instance_url": account.instance_url or "",
+        },
         "title": post.title or "",
         "caption": post.caption or "",
         "first_comment": post.first_comment or "",
@@ -101,6 +167,11 @@ def fingerprint(pp) -> str:
         "format": extra,
         "media": media,
     }
+    references = _referenced_media(pp)
+    if references:
+        # Existing approvals without separate thumbnails/covers keep their
+        # original fingerprint; only affected visuals need fresh review.
+        payload["referenced_media"] = references
     blob = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
@@ -185,7 +256,11 @@ def check_write(pp, loaded_status) -> None:
 
 
 def _stamp_on_approve(pp, workspace) -> None:
-    approver = dashboard_approver(workspace)
+    approver = verified_human_approver(workspace)
+    if any(item.get("unavailable") for item in _referenced_media(pp).values()):
+        raise ApprovalRequired(
+            "The selected thumbnail or cover is unavailable in this workspace. Choose it again before approval."
+        )
     current = fingerprint(pp)
     if approver is None:
         # The client's sign-off in a two-stage workflow confirms an internal
@@ -193,6 +268,17 @@ def _stamp_on_approve(pp, workspace) -> None:
         if pp.status == "pending_client" and pp.approved_fingerprint == current:
             return
         raise ApprovalRequired("Only an approver signed in to the dashboard can approve content in this workspace.")
+    from apps.studio import trust
+
+    for brief in pp.post.studio_briefs.select_related("workspace", "workspace__organization", "source_picture").filter(
+        status__in=["ready", "approved"]
+    ):
+        if not brief.trust_snapshot:
+            brief.trust_snapshot = trust.capture(brief)
+            brief.save(update_fields=["trust_snapshot", "updated_at"])
+        reason = trust.blocker(brief)
+        if reason:
+            raise ApprovalRequired(reason)
     pp.approved_fingerprint = current
     pp.approved_revision = _current_revision(pp.post)
     pp.approved_by = approver
@@ -216,7 +302,7 @@ def _require_for_schedule(pp, workspace) -> None:
     when = effective_publish_at(pp)
     if _same_time(when, pp.approved_publish_at):
         return
-    approver = dashboard_approver(workspace)
+    approver = verified_human_approver(workspace)
     if approver is None or when is None:
         raise ApprovalRequired(
             "The publish time differs from the approved one. An approver must approve the new time in the dashboard."
@@ -238,6 +324,11 @@ def publish_blocker(pp) -> str | None:
 
     Pure check — no actor, no re-stamping: the worker is never an approver.
     """
+    from apps.studio.trust import post_blocker
+
+    trust_error = post_blocker(pp.post)
+    if trust_error:
+        return trust_error
     if not enforced(pp.post.workspace):
         return None
     if not pp.approved_fingerprint:
@@ -323,7 +414,7 @@ def revalidate_post(post_id) -> list:
         elif fingerprint(pp) != pp.approved_fingerprint:
             reason = "the content changed after approval"
         elif pp.status == "scheduled" and not _same_time(effective_publish_at(pp), pp.approved_publish_at):
-            approver = dashboard_approver(post.workspace)
+            approver = verified_human_approver(post.workspace)
             if approver is not None and effective_publish_at(pp) is not None:
                 _approve_time(pp, approver)
                 continue

@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from django.core.files import File
 from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connection
+from django.db import connection, transaction
 
 
 class Command(BaseCommand):
@@ -41,7 +41,11 @@ class Command(BaseCommand):
 
     def _backup(self) -> str:
         stamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
-        with connection.cursor() as cursor:
+        # A backup must represent one database snapshot. Under PostgreSQL's
+        # default READ COMMITTED isolation, every COPY can see a later state,
+        # producing an archive with children whose parents were never dumped.
+        with transaction.atomic(), connection.cursor() as cursor:
+            cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
             cursor.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")
             tables = [row[0] for row in cursor.fetchall()]
             raw = cursor.cursor  # psycopg 3 cursor
@@ -51,12 +55,18 @@ class Command(BaseCommand):
                 counts = {}
                 with tarfile.open(tmp_path, "w:gz") as tar:
                     for table in tables:
-                        buf = io.BytesIO()
-                        with raw.copy(f'COPY "{table}" TO STDOUT WITH (FORMAT csv, HEADER true)') as copy:
-                            for chunk in copy:
-                                buf.write(chunk)
-                        counts[table] = raw.rowcount
-                        self._add(tar, f"{table}.csv", buf.getvalue())
+                        # Media metadata and audit tables can grow large. Spool
+                        # each table to disk instead of holding it in RAM.
+                        with tempfile.TemporaryFile() as buf:
+                            quoted_table = connection.ops.quote_name(table)
+                            with raw.copy(f"COPY {quoted_table} TO STDOUT WITH (FORMAT csv, HEADER true)") as copy:
+                                for chunk in copy:
+                                    buf.write(chunk)
+                            counts[table] = raw.rowcount
+                            info = tarfile.TarInfo(f"{table}.csv")
+                            info.size = buf.tell()
+                            buf.seek(0)
+                            tar.addfile(info, buf)
                     manifest = {
                         "created_at": stamp,
                         "commit": os.environ.get("RAILWAY_GIT_COMMIT_SHA", ""),

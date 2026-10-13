@@ -35,6 +35,15 @@ def create_comment(post, author, body, visibility, parent_id=None, attachment=No
     """
     if attachment and attachment.size > MAX_ATTACHMENT_SIZE:
         raise ValueError("Attachment exceeds 5MB limit.")
+    if visibility not in PostComment.Visibility.values:
+        raise ValueError("Invalid comment visibility.")
+    membership = WorkspaceMembership.objects.filter(user=author, workspace=post.workspace).first()
+    if (
+        membership
+        and membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT
+        and visibility != PostComment.Visibility.EXTERNAL
+    ):
+        raise ValueError("Clients can only create external comments.")
 
     parent_comment = None
     if parent_id:
@@ -43,6 +52,14 @@ def create_comment(post, author, body, visibility, parent_id=None, attachment=No
             post=post,
             deleted_at__isnull=True,
         ).first()
+        if parent_comment is None:
+            raise ValueError("Parent comment not found.")
+        if (
+            membership
+            and membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT
+            and parent_comment.visibility != PostComment.Visibility.EXTERNAL
+        ):
+            raise ValueError("Parent comment not found.")
 
     comment = PostComment.objects.create(
         post=post,
@@ -57,7 +74,7 @@ def create_comment(post, author, body, visibility, parent_id=None, attachment=No
     workspace = post.workspace
     mentions = MENTION_REGEX.findall(body)
     if mentions:
-        _notify_mentions(mentions, post, author, workspace, body)
+        _notify_mentions(mentions, post, author, workspace, body, visibility=visibility)
 
     return comment
 
@@ -136,10 +153,15 @@ def get_comments_for_post(post, user):
         user=user,
         workspace=workspace,
     ).first()
+    if membership is None:
+        return PostComment.objects.none()
+    is_client = membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT
 
     active_replies = PostComment.objects.filter(
         deleted_at__isnull=True,
     ).select_related("author")
+    if is_client:
+        active_replies = active_replies.filter(visibility=PostComment.Visibility.EXTERNAL)
 
     qs = (
         PostComment.objects.filter(
@@ -155,18 +177,20 @@ def get_comments_for_post(post, user):
     )
 
     # Clients only see external comments
-    if membership and membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT:
+    if is_client:
         qs = qs.filter(visibility=PostComment.Visibility.EXTERNAL)
 
     return qs
 
 
-def _notify_mentions(mentions, post, author, workspace, body):
+def _notify_mentions(mentions, post, author, workspace, body, *, visibility):
     """Send notifications to @mentioned workspace members."""
     # Build lookup of display names / email prefixes → user
     memberships = WorkspaceMembership.objects.filter(
         workspace=workspace,
     ).select_related("user")
+    if visibility == PostComment.Visibility.INTERNAL:
+        memberships = memberships.exclude(workspace_role=WorkspaceMembership.WorkspaceRole.CLIENT)
 
     name_to_user = {}
     for m in memberships:

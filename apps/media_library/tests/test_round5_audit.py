@@ -106,6 +106,30 @@ class FolderNameInjectionTests(MediaBase):
 
 
 class UploadAndFilterEdgeTests(MediaBase):
+    def test_incomplete_crop_is_rejected_without_creating_a_version(self):
+        asset = self._asset()
+        url = reverse("media_library:asset_edit", kwargs={"workspace_id": self.ws.id, "asset_id": asset.id})
+        response = self.client.post(url, {"crop_x": "0"})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(asset.versions.exists())
+
+    def test_edit_output_limit_is_enforced_in_workspace_and_shared_library(self):
+        for shared in (False, True):
+            asset = self._asset(workspace=None if shared else "ws")
+            url = (
+                reverse("media_library_org:shared_asset_edit", kwargs={"asset_id": asset.id})
+                if shared
+                else reverse("media_library:asset_edit", kwargs={"workspace_id": self.ws.id, "asset_id": asset.id})
+            )
+            for operations in (
+                {"crop_x": "0", "crop_y": "0", "crop_width": "1000000000", "crop_height": "1000000000"},
+                {"resize_width": "10000", "resize_height": "10000"},
+            ):
+                with self.subTest(shared=shared, operations=operations):
+                    response = self.client.post(url, operations)
+                    self.assertEqual(response.status_code, 400)
+                    self.assertFalse(asset.versions.exists())
+
     def test_over_quota_is_reported_not_a_500(self):
         url = reverse("media_library:upload", kwargs={"workspace_id": self.ws.id})
         with patch(

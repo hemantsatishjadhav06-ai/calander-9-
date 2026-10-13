@@ -26,6 +26,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 from oauth2_provider.models import get_application_model
 
+from apps.common.net import client_ip
+
 from .metadata import authorization_server_metadata, protected_resource_metadata
 
 LOG = logging.getLogger(__name__)
@@ -54,19 +56,20 @@ def _dcr_error(error: str, description: str, status: int = 400) -> JsonResponse:
 def _client_ip(request) -> str:
     """Return the client IP used for rate-limiting.
 
-    Uses ``REMOTE_ADDR`` directly. Behind a proxy this is the proxy address —
-    accurate per-client attribution would require a vetted ``X-Forwarded-For``
-    parsing chain, and we deliberately don't trust an arbitrary forwarded
-    header here. The global backstop catches mass spray.
+    Apply the same configured trusted-proxy chain as the login throttle.
+    Arbitrary forwarded headers from untrusted addresses remain ignored.
     """
-    return request.META.get("REMOTE_ADDR", "unknown") or "unknown"
+    return client_ip(request) or "unknown"
 
 
 def _incr_counter(key: str) -> int:
     """Atomic increment with TTL bootstrap."""
+    if cache.add(key, 1, _DCR_RATE_WINDOW):
+        return 1
     try:
         return cache.incr(key)
     except ValueError:
+        # The existing window expired between add and incr.
         cache.set(key, 1, _DCR_RATE_WINDOW)
         return 1
 
@@ -88,10 +91,25 @@ def _dcr_rate_limited(request) -> bool:
 
 
 def _is_https_uri(value) -> bool:
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not value or len(value) > 2048:
         return False
-    parsed = urlparse(value)
-    return parsed.scheme == "https" and bool(parsed.netloc)
+    # DOT stores URI lists separated by whitespace. Accepting whitespace in a
+    # single list item registers additional callbacks after we have validated
+    # it; controls and backslashes are also interpreted differently by browsers.
+    if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value) or "\\" in value:
+        return False
+    try:
+        parsed = urlparse(value)
+        return (
+            parsed.scheme == "https"
+            and bool(parsed.hostname)
+            and parsed.username is None
+            and parsed.password is None
+            and not parsed.fragment
+            and (parsed.port is None or 0 < parsed.port <= 65535)
+        )
+    except ValueError:
+        return False
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -131,7 +149,11 @@ class RegisterView(View):
             )
 
         grant_types = body.get("grant_types") or ["authorization_code"]
-        if not isinstance(grant_types, list) or set(grant_types) - _SUPPORTED_GRANTS:
+        if (
+            not isinstance(grant_types, list)
+            or not all(isinstance(grant, str) for grant in grant_types)
+            or set(grant_types) - _SUPPORTED_GRANTS
+        ):
             return _dcr_error(
                 "invalid_client_metadata",
                 "Only authorization_code and refresh_token grants are supported.",

@@ -241,6 +241,7 @@ class StudioBrief(models.Model):
     )
     post_copy = models.JSONField(default=dict, blank=True)
     design_spec = models.JSONField(default=dict, blank=True)
+    trust_snapshot = models.JSONField(default=dict, blank=True)
     review_notes = models.JSONField(default=dict, blank=True)
     style_reference = models.JSONField(default=dict, blank=True)
     picture = models.ForeignKey(
@@ -284,7 +285,9 @@ class StudioBrief(models.Model):
 
     @property
     def caption(self) -> str:
-        return (self.post_copy or {}).get("caption", "")
+        from .pipeline import full_caption
+
+        return full_caption({**(self.post_copy or {}), "hashtags": []})
 
     @property
     def usage_totals(self) -> dict:
@@ -526,6 +529,14 @@ class AgencySettings(models.Model):
         related_name="+",
         help_text="Drafts the team makes on its own carry this person's name. An owner or manager.",
     )
+    backup = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="agency_backup_workspaces",
+        help_text="A second current internal approver for deadline alerts and recovery.",
+    )
     learn_from_best = models.BooleanField(
         default=False,
         help_text="Let the art director start from your best creatives and references, not only the last post.",
@@ -543,6 +554,72 @@ class AgencySettings(models.Model):
 
     def __str__(self):
         return f"AgencySettings({self.workspace_id})"
+
+
+class BrandClaim(models.Model):
+    """A source-backed claim, explicitly verified by a person until an expiry date."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="brand_claims")
+    category = models.CharField(
+        max_length=20,
+        choices=[
+            ("general", "Offering or brand fact"),
+            ("price", "Price or discount"),
+            ("availability", "Availability"),
+            ("registration", "Registration or title"),
+            ("launch", "Launch or date"),
+            ("contact", "Contact or next step"),
+        ],
+        default="general",
+    )
+    claim = models.TextField(max_length=2000)
+    source_url = models.URLField(max_length=1000, blank=True, default="")
+    source_note = models.CharField(max_length=500, blank=True, default="")
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    valid_until = models.DateField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = WorkspaceScopedManager()
+
+    class Meta:
+        db_table = "studio_brand_claim"
+        ordering = ["category", "-updated_at"]
+
+
+class CampaignOutcome(models.Model):
+    """Manual campaign event counts without personal lead data or inferred attribution."""
+
+    class Kind(models.TextChoices):
+        ENQUIRY = "enquiry", "Enquiry"
+        QUALIFIED_ENQUIRY = "qualified_enquiry", "Qualified enquiry"
+        SITE_VISIT = "site_visit", "Site visit"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="campaign_outcomes")
+    post = models.ForeignKey(
+        "composer.Post", on_delete=models.SET_NULL, null=True, blank=True, related_name="campaign_outcomes"
+    )
+    campaign_name = models.CharField(max_length=120)
+    occurred_on = models.DateField()
+    kind = models.CharField(max_length=32, choices=Kind.choices)
+    count = models.PositiveIntegerField(default=1)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = WorkspaceScopedManager()
+
+    class Meta:
+        db_table = "studio_campaign_outcome"
+        ordering = ["-occurred_on", "-created_at"]
+        constraints = [models.CheckConstraint(condition=models.Q(count__gte=1), name="campaign_outcome_positive_count")]
 
 
 class AutopilotWeek(models.Model):
@@ -648,6 +725,11 @@ class Conversation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="conversations")
     audience = models.CharField(max_length=20, choices=Audience.choices, default=Audience.INTERNAL)
+    is_private = models.BooleanField(
+        default=False,
+        db_default=False,
+        help_text="Private transport history stays private after disconnection or a role change.",
+    )
     title = models.CharField(max_length=200, blank=True, default="")
     brief = models.ForeignKey(
         StudioBrief, on_delete=models.CASCADE, null=True, blank=True, related_name="conversations"

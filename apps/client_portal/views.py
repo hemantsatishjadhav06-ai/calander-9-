@@ -15,6 +15,7 @@ from apps.composer.models import Post
 from apps.members.models import WorkspaceMembership
 
 from .decorators import portal_auth_required
+from .models import MagicLinkToken
 from .services import consume_magic_link, create_portal_session, magic_link_problem, peek_magic_link
 
 
@@ -52,7 +53,10 @@ def magic_link_entry(request, token):
         user, workspace, is_valid = consume_magic_link(token)
         if not is_valid:
             return _link_problem_redirect(magic_link_problem(token) or "used")
-        create_portal_session(request, user, workspace)
+        magic_token = MagicLinkToken.objects.filter(token=token, user=user, workspace=workspace).first()
+        if magic_token is None:
+            return _link_problem_redirect("invalid")
+        create_portal_session(request, user, workspace, token=magic_token)
         return redirect("client_portal:dashboard")
 
     magic_token = peek_magic_link(token)
@@ -178,6 +182,8 @@ def portal_approval_queue(request):
     # (N+1). Portal users are clients, so they see EXTERNAL comments only.
     is_client = request.portal_membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT
     active_replies = PostComment.objects.filter(deleted_at__isnull=True).select_related("author")
+    if is_client:
+        active_replies = active_replies.filter(visibility=PostComment.Visibility.EXTERNAL)
     comment_qs = (
         PostComment.objects.filter(
             post_id__in=[p.id for p in all_posts],

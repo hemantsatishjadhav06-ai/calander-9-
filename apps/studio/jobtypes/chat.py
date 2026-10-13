@@ -27,13 +27,20 @@ request, before this job runs.
 from __future__ import annotations
 
 import logging
+import uuid
 import zoneinfo
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 
-from .. import budget, chat, engine, services
+from django.db import transaction
+from django.db.models import Exists, OuterRef, Q
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
+from .. import budget, chat, creative_brief, creative_sources, engine, memory, pipeline, services
 from ..brand_defaults import ensure_profile
-from ..models import AgencyJob, AgencySettings, Conversation, Message, StudioBrief
+from ..models import AgencyJob, AgencySettings, AgentRun, Conversation, Message, StudioBrief
 from ..roles import base
 from ..roles import client as client_roles
 
@@ -55,6 +62,7 @@ ARTICLE_LOCKED = (
 )
 #: Posts one person may have in the works at once from the thread.
 MAX_ACTIVE_CHAT_POSTS = 2
+SOURCE_MAX_AGE = timedelta(minutes=30)
 LOCKED = (
     "This post has already been approved or scheduled, so it can't be changed from here. I've asked a person on the "
     "team to pause it and make the change."
@@ -94,6 +102,8 @@ class Target:
     brief: StudioBrief | None = None
     post: Any = None
     blog_post: Any = None
+    ambiguous_briefs: list[StudioBrief] = field(default_factory=list)
+    invalid_selection: bool = False
 
 
 @dataclass
@@ -103,6 +113,91 @@ class Outcome:
     status: str = ""
     notify_staff: bool = False
     result: dict[str, Any] = field(default_factory=dict)
+
+
+def _lock_current_job(job):
+    """Serialize side effects with cancellation/restart, after all network work."""
+    current = (
+        AgencyJob.objects.select_for_update()
+        .filter(
+            pk=job.pk,
+            workspace_id=job.workspace_id,
+            conversation_id=job.conversation_id,
+            requested_by_id=job.requested_by_id,
+            revision=job.revision,
+            stage=job.stage,
+            status=AgencyJob.Status.WORKING,
+        )
+        .first()
+    )
+    if current is None:
+        raise engine.StaleJobError
+
+
+def _current_membership(job, conversation, requester):
+    """Lock and revalidate the author and permissions before mutating creative work."""
+    from apps.accounts.models import User
+    from apps.members.models import CustomRole, WorkspaceMembership
+    from apps.workspaces.models import Workspace
+
+    telegram_context = (job.input or {}).get("telegram_context")
+    if telegram_context is not None:
+        try:
+            kind, paired_member = chat.telegram_author_kind(conversation, requester, telegram_context, locked=True)
+        except chat.ChatError:
+            return None
+        _lock_current_job(job)
+        if not Message.objects.filter(
+            pk=(job.input or {}).get("message_id"),
+            conversation=conversation,
+            author_id=requester.pk,
+            author_kind=kind,
+            is_internal=False,
+        ).exists():
+            return None
+        return paired_member
+    _lock_current_job(job)
+    current_thread = (
+        Conversation.objects.select_for_update()
+        .filter(
+            pk=conversation.pk,
+            workspace_id=job.workspace_id,
+        )
+        .first()
+    )
+    workspace = Workspace.objects.select_for_update().filter(pk=job.workspace_id, is_archived=False).first()
+    person = User.objects.select_for_update().filter(pk=requester.pk, is_active=True).first()
+    if (
+        current_thread is None
+        or workspace is None
+        or person is None
+        or current_thread.audience != conversation.audience
+    ):
+        return None
+    # Retain the fresh audience/targets while preserving the pre-call model input.
+    conversation.audience = current_thread.audience
+    conversation.brief_id, conversation.post_id, conversation.blog_post_id = (
+        current_thread.brief_id,
+        current_thread.post_id,
+        current_thread.blog_post_id,
+    )
+    conversation._state.fields_cache.clear()
+    conversation.workspace = workspace
+    membership = (
+        WorkspaceMembership.objects.select_for_update()
+        .filter(
+            user=person,
+            workspace=workspace,
+        )
+        .first()
+    )
+    if membership is not None and membership.custom_role_id:
+        membership.custom_role = CustomRole.objects.select_for_update().get(pk=membership.custom_role_id)
+    if chat.is_staff_membership(membership):
+        return membership
+    if chat.is_client_membership(membership) and conversation.audience == Conversation.Audience.CLIENT:
+        return membership
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -140,9 +235,82 @@ def answer(job: AgencyJob) -> None:
     membership = chat.membership_for(requester, workspace)
     speaker = "staff" if chat.is_staff_membership(membership) else "client"
     for_client = conversation.audience == Conversation.Audience.CLIENT
-    target = resolve_target(conversation)
+    if requester is None or not requester.is_active or trigger.author_id != requester.pk or trigger.is_internal:
+        engine.finish(job, result={"skipped": "This request no longer has an authorized author."})
+        return None
+    try:
+        telegram_context = (job.input or {}).get("telegram_context")
+        if telegram_context is not None:
+            author_kind, membership = chat.telegram_author_kind(conversation, requester, telegram_context)
+        else:
+            author_kind = chat.author_kind_for(requester, conversation)
+    except chat.ChatError:
+        engine.finish(job, result={"skipped": "This request no longer has an authorized author."})
+        return None
+    if author_kind != trigger.author_kind:
+        engine.finish(job, result={"skipped": "The request author's role changed."})
+        return None
+    speaker = "client" if author_kind == Message.AuthorKind.CLIENT else "staff"
+    if (job.input or {}).get("kind") == "confirm_brief":
+        outcome = _confirm(job, conversation, trigger, requester, membership)
+        reply = chat.post_agent_message(
+            conversation, outcome.reply, job=job, action=outcome.action, action_status=outcome.status
+        )
+        engine.finish(
+            job,
+            result={**outcome.result, "action": outcome.action, "status": outcome.status, "message_id": str(reply.pk)},
+        )
+        return None
+    target = resolve_target(
+        conversation, requester=requester, target_brief_id=(job.input or {}).get("target_brief_id") or ""
+    )
+    if target.invalid_selection:
+        reply = chat.post_agent_message(
+            conversation,
+            "Choose a draft from this thread's draft selector, then send the requested change here.",
+            job=job,
+            action="answer",
+            action_status=Message.ActionStatus.DECLINED,
+        )
+        engine.finish(
+            job, result={"action": "answer", "status": Message.ActionStatus.DECLINED, "message_id": str(reply.pk)}
+        )
+        return None
     allowed = allowed_actions(membership, conversation, target)
+    if telegram_context is not None and speaker == "client":
+        allowed = tuple(action for action in allowed if action in CLIENT_ACTIONS)
     profile = ensure_profile(workspace)
+    guided = (speaker == "staff" and conversation.audience == Conversation.Audience.INTERNAL) or (
+        telegram_context is not None
+        and conversation.audience == Conversation.Audience.CLIENT
+        and (speaker == "client" or (job.input or {}).get("explicit_assistant_request") is True)
+    )
+    context = _guided_context(job, conversation, trigger, requester, profile) if guided else None
+    item_context = describe(target, workspace, for_client=for_client)
+    if guided and target.brief is not None:
+        human_input = job.input or {}
+        chosen_reference = human_input.get("reference_id") or ""
+        if chosen_reference == "none":
+            item_context += "\nThe person explicitly chose to clear the supplied photo."
+        elif chosen_reference:
+            chosen = _reference(workspace, chosen_reference)
+            if chosen is not None:
+                item_context += "\nThe person selected a replacement photo for this revision: " + base.untrusted(
+                    "person_selected_photo", chosen.title or chosen.filename, limit=300
+                )
+        chosen_style = human_input.get("style_mode") or ""
+        if chosen_style in {"brand", "fresh"}:
+            item_context += f"\nThe person selected the {chosen_style} layout option for this revision."
+    extra = (
+        {
+            "guided": True,
+            "creative_brief": context["creative_brief"],
+            "sources": context["sources"],
+            "available_channels": _channel_choices(context["accounts"]),
+        }
+        if context is not None
+        else {}
+    )
 
     run, result = engine.call(
         job,
@@ -152,47 +320,116 @@ def answer(job: AgencyJob) -> None:
             audience=conversation.audience,
             speaker=speaker,
             history=history(conversation, trigger, for_client=for_client),
-            item=describe(target, workspace, for_client=for_client),
+            item=item_context,
             request=trigger.body,
             request_kind=str((job.input or {}).get("kind") or ""),
             allowed_actions=list(allowed),
+            **extra,
         ),
         effort=client_roles.ACCOUNT_MANAGER_EFFORT,
     )
     out = result.output
-    try:
-        outcome = perform(job, conversation, target, requester, membership, out, allowed, trigger, speaker=speaker)
-    except engine.StaleJobError:
-        raise
-    except Exception:
-        logger.exception("Chat job %s: acting on %s failed", job.pk, out.action)
-        outcome = Outcome(
-            reply="Something went wrong passing this on, so I've asked a person on the team to pick it up. " + HANDOFF,
-            action=out.action,
-            status=Message.ActionStatus.NEEDS_HUMAN,
-            notify_staff=True,
+    # Intake source reads happen before taking any mutation locks.
+    prepared_intake = None
+    if (
+        context is not None
+        and out.action in allowed
+        and out.action in {"answer", "new_post"}
+        and (out.action == "new_post" or out.creative_brief is not None)
+    ):
+        prepared_intake = _intake(job, conversation, trigger, out, context)
+    with transaction.atomic():
+        membership = _current_membership(job, conversation, requester)
+        if membership is None or not budget.can_spend(workspace):
+            skipped = "This request no longer has an authorized author." if membership is None else "over budget"
+            engine.end(run, summary=skipped, status=AgentRun.Status.SKIPPED, result=result)
+            engine.finish(job, result={"skipped": skipped})
+            return None
+        target = resolve_target(
+            conversation, requester=requester, target_brief_id=(job.input or {}).get("target_brief_id") or ""
         )
-
-    reply = chat.post_agent_message(
-        conversation, outcome.reply, job=job, action=outcome.action, action_status=outcome.status
-    )
-    engine.end(
-        run,
-        summary=f"Answered {trigger.sender_name}: {outcome.action.replace('_', ' ')}"
-        + (f" ({outcome.status.replace('_', ' ')})" if outcome.status else "")
-        + f". {out.reason}".rstrip(". ")
-        + ".",
-        output={
-            "action": out.action,
-            "performed": outcome.action,
-            "status": outcome.status,
-            "needs_human": out.needs_human,
-            "instructions": out.instructions,
-            "reason": out.reason,
-            **outcome.result,
-        },
-        result=result,
-    )
+        allowed = allowed_actions(membership, conversation, target)
+        if telegram_context is not None:
+            try:
+                current_kind, _member = chat.telegram_author_kind(
+                    conversation, requester, telegram_context, locked=True
+                )
+            except chat.ChatError:
+                current_kind = ""
+            if current_kind != trigger.author_kind:
+                engine.end(run, summary="Telegram pairing changed", status=AgentRun.Status.SKIPPED, result=result)
+                engine.finish(job, result={"skipped": "This Telegram pairing changed."})
+                return None
+            speaker = "client" if current_kind == Message.AuthorKind.CLIENT else "staff"
+            if speaker == "client":
+                allowed = tuple(action for action in allowed if action in CLIENT_ACTIONS)
+        else:
+            speaker = "staff" if chat.is_staff_membership(membership) else "client"
+        try:
+            outcome = perform(
+                job,
+                conversation,
+                target,
+                requester,
+                membership,
+                out,
+                allowed,
+                trigger,
+                speaker=speaker,
+                guided_context=context,
+                prepared_intake=prepared_intake,
+            )
+        except engine.StaleJobError:
+            raise
+        except Exception:
+            logger.exception("Chat job %s: acting on %s failed", job.pk, out.action)
+            outcome = Outcome(
+                reply="Something went wrong passing this on, so I've asked a person on the team to pick it up. "
+                + HANDOFF,
+                action=out.action,
+                status=Message.ActionStatus.NEEDS_HUMAN,
+                notify_staff=True,
+            )
+        if outcome.notify_staff and chat.is_private_conversation(conversation):
+            destination = "client group" if speaker == "client" else "internal team group"
+            sharing_instruction = (
+                f"Share the request yourself in the intended {destination} for a person's review. "
+                "This private chat is not forwarded to the agency."
+            )
+            if outcome.result.get("client_preparation_requested"):
+                outcome.reply = (
+                    creative_brief.summary(outcome.result.get("creative_brief")) + "\n\n" + sharing_instruction
+                )
+                outcome.reply += " A paired agency lead can check the request and confirm draft preparation there; your message has not started or approved a draft."
+            elif outcome.status == Message.ActionStatus.NEEDS_HUMAN:
+                outcome.reply = "This request needs a person's decision. " + sharing_instruction
+            else:
+                outcome.reply += "\n\n" + sharing_instruction
+            outcome.notify_staff = False
+        reply = chat.post_agent_message(
+            conversation, outcome.reply, job=job, action=outcome.action, action_status=outcome.status
+        )
+        engine.end(
+            run,
+            summary=f"Answered {trigger.sender_name}: {outcome.action.replace('_', ' ')}"
+            + (f" ({outcome.status.replace('_', ' ')})" if outcome.status else "")
+            + f". {out.reason}".rstrip(". ")
+            + ".",
+            output={
+                "action": out.action,
+                "performed": outcome.action,
+                "status": outcome.status,
+                "needs_human": out.needs_human,
+                "instructions": out.instructions,
+                "reason": out.reason,
+                **outcome.result,
+            },
+            result=result,
+        )
+        engine.finish(
+            job,
+            result={**outcome.result, "action": outcome.action, "status": outcome.status, "message_id": str(reply.pk)},
+        )
     if outcome.notify_staff:
         chat.notify_staff(
             conversation,
@@ -203,9 +440,6 @@ def answer(job: AgencyJob) -> None:
         )
     if speaker == "client" and requester is not None:
         chat.notify_clients_of_reply(conversation, only=requester)
-    engine.finish(
-        job, result={"action": outcome.action, "status": outcome.status, "message_id": str(reply.pk), **outcome.result}
-    )
     return None
 
 
@@ -221,12 +455,31 @@ JOB = engine.JobType(
 # ---------------------------------------------------------------------------
 
 
-def resolve_target(conversation: Conversation) -> Target:
+def resolve_target(conversation: Conversation, *, requester=None, target_brief_id="") -> Target:
     """The thread's item, re-checked against the workspace (targets never come from the model)."""
     workspace_id = conversation.workspace_id
 
     def own(item):
         return item if item is not None and item.workspace_id == workspace_id else None
+
+    if target_brief_id:
+        try:
+            selected_id = uuid.UUID(str(target_brief_id))
+        except (ValueError, TypeError, AttributeError):
+            return Target(invalid_selection=True)
+        choices = StudioBrief.objects.filter(
+            pk=selected_id,
+            workspace_id=workspace_id,
+            origin=StudioBrief.Origin.CHAT,
+            job__workspace_id=workspace_id,
+            job__conversation=conversation,
+        )
+        if not chat.is_staff(requester, conversation.workspace):
+            choices = choices.filter(requested_by=requester) if requester is not None else choices.none()
+        selected = choices.first()
+        if selected is None:
+            return Target(invalid_selection=True)
+        return Target(brief=selected, post=own(selected.post) if selected.post_id else None)
 
     brief = own(conversation.brief) if conversation.brief_id else None
     post = own(conversation.post) if conversation.post_id else None
@@ -240,6 +493,33 @@ def resolve_target(conversation: Conversation) -> Target:
         )
     if post is None and brief is not None and brief.post_id:
         post = own(brief.post)
+    if brief is None and post is None and blog_post is None and requester is not None:
+        from apps.composer.models import PlatformPost
+
+        locked_channels = PlatformPost.objects.filter(post_id=OuterRef("post_id")).exclude(
+            status__in=pipeline.REVISABLE_STATUSES
+        )
+        revisable_channels = PlatformPost.objects.filter(
+            post_id=OuterRef("post_id"), status__in=pipeline.REVISABLE_STATUSES
+        )
+        linked: list[StudioBrief] = list(
+            StudioBrief.objects.filter(
+                workspace_id=workspace_id,
+                origin=StudioBrief.Origin.CHAT,
+                job__workspace_id=workspace_id,
+                job__conversation=conversation,
+                requested_by=requester,
+            )
+            .exclude(status=StudioBrief.Status.DISCARDED)
+            .annotate(_has_locked_channel=Exists(locked_channels), _has_revisable_channel=Exists(revisable_channels))
+            .filter(~Q(status=StudioBrief.Status.APPROVED) | Q(_has_locked_channel=False, _has_revisable_channel=True))
+            .order_by("-created_at")[:3]
+        )
+        if len(linked) > 1:
+            return Target(ambiguous_briefs=linked)
+        if linked:
+            brief = linked[0]
+            post = own(brief.post) if brief.post_id else None
     return Target(brief=brief, post=post, blog_post=blog_post)
 
 
@@ -252,7 +532,7 @@ def allowed_actions(membership, conversation: Conversation, target: Target) -> t
     else:
         permitted = OTHER_ACTIONS
     offered = ["answer"]
-    if target.brief is not None:
+    if target.brief is not None or target.ambiguous_briefs:
         offered += REVISION_ACTIONS
     offered.append("new_post")
     if target.blog_post is not None:
@@ -392,7 +672,18 @@ def history(conversation: Conversation, trigger: Message, *, for_client: bool) -
 
 
 def perform(
-    job, conversation, target: Target, requester, membership, out, allowed, trigger, *, speaker="staff"
+    job,
+    conversation,
+    target: Target,
+    requester,
+    membership,
+    out,
+    allowed,
+    trigger,
+    *,
+    speaker="staff",
+    guided_context=None,
+    prepared_intake=None,
 ) -> Outcome:
     """Validate the account manager's action against what this person may ask for here, and do it."""
     action = out.action
@@ -400,6 +691,25 @@ def perform(
     instructions = (out.instructions or "").strip() or trigger.body
     if action not in allowed:
         return Outcome(NOT_ALLOWED, action, Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
+    if (
+        guided_context is not None
+        and action in {"answer", "new_post"}
+        and (action == "new_post" or out.creative_brief is not None)
+    ):
+        intake = (
+            prepared_intake if prepared_intake is not None else _intake(job, conversation, trigger, out, guided_context)
+        )
+        if (job.input or {}).get("telegram_context") is not None and speaker == "client":
+            intake.result["awaiting_confirmation"] = False
+            intake.result["client_preparation_requested"] = True
+            intake.reply = intake.reply.replace(
+                "Use Confirm brief after checking the source facts. This only starts a draft for human approval.",
+                "A paired agency lead must send /brief here to check this request and confirm preparation. Your message does not approve or start a draft.",
+            )
+            if not creative_brief.missing(intake.result.get("creative_brief")):
+                intake.status = Message.ActionStatus.NEEDS_HUMAN
+                intake.notify_staff = True
+        return intake
     if action == "answer":
         if out.needs_human:
             return Outcome(_with_handoff(reply), action, Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
@@ -407,7 +717,30 @@ def perform(
     if action == "escalate":
         return Outcome(_with_handoff(reply), action, Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
     if action in REVISION_ACTIONS:
-        outcome = _revise(target.brief, action, instructions, reply, speaker=speaker, requester=requester)
+        if target.ambiguous_briefs:
+            names = "; ".join((brief.title or brief.idea)[:100] for brief in target.ambiguous_briefs)
+            return Outcome(
+                f"Which draft should I change? There are several unfinished drafts in this thread: {names}. Choose the intended draft in this thread's draft selector and send the change here.",
+                action,
+                Message.ActionStatus.DECLINED,
+            )
+        outcome = _revise(
+            target.brief,
+            action,
+            instructions,
+            reply,
+            speaker=speaker,
+            requester=requester,
+            revision_input=job.input or {},
+            allow_choices=speaker == "staff"
+            and (
+                conversation.audience == Conversation.Audience.INTERNAL
+                or (
+                    (job.input or {}).get("telegram_context") is not None
+                    and (job.input or {}).get("explicit_assistant_request") is True
+                )
+            ),
+        )
     elif action == "new_post":
         outcome = _new_post(job, conversation.workspace, requester, membership, instructions, reply)
     elif action == "edit_blog":
@@ -432,6 +765,8 @@ def _revise(
     *,
     speaker: str = "staff",
     requester=None,
+    revision_input=None,
+    allow_choices=False,
 ) -> Outcome:
     if brief is None:
         return Outcome(NOT_ALLOWED, action, Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
@@ -445,26 +780,79 @@ def _revise(
             Message.ActionStatus.NEEDS_HUMAN,
             notify_staff=True,
         )
-    if not services.reopen(brief):
-        return _locked(brief, action, speaker)
+    human_choices = revision_input or {}
+    reference_id = human_choices.get("reference_id") or ""
+    style_mode = human_choices.get("style_mode") or ""
+    if (reference_id or style_mode) and not allow_choices:
+        return Outcome(
+            "Photo and style choices must be made by the agency team in its internal thread.",
+            action,
+            Message.ActionStatus.DECLINED,
+        )
+    source_picture_mode = "keep" if not reference_id else "clear" if reference_id == "none" else "replace"
+    source_picture = _reference(brief.workspace, reference_id) if source_picture_mode == "replace" else None
+    if style_mode not in {"", "brand", "fresh"} or (source_picture_mode == "replace" and source_picture is None):
+        return Outcome(
+            "The selected photo or style is unavailable. Choose a current photo from this workspace or clear it, then send the revision again.",
+            action,
+            Message.ActionStatus.DECLINED,
+        )
+    choices: dict[str, Any] = {
+        "source_picture_mode": source_picture_mode,
+        "source_picture": source_picture,
+        "style_mode": style_mode,
+        "allow_reopen": True,
+    }
     try:
         if action == "new_angles":
-            services.new_angles(brief, instructions, requested_by=requester)
+            services.new_angles(brief, instructions, requested_by=requester, **choices)
         else:
             services.request_changes(
                 brief,
                 _FEEDBACK_LEAD.get(action, "") + instructions,
                 new_picture=action == "new_picture",
                 requested_by=requester,
+                **choices,
             )
     except services.StudioActionError as exc:
         logger.info("Chat: revision of brief %s refused: %s", brief.pk, exc)
         return _locked(brief, action, speaker)
-    return Outcome(reply, action, Message.ActionStatus.STARTED, result={"brief_id": str(brief.pk)})
+    effective_photo_action = (
+        "clear" if source_picture_mode == "keep" and action == "new_picture" else source_picture_mode
+    )
+    details = {
+        "keep": "The current photo choice is kept.",
+        "clear": "The previous photo is cleared; the team will generate a new image or use the brand background.",
+        "replace": "The team will use the photo you selected.",
+    }
+    queued_reply = "The revision is queued for the creative team. " + details[effective_photo_action]
+    if style_mode:
+        queued_reply += (
+            " The layout will be fresh within the brand."
+            if style_mode == "fresh"
+            else " The brand look will be followed."
+        )
+    queued_reply += " The updated draft returns for human review before publishing."
+    result: dict[str, Any] = {"brief_id": str(brief.pk), "queued": True}
+    if allow_choices:
+        result.update(
+            photo_action=effective_photo_action,
+            reference_id=str(brief.source_picture_id) if brief.source_picture_id else "none",
+            style_mode="brand" if brief.style_lock else "fresh",
+        )
+    return Outcome(queued_reply, action, Message.ActionStatus.STARTED, result=result)
 
 
 def _locked(brief: StudioBrief, action: str, speaker: str) -> Outcome:
     """The reply when the post can't be revised from here, saying why in the reader's terms."""
+    if services.has_unconfirmed_delivery(brief):
+        return Outcome(
+            "The previous delivery record needs a human decision before the content, photo or account can change. "
+            "Check an unknown outcome, or use Return for review after an expired publishing time.",
+            action,
+            Message.ActionStatus.NEEDS_HUMAN,
+            notify_staff=True,
+        )
     if "pending_client" in services.post_statuses(brief):
         if speaker == "client":
             # The client's own button does it (and records their decision); the thread can't.
@@ -509,6 +897,441 @@ def accounts_for(workspace) -> list:
     if not accounts:
         accounts = [a for a in studio_accounts(workspace) if not a.needs_reconnect]
     return accounts
+
+
+def _account_info(account) -> dict:
+    return {
+        "id": str(account.pk),
+        "platform": account.platform,
+        "name": account.account_name or account.account_handle or account.platform,
+        "native_id": str(account.account_platform_id or ""),
+        "handle": account.account_handle or "",
+    }
+
+
+def _account_label(account) -> str:
+    return f"{account.platform}:{account.account_name or account.account_handle or account.pk} [{account.pk}]"
+
+
+def _channel_choices(accounts) -> list[str]:
+    counts: dict[str, int] = {}
+    for account in accounts:
+        counts[account.platform] = counts.get(account.platform, 0) + 1
+    return [account.platform if counts[account.platform] == 1 else _account_label(account) for account in accounts]
+
+
+def _selected_accounts(channels, accounts) -> tuple[list, str]:
+    """Resolve only explicit, unique destinations in this workspace."""
+    selected = []
+    for channel in channels:
+        value = channel.strip().casefold()
+        candidates = [
+            account
+            for account in accounts
+            if value
+            in {
+                str(account.pk).casefold(),
+                account.platform.casefold(),
+                _account_label(account).casefold(),
+                (account.account_name or "").casefold(),
+                (account.account_handle or "").casefold(),
+            }
+        ]
+        if len(candidates) != 1:
+            return (
+                [],
+                "Choose one exact connected account for each channel; unavailable or ambiguous channel choices cannot start a draft.",
+            )
+        if candidates[0] not in selected:
+            selected.append(candidates[0])
+    return selected, ""
+
+
+def _collect_sources(workspace, profile, accounts) -> dict:
+    sources = creative_sources.collect(workspace, profile, accounts)
+    sources = (
+        dict(sources)
+        if isinstance(sources, dict)
+        else {"notes": ["Source evidence is unavailable; supply and check current brand facts."]}
+    )
+    sources["creative_memory"] = memory.prompt_memory(workspace, platforms={a.platform for a in accounts})
+    sources["available_accounts"] = [_account_info(account) for account in accounts]
+    return sources
+
+
+def _guided_context(job, conversation, trigger, requester, profile) -> dict:
+    # Offer all currently connected Studio accounts, not only autopilot defaults.
+    from ..forms import studio_accounts
+
+    accounts = [account for account in studio_accounts(conversation.workspace) if not account.needs_reconnect]
+    previous = creative_brief.latest_intake(conversation, requester, before=trigger.created_at)
+    old = previous.result if previous is not None else {}
+    reusable = bool(old.get("creative_brief")) and not (old.get("brief_id") or old.get("confirmed_from"))
+    sources = old.get("sources") if reusable else None
+    words = trigger.body.casefold()
+    creative_request = reusable or any(
+        word in words
+        for word in (
+            "post",
+            "draft",
+            "creative",
+            "campaign",
+            "image",
+            "caption",
+            "design",
+            "social",
+            "announce",
+            "publish",
+        )
+    )
+    if (not isinstance(sources, dict) or not sources) and creative_request:
+        sources = _collect_sources(conversation.workspace, profile, accounts)
+    return {
+        "creative_brief": old.get("creative_brief", {}) if reusable else {},
+        "sources": sources if isinstance(sources, dict) else {},
+        "accounts": accounts,
+        "profile": profile,
+        "reference_id": (job.input or {}).get("reference_id", old.get("reference_id", "") if reusable else ""),
+        "style_mode": (job.input or {}).get("style_mode", old.get("style_mode", "") if reusable else ""),
+    }
+
+
+def _reference(workspace, reference_id):
+    from apps.media_library.models import MediaAsset
+
+    if reference_id in {"", "none", None}:
+        return None
+    try:
+        selected = uuid.UUID(str(reference_id))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    return MediaAsset.objects.filter(
+        pk=selected,
+        workspace=workspace,
+        organization_id=workspace.organization_id,
+        media_type=MediaAsset.MediaType.IMAGE,
+    ).first()
+
+
+def _intake(job, conversation, trigger, out, context) -> Outcome:
+    proposed = creative_brief.normalized(out.creative_brief)
+    previous = creative_brief.normalized(context["creative_brief"])
+    new_topic = bool(previous["topic"] and proposed["topic"] and previous["topic"] != proposed["topic"])
+    if new_topic:
+        data = creative_brief.merge({}, proposed)
+        context["sources"] = _collect_sources(conversation.workspace, context["profile"], context["accounts"])
+        context["reference_id"] = (job.input or {}).get("reference_id", "")
+        context["style_mode"] = (job.input or {}).get("style_mode", "")
+    else:
+        data = creative_brief.merge(previous, proposed)
+    if not context["sources"]:
+        context["sources"] = _collect_sources(conversation.workspace, context["profile"], context["accounts"])
+    if not data["visual_direction"] and context["style_mode"] in {"brand", "fresh"}:
+        data["visual_direction"] = (
+            "Use a fresh layout within the brand's colours and typography."
+            if context["style_mode"] == "fresh"
+            else "Match the current brand series and its saved creative memory."
+        )
+    if not data["topic"] and out.action == "new_post":
+        data["topic"] = ((out.instructions or "").strip() or trigger.body)[:1000]
+    reference_id = context["reference_id"]
+    reference = _reference(conversation.workspace, reference_id)
+    reference_error = bool(reference_id not in {"", "none", None} and reference is None)
+    if reference is not None:
+        data["references"] = f"Use the selected reference: {reference.title or reference.filename}"[:1000]
+    elif reference_id == "none":
+        data["references"] = (
+            "No uploaded reference selected; follow the confirmed visual direction and saved creative memory preference."
+        )
+    elif reference_error:
+        data["references"] = ""
+    selected, channel_error = _selected_accounts(data["channels"], context["accounts"])
+    if channel_error:
+        data["channels"] = []
+    ready = not creative_brief.missing(data) and bool(selected) and not reference_error
+    result = {
+        "creative_brief": data,
+        "sources": context["sources"],
+        "awaiting_confirmation": ready,
+        "reference_id": str(reference_id or ""),
+        "style_mode": context["style_mode"] if context["style_mode"] in {"", "brand", "fresh"} else "",
+        "selected_accounts": [_account_info(account) for account in selected],
+    }
+    if ready:
+        names = "; ".join(f"{a.get_platform_display()}: {a.account_name or a.account_handle}" for a in selected)
+        reply = (
+            "Please check this brief and its source evidence before the team creates a draft.\n\n"
+            + creative_brief.summary(data)
+        )
+        reply += f"\nSelected accounts: {names}.\nUse Confirm brief after checking the source facts. This only starts a draft for human approval."
+        if (job.input or {}).get("telegram_context") is not None and trigger.author_kind == Message.AuthorKind.STAFF:
+            reply = reply.replace(
+                "Use Confirm brief after checking the source facts. This only starts a draft for human approval.",
+                "Send /brief to open the current confirmation card after checking these source facts. Its explicit button only starts a draft for human approval.",
+            )
+    else:
+        reply = creative_brief.questions(data, _channel_choices(context["accounts"]))
+        if reference_error:
+            reply += " The selected reference is unavailable; choose another image or no uploaded reference."
+        if channel_error:
+            reply += " " + channel_error
+    return Outcome(reply, "new_post", result=result)
+
+
+def _brief_notes(data, sources, *, style_mode="") -> str:
+    # The full immutable evidence remains on the chat job. Put the person's
+    # direction first so the downstream bounded prompt keeps the essentials.
+    notes = [
+        f"Audience: {data['audience']}",
+        f"Key message: {data['key_message']}",
+        f"Call to action: {data['call_to_action']}",
+        f"Visual direction: {data['visual_direction']}",
+        f"References: {data['references']}",
+        f"Constraints: {data['constraints'] or 'None specified'}",
+        f"Style choice: {style_mode or 'brand'}. The person checked this snapshot; it is not independent fact verification.",
+    ]
+    website = sources.get("website") or {}
+    if isinstance(website, dict):
+        excerpt = website.get("excerpt") or website.get("text") or ""
+        notes.append(f"Website source ({website.get('status', 'unavailable')}): {str(excerpt)[:600]}")
+    for channel in (sources.get("channels") or [])[:3]:
+        if not isinstance(channel, dict):
+            continue
+        captions = [
+            str(post.get("caption") or "")[:180] for post in (channel.get("posts") or [])[:2] if isinstance(post, dict)
+        ]
+        notes.append(
+            f"Channel evidence ({channel.get('source', 'source snapshot')}; {channel.get('platform', '')}): {'; '.join(captions)}"
+        )
+    remembered = sources.get("creative_memory") or {}
+    if isinstance(remembered, dict):
+        notes.append("Saved creative memory, for visual craft only: " + str(remembered.get("house_style") or "")[:250])
+        notes.extend(str(item)[:250] for item in (remembered.get("references") or [])[:3])
+    return "\n".join(notes)[:12000]
+
+
+def _source_expired(sources) -> bool:
+    if not isinstance(sources, dict):
+        return True
+    try:
+        fetched = parse_datetime(str(sources.get("fetched_at") or ""))
+        if fetched is None or timezone.is_naive(fetched):
+            return True
+        age = timezone.now() - fetched
+        return age < timedelta(0) or age > SOURCE_MAX_AGE
+    except (ValueError, TypeError, OverflowError):
+        return True
+
+
+def _confirm(job, conversation, trigger, requester, membership) -> Outcome:
+    denied = Outcome(
+        "This brief cannot be confirmed from this message. Ask the team to show your current complete brief, then check its source facts and confirm it here.",
+        "new_post",
+        Message.ActionStatus.DECLINED,
+    )
+    telegram_guided = False
+    context = (job.input or {}).get("telegram_context")
+    if context is not None and (job.input or {}).get("explicit_assistant_request") is True:
+        try:
+            kind, _member = chat.telegram_author_kind(conversation, requester, context)
+            telegram_guided = kind == Message.AuthorKind.STAFF
+        except chat.ChatError:
+            pass
+    if (
+        (conversation.audience != Conversation.Audience.INTERNAL and not telegram_guided)
+        or not chat.is_staff_membership(membership)
+        or not requester.is_active
+        or trigger.author_kind != Message.AuthorKind.STAFF
+        or trigger.author_id != requester.pk
+        or trigger.is_internal
+        or (job.input or {}).get("facts_confirmed") is not True
+    ):
+        return denied
+    try:
+        source_id = uuid.UUID(str((job.input or {}).get("confirmation_message_id") or ""))
+    except (ValueError, TypeError, AttributeError):
+        return denied
+    # Read-only network work must not hold a conversation row lock. Its
+    # candidate and membership are revalidated below before any result is used.
+    candidate = (
+        Message.objects.filter(
+            pk=source_id,
+            conversation=conversation,
+            author_kind=Message.AuthorKind.AGENT,
+            is_internal=False,
+        )
+        .select_related("job")
+        .first()
+    )
+    refreshed = None
+    if (
+        candidate is not None
+        and candidate.job is not None
+        and candidate.job.workspace_id == job.workspace_id
+        and candidate.job.requested_by_id == requester.pk
+        and candidate.job.conversation_id == conversation.pk
+        and candidate.job.status == AgencyJob.Status.DONE
+        and (candidate.job.result or {}).get("awaiting_confirmation") is True
+        and (candidate.job.result or {}).get("message_id") == str(candidate.pk)
+        and _source_expired((candidate.job.result or {}).get("sources"))
+    ):
+        from ..forms import studio_accounts
+
+        available = [a for a in studio_accounts(conversation.workspace) if not a.needs_reconnect]
+        refreshed = _collect_sources(conversation.workspace, ensure_profile(conversation.workspace), available)
+    with transaction.atomic():
+        membership = _current_membership(job, conversation, requester)
+        if (
+            not chat.is_staff_membership(membership)
+            or (conversation.audience != Conversation.Audience.INTERNAL and not telegram_guided)
+            or not budget.can_spend(conversation.workspace)
+        ):
+            return denied
+        existing = StudioBrief.objects.filter(
+            workspace=conversation.workspace,
+            origin=StudioBrief.Origin.CHAT,
+            requested_by=requester,
+            job__conversation=conversation,
+            job__input__confirmation_message_id=str(source_id),
+        ).first()
+        if existing is not None:
+            return Outcome(
+                "This confirmed brief already has a draft. Open it here to review it; publishing still requires human approval.",
+                "new_post",
+                Message.ActionStatus.STARTED,
+                result={"brief_id": str(existing.pk), "confirmed_from": str(source_id), "awaiting_confirmation": False},
+            )
+        source = (
+            Message.objects.filter(
+                pk=source_id,
+                conversation=conversation,
+                author_kind=Message.AuthorKind.AGENT,
+                is_internal=False,
+                created_at__lt=trigger.created_at,
+            )
+            .select_related("job")
+            .first()
+        )
+        source_job = source.job if source is not None else None
+        if (
+            source is None
+            or source_job is None
+            or source_job.workspace_id != job.workspace_id
+            or source_job.conversation_id != conversation.pk
+            or source_job.requested_by_id != requester.pk
+            or source_job.kind != AgencyJob.Kind.CHAT
+            or source_job.status != AgencyJob.Status.DONE
+            or (source_job.result or {}).get("awaiting_confirmation") is not True
+            or (source_job.result or {}).get("message_id") != str(source.pk)
+        ):
+            return denied
+        latest = creative_brief.latest_intake(conversation, requester, before=trigger.created_at)
+        if latest is None or latest.pk != source_job.pk:
+            return denied
+        # A newer request can still be queued; do not confirm the old snapshot
+        # while a delayed model turn is collecting the person's changes.
+        prior_confirmation_ids = [
+            row.get("message_id")
+            for row in AgencyJob.objects.filter(
+                workspace_id=job.workspace_id,
+                conversation=conversation,
+                requested_by=requester,
+                kind=AgencyJob.Kind.CHAT,
+                input__kind="confirm_brief",
+                input__confirmation_message_id=str(source_id),
+            ).values_list("input", flat=True)
+            if isinstance(row, dict) and row.get("message_id")
+        ]
+        if (
+            Message.objects.filter(
+                conversation=conversation,
+                author=requester,
+                author_kind=Message.AuthorKind.STAFF,
+                is_internal=False,
+                created_at__gt=source.created_at,
+                created_at__lt=trigger.created_at,
+            )
+            .exclude(pk__in=prior_confirmation_ids)
+            .exists()
+        ):
+            return denied
+        snapshot = source_job.result
+        data = creative_brief.normalized(snapshot.get("creative_brief"))
+        sources = snapshot.get("sources")
+        if creative_brief.missing(data) or not isinstance(sources, dict):
+            return denied
+        from ..forms import studio_accounts
+
+        accounts, error = _selected_accounts(
+            data["channels"], [a for a in studio_accounts(conversation.workspace) if not a.needs_reconnect]
+        )
+        if not accounts or error:
+            return denied
+        stored_accounts = snapshot.get("selected_accounts")
+        if not isinstance(stored_accounts, list) or {
+            a["id"] for a in stored_accounts if isinstance(a, dict) and "id" in a
+        } != {str(a.pk) for a in accounts}:
+            return denied
+        if {row["id"]: row for row in stored_accounts if isinstance(row, dict) and "id" in row} != {
+            str(account.pk): _account_info(account) for account in accounts
+        }:
+            return denied
+        reference_id = snapshot.get("reference_id") or ""
+        reference = _reference(conversation.workspace, reference_id)
+        if reference_id not in {"", "none"} and reference is None:
+            return denied
+        if (
+            StudioBrief.objects.filter(
+                workspace=conversation.workspace,
+                origin=StudioBrief.Origin.CHAT,
+                requested_by=requester,
+                status__in=StudioBrief.ACTIVE_STATUSES,
+            ).count()
+            >= MAX_ACTIVE_CHAT_POSTS
+        ):
+            return Outcome(
+                "The team is still making your previous drafts. Once one is ready, confirm this brief again.",
+                "new_post",
+                Message.ActionStatus.DECLINED,
+            )
+        style_mode = snapshot.get("style_mode") or ""
+        if refreshed is not None:
+            updated = {**snapshot, "sources": refreshed, "awaiting_confirmation": True}
+            names = "; ".join(f"{a.get_platform_display()}: {a.account_name or a.account_handle}" for a in accounts)
+            return Outcome(
+                "The source snapshot was older than 30 minutes, so I refreshed it. Check the updated evidence and confirm this brief again before the team starts.\n\n"
+                + creative_brief.summary(data)
+                + f"\nSelected accounts: {names}.",
+                "new_post",
+                result=updated,
+            )
+        if _source_expired(sources):
+            return denied
+        _lock_current_job(job)
+        brief = services.create_brief(
+            conversation.workspace,
+            requester,
+            idea=data["topic"][:2000],
+            goal=data["goal"],
+            notes=_brief_notes(data, sources, style_mode=style_mode),
+            accounts=accounts,
+            style_lock=style_mode != "fresh",
+            source_picture=reference,
+            origin=StudioBrief.Origin.CHAT,
+            job=job,
+            requested_by=requester,
+        )
+        return Outcome(
+            "The confirmed brief is with the creative team. Its draft will appear in this thread for review; a person must approve it before anything is scheduled or published.",
+            "new_post",
+            Message.ActionStatus.STARTED,
+            result={
+                **snapshot,
+                "brief_id": str(brief.pk),
+                "confirmed_from": str(source_id),
+                "awaiting_confirmation": False,
+            },
+        )
 
 
 def _new_post(job, workspace, requester, membership, idea: str, reply: str) -> Outcome:

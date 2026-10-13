@@ -56,6 +56,12 @@ through the team thread: the client's change request is recorded first, then the
                 <span class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0" style="background: var(--primary-strong);">{{ c.author.display_name|default:"?"|make_list|first|upper }}</span>
                 <div class="min-w-0"><span class="text-[0.75rem] font-semibold text-stone-700">{{ c.author.display_name|default:"Team" }}</span><p class="text-[0.8125rem] text-stone-600">{{ c.body }}</p></div>
             </div>
+            {% for reply in c.replies.all %}
+            <div class="flex gap-2 mb-2 ml-8 border-l border-stone-200 pl-3">
+                <span class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0" style="background: var(--primary-strong);">{{ reply.author.display_name|default:"?"|make_list|first|upper }}</span>
+                <div class="min-w-0"><span class="text-[0.75rem] font-semibold text-stone-700">{{ reply.author.display_name|default:"Team" }}</span><p class="text-[0.8125rem] text-stone-600">{{ reply.body }}</p></div>
+            </div>
+            {% endfor %}
             {% endfor %}
         </div>
         {% endif %}

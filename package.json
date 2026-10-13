@@ -2,7 +2,11 @@
   "name": "smbean",
   "private": true,
   "scripts": {
-    "heroku-postbuild": "cd theme/static_src && npm ci && npm run build"
+    "heroku-postbuild": "cd theme/static_src && npm ci && npm run build",
+    "test:ui": "node --test tests/js/*.test.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
   },
   "cacheDirectories": ["theme/static_src/node_modules"]
 }

@@ -1,11 +1,12 @@
 """Background tasks for social account health checks."""
 
 import logging
-from datetime import timedelta
 
 from background_task import background
+from django.db import transaction
 from django.utils import timezone
 
+from apps.common.background import keep_schedule
 from providers.exceptions import QuotaExceededError
 
 from .webhooks import retry_failed_subscription
@@ -35,6 +36,8 @@ def check_social_account_health(account_id: str):
     except SocialAccount.DoesNotExist:
         logger.warning("Health check: account %s not found, skipping", account_id)
         return
+    if account.connection_status == SocialAccount.ConnectionStatus.DISCONNECTED:
+        return
 
     # Resolve per-account credentials via the shared resolver: org/.env app creds
     # plus per-account federation metadata (Mastodon instance_url behind an SSRF
@@ -59,18 +62,11 @@ def check_social_account_health(account_id: str):
     # Platforms whose refresh token outlives the access token are deliberately
     # left out: for them an unknown expiry means nothing needs doing yet.
     needs_expiry_bootstrap = account.platform in EXPIRY_BOOTSTRAP_PLATFORMS and account.token_expires_at is None
-    refreshed_tokens = False
     if (account.is_token_expiring_soon or needs_expiry_bootstrap) and account.oauth_refresh_token:
         try:
-            new_tokens = provider.refresh_token(account.oauth_refresh_token)
-            account.oauth_access_token = new_tokens.access_token
-            if new_tokens.refresh_token:
-                account.oauth_refresh_token = new_tokens.refresh_token
-            if new_tokens.expires_in:
-                account.token_expires_at = timezone.now() + timedelta(seconds=new_tokens.expires_in)
-            account.connection_status = SocialAccount.ConnectionStatus.CONNECTED
-            account.last_error = ""
-            refreshed_tokens = True
+            # Share the publisher's row lock: an independent rotation here
+            # could invalidate the refresh token another worker just saved.
+            account.refresh_oauth_token(provider, enqueue_backfill=False)
             logger.info("Health check: refreshed token for %s", account)
         except Exception as e:
             logger.warning("Health check: token refresh failed for %s: %s", account, e)
@@ -121,23 +117,34 @@ def check_social_account_health(account_id: str):
         account.last_error = friendly_health_check_error(e)
 
     account.last_health_check_at = timezone.now()
-    # Token columns are written only when this run rotated them. The check
-    # spends seconds on the network, and a reconnect landing in that window
-    # used to be overwritten with the tokens loaded before it.
-    token_fields = ["oauth_access_token", "oauth_refresh_token", "token_expires_at"] if refreshed_tokens else []
-    account.save(
-        update_fields=[
-            *token_fields,
-            "follower_count",
-            "avatar_url",
-            "account_name",
-            "account_handle",
-            "connection_status",
-            "last_error",
-            "last_health_check_at",
-            "updated_at",
-        ]
-    )
+    # Rotation is persisted under the account lock above. Never write those
+    # columns again after the profile request: a reconnect may have replaced
+    # them while the network call was in flight.
+    with transaction.atomic():
+        current = SocialAccount.objects.select_for_update().filter(pk=account.pk).first()
+        if current is None:
+            return
+        if (
+            current.connection_status == SocialAccount.ConnectionStatus.DISCONNECTED
+            or current.oauth_access_token != account.oauth_access_token
+            or current.oauth_refresh_token != account.oauth_refresh_token
+        ):
+            # A reconnect/disconnect or another token rotation superseded this
+            # probe. Its result says nothing about the current grant.
+            logger.info("Health check superseded for %s; ignoring stale result", account)
+            return
+        account.save(
+            update_fields=[
+                "follower_count",
+                "avatar_url",
+                "account_name",
+                "account_handle",
+                "connection_status",
+                "last_error",
+                "last_health_check_at",
+                "updated_at",
+            ]
+        )
 
     # A fix for a broken subscription is worthless if nothing re-runs it; this
     # is the only thing that does so unattended. Bounded inside
@@ -146,6 +153,7 @@ def check_social_account_health(account_id: str):
 
 
 @background(schedule=0)
+@keep_schedule
 def schedule_all_health_checks():
     """Enqueue individual health checks for all active accounts."""
     from .models import SocialAccount

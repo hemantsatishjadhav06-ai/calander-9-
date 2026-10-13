@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.client_portal.models import MagicLinkToken
 from apps.composer.models import PlatformPost, Post
 from apps.members.models import WorkspaceMembership
 from apps.notifications.models import EventType, Notification
@@ -41,6 +42,7 @@ def portal_login(client, user, workspace):
     session = client.session
     session["is_portal_session"] = True
     session["portal_workspace_id"] = str(workspace.id)
+    session["portal_token_id"] = str(MagicLinkToken.objects.create(user=user, workspace=workspace, is_consumed=True).id)
     session.save()
 
 

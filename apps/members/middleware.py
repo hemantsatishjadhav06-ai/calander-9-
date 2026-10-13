@@ -1,6 +1,7 @@
 """RBAC middleware that resolves org role + workspace role on every request."""
 
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect
 
 from .models import OrgMembership, WorkspaceMembership
 
@@ -42,6 +43,24 @@ class RBACMiddleware:
 
         if request.path.startswith(CONTEXT_FREE_PATH_PREFIXES):
             return self.get_response(request)
+
+        # An emailed approval link proves access to the portal only. The same
+        # account can also own an organization or later receive a staff role;
+        # its passwordless session must not inherit those account privileges.
+        if hasattr(request, "session") and request.session.get("is_portal_session"):
+            if request.path == "/":
+                return redirect("client_portal:dashboard")
+            public_paths = (
+                "/portal/",
+                "/accounts/logout/",
+                "/accounts/accept-terms/",
+                "/terms/",
+                "/privacy/",
+                "/support/",
+                "/health/",
+            )
+            if not request.path.startswith(public_paths):
+                raise PermissionDenied("Sign out of the client portal and sign in to access the full application.")
 
         # Resolve org and workspace context early.
         # Workspace-from-URL resolution happens in process_view() (after URL

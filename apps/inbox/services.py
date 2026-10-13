@@ -61,6 +61,8 @@ def reply_failure_reason(exc: Exception) -> str:
         return "the account has hit its rate limit. Wait a few minutes and try again."
     if isinstance(exc, TokenExpiredError | OAuthError):
         return "the connection has expired. Reconnect the account in Workspace Settings."
+    if isinstance(exc, NotImplementedError):
+        return "this account does not support replies here. Reply directly on the platform."
     return "the platform rejected it. Try again, or reconnect the account if this keeps happening."
 
 
@@ -168,9 +170,8 @@ def send_reply_now(reply: InboxReply, *, actor=None) -> InboxReply:
     On a platform refusal the row is kept and moved to ``failed`` with a
     human-readable ``send_error`` so the team can retry; the underlying
     exception is re-raised for the caller to shape into its own error.
-    ``NotImplementedError`` (provider has no reply API) is not a failure —
-    the reply is recorded locally with an empty ``platform_reply_id``,
-    matching the pre-existing behaviour.
+    A provider without a reply API is a delivery failure too: a local row
+    must never tell the team that a customer received an unsent answer.
     """
     failure = None
     with transaction.atomic():
@@ -186,13 +187,6 @@ def send_reply_now(reply: InboxReply, *, actor=None) -> InboxReply:
 
         try:
             platform_reply_id = _dispatch_to_platform(message, reply.body)
-        except NotImplementedError:
-            logger.info(
-                "Provider %s cannot send replies; recording reply %s locally.",
-                message.social_account.platform,
-                reply.id,
-            )
-            platform_reply_id = ""
         except Exception as exc:
             logger.exception("Failed to send inbox reply %s (%s)", reply.id, message.social_account.platform)
             reply.status = InboxReply.Status.FAILED
@@ -223,7 +217,7 @@ def send_reply(*, message: InboxMessage, body: str, author=None) -> InboxReply:
 
     If the platform refuses it, the ``failed`` row is removed and the
     exception propagates — the thread must never show a reply the customer
-    never received. ``NotImplementedError`` keeps the local record.
+    never received. The web composer retains the written text on failure.
     """
     with transaction.atomic():
         reply = create_reply_draft(message=message, body=body, author=author)

@@ -4,6 +4,7 @@ import logging
 import tempfile
 
 from background_task import background
+from django.core.exceptions import ValidationError
 from django.core.files.base import File
 
 from apps.common.background import keep_schedule
@@ -69,8 +70,12 @@ def _process_image(asset):
     asset.height = metadata.get("height", 0)
 
     thumbnail = generate_image_thumbnail(asset.file)
-    if thumbnail:
-        asset.thumbnail.save(f"thumb_{asset.id}.jpg", thumbnail, save=False)
+    if not thumbnail:
+        # Sniffing the header establishes a supported type, but truncated or
+        # corrupt bodies still fail to decode. Such files are not ready to
+        # compose or publish, even if reading their dimensions succeeded.
+        raise ValidationError("The uploaded image cannot be decoded.")
+    asset.thumbnail.save(f"thumb_{asset.id}.jpg", thumbnail, save=False)
 
 
 def _process_video(asset):
@@ -166,6 +171,7 @@ def process_image_edit(version_id, operations):
         asset.save(update_fields=["current_version", "updated_at"])
     except Exception:
         logger.exception("Failed to process image edit for version %s", version_id)
+        _discard_failed_version(version)
 
 
 @background(schedule=0)

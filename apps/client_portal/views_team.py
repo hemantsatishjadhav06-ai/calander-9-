@@ -66,6 +66,8 @@ def _parse_uuid(value):
 def thread_context(request, conversation, *, post=None, dom_id="team-thread", error="", body="") -> dict:
     """What ``client_portal/partials/team_thread.html`` needs (the conversation may not exist yet)."""
     workspace = request.portal_workspace
+    if chat.is_private_conversation(conversation):
+        raise Http404
     messages = chat.recent_messages(conversation, for_client=True) if conversation is not None else []
     chat.mark_read(request.user, conversation)
     if post is not None:
@@ -188,13 +190,12 @@ def portal_team_unread(request):
         return HttpResponse(status=405)
     if not request.user.is_authenticated or not request.session.get("is_portal_session"):
         return HttpResponse(status=204)
-    from apps.members.models import WorkspaceMembership
-    from apps.workspaces.models import Workspace
+    return _authenticated_portal_team_unread(request)
 
-    workspace = Workspace.objects.filter(id=request.session.get("portal_workspace_id")).first()
-    if workspace is None or not WorkspaceMembership.objects.filter(user=request.user, workspace=workspace).exists():
-        return HttpResponse(status=204)
-    count = chat.portal_unread_total(request.user, workspace)
+
+@portal_auth_required
+def _authenticated_portal_team_unread(request):
+    count = chat.portal_unread_total(request.user, request.portal_workspace)
     return render(request, "client_portal/partials/team_badge.html", {"count": count})
 
 

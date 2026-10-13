@@ -29,7 +29,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from django_ratelimit.decorators import ratelimit
 
 from apps.members.decorators import require_permission
-from apps.studio import budget, engine, images, llm, team
+from apps.studio import budget, chat, engine, images, llm, team
 from apps.studio.jobtypes import blog as blog_job
 from apps.studio.jobtypes import repurpose as repurpose_job
 from apps.studio.models import AgencyJob, AgentRun, StudioBrief
@@ -117,7 +117,7 @@ def _team_busy(workspace) -> str:
 
 def _recent_jobs(workspace, limit=6):
     return list(
-        AgencyJob.objects.filter(workspace=workspace, kind__in=TEAM_KINDS)
+        chat.web_jobs(AgencyJob.objects.filter(workspace=workspace, kind__in=TEAM_KINDS))
         .select_related("requested_by")
         .order_by("-created_at")[:limit]
     )
@@ -180,7 +180,10 @@ def write(request, workspace_id):
 def _get_job(request, workspace_id, job_id):
     workspace = _workspace(request, workspace_id)
     job = get_object_or_404(
-        AgencyJob.objects.select_related("requested_by"), pk=job_id, workspace=workspace, kind__in=TEAM_KINDS
+        chat.web_jobs(AgencyJob.objects.select_related("requested_by")),
+        pk=job_id,
+        workspace=workspace,
+        kind__in=TEAM_KINDS,
     )
     return workspace, job
 
@@ -289,13 +292,9 @@ def team_panel(request, workspace_id, post_id):
     if workspace is None or workspace.id != workspace_id or is_plain_client(request.workspace_membership):
         return HttpResponse("")
     post = get_object_or_404(BlogPost.objects.select_related("site"), pk=post_id, workspace=workspace)
-    active = blog_job.active_job(post)
-    latest = (
-        AgencyJob.objects.filter(workspace=workspace, blog_post=post, kind__in=TEAM_KINDS)
-        .exclude(status__in=AgencyJob.ACTIVE_STATUSES)
-        .order_by("-created_at")
-        .first()
-    )
+    jobs = chat.web_jobs(AgencyJob.objects.filter(workspace=workspace, blog_post=post, kind__in=TEAM_KINDS))
+    active = jobs.filter(status__in=AgencyJob.ACTIVE_STATUSES).order_by("-created_at").first()
+    latest = jobs.exclude(status__in=AgencyJob.ACTIVE_STATUSES).order_by("-created_at").first()
     can_revise, can_repurpose = _may_revise(request, post), _may_repurpose(request, post)
     if not (can_revise or can_repurpose or active or latest):
         return HttpResponse("")

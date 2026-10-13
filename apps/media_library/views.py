@@ -18,6 +18,7 @@ from apps.workspaces.models import Workspace
 from .models import MediaAsset, MediaFolder
 from .quotas import StorageQuotaExceededError
 from .services import (
+    ImageTooLargeError,
     ProtectedAssetError,
     create_asset,
     create_folder,
@@ -26,6 +27,7 @@ from .services import (
     promote_subfolders,
     restore_version,
     upload_rejection_message,
+    validate_image_edit_dimensions,
 )
 from .tasks import process_image_edit, process_media_asset, process_video_trim
 from .validators import get_accepted_file_types
@@ -342,15 +344,22 @@ def asset_edit(request, workspace_id, asset_id):
                     crop_y = int(request.POST["crop_y"])
                     crop_w = int(request.POST["crop_width"])
                     crop_h = int(request.POST["crop_height"])
-                    if crop_x < 0 or crop_y < 0 or crop_w <= 0 or crop_h <= 0:
+                    validate_image_edit_dimensions(crop_w, crop_h)
+                    if crop_x < 0 or crop_y < 0:
                         raise ValueError("Crop dimensions must be positive")
+                    if (
+                        asset.width
+                        and asset.height
+                        and (crop_x + crop_w > asset.width or crop_y + crop_h > asset.height)
+                    ):
+                        raise ValueError("Crop must fit inside the image")
                     operations["crop"] = {
                         "x": crop_x,
                         "y": crop_y,
                         "width": crop_w,
                         "height": crop_h,
                     }
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, KeyError, ValidationError, ImageTooLargeError):
                     return JsonResponse({"error": "Invalid crop parameters"}, status=400)
             if request.POST.get("rotate"):
                 try:
@@ -371,8 +380,9 @@ def asset_edit(request, workspace_id, asset_id):
                     rh = int(request.POST["resize_height"])
                     if rw <= 0 or rh <= 0 or rw > 10000 or rh > 10000:
                         raise ValueError("Resize dimensions out of range")
+                    validate_image_edit_dimensions(rw, rh)
                     operations["resize"] = {"width": rw, "height": rh}
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, ValidationError, ImageTooLargeError):
                     return JsonResponse({"error": "Invalid resize parameters"}, status=400)
 
             if operations:
@@ -1008,15 +1018,22 @@ def shared_asset_edit(request, asset_id):
                     crop_y = int(request.POST["crop_y"])
                     crop_w = int(request.POST["crop_width"])
                     crop_h = int(request.POST["crop_height"])
-                    if crop_x < 0 or crop_y < 0 or crop_w <= 0 or crop_h <= 0:
+                    validate_image_edit_dimensions(crop_w, crop_h)
+                    if crop_x < 0 or crop_y < 0:
                         raise ValueError("Crop dimensions must be positive")
+                    if (
+                        asset.width
+                        and asset.height
+                        and (crop_x + crop_w > asset.width or crop_y + crop_h > asset.height)
+                    ):
+                        raise ValueError("Crop must fit inside the image")
                     operations["crop"] = {
                         "x": crop_x,
                         "y": crop_y,
                         "width": crop_w,
                         "height": crop_h,
                     }
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, KeyError, ValidationError, ImageTooLargeError):
                     return JsonResponse({"error": "Invalid crop parameters"}, status=400)
             if request.POST.get("rotate"):
                 try:
@@ -1037,8 +1054,9 @@ def shared_asset_edit(request, asset_id):
                     rh = int(request.POST["resize_height"])
                     if rw <= 0 or rh <= 0 or rw > 10000 or rh > 10000:
                         raise ValueError("Resize dimensions out of range")
+                    validate_image_edit_dimensions(rw, rh)
                     operations["resize"] = {"width": rw, "height": rh}
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, ValidationError, ImageTooLargeError):
                     return JsonResponse({"error": "Invalid resize parameters"}, status=400)
 
             if operations:

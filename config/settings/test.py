@@ -29,6 +29,19 @@ EMAIL_RECIPIENT_DAILY_LIMIT = -1
 # Disable CSP in tests
 CSP_REPORT_ONLY = True
 
+# Tests must not inherit a production Redis binding from the machine's .env.
+# Shared counters and stale OAuth state leak between test runs/processes and
+# can make unrelated login/API tests fail. Redis integration tests opt in with
+# override_settings(CACHES=...) and an isolated Redis database explicitly.
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "tests"},
+    "filmstrip": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "test-filmstrip",
+        "OPTIONS": {"MAX_ENTRIES": 32, "CULL_FREQUENCY": 2},
+    },
+}
+
 # Use local storage in tests. STORAGES must be reset too, not just the flag:
 # base.py already picked the backend from the *environment*, so on a machine
 # whose .env sets STORAGE_BACKEND=s3 the suite was quietly running against the

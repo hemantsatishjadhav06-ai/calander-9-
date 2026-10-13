@@ -17,6 +17,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ui:
+    name: Agency UI state tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked UI test dependencies
+        run: npm ci --ignore-scripts
+      - name: Run UI state tests
+        run: npm run test:ui
+
   lint:
     name: Lint (ruff)
     runs-on: ubuntu-latest
@@ -70,7 +89,7 @@ jobs:
   test:
     name: Test (pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     services:
       postgres:
         # Pulled via AWS's public mirror of Docker Hub official images —
@@ -124,7 +143,7 @@ jobs:
     name: Docker build
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, ui]
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -162,8 +181,13 @@ jobs:
 
       - name: Install gitleaks
         run: |
-          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | tar -xz -C /tmp gitleaks
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fLsS --retry 3 -o "/tmp/${archive}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          curl -fLsS --retry 3 -o /tmp/gitleaks_checksums.txt \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          (cd /tmp && sha256sum --check --ignore-missing gitleaks_checksums.txt)
+          tar -xzf "/tmp/${archive}" -C /tmp gitleaks
           sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
           gitleaks version
 

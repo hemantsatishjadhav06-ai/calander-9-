@@ -199,7 +199,11 @@ class LocalTimeTests(UploadFeedbackBase):
 
 def test_caddy_serves_only_the_public_media_prefixes():
     caddyfile = (Path(settings.BASE_DIR) / "Caddyfile").read_text()
-    match = re.search(r"@public_media path (.+)", caddyfile)
+    match = re.search(r"@public_media\s*\{\s*path ([^\n]+)", caddyfile)
     assert match, "Caddyfile must restrict /media/ to a @public_media matcher"
     served = {p.strip("/*") + "/" for p in match.group(1).split()}
     assert served == set(PUBLIC_MEDIA_PREFIXES)
+    # Switching to S3 must also retire any uploads left on the persistent volume.
+    assert 'expression `"{$STORAGE_BACKEND:local}" == "local"`' in caddyfile
+    assert "handle @public_media {\n            file_server\n        }" in caddyfile
+    assert "handle {\n            respond 404\n        }" in caddyfile

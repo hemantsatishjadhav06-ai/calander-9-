@@ -456,10 +456,14 @@ class PortalMixedPostActionTests(TestCase):
         )
 
     def _login_portal(self):
+        from apps.client_portal.models import MagicLinkToken
+
         self.client.force_login(self.client_user)
+        token = MagicLinkToken.objects.create(user=self.client_user, workspace=self.ws, is_consumed=True)
         session = self.client.session
         session["is_portal_session"] = True
         session["portal_workspace_id"] = str(self.ws.id)
+        session["portal_token_id"] = str(token.id)
         session.save()
 
     def test_mixed_pending_post_exposes_client_actions(self):

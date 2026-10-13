@@ -245,6 +245,7 @@ class Post(models.Model):
     caption = models.TextField(blank=True, default="")
     first_comment = models.TextField(blank=True, default="")
     internal_notes = models.TextField(blank=True, default="")
+    delivery_holds = models.JSONField(default=dict, blank=True)
     tags = models.JSONField(default=list, blank=True)
     category = models.ForeignKey(
         ContentCategory,
@@ -278,6 +279,18 @@ class Post(models.Model):
         snippet = (self.caption[:50] + "...") if len(self.caption) > 50 else self.caption
         return f"Post({self.status}): {snippet or '(no caption)'}"
 
+    def save(self, *args, **kwargs):
+        from apps.publisher.delivery import trusted_delivery_write
+
+        if not trusted_delivery_write():
+            stored = (
+                type(self).objects.filter(pk=self.pk).values_list("delivery_holds", flat=True).first()
+                if self.pk
+                else None
+            )
+            self.delivery_holds = stored if isinstance(stored, dict) else {}
+        super().save(*args, **kwargs)
+
     # ------------------------------------------------------------------
     # Derived status (aggregated across PlatformPost children)
     # ------------------------------------------------------------------
@@ -302,6 +315,8 @@ class Post(models.Model):
     @property
     def is_editable(self):
         """Whether the post can be edited in the composer."""
+        if self.has_unknown_delivery:
+            return False
         return self.status in (
             "draft",
             "changes_requested",
@@ -309,6 +324,13 @@ class Post(models.Model):
             "approved",
             "scheduled",
         )
+
+    @property
+    def has_unknown_delivery(self):
+        holds = self.delivery_holds if isinstance(self.delivery_holds, dict) else {}
+        if any(isinstance(h, dict) and h.get("kind") == "unknown" for h in holds.values()):
+            return True
+        return bool(self.pk and self.platform_posts.filter(platform_extra___delivery_state__kind="unknown").exists())
 
     @property
     def is_schedulable(self):
@@ -585,9 +607,26 @@ class PlatformPost(models.Model):
         instance._loaded_status = instance.__dict__.get("status")
         return instance
 
+    def _preserve_delivery_state(self):
+        from apps.publisher.delivery import STATE_KEY, trusted_delivery_write
+
+        if trusted_delivery_write():
+            return
+        old = (
+            type(self).objects.filter(pk=self.pk).values_list("platform_extra", flat=True).first() if self.pk else None
+        )
+        old_marker = old.get(STATE_KEY) if isinstance(old, dict) else None
+        extra = dict(self.platform_extra or {})
+        if old_marker is not None:
+            extra[STATE_KEY] = old_marker
+        else:
+            extra.pop(STATE_KEY, None)
+        self.platform_extra = extra
+
     def save(self, *args, **kwargs):
         from apps.approvals import gate
 
+        self._preserve_delivery_state()
         # Backstop for writers that set ``status`` without transition_to().
         gate.check_write(self, getattr(self, "_loaded_status", None))
         super().save(*args, **kwargs)
@@ -610,6 +649,8 @@ class PlatformPost(models.Model):
         from apps.approvals import gate
 
         expected = getattr(self, "_loaded_status", None)
+        if "platform_extra" in fields:
+            self._preserve_delivery_state()
         if "status" in fields:
             gate.check_write(self, expected)
         values = {name: getattr(self, name) for name in fields if name != "updated_at"}

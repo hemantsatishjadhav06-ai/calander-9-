@@ -1,80 +1,110 @@
-"""Onboarding checklist evaluation logic.
+"""Activation milestones for a reviewed brand draft and its actual delivery."""
 
-Computes the 4 checklist items and their completion status for a workspace.
-Used by the workspace dashboard to render the dynamic "Get Started" card.
-"""
+from datetime import timedelta
 
 from django.urls import reverse
 
 
 def get_checklist_items(workspace):
-    """Return a list of checklist item dicts with dynamic completion status.
+    """Guide the first useful agency outcome without treating a draft as delivery.
 
-    Each item has: key, title, description, completed (bool), url, icon_color, icon_svg
-
-    SECURITY: `icon_svg` is rendered with `|safe` in the checklist template.
-    It MUST remain a server-side constant string. Never populate it from user
-    input, model fields, or any other untrusted source.
+    The account milestone reflects saved connection health, not an independent
+    live identity check. Publication requires a successful native post ID.
+    ``icon_svg`` values are server constants because the template uses safe.
     """
-    from apps.composer.models import Idea, Post
+    from apps.approvals.models import ApprovalAction
+    from apps.composer.models import PlatformPost
     from apps.members.models import WorkspaceMembership
     from apps.social_accounts.models import SocialAccount
+    from apps.studio.models import StudioBrief
+    from apps.studio.trust import current_claims
 
-    workspace_id = workspace.id
-
-    items = [
-        {
-            "key": "connect_accounts",
-            "title": "Connect social accounts",
-            "description": "Link the social accounts you publish to",
-            "completed": SocialAccount.objects.for_workspace(workspace_id).exists(),
-            "url": reverse(
-                "social_accounts:connect",
-                kwargs={"workspace_id": workspace_id},
-            ),
-            "icon_color": "sky",
-            "icon_svg": '<path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"/><path d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>',
-        },
-        {
-            "key": "create_post",
-            "title": "Schedule your first post",
-            "description": "Put a post on the calendar for one of your channels",
-            # Activation is a post on its way out, not a draft: a lone draft
-            # used to tick this and the checklist declared the team onboarded.
-            "completed": Post.objects.for_workspace(workspace_id)
-            .filter(platform_posts__status__in=["scheduled", "publishing", "published"])
-            .exists(),
-            "url": reverse(
-                "composer:compose",
-                kwargs={"workspace_id": workspace_id},
-            ),
-            "icon_color": "sky",
-            "icon_svg": '<path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>',
-        },
-        {
-            "key": "create_idea",
-            "title": "Create your first idea",
-            "description": "Capture content ideas to develop later",
-            "completed": Idea.objects.for_workspace(workspace_id).filter(author__isnull=False).exists(),
-            "url": reverse(
-                "composer:create_landing",
-                kwargs={"workspace_id": workspace_id},
-            ),
-            "icon_color": "sky",
-            "icon_svg": '<path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>',
-        },
-        {
-            "key": "invite_members",
-            "title": "Invite your team",
-            "description": "Add team members to collaborate on content",
-            # Any teammate counts. This used to require a *client* membership, so
-            # a team that invited editors and managers sat at 3/4 forever.
-            "completed": WorkspaceMembership.objects.filter(workspace_id=workspace_id)
+    workspace_id = workspace.pk
+    healthy = any(
+        not account.needs_reconnect and not account.token_expires_within(timedelta(seconds=0))
+        for account in SocialAccount.objects.filter(workspace=workspace, connection_status="connected")
+    )
+    checked_facts = current_claims(workspace).exists()
+    confirmed = StudioBrief.objects.filter(
+        workspace=workspace,
+        origin=StudioBrief.Origin.CHAT,
+        job__workspace=workspace,
+        job__input__kind="confirm_brief",
+        job__input__facts_confirmed=True,
+    ).exists()
+    reviewed = ApprovalAction.objects.filter(
+        post__workspace=workspace,
+        action=ApprovalAction.ActionType.APPROVED,
+        channel="dashboard",
+        user__isnull=False,
+    ).exists()
+    delivered = (
+        PlatformPost.objects.filter(
+            post__workspace=workspace,
+            social_account__workspace=workspace,
+            status=PlatformPost.Status.PUBLISHED,
+            published_at__isnull=False,
+        )
+        .exclude(platform_post_id="")
+        .exists()
+    )
+    calendar = reverse("calendar:calendar", kwargs={"workspace_id": workspace_id})
+    milestones = [
+        (
+            "verified_facts",
+            "Confirm your brand facts",
+            "Add an owner-verified source and review date before briefing the team.",
+            checked_facts,
+            reverse("studio:trust", kwargs={"workspace_id": workspace_id}),
+        ),
+        (
+            "connect_accounts",
+            "Connect your brand account",
+            "Connect an active account and check that it belongs to this brand.",
+            healthy,
+            reverse("social_accounts:connect", kwargs={"workspace_id": workspace_id}),
+        ),
+        (
+            "confirmed_brief",
+            "Confirm your first creative brief",
+            "Answer the team's questions, check the source facts and confirm a draft.",
+            confirmed,
+            reverse("studio:thread", kwargs={"workspace_id": workspace_id}),
+        ),
+        (
+            "review_draft",
+            "Review your first draft",
+            "Check the finished graphic and each channel's copy, then approve and schedule.",
+            reviewed,
+            calendar + "?mode=list&tab=approvals",
+        ),
+        (
+            "published_post",
+            "Check your first published post",
+            "Confirm the actual post on the intended account after delivery.",
+            delivered,
+            calendar + "?mode=list&tab=sent",
+        ),
+        (
+            "invite_members",
+            "Invite your team",
+            "Add an active teammate to collaborate on content and review.",
+            WorkspaceMembership.objects.filter(workspace=workspace, user__is_active=True)
             .exclude(workspace_role=WorkspaceMembership.WorkspaceRole.OWNER)
             .exists(),
-            "url": reverse("members:list"),
-            "icon_color": "sky",
-            "icon_svg": '<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6m3-3h-6"/>',
-        },
+            reverse("members:list"),
+        ),
     ]
-    return items
+    icon = '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>'
+    return [
+        {
+            "key": key,
+            "title": title,
+            "description": description,
+            "completed": complete,
+            "url": url,
+            "icon_color": "sky",
+            "icon_svg": icon,
+        }
+        for key, title, description, complete, url in milestones
+    ]

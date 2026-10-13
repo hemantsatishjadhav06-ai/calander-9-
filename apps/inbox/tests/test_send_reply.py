@@ -104,8 +104,8 @@ def test_providers_without_a_comment_edge_alias_reply_to_comment():
         provider.reply_to_message.assert_called_once_with("token", "comment-1", "Thanks!", {"k": "v"})
 
 
-def test_a_provider_that_cannot_reply_records_the_reply_locally(client, fb_account, org_owner, user):
-    """Losing the platform call must not lose the team's written answer."""
+def test_a_provider_that_cannot_reply_reports_failure(client, fb_account, org_owner, user):
+    """The composer keeps the answer; the thread cannot show it as delivered."""
     from apps.members.models import WorkspaceMembership
 
     WorkspaceMembership.objects.create(
@@ -121,10 +121,9 @@ def test_a_provider_that_cannot_reply_records_the_reply_locally(client, fb_accou
         )
 
     assert response.status_code == 200
-    assert "HX-Reply-Failed" not in response
-    reply = InboxReply.objects.get(inbox_message=message)
-    assert reply.status == InboxReply.Status.SENT
-    assert reply.platform_reply_id == ""
+    assert response["HX-Reply-Failed"] == "1"
+    assert "does not support replies" in response.content.decode()
+    assert not InboxReply.objects.filter(inbox_message=message).exists()
 
 
 def test_the_error_shown_to_users_carries_no_raw_api_text(client, fb_account, org_owner, user):

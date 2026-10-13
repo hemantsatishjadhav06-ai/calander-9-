@@ -14,6 +14,7 @@ import json
 import uuid
 from typing import Any
 
+from django.db import transaction
 from django.http import HttpRequest
 
 from apps.api.models import IdempotencyRecord
@@ -52,18 +53,21 @@ def log_audit_entry(
     # ``api_key`` FK. See apps/api/auth.py::OAuthMcpActor.
     is_oauth = getattr(api_key, "is_oauth", False)
     try:
-        ApiKeyAuditLog.objects.create(
-            api_key=None if is_oauth else api_key,
-            actor_user=api_key.issued_by if is_oauth else None,
-            actor_label="oauth" if is_oauth else "",
-            action=action,
-            target_id=target_id,
-            method=request.method or "",
-            path=request.path[:255],
-            status_code=status_code,
-            ip=_client_ip(request),
-            user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:512],
-        )
+        # Isolate DB failures with a savepoint. Swallowing an IntegrityError
+        # without one poisons the caller's transaction and fails its request.
+        with transaction.atomic():
+            ApiKeyAuditLog.objects.create(
+                api_key=None if is_oauth else api_key,
+                actor_user=api_key.issued_by if is_oauth else None,
+                actor_label="oauth" if is_oauth else "",
+                action=action,
+                target_id=target_id,
+                method=request.method or "",
+                path=request.path[:255],
+                status_code=status_code,
+                ip=_client_ip(request),
+                user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:512],
+            )
     except Exception:  # noqa: BLE001 — best-effort, swallow.
         import logging
 
@@ -163,6 +167,10 @@ def claim_idempotency_slot(
 
     if not idempotency_key:
         return "passthrough", None, None
+
+    max_key_length = IdempotencyRecord._meta.get_field("key").max_length
+    if max_key_length is not None and len(idempotency_key) > max_key_length:
+        raise ValueError("idempotency_key must contain at most 128 characters.")
 
     try:
         with transaction.atomic():

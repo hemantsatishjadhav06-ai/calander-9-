@@ -176,8 +176,16 @@ class SocialAccount(models.Model):
             "oauth_refresh_token",
             "token_expires_at",
             "connection_status",
+            "last_error",
             "updated_at",
         ]
+        token_fields = (
+            "oauth_access_token",
+            "oauth_refresh_token",
+            "token_expires_at",
+            "connection_status",
+            "last_error",
+        )
         # Serialise refreshes on the account row. Two due posts on one channel
         # run in different threads with separate instances; both refreshing
         # from the same refresh token means the loser persists a token the
@@ -186,30 +194,40 @@ class SocialAccount(models.Model):
         # the lock, a refresh another caller just completed is simply adopted.
         with transaction.atomic():
             fresh = type(self).objects.select_for_update().get(pk=self.pk)
-            if fresh.oauth_access_token != self.oauth_access_token and not fresh.is_token_expiring_soon:
-                for field in ("oauth_access_token", "oauth_refresh_token", "token_expires_at", "connection_status"):
+            changed = (
+                fresh.oauth_access_token != self.oauth_access_token
+                or fresh.oauth_refresh_token != self.oauth_refresh_token
+            )
+            if changed and (fresh.token_expires_at is None or fresh.token_expires_at > timezone.now()):
+                # Short-lived tokens remain inside the seven-day refresh window
+                # even immediately after rotation. Adopt that rotation rather
+                # than refreshing again for every waiting publisher.
+                for field in token_fields:
                     setattr(self, field, getattr(fresh, field))
                 return self.oauth_access_token
 
             new_tokens = provider.refresh_token(fresh.oauth_refresh_token)
-            self.oauth_access_token = new_tokens.access_token
+            fresh.oauth_access_token = new_tokens.access_token
             if new_tokens.refresh_token:
-                self.oauth_refresh_token = new_tokens.refresh_token
+                fresh.oauth_refresh_token = new_tokens.refresh_token
             if new_tokens.expires_in:
-                self.token_expires_at = timezone.now() + timedelta(seconds=new_tokens.expires_in)
-            self.connection_status = self.ConnectionStatus.CONNECTED
+                fresh.token_expires_at = timezone.now() + timedelta(seconds=new_tokens.expires_in)
+            fresh.connection_status = self.ConnectionStatus.CONNECTED
+            fresh.last_error = ""
             if enqueue_backfill:
-                self.save(update_fields=update_fields)
+                fresh.save(update_fields=update_fields)
             else:
                 # post_save signals do not receive caller-local keyword arguments.
                 # A short-lived instance flag keeps the token in the normal
                 # update_fields path while telling analytics.signals that this save
                 # is already part of the analytics pass.
-                self._skip_analytics_backfill = True
+                fresh.__dict__["_skip_analytics_backfill"] = True
                 try:
-                    self.save(update_fields=update_fields)
+                    fresh.save(update_fields=update_fields)
                 finally:
-                    del self._skip_analytics_backfill
+                    del fresh.__dict__["_skip_analytics_backfill"]
+            for field in token_fields:
+                setattr(self, field, getattr(fresh, field))
         return new_tokens.access_token
 
     # Platform character limits
