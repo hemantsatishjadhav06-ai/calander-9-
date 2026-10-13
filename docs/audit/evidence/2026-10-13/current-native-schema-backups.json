@@ -1,0 +1,43 @@
+{
+  "record_type": "sm_bean_current_native_schema_backups",
+  "source_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+  "required_migrations_present": true,
+  "required_migration_count": 10,
+  "pending_migrations": 0,
+  "managed_bot_required_columns": 18,
+  "managed_bot_columns_present": true,
+  "oauth_physical_nonblank_or_null_counts": {
+    "access": 0,
+    "refresh": 0
+  },
+  "oauth_row_visibility_complete": true,
+  "oauth_effective_storage_ready": true,
+  "oauth_refresh_grace_integer_zero": true,
+  "one_use_release_marker_absent": true,
+  "pre_migration_backup": {
+    "required": true,
+    "old_writers_removed_before_backup": true,
+    "source_commit_matches": true,
+    "isolation": "REPEATABLE READ READ ONLY",
+    "exists": true,
+    "csv_tables": 110,
+    "manifest_tables": 110,
+    "bytes": 3761589
+  },
+  "normal_release_backup": {
+    "required": true,
+    "source_commit_matches": true,
+    "isolation": "REPEATABLE READ READ ONLY",
+    "exists": true,
+    "csv_tables": 121,
+    "manifest_tables": 121,
+    "bytes": 3763642
+  },
+  "native_daily_backup": {
+    "configured": true,
+    "retention_days": 6,
+    "manual_and_prior_snapshots_preserved": true
+  },
+  "production_restore_drill_performed": false,
+  "private_rows_or_capability_urls_included": false
+}

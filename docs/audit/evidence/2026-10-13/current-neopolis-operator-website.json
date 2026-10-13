@@ -1,0 +1,36 @@
+{
+  "record_type": "sm_bean_current_neopolis_preparation",
+  "source_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+  "workspace": "Neopolis",
+  "operator_grant": {
+    "original_company_owner_preserved": true,
+    "terms_state_preserved": true,
+    "email_verification_preserved": true,
+    "can_manage_agency_content": true,
+    "can_approve": true,
+    "can_read": true,
+    "can_manage_workspace_settings": true,
+    "org_role": "admin",
+    "workspace_role": "manager",
+    "custom_role": true
+  },
+  "custom_role_name": "Agency operator",
+  "custom_role_scope": "Existing organization only; built-in manager permissions plus manage_workspace_settings.",
+  "canonical_website": "https://neopolisinfra.com/",
+  "website_only_corrected": true,
+  "canonical_collector_ready": true,
+  "claims_count": 0,
+  "verified_claims_count": 0,
+  "approval_policy_preserved": true,
+  "ownership_preserved": true,
+  "paid_jobs_or_calls_performed": false,
+  "next_week": {
+    "start": "2026-10-19",
+    "end": "2026-10-25",
+    "timezone": "Asia/Kolkata",
+    "generated_drafts": 0,
+    "schedule_changes": 0,
+    "native_publications": 0
+  },
+  "private_identities_or_raw_output_included": false
+}

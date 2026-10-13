@@ -1,0 +1,20 @@
+{
+  "record_type": "sm_bean_current_trial_telegram_connection",
+  "source_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+  "workspace": "Neopolis",
+  "username": "sammanager06_bot",
+  "native_credential_identity_verified": true,
+  "native_settings_ready": true,
+  "native_receiver_matches": true,
+  "encrypted_connection_active": true,
+  "ciphertext_shape_verified": true,
+  "decryption_roundtrip_verified": true,
+  "approval_gate_preserved": true,
+  "can_manage_bots": false,
+  "human_pairing_completed": false,
+  "team_or_client_groups_paired": false,
+  "child_bot_creation_completed": false,
+  "messages_or_real_approvals_sent": false,
+  "human_legal_consent_changed": false,
+  "private_identifiers_or_credentials_included": false
+}

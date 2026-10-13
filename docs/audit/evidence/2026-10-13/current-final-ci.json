@@ -1,0 +1,68 @@
+{
+  "record_type": "sm_bean_final_application_ci",
+  "observed_on": "2026-10-13",
+  "tested_source_commit": "30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1",
+  "deployed_merge_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+  "tested_and_deployed_trees_equal": true,
+  "pr11_run_url": "https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/38414262597",
+  "all_six_jobs_passed": true,
+  "checks": [
+    {
+      "id": 115361500579,
+      "name": "Docker build",
+      "head_sha": "30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 115354361412,
+      "name": "Secret scan (gitleaks)",
+      "head_sha": "30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 115354361285,
+      "name": "Type check (mypy)",
+      "head_sha": "30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 115354361169,
+      "name": "Test (pytest)",
+      "head_sha": "30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 115354361094,
+      "name": "Agency UI state tests",
+      "head_sha": "30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 115354360993,
+      "name": "Lint (ruff)",
+      "head_sha": "30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "pytest": {
+    "passed": 4731,
+    "skipped": 1,
+    "subtests_passed": 194,
+    "warnings": 1388,
+    "duration_seconds": 779.56
+  },
+  "both_full_docker_builds_and_runtime_secret_isolation_verified": true,
+  "main_ci": {
+    "source_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+    "run_url": "https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/38417472520",
+    "all_six_jobs_passed": true,
+    "evidence_basis": "Fresh GitHub API verification by release owner; main-run pytest totals not separately inspected."
+  },
+  "raw_logs_included": false
+}

@@ -1,17 +1,36 @@
 # Launch fix verification — 13 October 2026
 
-The Railway-compatible build recipe and local marketing fixes passed the checks below. Full CI for these changes and deployment of the new source remain pending. The last observed active production source is `05ca828b2be22d4c3a65fbdf67404961e0f13124`.
+The Railway-compatible Docker recipe and marketing corrections are now deployed
+in matching native web/worker services at `91bef9ec9ff42b47fed80db66ca572fc5b066107`.
+The evidence supports a supervised operator beta; production AI, Gmail, paired
+customer/group approval and publication acceptance remain incomplete.
 
 | Check | Observed result |
 | --- | --- |
-| Docker recipe validation | `docker buildx build --check` passed for `Dockerfile` and `Dockerfile.cloud`, with official ECR Node/Python base overrides and no warnings. This did not execute a full build or start an image. |
-| Generated cloud recipe | Deterministic generation and `--check` passed. Missing, duplicate, commented-out, changed install blocks and missing/stale generated files were rejected. Ruff, formatting, mypy and CI YAML/script syntax passed. |
-| Local Chromium | **73 checks passed**: 66 navigation/layout/fallback checks and 7 mobile button contrast checks across desktop, tablet, mobile, disabled JavaScript, blocked script and reduced-motion scenarios. |
-| Existing marketing suite | **17 passed**, as recorded in the completed reviewer run. |
-| Existing DOM suite | **30 passed** with `npm run test:ui`, as recorded in the completed reviewer run. |
+| Final required CI | All six jobs passed on tested PR11 head `30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1`: **4,731 passed, 1 skipped, 194 subtests**. The merged deployed tree is identical. All six main checks also passed on the exact deployed commit; main-run totals were not separately inspected. |
+| Full Docker builds | Canonical `Dockerfile` and generated `Dockerfile.cloud` both completed in CI. Cloud dependency stages executed with CA trust; runtime assertions confirmed absence of the secret file, CA environment overrides and `.env`. This is stronger evidence than the earlier recipe-only check. |
+| Generated cloud recipe | Deterministic generation/drift validation and negative cases passed. TLS, frozen npm installation and hash-verified Python dependencies remain enforced. |
+| Local Chromium, historical | **73 passed**: 66 layout/navigation/fallback checks plus 7 mobile-contrast checks; desktop/tablet/mobile, disabled JavaScript, blocked script and reduced motion. Two deliberate script blocks produced two expected resource errors. |
+| Marketing and DOM suites | **17 marketing tests** and **30 locked DOM state tests** passed. Targeted counts overlap broader CI and are not added to its total. |
+| Live anonymous production checks | **137 checks passed** against actual production browser/layout/navigation and route/header behavior, including fallback behavior. These are anonymous checks; email consent, client acceptance and paid providers remain separate. |
+| Current native release | Web `aac80bcf-d891-4541-a312-ab5452c8ea13`, worker `afc72c9f-7640-4273-9f12-d7dc9fd8b222`:SUCCESS, correct native source,16 anchors each, actual `/Dockerfile`, one replica each. |
+| Production security/reliability | Ten migrations; pending 0; 18 required managed-bot columns; physical OAuth plaintext counts 0; one worker lease; four actual successful recurring cycles; cache roundtrip/cleanup and public health pass. Wrong-secret Telegram POST returns 403. |
+| Telegram and Neopolis preparation | Trial identity, encrypted workspace connection and native receiver pass; real operator scope and website-only canonical correction completed. Pairing, groups, child-bot creation, draft generation and real publication remain undone. |
 
-The browser run recorded no page exceptions or unintended request failures. Two marketing-script requests were deliberately blocked to test fallback navigation; their two resource console errors are expected. The additional contrast checks passed after the mobile button fix.
+[Current CI](evidence/2026-10-13/current-final-ci.json) ·
+[Native rollout](evidence/2026-10-13/current-native-rollout.json) ·
+[Schema/backups](evidence/2026-10-13/current-native-schema-backups.json) ·
+[Worker](evidence/2026-10-13/current-native-worker.json) ·
+[Encrypted trial connection](evidence/2026-10-13/current-telegram-neopolis.json).
 
-Canonical dependency installation still uses TLS, `npm ci` and hash-verified pip. The generated cloud recipe supplies optional CA trust through BuildKit secrets. CI is configured to build both recipes, execute the cloud dependency stages with a mounted CA and check that the secret, CA environment settings and `.env` are absent from its runtime image. These full-build results are not yet observed.
+The earlier [recipe-only receipt](evidence/2026-10-13/launch-fix-verification.json)
+records validation before full CI and activation. Its pending/older-source fields
+are historical snapshots, superseded by the current receipts above. Earlier
+unsupported-mount failures and the preliminary platform diagnosis are also
+historical. No credentials, private actors, raw logs or signed capability URLs
+are included in the curated current evidence.
 
-[Curated evidence](evidence/2026-10-13/launch-fix-verification.json) includes recipe/source-record digests and safe counts. It contains no private identities, credentials or capability links. These local anonymous checks do not establish Gmail consent, real provider generation/publication, authenticated acceptance or the new live worker/source revision.
+The [CTO decision](CTO_LAUNCH_DECISION_2026-10-13.md) retains the critical launch
+limits. AI campaign generation requires the absent Railway OpenRouter key;
+Gmail requires genuine human consent; actual clients, groups, approval and
+native publication receipts still need a supervised pilot.

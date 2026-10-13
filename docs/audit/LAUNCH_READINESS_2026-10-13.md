@@ -1,10 +1,10 @@
 # SM Bean release review — 13 October 2026
 
-The uploaded update has been integrated with the preceding security and
-publishing repairs. The resulting release is a tested staging candidate.
-Public launch and the real Neopolis calendar remain unverified until the live
-acceptance below is completed. Historical reports and synthetic fixtures do
-not establish current production behavior.
+SM Bean now runs the reviewed release in matching native web and worker services
+at `91bef9ec9ff42b47fed80db66ca572fc5b066107`. The application supports a
+**supervised operator beta**. Production AI credentials, Gmail consent, real
+client/group acceptance and a completed Neopolis campaign remain outstanding.
+Historical fixtures and public-route checks do not establish those outcomes.
 
 ## What changed
 
@@ -24,141 +24,120 @@ not establish current production behavior.
 
 | Check | Observed result |
 | --- | --- |
-| Integrated PostgreSQL suite before the final OAuth repair | Local: **4,676 passed, 1 skipped**, 31 warnings; 513.68 seconds. First GitHub CI: **4,679 passed, 1 skipped**, plus 194 subtests. The final full CI result is recorded in the next row. |
-| Final full GitHub CI | **4,731 passed, 1 skipped**, plus **194 subtests**; 1,388 warnings in 761.91 seconds. All six jobs passed at `31ae13fc22483759a0f79053417003ac9d9ba4c2`: PostgreSQL tests, Docker, UI, lint, types and secret scan. [CI run](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/38391832886). |
-| Browser review | **49 checks passed** using Chromium, including real local passwordless portal sessions, revocation, personal pairing, managed consent UI, guided briefs and phone/tablet layouts. No JavaScript errors, failed requests or HTTP 5xx were observed. Telegram/model responses in this review were controlled fixtures. |
-| DOM state tests | **30 passed** from the locked root npm dependencies. |
-| Lint, formatting and types | Ruff passed; 746 Python files formatted; mypy passed across 861 source files. |
-| Migration and Django checks | No migration drift; application system checks passed. |
-| Dependency audits | No known vulnerabilities reported by pip-audit against the frozen Python lock or npm audit for the root and theme locks at review time. |
-| CSS/static assets | Tailwind build and production collectstatic passed. |
-| OAuth storage repair | **153 focused PostgreSQL tests passed**, including 15 new seeded migration/legacy authentication, rotation, replay and revocation regressions; migration drift, types, formatting and deployment checks passed. |
-| Current release inspector | **64 focused regressions passed**, including manifest v2 tamper checks, current schema, actual read-only PostgreSQL counts and hidden-row refusal. |
-| Redis integration | **7 passed, 0 skipped**, including the default suite's skipped case, real cache round trips and filmstrip alias separation. Isolated Redis prefixes/test database were cleaned. |
-| Production container before final OAuth/tooling repair | Passed: PostgreSQL/Redis health, secure login, authenticated calendar/agency/Telegram pages, collected assets, wrong-secret webhook 403, all migrations including Telegram 0002, worker success heartbeats, one lease, overlapping worker rejection and graceful lease release. Unprivileged runtime, immutable code and writable media checked. Internal network and synthetic records; no provider/public-bot calls. Final Docker CI build also passed; final Railway image boot remains unrun. |
-| Secret scan | Official checksum-verified Gitleaks 8.24.3: no findings in available Git history or current source. |
+| Final PR11 CI | **4,731 passed, 1 skipped, 194 subtests**; all six jobs passed on `30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1`. The deployed merge has the identical tree. [Current CI receipt](evidence/2026-10-13/current-final-ci.json). |
+| Main CI on deployed source | All six jobs passed on exact native commit `91bef9ec9ff42b47fed80db66ca572fc5b066107`. [Run38417472520](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/38417472520). Main-run pytest totals were not separately inspected. |
+| Canonical/cloud full builds | Both full Docker builds completed. Cloud npm/hash-checked pip stages executed; runtime assertions verified absence of the mounted secret, CA overrides and `.env`. Native Railway Web/worker both use `/Dockerfile`. |
+| Live anonymous production review | **137 checks passed**, covering actual public browser/layout/navigation/fallback behavior and route/header checks. These checks do not establish authenticated client, email, paid-provider or publication acceptance. |
+| Native source and services | Web `aac80bcf-d891-4541-a312-ab5452c8ea13` and worker `afc72c9f-7640-4273-9f12-d7dc9fd8b222`: SUCCESS on the same full commit, all 16 file anchors verified per service, one us-west2 replica each. |
+| Native schema/security | All ten required migrations applied; pending 0; all 18 required managed-bot columns present. Physical access/refresh counts for NULL or nonblank OAuth tokens are both 0, with complete row visibility. Effective compliant storage is enabled and refresh grace is integer 0. |
+| Live worker/cache | Exactly one PostgreSQL singleton lease; four registered core schedules and four actual successful recurring-cycle heartbeats. Publisher, agency and confirmation health are current. Cache roundtrip and cleanup passed. |
+| HTTPS and webhook protection | Public health returns 200 with database/cache healthy; a public wrong-secret Telegram POST returns 403. These checks are separate from the real trial receiver verification. |
+| Required backups | Pre-migration: 110 CSV/manifest tables, 3,761,589 bytes, after old writers were removed. Normal second-Web release: 121 CSV/manifest tables, 3,763,642 bytes. Stored manifests match source. Both use repeatable-read read-only snapshots. Daily native backups retain six days; prior snapshots are preserved. |
+| Telegram trial | Actual runtime identity, active encrypted Neopolis connection, ciphertext/decryption roundtrip and native receiver match passed. READY is true in Web/worker. Personal/group pairing, real messages and approvals remain unverified. |
+| Operator and canonical source | Intended real operator scope is granted; company ownership and legal/email state preserved. Only the saved website changed to `https://neopolisinfra.com/`; the canonical collector succeeds. No business claims were promoted to verified. |
 
-The default suite uses isolated memory caches, so its Redis-specific filmstrip
-case is skipped. The full-suite warnings primarily concern test-setting
-overrides. Targeted agent runs overlap this suite and are not added to its count.
-The container build initially exhausted this sandbox's VFS disk; that interrupted
-run is not a passing test result. The clean full run above completed after
-task-owned unused build cache was removed.
+The single skipped full-suite case uses Redis-specific behavior. A separate
+seven-test real-Redis run passed, as recorded in earlier evidence. Targeted
+suite counts overlap the full suite and are not summed into 4,731.
 
-## Production observations and open acceptance
+## Completed production rollout
 
-**Corrected deployment diagnosis:** official snapshot-scoped logs now identify
-Railway rejecting the optional `type=secret` Dockerfile mounts. The earlier
-allocation-only log view omitted the actual parser errors. Four attempts,
-including a direct immutable source upload on another builder, share that error.
-The canonical recipe is being corrected; a generated cloud variant retains
-optional secure CA mounts. No certificate or dependency-hash verification is
-disabled. The earlier unexplained-platform-outage assessment is superseded.
+The old worker was removed before the old Web. Exact IDs, native REMOVED status,
+absence of old/duplicate active deployments and fresh zero locked-task/publishing
+claims were checked before one authorized marker PUT. The native image had
+already verified all 16 immutable file hashes and its full Git/deployment
+identity. The marker was consumed and verified absent before the required
+backup and migration command.
 
-PR [10](https://github.com/hemantsatishjadhav06-ai/calander-9-/pull/10) merged into `main` at `e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f`; its tree exactly matches the final CI source. Railway automatic deployment remains held for the controlled migration. The earlier metadata-only readout showed scheduling messages and no image; the corrected diagnosis above identifies the parser errors it missed. The V2 diagnostic was restored to V3 without deployment. Existing web and worker remain running. No old service has been stopped, and no new image has been activated.
+A second Web deployment then used the normal `python manage.py release --verify`
+command with Telegram readiness enabled. The matching new leased worker started
+after Web source/schema/readiness verification. Each service now has exactly
+one matching active deployment. Automatic deployment remains held for controlled
+operator releases; worker predeploy is empty. Existing encryption, storage,
+database, cache and Fal configuration was preserved.
 
-The public SM Bean health endpoint reported healthy database/cache, and the
-landing and login pages responded successfully. These requests do not identify
-the deployed source or exercise authenticated workflows. The confirmed Railway
-project is `66526b2a-6a09-43d8-bedb-ecfdd37f8d8a`; authenticated project control
-was initially unavailable. After the user saved secret bindings, authenticated
-inspection confirmed the SM Bean production web and worker at the older
-`05ca828b2be22d4c3a65fbdf67404961e0f13124` source. Both automatic deployments
-were held. Explicit hosts, trusted worker proxy, OpenRouter provider/model and
-inactive Telegram setup were staged without restarting the old services. The
-initially staged OpenRouter credential was an opaque cloud proxy reference,
-not a portable raw API key. That new entry has now been removed from both
-services with a staged patch that did not trigger deployment. Every other
-rendered variable was preserved. The key is still missing in Railway, so paid
-Studio generation remains blocked pending secure installation and verification.
-The old services remain running with their existing configuration.
-Matching existing encryption, database, cache, storage and fal values were
-preserved. The previous wildcard host configuration would fail the new release's
-deployment check; the staged configuration passes it.
+[Current rollout](evidence/2026-10-13/current-native-rollout.json) ·
+[Current schema/backups](evidence/2026-10-13/current-native-schema-backups.json) ·
+[Current worker](evidence/2026-10-13/current-native-worker.json) ·
+[Current encrypted bot](evidence/2026-10-13/current-telegram-neopolis.json) ·
+[Operator/source preparation](evidence/2026-10-13/current-neopolis-operator-website.json).
 
-A native PostgreSQL snapshot and a repeatable-read application backup were
-created and independently verified. The latter contains 110 CSV tables and a
-matching manifest. Storage authentication, TLS, temporary-object cleanup and
-anonymous backup-access denial were checked. Native daily PostgreSQL backups
-are now configured with six-day retention; the manual snapshot and prior backups
-were preserved. A bounded, fail-closed operator
-gate permits migration only after the old services are removed and database
-work is drained. These observations precede the final rollout; final deployed
-source/runtime receipts must be recorded separately.
+## Remaining acceptance and critical limits
 
-OpenRouter authentication and positive credits were verified through the cloud
-proxy without generation. Cloud secret references work only through their
-configured proxy bindings and must not be copied into Railway as raw keys.
-The cloud `FAL_KEY` reference is scoped to `fal.run` and `queue.fal.run`. The
-earlier `api.fal.ai` HTTP 401 was outside that binding and does not establish the
-underlying Fal key's validity. Preserve the existing Railway raw Fal key: it
-returned HTTP 200 for model metadata. Its billing scope does not expose credits;
-actual inference still needs a real workflow.
+OpenRouter authentication and positive credits passed through the cloud proxy,
+but `OPENROUTER_API_KEY` is still absent in Railway. A proxy reference is not a
+portable raw key. Install it securely for the production services, or extend
+the saved binding to the authorized hosting destination before forwarding it.
+Verify authentication inside the app before paid work. Existing Railway Fal
+passed authenticated model metadata; billing scope and actual inference remain
+unverified. An earlier cloud request to `api.fal.ai` was outside its saved
+binding and does not establish an invalid underlying key.
 
-The intended administrator was absent despite configured credentials. A normal
-Django `createsuperuser` bootstrap created only that new account and its default
-private organization/workspace. Current owner and all preexisting memberships
-were preserved. A live password login reached the human Terms gate; automation
-did not accept Terms, verify email or grant Neopolis access. The operator can
-now personally enter the Gmail consent flow from Email operations.
+The Gmail mailbox is unconnected. Human Terms acceptance, Google consent and
+actual email delivery remain undone. Published legal pages retain draft-policy
+notices; human/legal review and final operator details remain prerequisites for
+commercial launch. The intended administrator can complete the normal
+[Email operations](https://sm-bean-production-eb50.up.railway.app/ops/email/)
+flow after personally accepting the presented Terms. Automation did not accept
+Terms or verify anyone's email. Send the authorized client/team invitations
+only after delivery works; assign a distinct backup after genuine acceptance.
 
-Production has no connected Gmail mailbox/refresh token, and Neopolis has only
-one current member with no agency settings or backup approver. Invitations,
-password resets and emailed client links therefore need a genuine mailbox
-connection. The owner's email is unverified; mandatory verification was not
-enabled blindly. Public launch requires that human setup, actual delivery and a
-distinct current backup. The user has supplied two real invitation addresses;
-neither currently has an account or membership. Invite them through the normal
-flow after mailbox connection, retain client/team role boundaries, and assign
-backup only after acceptance. Error-tracking service and admin IP restriction
-remain operator configuration choices; production deployment checks expose them.
+The trial `@sammanager06_bot` is connected through encrypted workspace storage
+and its receiver is verified. It reports `can_manage_bots=false`. Real people
+still need their personal pairing links, and group administrators must create
+and link separate client/team groups. A capable manager plus native consent, or
+the supported BotFather/token flow, is required for new company bots. No child
+bots, groups, approval messages or real human approvals were fabricated.
+Replace the trial credential securely before customer use.
 
-The trial `@sammanager06_bot` passed a read-only identity check and reported
-`can_manage_bots=false`. No live webhook was changed, child bot created,
-group paired or message sent. Use a genuinely capable manager for native bot
-creation, or create a company bot with BotFather and enter its token in the
-encrypted workspace form. Telegram group creation and passive group membership
-remain human/admin responsibilities. Replace the token shared in chat before
-production use.
+The real operator has organization-admin and workspace-manager scope with an
+organization-scoped **Agency operator** role: built-in manager permissions plus
+workspace-settings authority. Original company ownership remains intact. The
+website-only canonical correction preserves other profile fields, approval
+policy and legal/email state. Canonical collection and existing Facebook/
+Instagram source reads are preparation evidence; verified business claims remain
+zero. They do not prove generated campaign quality or consent to publication.
 
-Automatic deployment was held before merging into `main`. Before activating the
-release, drain the old worker, pause writes, verify the backup, migrate once and
-deploy matching web/worker source with existing encryption keys intact.
-See the [controlled rollout](../TELEGRAM_RAILWAY_ROLLOUT.md). Record exact source,
-deployment and runtime receipts; public health alone is insufficient.
+The **19–25 October 2026** Neopolis week, in Asia/Kolkata, remains empty. No new
+model-generated drafts, approved schedule or publication were created. Once the
+production provider works, run the actual `listen → moments → plan → brief`
+workflow, review genuine copy/media and actual costs, then obtain exact human
+approval before scheduling. The [worksheet](NEOPOLIS_WEEK_2026-10-19.md) contains
+proposals, not delivered posts.
 
-Then complete a real client pilot: current lead and distinct backup, separate
-team/client groups, actual model/image output, current business facts, authentic
-or clearly disclosed illustrative imagery, exact phone approval, delivered
-notifications and a native social publication receipt. Verify email delivery,
-shared storage, provider permissions, actual costs and held-send recovery. This
-review does not establish those commercial or external-service outcomes.
+Stored backups do not establish a successful production restore. A single
+healthy worker does not establish capacity, paid-service quotas, an SLA or
+staffed support. Complete the supervised client pilot, production recovery and
+native-publication checks before widening launch. The
+[CTO decision](CTO_LAUNCH_DECISION_2026-10-13.md) and
+[50-criterion review](USER_REVIEW_2026-10-13.md) retain these user/business limits.
+Configurable software roles do not represent 50 human employees.
 
-## Critical user review and Neopolis
+## Historical evidence
 
-The current [CTO launch decision](CTO_LAUNCH_DECISION_2026-10-13.md) consolidates
-the business review and exact remaining actions.
+Earlier PR10 validation and pre-release reports described the healthy older
+`05ca828b2be22d4c3a65fbdf67404961e0f13124` services. Those old services are now
+removed. Four Git/CLI diagnostic builds failed before activation because the
+Railway parser rejected optional `type=secret` mounts. Snapshot-scoped logs
+superseded the preliminary unexplained-platform-outage diagnosis. The canonical
+recipe was corrected; optional cloud CA mounts remain in a separate generated
+recipe. TLS and artifact-hash verification remain enforced. The own-image
+registry fallback was researched and unused.
 
-The [50-criterion user review](USER_REVIEW_2026-10-13.md) records the interface,
-security, privacy, creative-quality and operating gaps, with browser evidence.
-It distinguishes implemented controls from acceptance that still needs actual
-people and external services. The software's configurable agency roles are not
-a claim that 50 human employees participated or that generated creatives have
-passed client review.
-
-The [19–25 October Neopolis worksheet](NEOPOLIS_WEEK_2026-10-19.md) uses fresh
-official-site context and separates company claims from verified facts. No live
-Neopolis drafts, approvals, schedule or publication were changed. Production
-access and paired actors are required to inspect existing work, run SM Bean's
-`listen → moments → plan → brief` workers, review actual outputs and update the
-remaining week. Topic suggestions in the worksheet are not generated posts.
+Earlier receipts remain dated snapshots: local 49-check controlled portal/
+Telegram review, local 73-check marketing review, 17 marketing tests, 30 DOM
+checks, focused OAuth/schema suites, isolated container smoke and recipe-only
+checks. [Earlier recipe receipt](evidence/2026-10-13/launch-fix-verification.json)
+and [parser investigation](RAILWAY_BUILD_BLOCKER_2026-10-13.md) are historical;
+their pending/older-source fields do not describe the current rollout. Use the
+curated current receipts and [machine status](RELEASE_STATUS_2026-10-13.json)
+for the present beta decision.
 
 ## Cloud environment
 
-The reusable setup draft includes hash-checked Python dependencies, frozen npm
-dependencies, UI checks and safe local setup that preserves existing `.env`
-keys. It also records PostgreSQL tests, worker/start instructions and the
-current release gates. Saving the draft does not execute it or publish the
-environment: review/save it in environment settings and publish it there.
-Declare credentials securely through settings; never place their values in
-Git, audit receipts or chat.
+Reusable installation/start instructions and secure bindings are maintained in
+environment settings separately from these production receipts. Frozen npm,
+hash-checked Python, PostgreSQL/Redis checks and the generated cloud recipe are
+part of the development workflow. Saving a draft does not execute or publish it;
+a new cloud task still needs its own startup validation. Keep credentials in
+secure settings and preserve existing `.env` keys.

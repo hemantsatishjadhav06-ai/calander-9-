@@ -1,224 +1,181 @@
 {
-  "record_type": "launch_execution_in_progress",
-  "prepared_on": "2026-10-13",
-  "release_branch": "codex/smbean-launch-parser-fix",
-  "target_branch": "main",
-  "source_manifest": "Schema v2, 16 immutable source anchors, ten required migrations; generate a fresh artifact from the final full commit SHA.",
-  "local_validation": {
-    "launch_parser_and_marketing_followup": {
-      "browser_checks_passed": 73,
-      "marketing_tests_passed": 17,
-      "node_dom_tests_passed": 30,
-      "canonical_and_cloud_docker_build_check": "passed",
-      "full_followup_ci": "pending",
-      "live_followup_activation": "pending"
-    },
-    "full_pytest": {
-      "passed": 4676,
-      "skipped": 1,
-      "warnings": 31,
-      "scope": "Before final OAuth repair; final full GitHub CI completed successfully on PR10."
-    },
-    "redis_followup": {
-      "passed": 7,
-      "skipped": 0
-    },
-    "chromium": {
-      "passed": 49,
-      "javascript_errors": 0,
-      "failed_requests": 0,
-      "http_5xx": 0,
-      "controlled_providers": true
-    },
-    "node_dom": {
-      "passed": 30
-    },
-    "release_manifest_schema_regressions": {
-      "passed": 64,
-      "includes_real_postgresql_readonly_counts": true
-    },
-    "ruff": "passed",
-    "format": "passed",
-    "mypy": "passed",
-    "migration_drift": "none",
-    "django_checks": "passed",
-    "dependency_audits": "no_known_vulnerabilities_reported",
-    "container_smoke": "passed",
-    "gitleaks_findings": 0,
-    "github_initial_ci": {
-      "passed": 4679,
-      "skipped": 1,
-      "subtests_passed": 194,
-      "all_six_jobs": "passed",
-      "source_commit": "7e472a69ae8d0c57bdbbe4b7d7196b07bed0cc63"
-    },
-    "oauth_storage_focused": {
-      "passed": 153,
-      "new_seeded_and_end_to_end_tests": 15
-    },
-    "github_final_ci": {
+  "record_type": "supervised_operator_beta_deployed",
+  "observed_on": "2026-10-13",
+  "decision": {
+    "application_rollout_complete": true,
+    "supervised_operator_beta_supported": true,
+    "unrestricted_customer_launch_ready": false,
+    "actual_campaign_delivery_complete": false
+  },
+  "application_release": {
+    "source_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+    "tested_source_commit": "30e4d3e0f2e018ba7725fd80cf4384cd9dc8a7c1",
+    "same_tree_as_tested_pr11": true,
+    "pull_request": "https://github.com/hemantsatishjadhav06-ai/calander-9-/pull/11",
+    "target_branch": "main",
+    "source_manifest_schema": 2,
+    "immutable_source_anchors": 16
+  },
+  "current_validation": {
+    "all_six_required_ci_jobs": "passed",
+    "pr11_pytest": {
       "passed": 4731,
       "skipped": 1,
-      "subtests_passed": 194,
-      "warnings": 1388,
-      "duration_seconds": 761.91,
-      "all_six_jobs": "passed",
-      "source_commit": "31ae13fc22483759a0f79053417003ac9d9ba4c2",
-      "run_url": "https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/38391832886"
+      "subtests_passed": 194
+    },
+    "pr11_ci_run_url": "https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/38414262597",
+    "main_exact_deployed_source_ci": {
+      "source_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+      "run_url": "https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/38417472520",
+      "all_six_jobs_passed": true,
+      "evidence_basis": "Fresh GitHub API verification by release owner; main-run pytest totals not separately inspected."
+    },
+    "both_full_docker_builds_and_runtime_secret_isolation": "passed",
+    "live_health": "HTTP200_database_and_cache_healthy",
+    "wrong_secret_telegram_webhook": "HTTP403",
+    "native_source_anchors_verified_each_service": 16,
+    "release_schema": {
+      "required_migrations": 10,
+      "pending_migrations": 0,
+      "managed_bot_columns": 18,
+      "oauth_physical_nonblank_or_null_access_tokens": 0,
+      "oauth_physical_nonblank_or_null_refresh_tokens": 0,
+      "complete_row_visibility": true,
+      "effective_compliant_token_storage": true,
+      "refresh_grace_integer_zero": true
+    },
+    "worker": {
+      "replicas": 1,
+      "exact_pg_singleton_lease_holders": 1,
+      "registered_core_schedules": 4,
+      "actual_successful_core_heartbeats": 4,
+      "publisher_agency_confirmation_health": "healthy",
+      "cache_roundtrip_and_cleanup": "passed"
+    },
+    "live_anonymous_production_checks": {
+      "passed": 137,
+      "scope": "Live anonymous actual-production checks: browser/layout/navigation/fallback plus route/header checks. Authenticated client, Gmail, provider and publication acceptance are separate."
     }
   },
   "production": {
     "project_id": "66526b2a-6a09-43d8-bedb-ecfdd37f8d8a",
-    "secret_bindings_saved": true,
-    "authenticated_inspection": "confirmed_sm_bean_web_and_worker",
-    "public_health": "healthy_database_and_cache",
-    "source_revision_verified": false,
-    "rollout_completed": false,
-    "bot_changed": false,
-    "messages_sent": false,
-    "social_posts_published": false,
-    "observed_existing_source_commit": "05ca828b2be22d4c3a65fbdf67404961e0f13124",
+    "url": "https://sm-bean-production-eb50.up.railway.app",
+    "web_deployment_id": "aac80bcf-d891-4541-a312-ab5452c8ea13",
+    "worker_deployment_id": "afc72c9f-7640-4273-9f12-d7dc9fd8b222",
+    "matching_native_source_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+    "web_status": "SUCCESS",
+    "worker_status": "SUCCESS",
+    "builder": "DOCKERFILE",
+    "dockerfile": "/Dockerfile",
+    "replicas_per_service": 1,
+    "region": "us-west2",
+    "old_web_and_worker_removed": true,
+    "no_unexpected_active_deployments": true,
     "autodeploy_held": true,
-    "configuration_staged_without_restart": true,
-    "staged_cloud_openrouter_reference_requires_raw_key_correction": false,
-    "staged_cloud_reference_active_in_running_services": false,
-    "stable_encryption_storage_and_fal_preserved": true,
-    "native_postgres_backup_record_verified": true,
-    "repeatable_read_application_backup_verified": {
-      "csv_tables": 110,
-      "manifest_tables": 110,
-      "bytes": 3721984
-    },
-    "anonymous_backup_access_denied": true,
-    "mailbox_connected": false,
-    "owner_email_verified": false,
-    "initial_new_web_build": {
-      "deployment_id": "a378721c-6d62-448b-b899-ca2fab612116",
-      "status": "FAILED",
-      "image_created": false,
-      "only_log_observed": "scheduling build on Metal builder",
-      "cause_established": true,
-      "old_services_remain_running": true,
-      "cause": "unsupported_Dockerfile_secret_mounts"
-    },
-    "observed_existing_source_verified": true,
-    "staged_cloud_openrouter_reference_removed": true,
-    "openrouter_key_installed_in_railway": false,
-    "openrouter_cleanup_preserved_all_other_variables": true,
-    "openrouter_cleanup_triggered_deployments": false,
-    "bounded_new_web_retry": {
-      "deployment_id": "620bc09e-7340-4620-9b30-5618436f937f",
-      "status": "FAILED",
-      "source_commit": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
-      "image_created": false,
-      "only_log_observed": "scheduling build on Metal builder",
-      "cause_established": true,
-      "old_services_remain_running": true,
-      "cause": "unsupported_Dockerfile_secret_mounts"
-    },
-    "configured_administrator_bootstrap": {
-      "created_with_normal_django_command": true,
-      "source_commit": "05ca828b2be22d4c3a65fbdf67404961e0f13124",
-      "password_login_reached_human_terms_gate": true,
-      "terms_accepted_by_automation": false,
-      "email_verified_by_automation": false,
-      "original_company_owner_and_memberships_preserved": true,
-      "neopolis_role_granted": false
-    },
-    "native_postgres_daily_backup": {
-      "configured": true,
-      "retention_seconds": 518400,
-      "cron_utc": "46 17 * * *",
-      "manual_snapshot_and_prior_backups_preserved": true
-    },
-    "alternative_build_route": {
-      "deployment_id": "0d6ad38d-76fd-4fa2-967a-12e94a121e6a",
-      "actual_builder": "DOCKERFILE",
-      "actual_build_environment": "V2",
-      "status": "FAILED",
-      "image_created": false,
-      "web_configuration_restored_to_original_v3": true,
-      "old_services_remain_running": true,
-      "cause": "unsupported_Dockerfile_secret_mounts"
-    },
-    "fresh_post_admin_application_backup_verified": {
-      "bytes": 3738004,
-      "csv_tables": 110,
-      "manifest_tables": 110,
-      "isolation": "REPEATABLE READ READ ONLY",
-      "writes_were_live": true,
-      "paused_writes_pre_migration_backup_still_required": true
-    },
-    "fresh_post_admin_native_snapshot_verified": true,
-    "container_registry_fallback": "researched_no_existing_public_pullable_image_verified_new_package_requires_visibility_and_provenance_setup",
-    "corrected_build_diagnosis": {
-      "established": true,
-      "failure": "Railway Dockerfile parser rejects type=secret mounts",
-      "reported_lines": [
-        9,
-        38
-      ],
-      "log_source": "official CLI snapshot-scoped environmentLogs",
-      "legacy_build_logs_omitted_parser_error": true,
-      "prior_unexplained_platform_outage_claim_superseded": true,
-      "billing_restriction_observed": false,
-      "native_cli_archive_digest_matches_submitted_immutable_source": true
-    },
-    "cli_upload_diagnostic": {
-      "deployment_id": "d188b90c-63cc-4e3a-9d5c-b55954b97d18",
-      "status": "FAILED",
-      "native_archive_digest_verified": true,
-      "same_parser_error": true,
-      "image_created": false,
-      "old_services_preserved": true
-    },
-    "telegram_trial_variable_stage": {
-      "web_only": true,
-      "skip_deploys": true,
-      "name_only_readback": true,
-      "active_and_latest_deployments_unchanged": true,
-      "runtime_auth_verified": false,
-      "webhook_changed": false
-    }
+    "web_predeploy": "python manage.py release --verify",
+    "worker_predeploy": null,
+    "stable_encryption_storage_database_cache_and_fal_preserved": true,
+    "one_use_release_marker_consumed_and_absent": true
   },
-  "trial_bot": {
-    "username": "sammanager06_bot",
-    "identity_verified": true,
-    "can_manage_bots": false,
-    "workspace_connected_by_this_work": false
+  "backups": {
+    "pre_migration": {
+      "csv_tables": 110,
+      "manifest_tables": 110,
+      "bytes": 3761589,
+      "verified": true,
+      "old_writers_removed": true
+    },
+    "second_web_normal_release": {
+      "csv_tables": 121,
+      "manifest_tables": 121,
+      "bytes": 3763642,
+      "verified": true
+    },
+    "application_backup_isolation": "REPEATABLE READ READ ONLY",
+    "native_daily_schedule_configured": true,
+    "native_daily_retention_days": 6,
+    "prior_native_and_application_backups_preserved": true,
+    "production_restore_drill_performed": false
+  },
+  "telegram": {
+    "trial_username": "sammanager06_bot",
+    "actual_runtime_identity_verified": true,
+    "encrypted_neopolis_connection_active": true,
+    "native_webhook_receiver_matches": true,
+    "ready_true_both_services": true,
+    "manager_child_bot_capability": false,
+    "human_personal_pairing_completed": false,
+    "team_or_client_group_pairing_completed": false,
+    "child_bots_created": false,
+    "real_messages_or_approvals_verified": false
   },
   "neopolis": {
-    "workspace_id_from_uploaded_release": "b1cb458c-cfaf-43cf-8e23-f5e18a9717c7",
+    "real_operator_scope_granted": true,
+    "organization_role": "admin",
+    "workspace_role": "manager",
+    "custom_role": "Agency operator",
+    "custom_role_scope": "Existing organization only; manager permissions plus workspace settings.",
+    "original_company_owner_preserved": true,
+    "terms_and_email_verification_state_preserved": true,
+    "website_only_corrected_to": "https://neopolisinfra.com/",
+    "canonical_collector_ready": true,
+    "all_other_profile_fields_preserved": true,
+    "verified_business_claims": 0,
     "week_start": "2026-10-19",
     "week_end": "2026-10-25",
     "timezone": "Asia/Kolkata",
-    "live_work_created": false,
-    "live_schedule_changed": false,
-    "active_workspace_confirmed": true,
-    "next_week_existing_post_count": 0,
-    "current_member_count": 1,
+    "new_generated_drafts": 0,
+    "approved_schedule_changed": false,
+    "social_posts_published": false,
     "backup_approver_configured": false,
-    "client_and_backup_addresses_supplied": true,
-    "requested_identities_have_existing_accounts": false,
-    "invitations_sent": false
+    "real_invitations_sent": false
   },
-  "note": "Current launch execution: detailed snapshot logs identified a target-specific Dockerfile parser error; prior unexplained-platform-failure diagnosis is superseded. Production recipe and marketing corrections are under validation. Final activation and real client/provider acceptance remain pending. Never include secret values or private customer data.",
-  "provider_verification": {
-    "cloud_openrouter": "cloud_proxy_authenticated_positive_credits",
-    "cloud_fal": "opaque_proxy_reference_api_fal_ai_401_outside_binding_does_not_establish_key_validity",
-    "cloud_fal_allowed_hosts": [
-      "fal.run",
-      "queue.fal.run"
-    ],
-    "cloud_references_are_portable_raw_keys": false,
-    "staged_railway_openrouter_value": "opaque_reference_removed_missing_real_key",
-    "existing_railway_fal": "raw_key_model_metadata_accepted_http_200_billing_scope_unavailable",
-    "paid_generation_verified": false
+  "remaining_acceptance": {
+    "openrouter_key_installed_in_railway": false,
+    "actual_paid_model_or_image_generation_verified": false,
+    "gmail_mailbox_connected": false,
+    "real_email_delivery_verified": false,
+    "human_terms_and_google_consent_completed": false,
+    "real_client_invitation_and_acceptance_completed": false,
+    "distinct_backup_approver_accepted": false,
+    "personal_and_separate_team_client_telegram_groups_paired": false,
+    "real_post_phone_review_and_final_human_approval_completed": false,
+    "native_social_publication_receipt_verified": false,
+    "production_restore_and_capacity_drill_completed": false,
+    "draft_legal_policies_human_review_completed": false,
+    "legal_policy_draft_notices_present": true
   },
-  "git_main_merge": {
-    "pull_request": "https://github.com/hemantsatishjadhav06-ai/calander-9-/pull/10",
-    "merged": true,
-    "merge_commit": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
-    "same_tree_as_final_ci_source": true
-  }
+  "provider_scope": {
+    "cloud_openrouter": "Authenticated read-only checks and positive credits; production key remains absent.",
+    "cloud_secret_references_are_portable_keys": false,
+    "railway_fal": "Existing credential preserved; authenticated model metadata HTTP200, billing scope unavailable, actual inference unverified.",
+    "cloud_fal_api_fal_ai_401": "Outside saved proxy destination scope; does not classify underlying credential invalid."
+  },
+  "historical_evidence": {
+    "scope": "Earlier validation and failed-build observations retained as history; they are superseded by current native receipts above.",
+    "pre_release_application_source": "05ca828b2be22d4c3a65fbdf67404961e0f13124",
+    "previous_status_report_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+    "earlier_pr10_merge": "e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f",
+    "earlier_ci_head": "31ae13fc22483759a0f79053417003ac9d9ba4c2",
+    "four_failed_builds": "Unsupported type=secret mounts; parser diagnosis confirmed through snapshot logs. Git/CLI diagnostics produced no image and preceded the completed corrected native rollout.",
+    "initial_platform_outage_diagnosis_superseded": true,
+    "local_controlled_browser_checks": 49,
+    "local_marketing_followup_browser_checks": 73,
+    "local_marketing_tests": 17,
+    "locked_dom_tests": 30,
+    "focused_oauth_storage_tests": 153,
+    "focused_manifest_schema_regressions": 64,
+    "independent_offline_gate_controller_tests": 46,
+    "independent_native_gate_consumer_cases": 15,
+    "counts_are_not_added_to_full_ci_totals": true
+  },
+  "current_safe_evidence": [
+    "evidence/2026-10-13/current-final-ci.json",
+    "evidence/2026-10-13/current-native-rollout.json",
+    "evidence/2026-10-13/current-native-schema-backups.json",
+    "evidence/2026-10-13/current-native-worker.json",
+    "evidence/2026-10-13/current-telegram-neopolis.json",
+    "evidence/2026-10-13/current-neopolis-operator-website.json"
+  ],
+  "note": "Code deployment, encrypted trial-bot connection and worker processing are complete. Supervised operator beta requires the human/provider acceptance listed above; current tests do not establish finished Neopolis campaigns or unrestricted launch."
 }

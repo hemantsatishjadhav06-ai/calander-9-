@@ -1,66 +1,81 @@
 # SM Bean launch decision — 13 October 2026
 
-The repaired application is a tested release candidate. Public launch is blocked:
-Railway has not yet built or activated the corrected code, and real client/provider
-acceptance is incomplete. The existing website remains healthy on its older
-revision. Do not advertise the cumulative fixes as already live.
+SM Bean is deployed and technically usable as a **supervised operator beta**.
+Matching web and worker services run the reviewed `91bef9ec9ff42b47fed80db66ca572fc5b066107`
+release. Unrestricted customer launch and the requested Neopolis campaign remain
+blocked by production provider setup and actual human acceptance.
+
+## Current deployment and acceptance
+
+PR [11](https://github.com/hemantsatishjadhav06-ai/calander-9-/pull/11) merged the
+exact tested tree into `main`. All six final CI jobs passed: **4,731 tests passed,
+1 skipped, 194 subtests**. All six main-branch checks also passed on the exact
+deployed commit; their separate pytest totals have not been inspected.
+[Current CI evidence](evidence/2026-10-13/current-final-ci.json).
+
+Web `aac80bcf-d891-4541-a312-ab5452c8ea13` and worker
+`afc72c9f-7640-4273-9f12-d7dc9fd8b222` are native Railway **SUCCESS** deployments,
+each with one replica and all 16 immutable source anchors verified. The old
+worker and web were removed in that order. Ten migrations are present, no
+migration is pending, and physical OAuth access/refresh plaintext counts are
+zero with complete row visibility. One PostgreSQL worker lease and four actual
+successful recurring-task heartbeats were verified. Public health returns 200;
+a wrong-secret Telegram POST returns 403. **137 live anonymous production checks
+passed**; these checks do not prove customer onboarding or external delivery.
+
+Required private backups were verified: 110 CSV/manifest tables before migration
+and 121 after migration, with matching source manifests. Daily native backups
+retain six days, and previous snapshots remain. Auto deployment stays held;
+web uses its normal required-backup release command and worker predeploy is empty.
+[Current rollout](evidence/2026-10-13/current-native-rollout.json) ·
+[Schema and backups](evidence/2026-10-13/current-native-schema-backups.json) ·
+[Worker evidence](evidence/2026-10-13/current-native-worker.json).
+
+The intended operator received organization-admin and workspace-manager scope
+with the organization-scoped **Agency operator** custom role. Original company
+ownership, Terms and email-verification state were preserved. Neopolis's saved
+website alone was corrected to `https://neopolisinfra.com/`; the canonical
+collector now succeeds. Other profile fields and factual-claim verification were
+preserved. The trial bot is now connected to Neopolis through the encrypted
+flow, its native identity and receiver were verified, and webhook readiness is
+true on both services. Actual people and groups remain unpaired.
 
 ## Critical review across the business
 
-| Perspective | Assessment | Required evidence before launch |
+| Perspective | Current assessment | Evidence still needed for unrestricted launch |
 | --- | --- | --- |
-| Client usability | Passwordless portal access and Telegram pairing passed local browser checks on phone/tablet. | A real invited client receives a link, pairs their own identity and reviews an actual finished draft. |
-| Agency operations | Lead/backup boundaries, guided preparation, exact approval and held-send recovery are implemented. | The real team member accepts access; reminders reach distinct current people; a native publication is confirmed. |
-| Security and privacy | Portal isolation, invitations, uploads, credential refresh and OAuth checksum storage have meaningful regressions. | Activate the reviewed web/worker and inspect migrated schema, zero reusable plaintext token counts and runtime source. |
-| Creative quality and factual accuracy | Current claims and photo provenance are enforced; illustrative media receives disclosures. | Review actual model/image output against current Neopolis facts. Scraped company claims and old photos are not independent verification. |
-| Reliability and recovery | Worker leases, uncertain-send holds and verified backups are in place. | Complete the live worker/provider pilot and a managed production recovery drill. Daily snapshots alone do not demonstrate restoration. |
-| Cost and capacity | The agency budget is a soft threshold; external services have separate charges. | Observe actual job costs, delivery latency and the intended workload. One serial worker does not establish a high-volume SaaS SLA. |
-| Integrations | Code supports several platforms; the trial Telegram identity is valid. | Check actual account permissions and native receipts for each advertised live channel. The trial bot cannot manage child bots. |
-| Support and commercial launch | Early-access policies describe limits and responsibilities. | Confirm the actual operator/support arrangements and monitor the pilot. Technical tests do not establish legal review, staffed support or conversion performance. |
+| Client usability | Public production navigation, mobile layouts and fallback behavior pass. Local controlled portal/pairing checks pass. | A real client receives access, accepts their account and reviews an actual finished draft on a phone. |
+| Agency operations | Real operator authority, matching worker, successful recurring cycles and exact review boundaries are verified. | A distinct real backup accepts access; team/client groups receive their intended notifications. |
+| Security and privacy | Migrated schema, plaintext-token redaction, encrypted trial connection and wrong-secret rejection pass in production. | Exercise tenant boundaries with real accepted clients; rotate the supplied trial credential before customer use. |
+| Creative quality and factual accuracy | Canonical source collection works; verified business claims remain zero. | Generate and review actual copy/images against current company facts. A source website or old photograph alone does not prove a claim. |
+| Reliability and recovery | Single-worker lease, durable cycle success, cache and required backups are verified. | Demonstrate production recovery, held-send handling and an actual provider pilot; stored backups alone do not prove restoration. |
+| Cost and capacity | One worker is operating; the agency budget remains a soft threshold. | Observe paid-job costs, latency, quotas and intended customer load before promising capacity or an SLA. |
+| Integrations | Encrypted Neopolis trial-bot connection and native receiver are verified. | Personal/group pairing, real messages, per-channel permissions and a native social publication receipt. The trial bot cannot create child bots. |
+| Support and commercial launch | Early-access policies state review boundaries and operating limits. | Actual human Terms/Google consent, support staffing and client acceptance. Test counts do not establish legal review or commercial readiness. |
 
-The [50-criterion review](USER_REVIEW_2026-10-13.md) contains the detailed user
-findings. Eight specialist workstreams and software roles are not a claim that
-50 human employees reviewed or delivered this product.
+The [50-criterion review](USER_REVIEW_2026-10-13.md) supplies the earlier detailed
+user findings. Software roles and specialist workstreams do not represent 50
+human employees or establish client approval of generated creatives.
 
-## Completed work
+## Remaining blockers and exact actions
 
-- Integrated the uploaded cumulative source while preserving the earlier audit
-  repairs; PR [10](https://github.com/hemantsatishjadhav06-ai/calander-9-/pull/10)
-  merged into `main` at `e630f34e1eaabe7ea4bfd8cb1b1ffe966d13a60f`.
-- Final CI: **4,731 passed, 1 skipped**, 194 subtests; all six jobs passed.
-  Additional local browser, Redis, DOM and focused security checks are recorded
-  separately in the [readiness report](LAUNCH_READINESS_2026-10-13.md).
-- Created the intended configured administrator through the normal Django
-  command. A live password login reached the human Terms gate. Existing company
-  ownership and memberships were preserved; no Terms or verification was forged.
-- Verified private application backups and native PostgreSQL snapshots,
-  including fresh backups after administrator creation. Enabled daily native
-  backups with six-day retention and preserved earlier snapshots.
-- Held automatic deployment, preserved existing encryption/storage/provider
-  keys and kept the original web/worker running. Removed the mistakenly staged
-  opaque OpenRouter references without triggering deployment.
-- Saved reusable cloud installation/start instructions and the actual checkout
-  declaration. This is draft persistence; the user still publishes the cloud
-  environment through its settings.
-
-## Remaining blockers and next actions
-
-| Blocker | Exact next action |
+| Blocker | Required action |
 | --- | --- |
-| Railway build recipe | Detailed snapshot logs identified unsupported secret mounts; the earlier unexplained-platform diagnosis was incorrect. Validate the corrected canonical Dockerfile and generated cloud variant, then activate matching reviewed web/worker under the existing gate. [Investigation](RAILWAY_BUILD_BLOCKER_2026-10-13.md). |
-| Provider credential installation | Add `backboard.railway.com` to the existing cloud OpenRouter binding, or securely set the real key in both Railway services. Verify actual service authentication before paid jobs. Add `api.fal.ai` to the existing cloud fal binding for noncharging metadata checks; preserve the working Railway Fal value. |
-| Gmail consent | Sign in with the configured administrator credentials, personally accept Terms, then use [Email operations](https://sm-bean-production-eb50.up.railway.app/ops/email/) → Connect Gmail and complete Google consent. Test actual sending before invitations. Cloud execution cannot operate the user's laptop or supply Google consent. |
-| Client/team access | Send the two authorized invitations through the normal protected flow after deployment and mail setup. Client gets client scope; team member gets internal manager scope. Assign backup only after real acceptance. Addresses are retained privately. |
-| Trial bot and identity | The secure trial binding is saved, and an intended web variable was staged without deployment. Verify its actual runtime authentication, then connect it through the encrypted workspace flow after activation. Pair actual people and separate client/team groups. `@sammanager06_bot` reports `can_manage_bots=false`; use BotFather or a capable manager with native human consent. |
-| Neopolis 19–25 October | Run the real `listen → moments → plan → brief` workers after deployment, operator scope and provider setup. Create five new educational drafts, review actual graphics/copy/costs and retain exact human review before scheduling. No new draft, approved schedule or publication has been created yet. |
+| OpenRouter in Railway | Securely install the real key for the production services, or add `backboard.railway.com` to the existing cloud binding before forwarding it through the supported hosting API. Verify authentication inside the deployed app before paid work. Cloud authentication and credits do not supply the missing production key. Preserve existing Fal; metadata access passed, but inference remains unverified. |
+| Gmail and human legal actions | The intended administrator personally signs in, accepts the presented Terms, then opens [Email operations](https://sm-bean-production-eb50.up.railway.app/ops/email/) and completes Google consent. Verify actual email delivery before invitations. No acceptance or consent was fabricated. Published legal pages retain draft-policy notices; human/legal review and final operator details remain required before commercial launch. |
+| Client and backup access | Send the already-authorized invitations through the protected flow after mailbox setup. Preserve separate client/internal scopes and assign backup only after genuine acceptance. Private addresses are excluded from these reports. |
+| Telegram people and groups | The encrypted trial connection is complete. Real people use their personal pairing links; group admins create and link separate team/client groups. `@sammanager06_bot` reports `can_manage_bots=false`; per-company bot creation requires a capable manager and native human consent, or the supported BotFather/token flow. |
+| Neopolis 19–25 October | After provider setup, run the real `listen → moments → plan → brief` workflow. Create new educational drafts, review actual copy/graphics/costs, then obtain exact human approval before scheduling. The week is still empty; no new drafts, schedule or publication were produced. |
 
-The own-container-image fallback was researched before the parser diagnosis. It is not needed to fix the identified recipe incompatibility. No existing publicly pullable
-SM Bean registry image was verified. New GHCR packages default to private;
-temporary workflow credentials do not provide lasting Railway pull access.
-Registry setup and verified image provenance are required before that path can
-replace the controlled Git-source rollout. No package or publishing workflow
-was created.
+## Historical investigation
 
-The [machine-readable status](RELEASE_STATUS_2026-10-13.json) and linked evidence
-record the observed state. Main contains the repaired code; the public deployment
-and actual Neopolis week remain pending these prerequisites.
+The four earlier Git/CLI build failures occurred before this completed rollout.
+Snapshot logs established unsupported Dockerfile secret mounts; the preliminary
+unexplained-platform-outage diagnosis was superseded. The canonical recipe was
+corrected and both full CI builds passed. The [parser investigation](RAILWAY_BUILD_BLOCKER_2026-10-13.md)
+and earlier receipts are historical evidence, not current deployment blockers.
+The researched registry fallback was unused; no publishing workflow/package was created.
+
+Use the [current status](RELEASE_STATUS_2026-10-13.json) and current receipts for
+this beta decision. Public launch remains conditional on the actual acceptance
+above; the Neopolis worksheet is a plan, not a delivered campaign.
