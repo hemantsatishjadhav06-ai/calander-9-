@@ -688,7 +688,13 @@
                 {% block sidebar_nav %}
                 {% if request.workspace %}
                 {# The agency team and the approvals queue come first: they are where a client's work starts and ends. #}
-                <a href="{% url 'studio:index' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.app_name == 'studio' %}active{% endif %}"{% if request.resolver_match.app_name == 'studio' %} aria-current="page"{% endif %}>
+                {% if request.workspace_membership.effective_permissions.create_posts %}
+                <a href="{% url 'studio:workflow' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'workflow' %}active{% endif %}"{% if request.resolver_match.url_name == 'workflow' %} aria-current="page"{% endif %}>
+                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M5 17h4M5 21h10"/></svg>
+                    <span class="sidebar-nav-label">Start a post</span>
+                </a>
+                {% endif %}
+                <a href="{% url 'studio:index' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.app_name == 'studio' and request.resolver_match.url_name != 'workflow' %}active{% endif %}"{% if request.resolver_match.app_name == 'studio' and request.resolver_match.url_name != 'workflow' %} aria-current="page"{% endif %}>
                     <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
                     <span class="sidebar-nav-label">Agency</span>
                 </a>

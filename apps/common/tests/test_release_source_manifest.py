@@ -26,6 +26,43 @@ def fixture_manifest():
     }
 
 
+def test_historical_v2_manifest_keeps_its_exact_anchor_contract():
+    historical = fixture_manifest()
+    historical["schema_version"] = 2
+    historical["source_anchors"] = {
+        path: hashlib.sha256(path.encode()).hexdigest() for path in inspector.V2_SOURCE_ANCHORS
+    }
+    assert inspector.validate_source_manifest(historical) is historical
+    assert len(historical["source_anchors"]) == 16
+    historical["source_anchors"]["apps/telegram/workflow_bridge.py"] = "a" * 64
+    with pytest.raises(ValueError, match="runtime source anchors"):
+        inspector.validate_source_manifest(historical)
+
+
+@pytest.mark.django_db
+def test_current_transport_schema_is_verified_from_actual_postgresql_metadata():
+    from django.db import connection
+
+    assert connection.vendor == "postgresql"
+    columns = inspector.workflow_transport_columns(connection)
+    assert set(columns) == set(inspector.WORKFLOW_TRANSPORT_COLUMNS)
+    assert all(required <= columns[table] for table, required in inspector.WORKFLOW_TRANSPORT_COLUMNS.items())
+
+
+def test_transport_metadata_ignores_unexpected_tables_and_reads_no_payload():
+    db, cursor = metadata_connection(
+        [("telegram_channel", "connection_id"), ("telegram_workflow_prompt", "snapshot"), ("private_table", "secret")]
+    )
+    columns = inspector.workflow_transport_columns(db)
+    assert columns["telegram_channel"] == {"connection_id"}
+    assert columns["telegram_workflow_prompt"] == {"snapshot"}
+    assert columns["telegram_channel_delivery"] == set()
+    sql, args = cursor.execute.call_args.args
+    assert "information_schema.columns" in sql and "BASE TABLE" in sql
+    assert args == list(inspector.WORKFLOW_TRANSPORT_COLUMNS)
+    assert "SELECT *" not in sql
+
+
 @pytest.fixture
 def committed_source(tmp_path):
     project = tmp_path / "project"
@@ -86,7 +123,7 @@ def test_generator_rejects_symlink_anchors(committed_source):
     [
         lambda data: data.update(schema_version=True),
         lambda data: data.update(schema_version=1),
-        lambda data: data.update(schema_version=3),
+        lambda data: data.update(schema_version=4),
         lambda data: data.update(record_type="another_receipt"),
         lambda data: data.update(reviewed_source_commit="short"),
         lambda data: data.update(reviewed_source_tree="B" * 40),
@@ -234,13 +271,17 @@ def test_source_valid_current_receipt_requires_oauth_redaction(
         ),
         mock.patch("tools.telegram_release_inspect.oauth_token_storage_evidence", return_value=evidence),
         mock.patch(
+            "tools.telegram_release_inspect.workflow_transport_columns",
+            return_value=inspector.WORKFLOW_TRANSPORT_COLUMNS,
+        ),
+        mock.patch(
             "apps.workspaces.models.Workspace.objects.filter", side_effect=AssertionError("Fail before workspace ORM")
         ),
     ):
         assert inspector.main() == 2
     receipt = json.loads(capsys.readouterr().out)
     checks = {row["check"]: row for row in receipt["checks"]}
-    assert receipt["source_manifest_schema_version"] == 2
+    assert receipt["source_manifest_schema_version"] == inspector.SOURCE_MANIFEST_VERSION
     assert receipt["oauth_token_storage_required"]
     assert checks["source.anchor_files"]["result"] == "PASS"
     assert checks["source.railway_commit"]["result"] == "PASS"
@@ -319,7 +360,7 @@ def test_current_manifest_rejects_historical_version_and_anchor_set():
 def test_current_manifest_detects_security_source_tampering(committed_source, path):
     project, commit = committed_source
     manifest = generator.generate_source_manifest(project, commit)
-    assert len(manifest["source_anchors"]) == 16
+    assert len(manifest["source_anchors"]) == len(inspector.CURRENT_SOURCE_ANCHORS)
     assert inspector.source_anchors_match(project, manifest["source_anchors"])
     (project / path).write_text("# changed security or managed-bot source\n")
     assert not inspector.source_anchors_match(project, manifest["source_anchors"])

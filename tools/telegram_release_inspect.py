@@ -39,7 +39,7 @@ SOURCE_ANCHORS = {
     "apps/telegram/outbox.py": "16194bfa6248040462070aa7f0a2140f737c2464c64ae44bdf8c16161e1f4191",
     "apps/telegram/views.py": "eb02932f8af28af28be30d1961efc6810856dd0a6d8c2e276e7dd49a8fb64c4d",
 }
-CURRENT_SOURCE_ANCHORS = (
+V2_SOURCE_ANCHORS = (
     *SOURCE_ANCHORS,
     "config/settings/base.py",
     "apps/telegram/managed.py",
@@ -49,7 +49,37 @@ CURRENT_SOURCE_ANCHORS = (
     "apps/telegram/migrations/0002_telegrammanagedbotreservation.py",
     "apps/oauth_server/migrations/0001_redact_token_plaintext.py",
 )
-SOURCE_MANIFEST_VERSION = 2
+CURRENT_SOURCE_ANCHORS = (
+    *V2_SOURCE_ANCHORS,
+    "apps/accounts/views.py",
+    "apps/studio/urls.py",
+    "apps/studio/chat.py",
+    "apps/studio/customer_workflow.py",
+    "apps/studio/views_customer_workflow.py",
+    "apps/studio/urls_customer_workflow.py",
+    "apps/studio/opendots.py",
+    "apps/studio/opendots_views.py",
+    "apps/studio/opendots_urls.py",
+    "apps/studio/jobtypes/chat.py",
+    "apps/studio/views_agency.py",
+    "apps/telegram/api.py",
+    "apps/telegram/channel_outbox.py",
+    "apps/telegram/workflow_bridge.py",
+    "apps/telegram/notifications.py",
+    "apps/telegram/processing.py",
+    "apps/telegram/forms.py",
+    "apps/telegram/urls.py",
+    "apps/telegram/migrations/0003_telegramchannel_telegramchanneldelivery_and_more.py",
+    "apps/telegram/migrations/0004_telegramworkflowprompt.py",
+    "templates/studio/customer_workflow.html",
+    "templates/studio/partials/customer_workflow_journeys.html",
+    "templates/studio/job_detail.html",
+    "templates/telegram/settings.html",
+    "templates/base.html",
+    "static/css/customer_workflow.css",
+    "static/js/customer_workflow.js",
+)
+SOURCE_MANIFEST_VERSION = 3
 SOURCE_MANIFEST_TYPE = "sm_bean_release_source_manifest"
 REQUIRED_MIGRATIONS = [
     ("approvals", "0005_alter_approvalaction_action"),
@@ -61,10 +91,15 @@ REQUIRED_MIGRATIONS = [
     ("studio", "0005_private_transport_history"),
     ("telegram", "0001_initial"),
 ]
-CURRENT_RELEASE_MIGRATIONS = [
+V2_RELEASE_MIGRATIONS = [
     *REQUIRED_MIGRATIONS,
     ("telegram", "0002_telegrammanagedbotreservation"),
     ("oauth_server", "0001_redact_token_plaintext"),
+]
+CURRENT_RELEASE_MIGRATIONS = [
+    *V2_RELEASE_MIGRATIONS,
+    ("telegram", "0003_telegramchannel_telegramchanneldelivery_and_more"),
+    ("telegram", "0004_telegramworkflowprompt"),
 ]
 OAUTH_TOKEN_TABLES = {
     "access": "oauth2_provider_accesstoken",
@@ -90,6 +125,58 @@ MANAGED_RESERVATION_COLUMNS = {
     "error",
     "created_at",
 }
+WORKFLOW_TRANSPORT_COLUMNS = {
+    "telegram_channel": {
+        "id",
+        "connection_id",
+        "organization_id",
+        "user_link_id",
+        "created_by_id",
+        "chat_id",
+        "title",
+        "bot_id",
+        "telegram_user_id",
+        "connection_epoch",
+        "pairing_epoch",
+        "authority_digest",
+        "visibility_confirmed_at",
+        "is_active",
+        "created_at",
+        "updated_at",
+    },
+    "telegram_channel_delivery": {
+        "id",
+        "channel_id",
+        "source_key",
+        "payload",
+        "status",
+        "attempts",
+        "next_attempt_at",
+        "claimed_at",
+        "native_message_id",
+        "error",
+        "created_at",
+        "updated_at",
+    },
+    "telegram_workflow_prompt": {
+        "id",
+        "source_key",
+        "snapshot",
+        "expires_at",
+        "consumed_at",
+        "created_at",
+        "author_id",
+        "chat_id",
+        "conversation_id",
+        "delivery_id",
+        "organization_id",
+        "response_message_id",
+        "source_job_id",
+        "source_message_id",
+        "user_link_id",
+        "workspace_id",
+    },
+}
 
 
 def validate_source_manifest(data: Any) -> dict:
@@ -99,13 +186,14 @@ def validate_source_manifest(data: Any) -> dict:
         raise ValueError("Source manifest must contain the complete versioned schema")
     if data["record_type"] != SOURCE_MANIFEST_TYPE:
         raise ValueError("Source manifest record type is invalid")
-    if type(data["schema_version"]) is not int or data["schema_version"] != SOURCE_MANIFEST_VERSION:
+    if type(data["schema_version"]) is not int or data["schema_version"] not in (2, SOURCE_MANIFEST_VERSION):
         raise ValueError("Source manifest schema version is unsupported")
     for field in ("reviewed_source_commit", "reviewed_source_tree"):
         if not isinstance(data[field], str) or not re.fullmatch(r"[0-9a-f]{40}", data[field]):
             raise ValueError("Source manifest must name a full lowercase Git commit and tree SHA")
     anchors = data["source_anchors"]
-    if not isinstance(anchors, dict) or set(anchors) != set(CURRENT_SOURCE_ANCHORS):
+    expected_anchors = V2_SOURCE_ANCHORS if data["schema_version"] == 2 else CURRENT_SOURCE_ANCHORS
+    if not isinstance(anchors, dict) or set(anchors) != set(expected_anchors):
         raise ValueError("Source manifest must cover exactly the required runtime source anchors")
     if any(not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest) for digest in anchors.values()):
         raise ValueError("Source manifest must contain full lowercase SHA-256 digests")
@@ -139,6 +227,22 @@ def managed_reservation_columns(db_connection: Any) -> set[str]:
             "AND table_name='telegram_managed_bot_reservation'"
         )
         return {row[0] for row in cursor.fetchall()}
+
+
+def workflow_transport_columns(db_connection: Any) -> dict[str, set[str]]:
+    """Inspect actual base-table metadata; no customer rows or decrypted fields."""
+    with db_connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT c.table_name, c.column_name FROM information_schema.columns c "
+            "JOIN information_schema.tables t ON t.table_schema=c.table_schema AND t.table_name=c.table_name "
+            "WHERE c.table_schema='public' AND t.table_type='BASE TABLE' AND c.table_name IN (%s, %s, %s)",
+            list(WORKFLOW_TRANSPORT_COLUMNS),
+        )
+        found: dict[str, set[str]] = {name: set() for name in WORKFLOW_TRANSPORT_COLUMNS}
+        for table, column in cursor.fetchall():
+            if table in found:
+                found[table].add(column)
+        return found
 
 
 def oauth_storage_config_ready(configuration: Any) -> bool:
@@ -207,6 +311,7 @@ def main() -> int:
     reviewed_commit = EXPECTED_COMMIT
     reviewed_tree = None
     manifest_sha256 = None
+    manifest_version = None
     anchors = SOURCE_ANCHORS
     if args.source_manifest:
         try:
@@ -216,6 +321,7 @@ def main() -> int:
         reviewed_commit = manifest["reviewed_source_commit"]
         reviewed_tree = manifest["reviewed_source_tree"]
         anchors = manifest["source_anchors"]
+        manifest_version = manifest["schema_version"]
     if args.expected_deployment_commit is None:
         args.expected_deployment_commit = reviewed_commit
     try:
@@ -234,7 +340,7 @@ def main() -> int:
         "reviewed_source_tree": reviewed_tree,
         "source_manifest_sha256": manifest_sha256,
         "source_manifest_origin": "explicit_manifest" if args.source_manifest else "embedded_historical",
-        "source_manifest_schema_version": SOURCE_MANIFEST_VERSION if args.source_manifest else None,
+        "source_manifest_schema_version": manifest_version,
         "managed_bot_schema_required": bool(args.source_manifest),
         "oauth_token_storage_required": bool(args.source_manifest),
         "expected_deployment_commit": args.expected_deployment_commit,
@@ -357,7 +463,13 @@ def main() -> int:
                 cursor.execute("SHOW transaction_read_only")
                 check("db.enforced_read_only", cursor.fetchone()[0] == "on")
             applied = MigrationRecorder(connection).applied_migrations()
-            required = CURRENT_RELEASE_MIGRATIONS if args.source_manifest else REQUIRED_MIGRATIONS
+            required = (
+                CURRENT_RELEASE_MIGRATIONS
+                if manifest_version == 3
+                else V2_RELEASE_MIGRATIONS
+                if manifest_version == 2
+                else REQUIRED_MIGRATIONS
+            )
             missing = [f"{app}.{name}" for app, name in required if (app, name) not in applied]
             check("db.cumulative_migrations", not missing, missing=missing)
             executor = MigrationExecutor(connection)
@@ -365,6 +477,7 @@ def main() -> int:
             check("db.no_pending_migrations", not pending, pending_count=len(pending))
             managed_schema_ok = True
             oauth_storage_ok = True
+            transport_schema_ok = True
             if args.source_manifest:
                 columns = managed_reservation_columns(connection)
                 absent_columns = sorted(MANAGED_RESERVATION_COLUMNS - columns)
@@ -382,7 +495,28 @@ def main() -> int:
                     evidence["counts"] is not None and all(count == 0 for count in evidence["counts"].values())
                 )
                 check("db.oauth_plaintext_redacted", oauth_storage_ok, nonblank_token_counts=evidence["counts"])
-            if missing or pending or not managed_schema_ok or not oauth_config_ok or not oauth_storage_ok:
+                if manifest_version == 3:
+                    transport_columns = workflow_transport_columns(connection)
+                    transport_missing = {
+                        table: sorted(required_columns - transport_columns.get(table, set()))
+                        for table, required_columns in WORKFLOW_TRANSPORT_COLUMNS.items()
+                        if required_columns - transport_columns.get(table, set())
+                    }
+                    transport_schema_ok = not transport_missing
+                    check(
+                        "db.workflow_transport_schema",
+                        transport_schema_ok,
+                        tables_required=len(WORKFLOW_TRANSPORT_COLUMNS),
+                        missing_columns=transport_missing,
+                    )
+            if (
+                missing
+                or pending
+                or not managed_schema_ok
+                or not oauth_config_ok
+                or not oauth_storage_ok
+                or not transport_schema_ok
+            ):
                 return finish()
             with connection.cursor() as cursor:
                 cursor.execute(

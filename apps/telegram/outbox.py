@@ -316,7 +316,12 @@ def _before_transport(row, chat):
     if not TelegramDelivery.objects.filter(pk=row.pk, status="sending", claimed_at=row.claimed_at).exists():
         return None
     current = _fresh_chat(chat.pk)
-    if current is None or not permitted_chat(current) or _scope(current) != row.payload.get("_scope"):
+    if (
+        current is None
+        or not permitted_chat(current)
+        or _scope(current) != row.payload.get("_scope")
+        or not _workflow_permitted(row, current)
+    ):
         _finish(
             row,
             status="failed",
@@ -324,6 +329,14 @@ def _before_transport(row, chat):
         )
         return None
     return current
+
+
+def _workflow_permitted(row, chat):
+    if not row.source_key.startswith("workflow-prompt:"):
+        return True
+    from .workflow_bridge import delivery_permitted
+
+    return delivery_permitted(row, chat) is True
 
 
 def _suspend_recipient(row, reason):
@@ -386,7 +399,12 @@ def send_one(delivery_id):
     attempted = False
     try:
         chat = _fresh_chat(row.chat_id)
-        if chat is None or chat.connection_id != row.connection_id or not permitted_chat(chat):
+        if (
+            chat is None
+            or chat.connection_id != row.connection_id
+            or not permitted_chat(chat)
+            or not _workflow_permitted(row, chat)
+        ):
             _finish(
                 row, status="failed", error="The Telegram connection, recipient or conversation is no longer permitted."
             )
@@ -449,6 +467,21 @@ def send_one(delivery_id):
         else:
             raise ValueError("Unsupported delivery.")
         message_id = result.get("message_id") if isinstance(result, dict) else None
+        if row.source_key.startswith("workflow-prompt:") and (
+            type(message_id) is not int
+            or message_id <= 0
+            or not isinstance(result.get("chat"), dict)
+            or type(result["chat"].get("id")) is not int
+            or result["chat"]["id"] != chat.chat_id
+            or result["chat"].get("type") != "private"
+        ):
+            _finish(
+                row,
+                status="unknown",
+                next_attempt_at=None,
+                error="Telegram did not return a verified private workflow receipt. Inspect the chat before resending.",
+            )
+            return "unknown"
         if method != "answerCallbackQuery" and (not isinstance(message_id, int) or isinstance(message_id, bool)):
             _finish(
                 row,
@@ -503,6 +536,8 @@ def send_one(delivery_id):
 
 
 def drain_outbox(*, limit=25):
+    from .channel_outbox import drain_channels
+
     limit = min(100, max(1, limit))
     recovered = recover_stale_deliveries(limit=limit)
     ids = list(
@@ -516,4 +551,6 @@ def drain_outbox(*, limit=25):
     for delivery_id in ids:
         status = send_one(delivery_id)
         outcomes[status] = outcomes.get(status, 0) + 1
+    for status, count in drain_channels(limit=limit).items():
+        outcomes[status] = outcomes.get(status, 0) + count
     return outcomes

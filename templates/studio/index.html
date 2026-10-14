@@ -34,6 +34,18 @@
 
     {% include "components/agency_tabs.html" %}
 
+    {% if can_create %}
+    <section aria-labelledby="guided-start-heading" class="mb-6 rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:p-5">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h2 id="guided-start-heading" class="text-base font-semibold text-stone-900">One place for your idea, draft and next step</h2>
+                <p class="mt-1 text-sm text-stone-600">Start with an idea. Answer the team's questions, review the draft, then approve a posting time.</p>
+            </div>
+            <a href="{% url 'studio:workflow' workspace_id=workspace.id %}" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Open guided workspace <span aria-hidden="true">→</span></a>
+        </div>
+    </section>
+    {% endif %}
+
     {% with readiness=setup.operational %}
     <section class="rounded-2xl border {% if readiness.blockers %}border-amber-300 bg-amber-50{% else %}border-stone-200 bg-stone-50{% endif %} p-4 mb-6" aria-label="Agency readiness" data-agency-readiness="{{ readiness.state }}">
         <h2 class="text-sm font-semibold text-stone-900">{{ readiness.title }}</h2>

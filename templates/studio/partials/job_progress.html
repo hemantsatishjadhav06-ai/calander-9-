@@ -2,7 +2,7 @@
 <section id="job-progress" aria-labelledby="job-progress-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm"
          {% if job.is_active %}hx-get="{% url 'studio:job_progress' workspace_id=workspace.id job_id=job.id %}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
     <h2 id="job-progress-heading" class="text-lg text-stone-900 mb-3" style="font-family: var(--font-display)">How the team is doing it</h2>
-    <p class="sr-only" aria-live="polite">{{ job.get_status_display }}</p>
+    <p class="sr-only" aria-live="polite">{{ assistant_task.label|default:job.get_status_display }}</p>
     <ol class="space-y-3">
         {% for row in stages %}
         <li class="flex items-start gap-3">

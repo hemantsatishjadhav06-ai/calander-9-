@@ -34,9 +34,11 @@ def run_telegram_cycle():
     from .notifications import sweep_receipts
     from .outbox import drain_outbox
     from .processing import drain_updates
+    from .workflow_bridge import sweep_workflow_messages
 
     outcomes = drain_updates(limit=TELEGRAM_BATCH_SIZE)
     sweep_receipts(limit=TELEGRAM_BATCH_SIZE)
+    sweep_workflow_messages(limit=TELEGRAM_BATCH_SIZE)
     deliveries = drain_outbox(limit=TELEGRAM_BATCH_SIZE)
     cleanup_transient_records(limit=TELEGRAM_BATCH_SIZE)
     if outcomes.get("failed", 0) or deliveries.get("failed", 0) or deliveries.get("unknown", 0):
@@ -56,13 +58,21 @@ def cleanup_transient_records(*, limit=25):
     TELEGRAM_ACTION_RETENTION_DAYS and TELEGRAM_PAIRING_RETENTION_DAYS.
     Held delivery statuses, semantic keys, actors and native receipts remain.
     """
-    from .models import TelegramAction, TelegramDelivery, TelegramPairing, TelegramUpdate
+    from .models import (
+        TelegramAction,
+        TelegramChannelDelivery,
+        TelegramDelivery,
+        TelegramPairing,
+        TelegramUpdate,
+        TelegramWorkflowPrompt,
+    )
 
     now, cap = timezone.now(), min(100, max(1, limit))
     count = 0
     for model, date_field, states, setting, default in (
         (TelegramUpdate, "created_at", ["processed", "failed"], "TELEGRAM_UPDATE_RETENTION_DAYS", 7),
         (TelegramDelivery, "updated_at", ["sent", "failed", "unknown"], "TELEGRAM_DELIVERY_RETENTION_DAYS", 30),
+        (TelegramChannelDelivery, "updated_at", ["sent", "failed", "unknown"], "TELEGRAM_DELIVERY_RETENTION_DAYS", 30),
     ):
         with transaction.atomic():
             # The shared EncryptedJSONField stores AES-GCM base64: an empty
@@ -79,6 +89,16 @@ def cleanup_transient_records(*, limit=25):
                 .values_list("pk", flat=True)[:cap]
             )
             count += model.objects.filter(pk__in=ids).update(payload={})
+    with transaction.atomic():
+        prompt_ids = list(
+            TelegramWorkflowPrompt.objects.select_for_update(skip_locked=True)
+            .filter(expires_at__lt=now - timedelta(days=_retention_days("TELEGRAM_DELIVERY_RETENTION_DAYS", 30)))
+            .annotate(_snapshot_size=Length("snapshot"))
+            .filter(_snapshot_size__gt=40)
+            .order_by("expires_at")
+            .values_list("pk", flat=True)[:cap]
+        )
+        count += TelegramWorkflowPrompt.objects.filter(pk__in=prompt_ids).update(snapshot={})
     with transaction.atomic():
         action_ids = list(
             TelegramAction.objects.select_for_update(skip_locked=True)

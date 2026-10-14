@@ -120,18 +120,55 @@ def is_staff(user, workspace) -> bool:
     return is_staff_membership(membership_for(user, workspace))
 
 
-def author_kind_for(user, conversation: Conversation, *, is_internal: bool = False) -> str:
-    """The kind of author ``user`` is in ``conversation``, or :class:`ChatError` when they may not write."""
-    membership = membership_for(user, conversation.workspace)
-    if is_staff_membership(membership):
+def web_kind_for_member(membership, conversation: Conversation, *, is_internal: bool = False) -> str:
+    """Classify a freshly authorized author without granting clients internal work."""
+    from apps.telegram.permissions import internal_member
+
+    if internal_member(membership) and membership.effective_permissions.get("create_posts") is True:
         return Message.AuthorKind.STAFF
-    if is_client_membership(membership):
+    if membership is not None and not internal_member(membership):
         if conversation.audience != Conversation.Audience.CLIENT:
             raise ChatError("This thread is for the agency team only.")
         if is_internal:
             raise ChatError("Only the agency team can leave internal notes.")
         return Message.AuthorKind.CLIENT
     raise ChatError("You can't write in this thread.")
+
+
+def web_author_kind(conversation, user, *, is_internal=False, locked=False):
+    """Check fresh tenant/actor/role before web writes or provider work.
+
+    Web sends and returning workers share workspace -> actor -> conversation
+    locking. In particular, a send must not hold its conversation while a
+    deferred job foreign-key check waits for another transaction's workspace.
+    """
+    from django.core.exceptions import PermissionDenied
+
+    from apps.telegram.permissions import current_member
+
+    if user is None or not getattr(user, "pk", None) or not getattr(user, "is_authenticated", False):
+        raise ChatError("Your current workspace access is unavailable.")
+    try:
+        member = current_member(conversation.workspace, user, locked=locked)
+    except PermissionDenied:
+        raise ChatError("Your current workspace access is unavailable.") from None
+    rows = Conversation.objects.select_for_update(of=("self",)) if locked else Conversation.objects.all()
+    current = rows.filter(pk=conversation.pk, workspace_id=member.workspace_id).first()
+    if current is None or is_private_conversation(current):
+        raise ChatError("This conversation is unavailable in the shared workspace.")
+    conversation.audience = current.audience
+    conversation.brief_id, conversation.post_id, conversation.blog_post_id = (
+        current.brief_id,
+        current.post_id,
+        current.blog_post_id,
+    )
+    conversation._state.fields_cache.clear()
+    conversation.workspace = member.workspace
+    return web_kind_for_member(member, conversation, is_internal=is_internal), member
+
+
+def author_kind_for(user, conversation: Conversation, *, is_internal: bool = False) -> str:
+    return web_author_kind(conversation, user, is_internal=is_internal)[0]
 
 
 def telegram_member(conversation, user, context, *, locked=False):
@@ -208,6 +245,52 @@ def telegram_author_kind(conversation, user, context, *, locked=False):
     raise ChatError("Your role cannot request the agency team from Telegram.")
 
 
+def _telegram_job_context(context, member):
+    """Persist consent epochs while canonical posting owns the actor/pairing locks."""
+    from apps.telegram.models import TelegramChat, TelegramUserLink
+    from apps.telegram.processing import connection_epoch
+    from apps.telegram.provisioning import channel_authority_digest
+
+    link = TelegramUserLink.objects.filter(pk=context["user_link_id"], user=member.user, is_active=True).first()
+    current = (
+        TelegramChat.objects.select_related("connection")
+        .filter(pk=context["chat_id"], connection_id=link.connection_id if link else None, is_active=True)
+        .first()
+    )
+    if link is None or current is None or current.connection.workspace_id != member.workspace_id:
+        raise ChatError("Your Telegram pairing changed. Send the request again in the currently paired conversation.")
+    return {
+        "chat_id": str(current.pk),
+        "user_link_id": str(link.pk),
+        "binding": {
+            "connection_epoch": connection_epoch(current.connection),
+            "connection_updated_at": current.connection.updated_at.isoformat(),
+            "pairing_epoch": link.updated_at.isoformat(),
+            "chat_epoch": current.updated_at.isoformat(),
+            "telegram_user_id": link.telegram_user_id,
+            "organization_id": str(member.workspace.organization_id),
+            "authority_digest": channel_authority_digest(member),
+        },
+    }
+
+
+def telegram_job_author_kind(job, conversation, user, *, locked=False):
+    """Old queued jobs cannot adopt a repaired identity's current authority."""
+    context = (job.input or {}).get("telegram_context")
+    if not isinstance(context, dict) or set(context) != {"chat_id", "user_link_id", "binding"}:
+        raise ChatError(
+            "This queued Telegram request has no current pairing proof. Review saved work and send it again "
+            "in the currently paired conversation."
+        )
+    kind, member = telegram_author_kind(conversation, user, context, locked=locked)
+    if context != _telegram_job_context(context, member):
+        raise ChatError(
+            "The bot, pairing or permissions changed after this Telegram request. Review saved work and send "
+            "it again in the currently paired conversation."
+        )
+    return kind, member
+
+
 # ---------------------------------------------------------------------------
 # Threads
 # ---------------------------------------------------------------------------
@@ -242,6 +325,9 @@ def _web_lookup(workspace, audience, **target):
         # A Telegram group has its own associated thread, rather than becoming
         # the workspace-wide general thread by being created first.
         rows = rows.filter(telegram_chats__isnull=True)
+        # Saved guided ideas have dedicated intake threads before they have
+        # a brief. They must never become the workspace-wide general thread.
+        rows = rows.exclude(messages__action="workflow_idea")
     return rows
 
 
@@ -610,13 +696,15 @@ def replies_today(workspace) -> int:
 
 
 def reply_refusal(workspace) -> str:
-    """Why the account manager can't answer now: ``"cap"``, ``"budget"`` or ``""``."""
-    from . import budget
+    """Why the assistant cannot answer yet; never queue a doomed provider call."""
+    from . import budget, llm
 
     if replies_today(workspace) >= DAILY_REPLY_CAP:
         return "cap"
     if not budget.can_spend(workspace):
         return "budget"
+    if not llm.is_configured():
+        return "setup"
     return ""
 
 
@@ -624,6 +712,13 @@ def refusal_text(workspace, reason: str, *, audience: str) -> str:
     """The polite sentence the thread shows instead of an answer. A client never reads about budgets."""
     from . import budget
 
+    if reason == "setup":
+        if audience == Conversation.Audience.CLIENT:
+            return "Your message is saved. Your agency needs to enable its assistant before it can answer."
+        return (
+            "Your message is saved. An administrator needs to connect the AI service before your assistant can continue. "
+            "You can still write or edit a draft."
+        )
     if audience == Conversation.Audience.CLIENT:
         return "Thanks — your message is with the team. A person will reply here as soon as they can."
     if reason == "budget":
@@ -654,6 +749,7 @@ def clean_body(body: str) -> str:
     return body
 
 
+@transaction.atomic
 def post_message(
     conversation: Conversation,
     author,
@@ -680,11 +776,11 @@ def post_message(
     if telegram_context is None and is_private_conversation(conversation):
         raise ChatError("Private Telegram conversations remain in their paired private chat.")
     if telegram_context is not None:
-        author_kind, _member = telegram_author_kind(conversation, author, telegram_context)
+        author_kind, _member = telegram_author_kind(conversation, author, telegram_context, locked=True)
         if is_internal:
             raise ChatError("Telegram messages cannot be internal notes.")
     else:
-        author_kind = author_kind_for(author, conversation, is_internal=is_internal)
+        author_kind, _member = web_author_kind(conversation, author, is_internal=is_internal, locked=True)
     if explicit_assistant_request and (
         author_kind != Message.AuthorKind.STAFF or is_internal or telegram_context is None
     ):
@@ -695,10 +791,7 @@ def post_message(
     )
     extra_input: dict[str, Any] = {}
     if telegram_context is not None:
-        extra_input["telegram_context"] = {
-            "chat_id": str(uuid.UUID(str(telegram_context["chat_id"]))),
-            "user_link_id": str(uuid.UUID(str(telegram_context["user_link_id"]))),
-        }
+        extra_input["telegram_context"] = _telegram_job_context(telegram_context, _member)
         extra_input["explicit_assistant_request"] = bool(explicit_assistant_request)
     if kind == "confirm_brief":
         if not guided or is_internal or not facts_confirmed:

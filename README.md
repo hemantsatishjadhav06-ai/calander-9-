@@ -712,6 +712,8 @@ Each post's **Cover** setting chooses between the designed cover (default) and t
 
 ## AI Agency
 
+**Start a post** is the first workspace screen for staff who can create posts. Save an idea, answer missing-detail questions, confirm the direction, review the draft and choose an approved posting time. Each idea keeps its conversation and progress together. Optional Telegram replies continue that same idea after personal pairing and explicit opt-in; verified channels receive status updates. [Customer workflow](docs/SM_BEAN_GUIDED_WORKFLOW.md) explains the steps, [Telegram channels](docs/TELEGRAM_CHANNELS.md) explains setup, and [OpenDots integration](docs/OPENDOTS_INTEGRATION.md) describes the persistent pause/resume and reviewed retry controls.
+
 **Agency** in the sidebar has 28 configured agent roles across seven departments: model-backed roles use the selected Anthropic/OpenRouter provider, image generation uses fal.ai, and rendering and orchestration also use ordinary code. These are software roles, not 28 employees or a guarantee of parallel execution. The workflow plans, writes, designs, checks and proposes times for posts and blog articles, uses available audience/performance evidence, and learns from reviewed creatives. **Nothing it makes goes out until a person approves the exact final version**: every post and article lands in the normal approval queue.
 
 | Department | Agents |

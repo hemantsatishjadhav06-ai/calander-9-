@@ -4,6 +4,29 @@ from .api import valid_token
 from .models import TelegramChat
 
 
+class ChannelForm(forms.Form):
+    channel_reference = forms.CharField(
+        label="Channel @username or numeric ID",
+        max_length=40,
+        widget=forms.TextInput(
+            attrs={"placeholder": "@your_channel or -100…", "class": "w-full rounded-lg border border-stone-300 p-3"}
+        ),
+        help_text="Copy @username from Channel info for a public channel, or use its numeric ID for a private channel.",
+    )
+    visibility_confirmed = forms.BooleanField(
+        label="I am a channel administrator and checked that every subscriber may see its shared work-status updates.",
+        required=True,
+    )
+
+    def clean_channel_reference(self):
+        from .provisioning import ProvisioningError, channel_reference
+
+        try:
+            return channel_reference(self.cleaned_data["channel_reference"])
+        except ProvisioningError as exc:
+            raise forms.ValidationError(str(exc)) from None
+
+
 class ConnectForm(forms.Form):
     token = forms.CharField(
         label="BotFather token",

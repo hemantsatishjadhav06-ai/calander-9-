@@ -30,6 +30,7 @@
       <li>{% if connection.is_active and own_link %}✓{% else %}○{% endif %} 2. Your own account linked</li>
       <li>{% if client_group_count %}✓{% else %}○{% endif %} 3. Client group linked</li>
       <li>{% if team_group_count %}✓{% else %}○{% endif %} 4. Internal team group linked</li>
+      <li>{% if channel_count %}✓{% else %}○{% endif %} Optional: status channel connected</li>
     </ol>
     {% endif %}
   </section>
@@ -113,6 +114,28 @@
       {% if not own_link %}<p class="text-sm text-amber-900">Link your own Telegram account before creating a group code.</p>{% endif %}
     </form>
     <p class="text-sm text-stone-700">Ask the lead, backup and each team member to link their own account. <a href="{% url 'studio:autopilot' workspace_id=workspace.id %}" class="underline text-orange-800">Select the current lead and backup approvers</a> in agency settings. Client sign-off stays separate from agency permission to publish.</p>
+  </section>
+  {% endif %}
+
+  {% if can_manage %}
+  <section id="telegram-channel-setup" class="rounded-xl border bg-white p-4 space-y-3" aria-labelledby="telegram-channel-heading">
+    <h2 id="telegram-channel-heading" class="font-semibold">4. Connect a channel for status updates (optional)</h2>
+    <p class="text-sm text-stone-700">A channel broadcasts brief draft, review, scheduling and delivery status updates to its subscribers. Questions, answers and approval buttons stay in your personally linked private chat or the appropriate client or team group.</p>
+    <ol class="list-decimal pl-5 space-y-2 text-sm text-stone-700">
+      <li>Link your own Telegram account above and press Start. Use an account that is a channel administrator.</li>
+      <li>In the channel's administrator settings, add @{{ connection.bot_username|default:'your client bot' }} and enable <strong>Post Messages</strong>.</li>
+      <li>Enter the channel's public @username or its private numeric channel ID. Confirm that its subscribers may see these status updates, then verify it below.</li>
+    </ol>
+    <p class="text-sm text-stone-600">We verify both administrator identities. Telegram cannot list every passive subscriber; you control that audience. Private conversation content, post captions, internal costs and approval buttons are never broadcast here. Use a separate channel for each client workspace.</p>
+    <form method="post" action="{% url 'telegram:connect_channel' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
+      {% if channel_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ channel_form.non_field_errors }}{% for field in channel_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
+      <div><label for="{{ channel_form.channel_reference.id_for_label }}" class="block mb-1 text-sm font-semibold">{{ channel_form.channel_reference.label }}</label>{{ channel_form.channel_reference }}<p class="mt-1 text-xs text-stone-600">{{ channel_form.channel_reference.help_text }}</p></div>
+      <label class="flex gap-2 items-start text-sm">{{ channel_form.visibility_confirmed }}<span>{{ channel_form.visibility_confirmed.label }}</span></label>
+      <button type="submit" class="w-full sm:w-auto rounded-lg bg-orange-700 px-4 py-3 font-semibold text-white disabled:opacity-50"{% if not channel_pairing_ready %} disabled{% endif %}>Verify and connect channel</button>
+      {% if not channel_pairing_ready %}<p class="text-sm text-stone-700">Create your personal Telegram link above and press Start in the bot's private chat before connecting a channel. A disabled private chat needs a fresh link.</p>{% endif %}
+    </form>
+    {% for channel in channels %}<div class="rounded-lg border p-3 space-y-2"><p class="break-words text-sm font-semibold">{{ channel.title }}{% if channel.username %} · @{{ channel.username }}{% endif %} · {% if channel.proof_current %}connected{% elif channel.is_active %}verification needed{% else %}disabled{% endif %}</p>{% if channel.is_active and not channel.proof_current %}<p class="text-sm text-amber-900">The bot, account pairing or permissions changed. Verify this channel again above before new updates can be sent.</p>{% endif %}{% if channel.is_active %}<form method="post" action="{% url 'telegram:disconnect_channel' workspace_id=workspace.id channel_id=channel.id %}">{% csrf_token %}<button type="submit" class="rounded-lg border px-4 py-2 text-sm">Disable channel updates</button></form>{% endif %}</div>{% empty %}<p class="text-sm text-stone-600">No status channel connected. Your private chats and groups work independently.</p>{% endfor %}
+    {% for item in channel_deliveries %}<div role="status" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">Channel delivery {{ item.status }} · {{ item.attempts }} attempt(s). {{ item.error }}{% if item.status == 'unknown' %} Check the channel before requesting another update.{% endif %}</div>{% endfor %}
   </section>
   {% endif %}
 

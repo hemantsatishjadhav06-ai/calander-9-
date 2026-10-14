@@ -5,7 +5,7 @@ from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
@@ -72,7 +72,7 @@ def home(request):
 
 @login_required
 def dashboard(request):
-    """Main dashboard - redirects to last used workspace or shows org overview."""
+    """Open the guided start for staff, retaining the client's scoped workflow."""
     from apps.members.models import WorkspaceMembership
 
     user = request.user
@@ -81,25 +81,43 @@ def dashboard(request):
     # in that workspace. Otherwise the org may have been deleted out from under
     # them and we'd redirect into a 403.
     if user.last_workspace_id:
-        if WorkspaceMembership.objects.filter(
+        membership = WorkspaceMembership.objects.filter(
             user=user,
             workspace_id=user.last_workspace_id,
             workspace__is_archived=False,
-        ).exists():
-            return redirect("calendar:calendar", workspace_id=user.last_workspace_id)
+            workspace__organization__deleted_at__isnull=True,
+        ).first()
+        if membership:
+            landing = _workspace_landing(membership)
+            if landing is not None:
+                return landing
         user.last_workspace_id = None
         user.save(update_fields=["last_workspace_id"])
 
     # Fallback: try to find any workspace the user belongs to
-    membership = (
-        WorkspaceMembership.objects.filter(user=user, workspace__is_archived=False).select_related("workspace").first()
-    )
-    if membership:
-        user.last_workspace_id = membership.workspace.id
-        user.save(update_fields=["last_workspace_id"])
-        return redirect("calendar:calendar", workspace_id=membership.workspace.id)
+    memberships = WorkspaceMembership.objects.filter(
+        user=user, workspace__is_archived=False, workspace__organization__deleted_at__isnull=True
+    ).select_related("workspace")
+    for membership in memberships:
+        landing = _workspace_landing(membership)
+        if landing is not None:
+            user.last_workspace_id = membership.workspace_id
+            user.save(update_fields=["last_workspace_id"])
+            return landing
 
     return render(request, "accounts/dashboard.html")
+
+
+def _workspace_landing(membership):
+    from apps.telegram.permissions import current_member, internal_member
+
+    try:
+        current = current_member(membership.workspace, membership.user)
+    except PermissionDenied:
+        return None
+    can_start = bool(internal_member(current) and current.effective_permissions.get("create_posts", False))
+    route = "studio:workflow" if can_start else "calendar:calendar"
+    return redirect(route, workspace_id=membership.workspace_id)
 
 
 @login_required

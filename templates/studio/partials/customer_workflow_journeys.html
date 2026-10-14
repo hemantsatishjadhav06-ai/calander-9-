@@ -1,0 +1,18 @@
+{% load tz %}
+<div id="workflow-journeys" class="cw-journeys" data-workspace="{{ workspace.id }}" data-active="{{ polling|yesno:'true,false' }}">
+    {% for journey in journeys %}
+    <article class="cw-card cw-journey" data-workflow-journey="{{ journey.id }}" data-workflow-state="{{ journey.state }}" aria-labelledby="cw-journey-{{ journey.id }}">
+        <div class="cw-journey-heading"><div><p class="cw-eyebrow">{% if journey.updated_at %}Updated {{ journey.updated_at|timezone:tzname|date:"j M, H:i" }} · {{ tzname }}{% else %}Saved idea{% endif %}</p><h3 id="cw-journey-{{ journey.id }}">{{ journey.title }}</h3></div><span class="cw-state" data-state="{{ journey.state }}">{{ journey.state_label }}</span></div>
+        <ol class="cw-journey-steps" aria-label="Progress for {{ journey.title }}">
+            {% for step in journey.steps %}<li data-step-state="{{ step.state }}"{% if step.state == 'current' %} aria-current="step"{% endif %}><span class="cw-journey-step-dot" aria-hidden="true">{% if step.state == 'complete' %}✓{% else %}{{ step.number }}{% endif %}</span><span>{{ step.label }}<span class="cw-sr-only">{% if step.state == 'complete' %}, completed{% elif step.state == 'current' %}, current step{% else %}, upcoming{% endif %}</span></span></li>{% endfor %}
+        </ol>
+        <div class="cw-next-action"><div><p class="cw-label">{% if journey.state == 'queued' %}Waiting for the team{% elif journey.state == 'working' %}The team is working{% elif journey.state == 'published' %}Delivery update{% elif journey.state == 'scheduled' %}Posting time saved{% else %}Next step{% endif %}</p><p>{{ journey.next_action }}</p></div><div class="cw-journey-actions">
+            {% if journey.can_resume and can_create %}<form method="post" action="{{ journey.resume_url }}" data-workflow-resume-form>{% csrf_token %}<button class="cw-button cw-button-primary" type="submit">Continue this idea <span aria-hidden="true">→</span></button></form>{% endif %}
+            {% if journey.action_url %}<a class="cw-button {% if journey.can_resume and can_create %}cw-button-secondary{% else %}cw-button-primary{% endif %}" href="{{ journey.action_url }}">{% if journey.action_label %}{{ journey.action_label }}{% elif journey.state == 'review' %}Review the draft{% elif journey.state == 'published' %}View delivery{% elif journey.state == 'scheduled' %}View the post{% else %}Open conversation{% endif %}<span aria-hidden="true">→</span></a>{% endif %}
+        </div></div>
+        {% if journey.events %}<details class="cw-timeline" data-workflow-details="{{ journey.id }}"><summary>View activity <span aria-hidden="true">+</span></summary><ol>{% for event in journey.events %}<li><span class="cw-event-dot" aria-hidden="true"></span><div><p>{{ event.label }}</p>{% if event.created_at %}<time datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|timezone:tzname|date:"j M, H:i" }} · {{ tzname }}</time>{% endif %}</div></li>{% endfor %}</ol></details>{% endif %}
+    </article>
+    {% empty %}
+    <div class="cw-card cw-empty"><span class="cw-empty-icon" aria-hidden="true">✦</span><h3>Your next post starts with an idea.</h3><p>{% if can_create %}Share a thought above. The conversation, draft and next steps will stay together here.{% else %}When your team starts an idea, you can follow its progress and open the conversation here.{% endif %}</p></div>
+    {% endfor %}
+</div>
