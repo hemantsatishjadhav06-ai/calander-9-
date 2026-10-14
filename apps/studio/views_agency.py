@@ -7,7 +7,6 @@ needs ``create_posts``.
 
 from __future__ import annotations
 
-from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Max, Q
 from django.http import HttpResponse
@@ -17,7 +16,7 @@ from django_ratelimit.decorators import ratelimit
 
 from apps.members.decorators import require_permission
 
-from . import budget, chat, dashboard, engine, team
+from . import chat, dashboard, engine, opendots, team
 from .models import AgencyJob, AgentRun
 from .views import _perms, _workspace
 
@@ -101,6 +100,7 @@ def _job_context(request, workspace, job):
         "stages": stages,
         "runs": runs,
         "can_act": _perms(request).get("create_posts", False),
+        "assistant_task": opendots.task_record(job),
         "tabs": dashboard.tabs(workspace, "overview"),
     }
 
@@ -127,14 +127,10 @@ def job_progress(request, workspace_id, job_id):
 @ratelimit(key="user", rate="10/m", method="POST", block=True)
 @require_POST
 def job_retry(request, workspace_id, job_id):
+    from .opendots_views import apply_control
+
     workspace, job = _get_job(request, workspace_id, job_id)
-    if job.status != AgencyJob.Status.FAILED:
-        messages.error(request, "Only a job that failed can be retried.")
-    elif not budget.can_spend(workspace):
-        messages.error(request, budget.over_budget_message(workspace))
-    else:
-        engine.restart(job)
-        messages.success(request, "The team is trying again from where it stopped.")
+    apply_control(request, workspace, job.pk, "retry")
     return redirect("studio:job", workspace_id=workspace.id, job_id=job.pk)
 
 
@@ -142,10 +138,10 @@ def job_retry(request, workspace_id, job_id):
 @require_permission("create_posts")
 @require_POST
 def job_cancel(request, workspace_id, job_id):
+    from .opendots_views import apply_control
+
     workspace, job = _get_job(request, workspace_id, job_id)
-    if job.is_active:
-        engine.cancel(job)
-        messages.success(request, "Stopped. Nothing the team had made so far was sent anywhere.")
+    apply_control(request, workspace, job.pk, "cancel")
     return redirect("studio:job", workspace_id=workspace.id, job_id=job.pk)
 
 

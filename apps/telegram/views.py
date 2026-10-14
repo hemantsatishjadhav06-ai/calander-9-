@@ -14,8 +14,10 @@ from apps.studio import dashboard
 from apps.workspaces.models import Workspace
 
 from . import provisioning
-from .forms import ConnectForm, ManagedBotCreationForm, PairingForm
+from .forms import ChannelForm, ConnectForm, ManagedBotCreationForm, PairingForm
 from .models import (
+    TelegramChannel,
+    TelegramChannelDelivery,
     TelegramConnection,
     TelegramDelivery,
     TelegramManagedBotReservation,
@@ -55,6 +57,27 @@ def _context(request, workspace_id):
         if managed_enabled
         else None
     )
+    channels = (
+        list(
+            TelegramChannel.objects.filter(
+                connection=connection, organization_id=member.workspace.organization_id
+            ).order_by("created_at")
+        )
+        if connection and manage
+        else []
+    )
+    from .channel_outbox import permitted_channel
+
+    for channel in channels:
+        channel.proof_current = permitted_channel(channel)
+    channel_pairing_ready = False
+    if connection and manage and own_link:
+        try:
+            provisioning.channel_actor(connection, request.user)
+        except (PermissionDenied, provisioning.ProvisioningError):
+            pass
+        else:
+            channel_pairing_ready = True
     return {
         "workspace": member.workspace,
         "connection": connection,
@@ -70,6 +93,17 @@ def _context(request, workspace_id):
         ),
         "pair_form": PairingForm(),
         "group_pair_form": PairingForm(group=True, auto_id="id_group_%s"),
+        "channel_form": ChannelForm(),
+        "channels": channels,
+        "channel_count": sum(channel.proof_current for channel in channels),
+        "channel_pairing_ready": channel_pairing_ready,
+        "channel_deliveries": TelegramChannelDelivery.objects.filter(
+            channel__connection=connection,
+            channel__organization_id=member.workspace.organization_id,
+            status__in=["failed", "unknown"],
+        ).order_by("-updated_at")[:10]
+        if connection and manage
+        else [],
         "managed_enabled": managed_enabled,
         "managed_form": ManagedBotCreationForm(managers=managers),
         "managed_managers": managers,
@@ -222,4 +256,47 @@ def deactivate_chat(request, workspace_id, chat_id):
         messages.error(request, str(exc))
     else:
         messages.success(request, "Chat disabled. Pair it again after checking its audience and membership.")
+    return redirect("telegram:settings", workspace_id=workspace_id)
+
+
+@login_required
+@require_POST
+def connect_channel(request, workspace_id):
+    context = _context(request, workspace_id)
+    if not context["can_manage"]:
+        raise PermissionDenied("Only a current workspace settings manager can connect a channel.")
+    form = ChannelForm(request.POST)
+    if form.is_valid() and context["connection"]:
+        try:
+            provisioning.connect_channel(
+                context["connection"],
+                request.user,
+                form.cleaned_data["channel_reference"],
+                visibility_confirmed=form.cleaned_data["visibility_confirmed"],
+            )
+        except provisioning.ProvisioningError as exc:
+            form.add_error(None, str(exc))
+        else:
+            messages.success(
+                request, "Channel connected for shared status updates. Questions and approvals stay in linked chats."
+            )
+            return redirect("telegram:settings", workspace_id=workspace_id)
+    elif not context["connection"]:
+        form.add_error(None, "Connect the workspace bot and link your own Telegram account first.")
+    context["channel_form"] = form
+    return _render(request, context, status=400)
+
+
+@login_required
+@require_POST
+def disconnect_channel(request, workspace_id, channel_id):
+    context = _context(request, workspace_id)
+    if not context["can_manage"] or not context["connection"]:
+        raise PermissionDenied("Only a current workspace settings manager can disconnect a channel.")
+    try:
+        provisioning.disconnect_channel(context["connection"], request.user, channel_id)
+    except provisioning.ProvisioningError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Channel updates disabled. Its private chats and group conversations are unchanged.")
     return redirect("telegram:settings", workspace_id=workspace_id)

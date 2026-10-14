@@ -8,7 +8,14 @@ from uuid import UUID
 from django.db import transaction
 from django.utils import timezone
 
-from .models import TelegramChat, TelegramConnection, TelegramDelivery, TelegramUpdate, TelegramUserLink
+from .models import (
+    TelegramChannel,
+    TelegramChat,
+    TelegramConnection,
+    TelegramDelivery,
+    TelegramUpdate,
+    TelegramUserLink,
+)
 
 INBOUND_PROCESSING: ContextVar[bool] = ContextVar("telegram_inbound_processing", default=False)
 CURRENT_UPDATE_ID: ContextVar[UUID | None] = ContextVar("telegram_current_update_id", default=None)
@@ -93,6 +100,24 @@ def _lifecycle(row):
         return True
     member = payload.get("my_chat_member", {})
     bot = member.get("new_chat_member", {})
+    if (
+        type(bot.get("user", {}).get("id")) is int
+        and bot["user"]["id"] == row.connection.bot_id
+        and (bot.get("status") != "administrator" or bot.get("can_post_messages") is not True)
+    ):
+        # Channel status is independent from private/group pairing. A late
+        # removal update cannot revoke a channel verified after its arrival.
+        with transaction.atomic():
+            from .provisioning import _invalidate_channel_deliveries
+
+            TelegramConnection.objects.select_for_update().filter(pk=row.connection_id).first()
+            channels = TelegramChannel.objects.select_for_update().filter(
+                connection=row.connection,
+                chat_id=member.get("chat", {}).get("id"),
+                updated_at__lte=row.created_at,
+            )
+            _invalidate_channel_deliveries(channels, reason="The bot's channel posting permission was removed.")
+            channels.update(is_active=False, updated_at=timezone.now())
     if bot.get("user", {}).get("id") == row.connection.bot_id and bot.get("status") in {"left", "kicked"}:
         for chat in TelegramChat.objects.filter(
             connection=row.connection, chat_id=member.get("chat", {}).get("id"), updated_at__lte=row.created_at
@@ -159,8 +184,11 @@ def process_one(update_id):
                 response = handle_callback(row.connection, row.payload["callback_query"])
             elif "message" in row.payload:
                 from .conversations import handle_message
+                from .workflow_bridge import handle_workflow_reply
 
-                response = handle_message(row.connection, row.payload)
+                response = handle_workflow_reply(row.connection, row.payload)
+                if response is None:
+                    response = handle_message(row.connection, row.payload)
             if not TelegramUpdate.objects.filter(pk=row.pk, status="working", claimed_at=row.claimed_at).exists():
                 return "failed"
             from .outbox import queue_response

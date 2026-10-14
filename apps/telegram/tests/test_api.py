@@ -44,6 +44,29 @@ def test_wrong_bot_identity_is_never_accepted(identity):
     assert caught.value.kind == "invalid_identity"
 
 
+@pytest.mark.parametrize("reference", [-10012345, "@status_channel"])
+def test_channel_lookup_uses_fixed_api_origin_and_explicit_reference(reference):
+    api, session = client(response({"id": -10012345, "type": "channel"}))
+    assert api.get_chat(reference)["id"] == -10012345
+    assert session.post.call_args.kwargs["json"] == {"chat_id": reference}
+    assert session.post.call_args.kwargs["allow_redirects"] is False
+
+
+@pytest.mark.parametrize("reference", [True, 123, 0, -(2**63), "@bad", "https://evil.test/channel", "-10012345"])
+def test_channel_lookup_rejects_unbounded_or_non_native_references(reference):
+    api, session = client(response({"id": -10012345, "type": "channel"}))
+    with pytest.raises(TelegramAPIError):
+        api.get_chat(reference)
+    session.post.assert_not_called()
+
+
+@pytest.mark.parametrize("native_id", [True, 123, 0, -(2**63), -10098765])
+def test_channel_lookup_rejects_mismatched_or_invalid_native_id(native_id):
+    api, _ = client(response({"id": native_id, "type": "channel"}))
+    with pytest.raises(TelegramAPIError):
+        api.get_chat(-10012345)
+
+
 @pytest.mark.parametrize("method,ambiguous", [("getMe", False), ("sendMessage", True)])
 @pytest.mark.parametrize("failure", [requests.ReadTimeout, requests.ConnectionError])
 def test_transport_errors_redact_credentials_and_mark_uncertain_writes(method, ambiguous, failure):

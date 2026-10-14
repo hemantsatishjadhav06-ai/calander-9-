@@ -19,6 +19,10 @@ def mirror_message(message_id):
     message = Message.objects.select_related("conversation").filter(pk=message_id).first()
     if message is None:
         return 0
+    if not TelegramChat.objects.filter(conversation_id=message.conversation_id).exists():
+        from .workflow_bridge import queue_workflow_message
+
+        return queue_workflow_message(message.pk)
     chats = TelegramChat.objects.select_related("conversation", "connection__workspace__organization").filter(
         conversation=message.conversation, is_active=True
     )
@@ -61,6 +65,56 @@ def _post_label(post):
     return post.title[:100] or "Your post"
 
 
+def _channel_post_event(post, event, *, source_key, brief=None):
+    """A channel receives only fixed status text for a nonprivate canonical post."""
+    from .channel_outbox import public_post, queue_channel_event
+    from .models import TelegramChannel
+
+    if not public_post(post):
+        return 0
+    channels = TelegramChannel.objects.filter(connection__workspace_id=post.workspace_id, is_active=True)
+    return sum(
+        queue_channel_event(channel, event, source_key=source_key, post=post, brief=brief) is not None
+        for channel in channels
+    )
+
+
+def _workflow_post_event(post, event, *, source_key, brief=None):
+    """Only the opted-in original web author receives a private fixed status."""
+    from .workflow_bridge import queue_post_event
+
+    return queue_post_event(post, event, source_key=source_key, brief=brief)
+
+
+def ready_draft(brief_id, *, post_id=None, author_id=None):
+    """Only a finished canonical Studio handoff announces a fixed draft status."""
+    from apps.studio.models import StudioBrief
+
+    try:
+        brief_id = UUID(str(brief_id))
+    except (ValueError, TypeError, AttributeError):
+        return 0
+    rows = StudioBrief.objects.select_related("post").filter(
+        pk=brief_id,
+        post__isnull=False,
+        status__in=["ready", "approved"],
+        stage="done",
+        finished_at__isnull=False,
+        revision__gte=1,
+    )
+    if post_id is not None:
+        rows = rows.filter(post_id=post_id)
+    if author_id is not None:
+        rows = rows.filter(author_id=author_id)
+    brief = rows.first()
+    if brief is None or brief.workspace_id != brief.post.workspace_id:
+        return 0
+    key = f"studio:{brief.pk}:revision:{brief.revision}:draft-ready"
+    return _channel_post_event(brief.post, "draft", source_key=key, brief=brief) + _workflow_post_event(
+        brief.post, "draft", source_key=key, brief=brief
+    )
+
+
 def _time(value, workspace):
     try:
         zone = ZoneInfo(workspace.effective_timezone)
@@ -83,6 +137,7 @@ def platform_receipt(platform_post_id):
     if pp.status == "published" and pp.platform_post_id and pp.published_at:
         text = f"Published: {label}\nAccount: {account}\nConfirmed at {_time(pp.published_at, pp.post.workspace)}\nReceipt: {pp.platform_post_id}"
         event = f"published:{pp.platform_post_id}"
+        channel_event = "published"
     elif pp.status == "failed":
         outcome = state(pp).get("kind")
         detail = (
@@ -94,16 +149,20 @@ def platform_receipt(platform_post_id):
         )
         text = f"{label}\nAccount: {account}\n{detail}"
         event = f"failed:{outcome or 'failed'}:{pp.retry_count}:{pp.approved_revision or 0}"
+        channel_event = "failed"
     elif pp.status == "scheduled" and (pp.scheduled_at or pp.post.scheduled_at):
         when = pp.scheduled_at or pp.post.scheduled_at
         text = f"Scheduled: {label}\nAccount: {account}\nTime: {_time(when, pp.post.workspace)}\nSM Bean will report the confirmed delivery."
         event = f"scheduled:{when.isoformat()}:{pp.approved_revision or 0}"
+        channel_event = "scheduled"
     else:
         return 0
     count = 0
     for chat in _post_chats(pp.post):
         if queue_message(chat, text, source_key=f"platform:{pp.pk}:{event}"):
             count += 1
+    count += _channel_post_event(pp.post, channel_event, source_key=f"platform:{pp.pk}:{event}")
+    count += _workflow_post_event(pp.post, channel_event, source_key=f"platform:{pp.pk}:{event}")
     return count
 
 
@@ -137,26 +196,56 @@ def notification_event(notification_id):
     post = Post.objects.filter(pk=data["post_id"]).first()
     if post is None or (data.get("workspace_id") and str(post.workspace_id) != str(data["workspace_id"])):
         return 0
+    draft_count = 0
+    if notice.event_type == "post_submitted":
+        if data.get("studio_brief_id"):
+            draft_count = ready_draft(data["studio_brief_id"], post_id=post.pk, author_id=notice.user_id)
+        else:
+            # The normal approval engine notifies reviewers before Studio's
+            # author notice. Its already committed canonical handoff must
+            # announce draft readiness before the review status too.
+            ready_id = (
+                post.studio_briefs.filter(status__in=["ready", "approved"], stage="done", finished_at__isnull=False)
+                .order_by("-finished_at")
+                .values_list("pk", flat=True)
+                .first()
+            )
+            if ready_id:
+                draft_count = ready_draft(ready_id, post_id=post.pk)
+    # Per-user notices may target reviewers who do not use Telegram. The web
+    # workflow author is authenticated by their own explicit opt-in and
+    # pairing, rather than inheriting the triggering recipient's identity.
+    version = hashlib.sha256(f"{post.updated_at.isoformat()}:{data.get('revision', '')}".encode()).hexdigest()[:20]
+    key = f"event:{notice.event_type}:post:{post.pk}:{version}"
+    channel_event = {
+        "post_submitted": "review",
+        "post_approved": "approved",
+        "post_changes_requested": "changes",
+        "post_rejected": "changes",
+        "client_approval_requested": "review",
+        "approval_hold_requested": "changes",
+        "approval_reminder": "review",
+    }[notice.event_type]
+    private_count = _workflow_post_event(post, channel_event, source_key=key)
     # The triggering recipient must remain paired to this exact workspace.
     link = TelegramUserLink.objects.filter(
         connection__workspace_id=post.workspace_id, user=notice.user, is_active=True
     ).first()
     if link is None:
-        return 0
+        return draft_count + private_count
     try:
         if fresh_member(link) is None:
-            return 0
+            return draft_count + private_count
     except TelegramPermissionDenied:
-        return 0
+        return draft_count + private_count
     # Collapse per-user copies of the same revision/event in a group.
-    version = hashlib.sha256(f"{post.updated_at.isoformat()}:{data.get('revision', '')}".encode()).hexdigest()[:20]
-    key = f"event:{notice.event_type}:post:{post.pk}:{version}"
-    count = 0
+    count = draft_count + private_count
     for chat in _post_chats(post):
         if chat.audience == "private" and chat.private_user_id != notice.user_id:
             continue
         if queue_message(chat, f"{_post_label(post)}\n{wording}", source_key=key):
             count += 1
+    count += _channel_post_event(post, channel_event, source_key=key)
     return count
 
 
@@ -239,4 +328,28 @@ def sweep_receipts(*, limit=25):
     # first batch. Semantic delivery keys make every revisit harmless.
     checkpoint.metadata = {"last_pk": str(ids[-1])} if ids else {}
     checkpoint.save(update_fields=["metadata", "updated_at"])
-    return sum(platform_receipt(item) for item in ids)
+    return sum(platform_receipt(item) for item in ids) + _sweep_ready_drafts(limit=limit)
+
+
+def _sweep_ready_drafts(*, limit=25):
+    """Recover queryset handoffs or missed notices without broadcasting ideas."""
+    from apps.common.models import TaskHeartbeat
+    from apps.studio.models import StudioBrief
+
+    checkpoint, _ = TaskHeartbeat.objects.get_or_create(task_name="apps.telegram.draft_cursor")
+    rows = StudioBrief.objects.filter(
+        post__isnull=False,
+        post__workspace__telegram_connection__is_active=True,
+        status__in=["ready", "approved"],
+        stage="done",
+        finished_at__isnull=False,
+        revision__gte=1,
+        updated_at__gte=timezone.now() - timedelta(days=7),
+    )
+    last_pk = checkpoint.metadata.get("last_pk") if isinstance(checkpoint.metadata, dict) else None
+    if last_pk:
+        rows = rows.filter(pk__gt=last_pk)
+    ids = list(rows.order_by("pk").values_list("pk", flat=True)[: min(100, max(1, limit))])
+    checkpoint.metadata = {"last_pk": str(ids[-1])} if ids else {}
+    checkpoint.save(update_fields=["metadata", "updated_at"])
+    return sum(ready_draft(item) for item in ids)

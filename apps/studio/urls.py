@@ -1,6 +1,16 @@
 from django.urls import include, path
 
-from . import urls_agency, urls_autopilot, urls_chat, urls_memory, urls_outcomes, urls_trust, views
+from . import (
+    opendots_urls,
+    urls_agency,
+    urls_autopilot,
+    urls_chat,
+    urls_customer_workflow,
+    urls_memory,
+    urls_outcomes,
+    urls_trust,
+    views,
+)
 
 app_name = "studio"
 
@@ -30,4 +40,6 @@ urlpatterns += (
     + urls_chat.urlpatterns
     + urls_outcomes.urlpatterns
     + urls_trust.urlpatterns
+    + urls_customer_workflow.urlpatterns
+    + opendots_urls.urlpatterns
 )

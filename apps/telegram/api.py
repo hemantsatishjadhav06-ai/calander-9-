@@ -240,6 +240,22 @@ class BotAPI:
             raise TelegramAPIError("Telegram chat membership could not be verified.", kind="invalid_response")
         return data
 
+    def get_chat(self, reference: int | str) -> dict:
+        if isinstance(reference, bool) or (
+            not (isinstance(reference, int) and -(2**63) < reference < 0)
+            and not (isinstance(reference, str) and re.fullmatch(r"@[A-Za-z0-9_]{5,32}", reference))
+        ):
+            raise TelegramAPIError("Enter a channel ID or @username.", kind="invalid_identity")
+        data = self.call("getChat", {"chat_id": reference})
+        if (
+            not isinstance(data, dict)
+            or _integer(data.get("id")) is None
+            or not -(2**63) < data["id"] < 0
+            or (isinstance(reference, int) and data["id"] != reference)
+        ):
+            raise TelegramAPIError("The Telegram channel could not be verified.", kind="invalid_response")
+        return data
+
     def get_file(self, file_id: str) -> dict:
         if not isinstance(file_id, str) or not 1 <= len(file_id) <= 256:
             raise TelegramAPIError("Choose a supported Telegram reference file.", kind="invalid_file")

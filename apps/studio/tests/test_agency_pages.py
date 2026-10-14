@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.members.models import WorkspaceMembership
-from apps.studio import engine, team
+from apps.studio import engine, opendots, team
 from apps.studio.models import AgencyJob, StudioBrief
 from apps.studio.tests.conftest import make_brief, run_all
 
@@ -119,7 +119,12 @@ def test_a_failed_job_can_be_retried_by_staff(client, world, report_job):
     assert client.post(_url("studio:job_retry", world, job_id=report_job.id)).status_code == 403
 
     client.force_login(world.editor)
-    client.post(_url("studio:job_retry", world, job_id=report_job.id))
+    report_job.refresh_from_db()
+    receipt = opendots.task_record(report_job)["review_receipt"]
+    client.post(
+        _url("studio:job_retry", world, job_id=report_job.id),
+        {"revision": report_job.revision, "review_receipt": receipt, "reviewed": "1"},
+    )
     report_job.refresh_from_db()
     assert report_job.status == AgencyJob.Status.QUEUED and report_job.revision == 2
 

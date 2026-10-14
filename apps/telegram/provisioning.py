@@ -1,6 +1,8 @@
 """One-use pairing and owner-controlled bot setup, without username authority."""
 
 import hashlib
+import json
+import re
 import secrets
 from collections.abc import Callable
 from datetime import timedelta
@@ -12,11 +14,14 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.common.validators import resolve_public_ip
+from apps.members.models import OrgMembership
 from apps.studio.models import Conversation
 
 from .api import BotAPI
 from .models import (
     TelegramAction,
+    TelegramChannel,
+    TelegramChannelDelivery,
     TelegramChat,
     TelegramConnection,
     TelegramDelivery,
@@ -35,6 +40,207 @@ from .permissions import (
 )
 
 PAIRING_TTL = timedelta(minutes=10)
+
+
+def channel_authority_digest(member):
+    """Bind a channel to the actor's exact current role, without logging it."""
+    org_member = (
+        OrgMembership.objects.filter(organization_id=member.workspace.organization_id, user_id=member.user_id)
+        .values("id", "org_role")
+        .first()
+    )
+    proof = {
+        "membership": str(member.pk),
+        "organization": str(member.workspace.organization_id),
+        "workspace_role": member.workspace_role,
+        "custom_role": str(member.custom_role_id) if member.custom_role_id else None,
+        "permissions": member.effective_permissions,
+        "org_membership": str(org_member["id"]) if org_member else None,
+        "org_role": org_member["org_role"] if org_member else None,
+    }
+    return hashlib.sha256(json.dumps(proof, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def channel_actor(connection, user):
+    """Channels need a real, active private pairing and current settings authority."""
+    if user is None:
+        raise TelegramPermissionDenied("The channel's settings manager is unavailable.")
+    member = _owner(connection.workspace, user, connection=connection)
+    current = (
+        TelegramConnection.objects.select_related("workspace")
+        .filter(pk=connection.pk, workspace=member.workspace, is_active=True, webhook_status="active")
+        .first()
+    )
+    if current is None:
+        raise ProvisioningError("Connect the workspace bot's deployed webhook first.")
+    link = TelegramUserLink.objects.filter(connection=current, user=member.user, is_active=True).first()
+    if link is None:
+        raise ProvisioningError("Link your own Telegram account before connecting a channel.")
+    member = fresh_member(link, "manage_workspace_settings")
+    private = (
+        TelegramChat.objects.select_related("conversation")
+        .filter(
+            connection=current,
+            chat_id=link.telegram_user_id,
+            chat_type="private",
+            audience="private",
+            private_user=member.user,
+            is_active=True,
+        )
+        .first()
+    )
+    if (
+        private is None
+        or not private.conversation.is_private
+        or private.conversation.workspace_id != member.workspace_id
+        or private.conversation.created_by_id != member.user_id
+        or private.conversation.audience != Conversation.Audience.INTERNAL
+    ):
+        raise ProvisioningError("Create a fresh personal Telegram link and press Start before connecting a channel.")
+    return current, link, member
+
+
+def channel_reference(value):
+    if isinstance(value, bool):
+        raise ProvisioningError("Enter a channel ID or @username.")
+    if isinstance(value, int) and -(2**63) < value < 0:
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if re.fullmatch(r"@[A-Za-z0-9_]{5,32}", value):
+            return value
+        if re.fullmatch(r"-[0-9]{1,19}", value) and -(2**63) < int(value) < 0:
+            return int(value)
+    raise ProvisioningError("Enter the numeric channel ID (starting with -) or its @username.")
+
+
+def _invalidate_channel_deliveries(channels, *, reason):
+    ids = list(channels.values_list("pk", flat=True))
+    if not ids:
+        return
+    now = timezone.now()
+    TelegramChannelDelivery.objects.filter(channel_id__in=ids, status="pending").update(
+        status="failed", error=reason, updated_at=now
+    )
+    TelegramChannelDelivery.objects.filter(channel_id__in=ids, status="sending").update(
+        status="unknown",
+        error="Channel access changed during a send. Inspect Telegram before trying again.",
+        updated_at=now,
+    )
+
+
+def connect_channel(connection, user, reference, *, visibility_confirmed=False):
+    """A dashboard POST verifies bot rights AND the real paired person's admin rights."""
+    if visibility_confirmed is not True:
+        raise ProvisioningError("Confirm that every channel subscriber may see the status updates.")
+    reference = channel_reference(reference)
+    current, link, member = channel_actor(connection, user)
+    epoch, pairing_epoch = current.updated_at, link.updated_at
+    authority, organization_id = channel_authority_digest(member), member.workspace.organization_id
+    try:
+        api = BotAPI(current.token)
+        identity = api.get_me()
+        channel = api.get_chat(reference)
+        if (
+            not isinstance(identity, dict)
+            or identity.get("is_bot") is not True
+            or type(identity.get("id")) is not int
+            or identity["id"] != current.bot_id
+            or identity.get("username") != current.bot_username
+            or not isinstance(channel, dict)
+            or channel.get("type") != "channel"
+            or type(channel.get("id")) is not int
+            or not -(2**63) < channel["id"] < 0
+            or (isinstance(reference, int) and reference != channel["id"])
+        ):
+            raise ProvisioningError("Telegram did not identify the selected channel and workspace bot.")
+        if isinstance(reference, str) and str(channel.get("username") or "").casefold() != reference[1:].casefold():
+            raise ProvisioningError("The channel username changed. Check Channel info before trying again.")
+        bot = api.get_chat_member(channel["id"], current.bot_id)
+        actor = api.get_chat_member(channel["id"], link.telegram_user_id)
+    except ProvisioningError:
+        raise
+    except Exception:
+        raise ProvisioningError(
+            "Telegram could not verify this channel. Check its ID and both administrator roles."
+        ) from None
+    if (
+        not isinstance(bot, dict)
+        or bot.get("status") != "administrator"
+        or bot.get("can_post_messages") is not True
+        or not isinstance(bot.get("user"), dict)
+        or bot["user"].get("is_bot") is not True
+        or type(bot["user"].get("id")) is not int
+        or bot["user"]["id"] != current.bot_id
+    ):
+        raise ProvisioningError("Add the workspace bot as a channel administrator with Post Messages enabled.")
+    if (
+        not isinstance(actor, dict)
+        or actor.get("status") not in {"creator", "administrator"}
+        or not isinstance(actor.get("user"), dict)
+        or actor["user"].get("is_bot") is not False
+        or type(actor["user"].get("id")) is not int
+        or actor["user"]["id"] != link.telegram_user_id
+    ):
+        raise TelegramPermissionDenied(
+            "Your personally linked Telegram account must be an administrator of this channel."
+        )
+    try:
+        with transaction.atomic():
+            _owner(current.workspace, user, locked=True, connection=current)
+            verified, active_link, member = channel_actor(current, user)
+            if (
+                verified.updated_at != epoch
+                or active_link.pk != link.pk
+                or active_link.updated_at != pairing_epoch
+                or active_link.telegram_user_id != link.telegram_user_id
+                or member.workspace.organization_id != organization_id
+                or channel_authority_digest(member) != authority
+            ):
+                raise TelegramPermissionDenied(
+                    "Your bot, workspace or personal permissions changed during verification."
+                )
+            old = TelegramChannel.objects.select_for_update().filter(chat_id=channel["id"]).first()
+            if old and (old.connection_id != verified.pk or old.organization_id != organization_id):
+                raise ProvisioningError("This channel already belongs to another workspace. Use a separate channel.")
+            if old:
+                _invalidate_channel_deliveries(
+                    TelegramChannel.objects.filter(pk=old.pk),
+                    reason="The channel was reverified; old status updates were held.",
+                )
+            saved = old or TelegramChannel(connection=verified, organization_id=organization_id, chat_id=channel["id"])
+            saved.username = str(channel.get("username") or "")[:32]
+            saved.title = str(channel.get("title") or "Channel status updates")[:255]
+            saved.created_by = member.user
+            saved.user_link = active_link
+            saved.telegram_user_id = active_link.telegram_user_id
+            saved.bot_id = verified.bot_id
+            saved.connection_epoch = verified.updated_at
+            saved.pairing_epoch = active_link.updated_at
+            saved.authority_digest = authority
+            saved.visibility_confirmed_at = timezone.now()
+            saved.is_active = True
+            saved.save()
+            return saved
+    except IntegrityError:
+        raise ProvisioningError("This channel was connected concurrently. Refresh before trying again.") from None
+
+
+def disconnect_channel(connection, user, channel_id):
+    with transaction.atomic():
+        member = _owner(connection.workspace, user, locked=True, connection=connection)
+        channel = (
+            TelegramChannel.objects.select_for_update()
+            .filter(pk=channel_id, connection=connection, organization_id=member.workspace.organization_id)
+            .first()
+        )
+        if channel is None:
+            raise ProvisioningError("This channel is unavailable in the workspace.")
+        _invalidate_channel_deliveries(
+            TelegramChannel.objects.filter(pk=channel.pk), reason="Channel updates were disabled."
+        )
+        channel.is_active = False
+        channel.save(update_fields=["is_active", "updated_at"])
 
 
 class ProvisioningError(ValueError):
@@ -247,6 +453,15 @@ def _invalidate_queues(
     connection, *, chat=None, user_link=None, exclude_update_pk=None, action_reason="access_revoked"
 ):
     """Hold unfinished intents durably; in-flight sends may already exist."""
+    channels = TelegramChannel.objects.filter(connection=connection)
+    if user_link is not None:
+        channels = channels.filter(user_link=user_link)
+    if chat is not None:
+        channels = (
+            channels.filter(created_by_id=chat.private_user_id) if chat.audience == "private" else channels.none()
+        )
+    _invalidate_channel_deliveries(channels, reason="The channel's bot or personal administrator proof was revoked.")
+    channels.update(is_active=False, updated_at=timezone.now())
     reservations = TelegramManagedBotReservation.objects.filter(
         manager=connection, status__in=["pending", "connecting"]
     )

@@ -136,14 +136,23 @@ def _lock_current_job(job):
 
 def _current_membership(job, conversation, requester):
     """Lock and revalidate the author and permissions before mutating creative work."""
-    from apps.accounts.models import User
-    from apps.members.models import CustomRole, WorkspaceMembership
-    from apps.workspaces.models import Workspace
+    from django.core.exceptions import PermissionDenied
 
+    from apps.telegram.permissions import current_member
+
+    if "workflow_telegram_context" in (job.input or {}):
+        from apps.telegram.workflow_bridge import workflow_member
+
+        try:
+            member = workflow_member(job, conversation, requester, locked=True)
+        except PermissionDenied:
+            return None
+        _lock_current_job(job)
+        return member
     telegram_context = (job.input or {}).get("telegram_context")
     if telegram_context is not None:
         try:
-            kind, paired_member = chat.telegram_author_kind(conversation, requester, telegram_context, locked=True)
+            kind, paired_member = chat.telegram_job_author_kind(job, conversation, requester, locked=True)
         except chat.ChatError:
             return None
         _lock_current_job(job)
@@ -156,6 +165,13 @@ def _current_membership(job, conversation, requester):
         ).exists():
             return None
         return paired_member
+    # Use the same workspace/actor/role -> job order as Telegram and the
+    # assistant task controls. A returning web result must not hold the job
+    # while waiting for a workspace lock held by a person pausing that job.
+    try:
+        membership = current_member(conversation.workspace, requester, locked=True)
+    except PermissionDenied:
+        return None
     _lock_current_job(job)
     current_thread = (
         Conversation.objects.select_for_update()
@@ -165,12 +181,9 @@ def _current_membership(job, conversation, requester):
         )
         .first()
     )
-    workspace = Workspace.objects.select_for_update().filter(pk=job.workspace_id, is_archived=False).first()
-    person = User.objects.select_for_update().filter(pk=requester.pk, is_active=True).first()
     if (
         current_thread is None
-        or workspace is None
-        or person is None
+        or membership.workspace_id != job.workspace_id
         or current_thread.audience != conversation.audience
     ):
         return None
@@ -182,22 +195,20 @@ def _current_membership(job, conversation, requester):
         current_thread.blog_post_id,
     )
     conversation._state.fields_cache.clear()
-    conversation.workspace = workspace
-    membership = (
-        WorkspaceMembership.objects.select_for_update()
-        .filter(
-            user=person,
-            workspace=workspace,
-        )
-        .first()
-    )
-    if membership is not None and membership.custom_role_id:
-        membership.custom_role = CustomRole.objects.select_for_update().get(pk=membership.custom_role_id)
-    if chat.is_staff_membership(membership):
-        return membership
-    if chat.is_client_membership(membership) and conversation.audience == Conversation.Audience.CLIENT:
-        return membership
-    return None
+    conversation.workspace = membership.workspace
+    try:
+        kind = chat.web_kind_for_member(membership, conversation)
+    except chat.ChatError:
+        return None
+    if not Message.objects.filter(
+        pk=(job.input or {}).get("message_id"),
+        conversation=conversation,
+        author_id=requester.pk,
+        author_kind=kind,
+        is_internal=False,
+    ).exists():
+        return None
+    return membership
 
 
 # ---------------------------------------------------------------------------
@@ -240,12 +251,27 @@ def answer(job: AgencyJob) -> None:
         return None
     try:
         telegram_context = (job.input or {}).get("telegram_context")
-        if telegram_context is not None:
-            author_kind, membership = chat.telegram_author_kind(conversation, requester, telegram_context)
+        if "workflow_telegram_context" in (job.input or {}):
+            from django.core.exceptions import PermissionDenied
+
+            from apps.telegram.workflow_bridge import workflow_member
+
+            try:
+                membership = workflow_member(job, conversation, requester)
+            except PermissionDenied:
+                raise chat.ChatError("This workflow Telegram author is no longer authorized.") from None
+            author_kind = Message.AuthorKind.STAFF
+        elif telegram_context is not None:
+            author_kind, membership = chat.telegram_job_author_kind(job, conversation, requester)
         else:
-            author_kind = chat.author_kind_for(requester, conversation)
-    except chat.ChatError:
-        engine.finish(job, result={"skipped": "This request no longer has an authorized author."})
+            author_kind, membership = chat.web_author_kind(conversation, requester)
+    except chat.ChatError as exc:
+        reason = (
+            str(exc)
+            if (job.input or {}).get("telegram_context") is not None
+            else "This request no longer has an authorized author."
+        )
+        engine.finish(job, result={"skipped": reason})
         return None
     if author_kind != trigger.author_kind:
         engine.finish(job, result={"skipped": "The request author's role changed."})
@@ -312,6 +338,37 @@ def answer(job: AgencyJob) -> None:
         else {}
     )
 
+    if "workflow_telegram_context" in (job.input or {}):
+        from django.core.exceptions import PermissionDenied
+
+        from apps.telegram.workflow_bridge import workflow_member
+
+        try:
+            workflow_member(job, conversation, requester)
+        except PermissionDenied:
+            engine.finish(job, result={"skipped": "This workflow Telegram author is no longer authorized."})
+            return None
+    elif telegram_context is None:
+        try:
+            current_kind, membership = chat.web_author_kind(conversation, requester)
+        except chat.ChatError:
+            current_kind = ""
+        if current_kind != trigger.author_kind:
+            engine.finish(job, result={"skipped": "This request no longer has an authorized author."})
+            return None
+    else:
+        try:
+            current_kind, membership = chat.telegram_job_author_kind(job, conversation, requester)
+        except chat.ChatError as exc:
+            engine.finish(job, result={"skipped": str(exc)})
+            return None
+        if current_kind != trigger.author_kind:
+            engine.finish(job, result={"skipped": "This Telegram role changed. Send the request again."})
+            return None
+    # Source reads may finish after a person pauses/stops the task. Fence this
+    # request once more immediately before beginning any paid model work.
+    with transaction.atomic():
+        _lock_current_job(job)
     run, result = engine.call(
         job,
         "account_manager",
@@ -351,9 +408,7 @@ def answer(job: AgencyJob) -> None:
         allowed = allowed_actions(membership, conversation, target)
         if telegram_context is not None:
             try:
-                current_kind, _member = chat.telegram_author_kind(
-                    conversation, requester, telegram_context, locked=True
-                )
+                current_kind, _member = chat.telegram_job_author_kind(job, conversation, requester, locked=True)
             except chat.ChatError:
                 current_kind = ""
             if current_kind != trigger.author_kind:
