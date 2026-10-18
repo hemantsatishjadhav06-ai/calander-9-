@@ -6,7 +6,7 @@
 
 <h2>Contact us</h2>
 {% if SUPPORT_EMAIL %}
-<p>Email <a href="mailto:{{ SUPPORT_EMAIL }}?subject={{ SITE_NAME|urlencode }}%20support">{{ SUPPORT_EMAIL }}</a>. We reply within one working day during early access. Please include your workspace name and, for a failed post, the time it was scheduled.</p>
+<p>Email <a href="mailto:{{ SUPPORT_EMAIL }}?subject={{ SITE_NAME|urlencode }}%20support">{{ SUPPORT_EMAIL }}</a> for help. Please include your workspace name and, for a failed post, the time it was scheduled.</p>
 {% else %}
 <p>This instance has no support address configured. Please contact the person who invited you.</p>
 {% endif %}
@@ -18,6 +18,12 @@
 <p>Check your spam folder and wait a couple of minutes. Links expire, so request a new one if yours is old.</p>
 <h3>A client says their approval link doesn't work</h3>
 <p>Approval links are personal and time-limited. Send a fresh one from Workspace settings → Clients.</p>
+<h3>A planned post has not gone out</h3>
+<p>Check its review and delivery status first. Confirming a brief starts draft work; only a person using <strong>Approve &amp; schedule</strong> authorizes delivery. A disconnected account, unavailable provider credit or an expired posting window may require attention. If a delivery result is uncertain, check the actual account before retrying so you do not publish twice.</p>
+<h3>Who covers an urgent posting deadline?</h3>
+<p>Name a lead approver and backup in your agency team and agree a review deadline. Early-access support is not a live campaign-monitoring service or a guaranteed emergency response. Keep a manual posting plan for time-sensitive work; do not send the same post while an uncertain delivery is being checked.</p>
+<h3>Why do I see AI usage during free early access?</h3>
+<p>The software and external services have separate costs. Agency Studio and AI Intelligence can consume model credits, generated pictures consume image-service credits, and some platforms charge for API use. Ask your operator who supplies and pays those accounts. The Agency budget is a soft usage limit; the provider's invoice determines actual charges.</p>
 <h3>How do I delete my data?</h3>
 <p>Organisation owners can delete the organisation under Settings; see our <a href="{{ LEGAL_PRIVACY_URL }}">Privacy Policy</a> for what happens next.</p>
 {% endblock %}

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Start a post · {{ workspace.name }} · {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/customer_workflow.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="customer-workflow" data-customer-workflow data-workflow-workspace="{{ workspace.id }}" data-workflow-status-url="{% url 'studio:workflow_status' workspace_id=workspace.id %}">
+    <header class="cw-header">
+        <div>
+            <p class="cw-eyebrow">{{ workspace.name }} <span aria-hidden="true">/</span> Your content workspace</p>
+            <h1>From an idea to your next post.</h1>
+            <p class="cw-intro">Share an idea, answer a few questions, then review the post and choose when it goes out. Your team keeps the work together here.</p>
+        </div>
+        <a class="cw-button cw-button-secondary" href="{% url 'calendar:calendar' workspace_id=workspace.id %}">View calendar <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <nav class="cw-shortcuts" aria-label="Content workspace">
+        <a href="{% url 'studio:workflow' workspace_id=workspace.id %}" aria-current="page">Start a post</a>
+        <a href="{% url 'studio:index' workspace_id=workspace.id %}">Agency overview</a>
+        <a href="{% url 'studio:thread' workspace_id=workspace.id %}">Ask the team</a>
+        <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=approvals">Approvals</a>
+    </nav>
+
+    <ol class="cw-process" aria-label="How a post gets made">
+        <li><span class="cw-step-number" aria-hidden="true">01</span><div><strong>Share your idea</strong><span>We ask for the details we need.</span></div></li>
+        <li><span class="cw-step-number" aria-hidden="true">02</span><div><strong>Create the draft</strong><span>Confirm the direction before creation.</span></div></li>
+        <li><span class="cw-step-number" aria-hidden="true">03</span><div><strong>Review together</strong><span>Check the copy, image and facts.</span></div></li>
+        <li><span class="cw-step-number" aria-hidden="true">04</span><div><strong>Approve &amp; schedule</strong><span>Choose the channels and posting time.</span></div></li>
+    </ol>
+
+    <div class="cw-layout">
+        <div class="cw-primary">
+            {% if can_create %}
+            <section class="cw-card cw-idea-card" aria-labelledby="cw-idea-heading">
+                <div class="cw-card-heading"><div><p class="cw-eyebrow">Start here</p><h2 id="cw-idea-heading">What would you like to share?</h2></div><span class="cw-small-badge">One idea at a time</span></div>
+                <p class="cw-muted">A rough thought is enough. Tell us the purpose, audience or message you have in mind.</p>
+                <form method="post" action="{% url 'studio:workflow_create' workspace_id=workspace.id %}" data-workflow-create-form>
+                    {% csrf_token %}
+                    {{ workflow_form.request_id }}
+                    {% if workflow_form.non_field_errors %}<div class="cw-error" role="alert">{{ workflow_form.non_field_errors|join:" " }}</div>{% endif %}
+                    <label class="cw-label" for="{{ workflow_form.idea.id_for_label }}">Your post idea</label>
+                    {{ workflow_form.idea }}
+                    {% if workflow_form.idea.errors %}<p class="cw-field-error" role="alert">{{ workflow_form.idea.errors|join:" " }}</p>{% endif %}
+                    <details class="cw-ideas">
+                        <summary>Need a starting point?</summary>
+                        <ul>
+                            <li>Answer a question your customers often ask.<button type="button" data-workflow-prompt="Create a helpful post answering a common question from our customers. Ask me which question and any facts you need." hidden>Use this idea</button></li>
+                            <li>Share an update about your product or team.<button type="button" data-workflow-prompt="Help me share a recent update about our business. Ask me what changed and which details we can share." hidden>Use this idea</button></li>
+                            <li>Invite people to an upcoming event.<button type="button" data-workflow-prompt="Create an invitation for an upcoming event. Ask me for the event details, audience and call to action." hidden>Use this idea</button></li>
+                        </ul>
+                    </details>
+                    {% if workflow_form.telegram_updates %}
+                    <div class="cw-telegram-choice">
+                        <label for="{{ workflow_form.telegram_updates.id_for_label }}">{{ workflow_form.telegram_updates }}<span>Send questions and draft updates to my paired Telegram account</span></label>
+                        <p>Replies to these workflow messages are shared with the workspace team on this idea. Pair your Telegram account first.</p>
+                        {% if workflow_form.telegram_updates.errors %}<p class="cw-field-error" role="alert">{{ workflow_form.telegram_updates.errors|join:" " }}</p>{% endif %}
+                    </div>
+                    {% endif %}
+                    <div class="cw-form-footer"><button class="cw-button cw-button-primary" type="submit" data-workflow-submit>Start a post <span aria-hidden="true">→</span></button><p>Your idea is saved first. We ask for missing details before creating a draft.</p></div>
+                </form>
+            </section>
+            {% else %}
+            <section class="cw-card" aria-labelledby="cw-review-heading"><p class="cw-eyebrow">Your next step</p><h2 id="cw-review-heading">Review the work your team shares.</h2><p class="cw-muted">Your team starts new posts. Open a conversation to answer their questions, share feedback or review a draft.</p><a class="cw-button cw-button-primary" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=approvals">Open approvals</a></section>
+            {% endif %}
+
+            {% if readiness.blockers or readiness.warnings %}
+            <section class="cw-readiness" aria-labelledby="cw-readiness-heading" data-workflow-readiness>
+                <h2 id="cw-readiness-heading">{% if readiness.blockers %}A few things need attention{% else %}Before you continue{% endif %}</h2>
+                {% if readiness.blockers %}<p>You can save your idea. The team can continue creating once these are resolved.</p><ul>{% for blocker in readiness.blockers %}<li>{{ blocker }}</li>{% endfor %}</ul>{% endif %}
+                {% if readiness.warnings %}<ul>{% for warning in readiness.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
+            </section>
+            {% endif %}
+
+            <section class="cw-activity" aria-labelledby="cw-activity-heading">
+                <div class="cw-section-heading"><div><p class="cw-eyebrow">Pick up where you left off</p><h2 id="cw-activity-heading">Your posts in progress</h2></div><a class="cw-text-link" href="{% url 'studio:thread' workspace_id=workspace.id %}">All conversations <span aria-hidden="true">↗</span></a></div>
+                <p class="cw-poll-status" data-workflow-poll-status role="status" aria-live="polite" aria-atomic="true"></p>
+                <button class="cw-update-button" type="button" data-workflow-apply-updates hidden>New activity available — show updates</button>
+                {% include "studio/partials/customer_workflow_journeys.html" %}
+                <p class="cw-muted cw-refresh-note" data-workflow-static-note><a class="cw-text-link" href="{% url 'studio:workflow' workspace_id=workspace.id %}">Reload this page</a> to see the latest progress. Your saved ideas and conversations stay available here.</p>
+                <p class="cw-refresh-note" data-workflow-refresh-note hidden>Progress could not refresh. Your saved work is safe. <a class="cw-text-link" href="{% url 'studio:workflow' workspace_id=workspace.id %}">Reload this page</a> to check the latest activity.</p>
+            </section>
+        </div>
+
+        <aside class="cw-secondary" aria-label="Keep your workspace connected">
+            <section class="cw-card cw-telegram" aria-labelledby="cw-telegram-heading">
+                <div class="cw-telegram-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m21 3-4 18-6-6-4 3v-6L21 3Z"/><path d="m7 12 14-9-10 12"/></svg></div>
+                <p class="cw-eyebrow">Stay in the loop</p><h2 id="cw-telegram-heading">Bring the updates to Telegram.</h2>
+                <p class="cw-muted">Get the team’s questions, draft updates and approval requests where you already chat.</p>
+                {% if telegram_label %}<p class="cw-connection-status" data-workflow-telegram-state="{{ telegram_state }}">{{ telegram_label }}</p>{% elif telegram_state %}<p class="cw-connection-status" data-workflow-telegram-state="{{ telegram_state }}">{{ telegram_state }}</p>{% endif %}
+                {% if telegram_description %}<p class="cw-muted cw-small">{{ telegram_description }}</p>{% endif %}
+                {% if telegram_url %}<a class="cw-button cw-button-secondary" href="{{ telegram_url }}">Set up Telegram <span aria-hidden="true">→</span></a>{% endif %}
+                <p class="cw-small cw-muted">Link your account first, then choose your team group or channel. Telegram updates do not replace required approval.</p>
+            </section>
+            <section class="cw-card cw-help" aria-labelledby="cw-help-heading">
+                <h2 id="cw-help-heading">What happens next?</h2>
+                <ul><li><span aria-hidden="true">01</span><p>The team asks for missing facts, photos or direction.</p></li><li><span aria-hidden="true">02</span><p>You confirm the plan before a draft is created.</p></li><li><span aria-hidden="true">03</span><p>You can request changes before approving a posting time.</p></li></ul>
+                <a class="cw-text-link" href="{% url 'studio:brand' workspace_id=workspace.id %}">Review brand details <span aria-hidden="true">↗</span></a>
+            </section>
+        </aside>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}<script defer src="{% static 'js/customer_workflow.js' %}"></script>{% endblock %}

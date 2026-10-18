@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.composer.models import PlatformPost
-from apps.studio.models import BrandProfile, StudioBrief
+from apps.studio.models import AgencyJob, BrandProfile, Conversation, StudioBrief
 from apps.studio.tests.conftest import make_brief, run_all
 
 
@@ -36,7 +36,7 @@ class TestPages:
 
         assert response.status_code == 200
         html = response.content.decode()
-        assert "AI Studio" in html and "Waiting for your approval" in html
+        assert "Your agency team" in html and "Waiting for your approval" in html
         # A viewer can look but not brief the team.
         assert response.context["can_create"] is False
         assert BrandProfile.objects.filter(workspace=world.workspace).exists()
@@ -52,7 +52,7 @@ class TestPages:
         response = _as(client, world.owner).get(_url("index", world))
 
         assert response.context["setup"]["claude_ready"] is False
-        assert "ANTHROPIC_API_KEY" in response.content.decode()
+        assert "AI service needs administrator setup" in response.content.decode()
 
 
 class TestBriefing:
@@ -62,12 +62,14 @@ class TestBriefing:
             {"idea": "Why landlord shares cost less", "accounts": [str(world.linkedin.pk)], "style_lock": "on"},
         )
 
-        brief = StudioBrief.objects.get(workspace=world.workspace)
+        job = AgencyJob.objects.get(workspace=world.workspace, kind=AgencyJob.Kind.CHAT)
+        conversation = Conversation.objects.get(pk=job.conversation_id)
         assert response.status_code == 302
-        assert response["Location"] == _url("detail", world, brief_id=brief.pk)
-        assert brief.author == world.editor
-        assert list(brief.social_accounts.all()) == [world.linkedin]
-        assert fake_team.queued == [(brief.pk, 1, "strategy")]
+        assert response["Location"].startswith(_url("thread", world))
+        assert job.requested_by == world.editor
+        assert conversation.audience == Conversation.Audience.INTERNAL
+        assert str(world.linkedin.pk) in conversation.messages.get().body
+        assert not StudioBrief.objects.exists() and not fake_team.queued
 
     def test_an_empty_idea_is_sent_back(self, client, world, fake_team):
         response = _as(client, world.editor).post(
@@ -86,7 +88,7 @@ class TestBriefing:
             follow=True,
         )
 
-        assert "ANTHROPIC_API_KEY" in _messages(response)
+        assert "check Agency readiness" in _messages(response)
         assert not StudioBrief.objects.exists()
 
     def test_viewers_cannot_brief(self, client, world, fake_team):

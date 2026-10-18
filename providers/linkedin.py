@@ -782,7 +782,10 @@ class LinkedInProvider(SocialProvider):
         because a remote URL has no size we control and ``resp.content`` on one
         is an unbounded read straight into the worker's heap.
         """
+        from apps.common.background import check_worker_lease
+
         with self._media_handle(source) as media:
+            check_worker_lease()
             with httpx.Client(timeout=120.0) as client:
                 upload_resp = client.put(
                     upload_url,
@@ -859,6 +862,9 @@ class LinkedInProvider(SocialProvider):
         via the `?sau=...` query param — only Content-Type should be sent. Adding
         an Authorization header or LinkedIn-Version can confuse the upload edge.
         """
+        from apps.common.background import check_worker_lease
+
+        check_worker_lease()
         with httpx.Client(timeout=120.0) as client:
             resp = client.put(
                 upload_url,

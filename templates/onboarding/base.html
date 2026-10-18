@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block layout %}
+<main id="main-content" tabindex="-1" class="auth-bg min-h-screen flex flex-col items-center justify-center py-12 px-4" style="font-family: var(--font-body);">
+    {% block auth_content %}{% endblock %}
+    {% if SOURCE_URL %}
+    <p class="mt-8 text-xs" style="color: var(--text-tertiary);">
+        <a href="{{ SOURCE_URL }}" target="_blank" rel="noopener" class="hover:underline">Source code</a>
+        · Open-source (AGPL-3.0)
+    </p>
+    {% endif %}
+</main>
+{% endblock %}

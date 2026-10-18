@@ -175,6 +175,9 @@ def create_post(
         missing = [mid for mid, u in resolved if u is None or u not in asset_map]
         if missing:
             raise ValueError(f"Media asset(s) not found in workspace {workspace.id}: {missing}")
+        normalized_ids = [u for _, u in resolved]
+        if len(normalized_ids) != len(set(normalized_ids)):
+            raise ValueError("Media asset IDs must be unique.")
 
     override = (platform_overrides or {}).get(social_account.id) or {}
 

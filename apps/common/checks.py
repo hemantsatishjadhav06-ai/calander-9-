@@ -10,9 +10,14 @@ gated on ``not DEBUG`` so ``--deploy`` in a dev shell stays quiet.
 Run before/after shipping:  python manage.py check --deploy
 """
 
+from ipaddress import ip_address, ip_network
+from urllib.parse import urlsplit
+
 from django.conf import settings
-from django.core.checks import Tags, register
+from django.core.checks import CheckMessage, Tags, register
+from django.core.checks import Error as CheckError
 from django.core.checks import Warning as CheckWarning
+from django.http.request import validate_host
 
 
 @register(Tags.security, deploy=True)
@@ -20,42 +25,72 @@ def check_production_config(app_configs, **kwargs):
     if settings.DEBUG:
         return []
 
-    errors = []
-    app_url = (getattr(settings, "APP_URL", "") or "").lower()
-    if "localhost" in app_url or "127.0.0.1" in app_url or not app_url:
+    errors: list[CheckMessage] = []
+    app_url = getattr(settings, "APP_URL", "") or ""
+    try:
+        origin = urlsplit(app_url)
+        host = origin.hostname or ""
+        _port = origin.port  # Validate the port as well as the hostname.
+        try:
+            public_host = ip_address(host).is_global
+        except ValueError:
+            public_host = bool(host and "." in host and host != "localhost" and not host.endswith(".localhost"))
+        valid_origin = (
+            origin.scheme == "https"
+            and public_host
+            and not origin.username
+            and not origin.password
+            and origin.path in ("", "/")
+            and not origin.query
+            and not origin.fragment
+        )
+    except ValueError:
+        valid_origin = False
+    if not valid_origin:
         errors.append(
-            CheckWarning(
-                "APP_URL is unset or still points at localhost.",
+            CheckError(
+                "APP_URL must be a public HTTPS origin.",
                 hint=(
                     "Absolute URLs (email/invite/portal links, the media URLs handed to "
                     "Instagram/Facebook/Threads/Pinterest/Google, OAuth issuer) are built "
                     "from APP_URL. Set APP_URL to your public https origin."
                 ),
-                id="smbean.W001",
+                id="smbean.E001",
             )
         )
 
     if not getattr(settings, "ENCRYPTION_KEY_SALT", None):
         errors.append(
-            CheckWarning(
+            CheckError(
                 "ENCRYPTION_KEY_SALT is not set.",
                 hint=(
                     "Connecting a social account (token encryption) and minting an API key "
                     "raise ValueError without it — every connect/API-key request will 500. "
                     "Set a random value BEFORE any account is connected and never change it."
                 ),
-                id="smbean.W002",
+                id="smbean.E002",
             )
         )
 
-    if str(getattr(settings, "STORAGE_BACKEND", "local")).lower() != "s3":
+    storage = str(getattr(settings, "STORAGE_BACKEND", "local")).lower()
+    if storage not in ("local", "s3"):
+        errors.append(CheckError("STORAGE_BACKEND must be 'local' or 's3'.", id="smbean.E003"))
+    elif storage == "s3" and not getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""):
+        errors.append(
+            CheckError(
+                "S3_BUCKET_NAME is required when STORAGE_BACKEND=s3.",
+                hint="Configure a durable bucket and its credentials or an attached IAM role before starting.",
+                id="smbean.E004",
+            )
+        )
+    elif storage == "local" and not getattr(settings, "MEDIA_STORAGE_PERSISTENT", False):
         errors.append(
             CheckWarning(
                 "STORAGE_BACKEND is 'local' in production.",
                 hint=(
-                    "Uploaded media lives on the container's ephemeral disk (lost on every "
-                    "redeploy) and localhost media URLs are unfetchable by the social "
-                    "platforms. Set STORAGE_BACKEND=s3 with the S3_* variables."
+                    "Mount MEDIA_ROOT on durable storage shared by web and worker, then set "
+                    "MEDIA_STORAGE_PERSISTENT=true (the production Compose manifest does this). "
+                    "On hosts with ephemeral disks, use STORAGE_BACKEND=s3."
                 ),
                 id="smbean.W003",
             )
@@ -67,6 +102,14 @@ def check_production_config(app_configs, **kwargs):
                 "EMAIL_BACKEND_TYPE is 'console': email is printed to the log, never sent.",
                 hint="Use gmail_api (works where outbound SMTP is blocked, e.g. Railway Hobby) or smtp.",
                 id="smbean.W011",
+            )
+        )
+    elif getattr(settings, "EMAIL_BACKEND_TYPE", "") not in ("smtp", "gmail_api"):
+        errors.append(
+            CheckError(
+                "EMAIL_BACKEND_TYPE must be smtp, gmail_api or console.",
+                hint="An unrecognized backend falls back to console and cannot deliver email.",
+                id="smbean.E005",
             )
         )
     if getattr(settings, "EMAIL_BACKEND_TYPE", "") == "smtp" and getattr(settings, "EMAIL_HOST", "") in (
@@ -95,6 +138,55 @@ def check_production_config(app_configs, **kwargs):
             )
         )
 
+    allowed_hosts = getattr(settings, "ALLOWED_HOSTS", [])
+    if not allowed_hosts or "*" in allowed_hosts:
+        errors.append(
+            CheckError(
+                "ALLOWED_HOSTS must list explicit production hostnames.",
+                hint="Set the public hostname and any platform health-check hostname; do not use '*'.",
+                id="smbean.E006",
+            )
+        )
+    elif valid_origin and not validate_host(host, allowed_hosts):
+        errors.append(
+            CheckError(
+                "ALLOWED_HOSTS does not allow the APP_URL hostname.",
+                hint="Add the public hostname to ALLOWED_HOSTS so browser and health-check requests can reach the app.",
+                id="smbean.E010",
+            )
+        )
+    if settings.DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql":
+        errors.append(
+            CheckError(
+                "Production requires PostgreSQL.",
+                hint="Publishing and background-task locking require PostgreSQL. Set DATABASE_URL accordingly.",
+                id="smbean.E007",
+            )
+        )
+    if settings.CACHES["default"]["BACKEND"] in (
+        "django.core.cache.backends.locmem.LocMemCache",
+        "django.core.cache.backends.dummy.DummyCache",
+    ):
+        errors.append(
+            CheckError(
+                "Production requires a shared cache for authentication and API rate limits.",
+                hint="Set REDIS_URL for a Redis service reachable by both web and worker processes.",
+                id="smbean.E008",
+            )
+        )
+    for proxy in getattr(settings, "BB_TRUSTED_PROXIES", ()):
+        try:
+            ip_network(proxy, strict=False)
+        except ValueError:
+            errors.append(
+                CheckError(
+                    "BB_TRUSTED_PROXIES contains an invalid address or CIDR range.",
+                    hint="Use the exact address or network of your trusted reverse proxy.",
+                    id="smbean.E009",
+                )
+            )
+            break
+
     # Behind a TLS-terminating proxy (SECURE_PROXY_SSL_HEADER is set), every
     # request's REMOTE_ADDR is the proxy's IP unless BB_TRUSTED_PROXIES lists it.
     # With it empty, all clients share one rate-limit bucket → 10 bad logins from
@@ -121,7 +213,7 @@ def check_production_config(app_configs, **kwargs):
         errors.append(
             CheckWarning(
                 "WEBHOOK_SECRET is not set.",
-                hint="Inbound webhooks cannot be authenticated. Set it to a long random value.",
+                hint="Set a long random value and share it with outbound webhook receivers to verify signatures.",
                 id="smbean.W007",
             )
         )

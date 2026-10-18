@@ -32,10 +32,20 @@ def _post_media_changed(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender="media_library.MediaAsset", dispatch_uid="approvals_revalidate_asset")
-def _asset_saved(sender, instance, created, **kwargs):
+@receiver(post_delete, sender="media_library.MediaAsset", dispatch_uid="approvals_revalidate_asset_deleted")
+def _asset_saved(sender, instance, created=False, **kwargs):
     if created:
         return
-    from apps.composer.models import PostMedia
+    from django.db.models import Q
 
-    for post_id in PostMedia.objects.filter(media_asset=instance).values_list("post_id", flat=True).distinct():
+    from apps.composer.models import PlatformPost, PostMedia
+
+    post_ids = set(PostMedia.objects.filter(media_asset=instance).values_list("post_id", flat=True))
+    post_ids.update(
+        PlatformPost.objects.filter(
+            Q(platform_extra__thumbnail_asset_id=str(instance.pk))
+            | Q(platform_extra__cover_image_asset_id=str(instance.pk))
+        ).values_list("post_id", flat=True)
+    )
+    for post_id in post_ids:
         gate.schedule_revalidation(post_id)

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import math
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import IO
 
 import httpx
@@ -32,6 +34,22 @@ from .types import (
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 30.0
+
+
+def _retry_after_seconds(value: str | None) -> int | None:
+    """Retry-After accepts both delta-seconds and an HTTP date."""
+    if not value:
+        return None
+    try:
+        return max(0, int(value))
+    except ValueError:
+        try:
+            retry_at = parsedate_to_datetime(value)
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=UTC)
+            return max(0, math.ceil((retry_at - datetime.now(UTC)).total_seconds()))
+        except (ValueError, TypeError, OverflowError):
+            return None
 
 
 class SocialProvider(ABC):
@@ -384,6 +402,9 @@ class SocialProvider(ABC):
                     retryable=False,
                 ) from exc
 
+        from apps.common.background import check_worker_lease
+
+        check_worker_lease()
         with httpx.Client(timeout=timeout) as client:
             # httpx uses `content` for a request body, `data` for form mappings.
             # A file object or byte iterator goes to `content` too, and httpx
@@ -428,7 +449,7 @@ class SocialProvider(ABC):
             logger.error("%s API 429 response: %s", self.platform_name, response.text[:1000])
             return RateLimitError(
                 f"Rate limit exceeded for {self.platform_name}: {response.text[:500]}",
-                retry_after=int(retry_after) if retry_after else None,
+                retry_after=_retry_after_seconds(retry_after),
                 platform=self.platform_name,
                 raw_response=self._safe_json(response),
             )

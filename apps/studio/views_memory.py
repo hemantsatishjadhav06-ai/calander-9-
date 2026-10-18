@@ -20,12 +20,14 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_POST
 from django_ratelimit.decorators import ratelimit
 
 from apps.members.decorators import require_permission
 
 from . import budget, dashboard, engine, llm
+from . import memory as creative_memory
 from .brand_defaults import ensure_profile
 from .forms_agency import HouseStyleForm, ReferenceUploadForm
 from .jobtypes.learn import PERSON_EDIT_HOLD, last_curator_text
@@ -56,6 +58,11 @@ def _card(insight: CreativeInsight) -> dict:
     top = None
     if insight.score is not None:
         top = max(1, round((1 - insight.score) * 100))
+    captured = (insight.metrics or {}).get("captured_at")
+    try:
+        evidence_at = parse_datetime(captured) if isinstance(captured, str) else None
+    except ValueError:
+        evidence_at = None
     return {
         "insight": insight,
         "image": _image_url(insight.media_asset),
@@ -64,6 +71,7 @@ def _card(insight: CreativeInsight) -> dict:
         "ratio": insight.ratio,
         "hook": hook[:120],
         "look": (insight.description or "").strip(),
+        "evidence_at": evidence_at,
     }
 
 
@@ -89,12 +97,8 @@ def _context(request, workspace, *, house_form=None, upload_form=None) -> dict:
         .select_related("media_asset")
         .order_by("-is_reference", "-created_at")[:GRID_SIZE]
     ]
-    best = [
-        _card(i)
-        for i in CreativeInsight.objects.filter(workspace=workspace, score__isnull=False, media_asset__isnull=False)
-        .select_related("media_asset")
-        .order_by("-score", "-published_at")[:8]
-    ]
+    fresh_ranked = creative_memory.best_performers(workspace, limit=GRID_SIZE)
+    best = [_card(i) for i in fresh_ranked if i.media_asset_id][:8]
     jobs = AgencyJob.objects.filter(workspace=workspace, kind=AgencyJob.Kind.LEARN).order_by("-created_at")
     last_job = jobs.first()
     last_done = jobs.filter(status=AgencyJob.Status.DONE).first()
@@ -106,7 +110,7 @@ def _context(request, workspace, *, house_form=None, upload_form=None) -> dict:
         "references": references,
         "reference_count": CreativeInsight.objects.filter(workspace=workspace, is_reference=True).count(),
         "best": best,
-        "scored_count": CreativeInsight.objects.filter(workspace=workspace, score__isnull=False).count(),
+        "scored_count": len(best),
         "origin": house_style_origin(profile),
         "last_job": last_job,
         "last_done": last_done,
@@ -252,7 +256,7 @@ def refresh(request, workspace_id):
         messages.info(request, "The curator is already studying your work.")
         return redirect("studio:job", workspace_id=workspace.id, job_id=active.pk)
     if not llm.is_configured():
-        messages.error(request, "ANTHROPIC_API_KEY is missing on the server, so the curator can't look at pictures.")
+        messages.error(request, llm.configuration_error())
         return _back(workspace)
     if not budget.can_spend(workspace):
         messages.error(request, budget.over_budget_message(workspace))

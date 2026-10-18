@@ -30,6 +30,7 @@
                 hx-target="#notif-{{ n.id }}"
                 hx-swap="outerHTML"
                 hx-trigger="click"
+                hx-vals='{"next": "{% if n.data.action_url %}{{ n.data.action_url|escapejs }}{% else %}{% url "notifications:list" %}{% endif %}"}'
                 {% endif %}
                 class="flex gap-3 px-5 py-3.5 cursor-pointer"
             >

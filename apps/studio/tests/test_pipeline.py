@@ -76,15 +76,16 @@ def test_the_reviewer_can_send_it_back_once(world, fake_team):
     fake_team.verdicts = ["revise", "revise", "revise"]
     brief = run_all(make_brief(world))
 
-    assert brief.status == StudioBrief.Status.READY
+    assert brief.status == StudioBrief.Status.FAILED and brief.stage == "qa"
     assert brief.auto_revisions == 1
     copy_calls = fake_team.calls["copywriter"]
     assert len(copy_calls) == 2
     assert copy_calls[1]["fixes"] == ["Remove 'best price'."] and copy_calls[1]["previous"]
-    # The second "revise" goes to the approver as notes instead of looping.
+    # One correction pass is bounded; unresolved risks stop handoff.
     assert len(fake_team.calls["reviewer"]) == 2
     assert brief.review_notes["risk_flags"] == ["'best price' is not in the facts"]
-    assert "Check before approving" in brief.post.internal_notes
+    assert brief.post is None
+    assert "final publication review still needs corrections" in brief.error
 
 
 def test_a_failed_agent_stops_the_run_and_retry_resumes_there(world, fake_team):

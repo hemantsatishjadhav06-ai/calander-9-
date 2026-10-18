@@ -3,13 +3,19 @@ import logging
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
+
+from apps.common.validators import clean_display_name
+
+from .uploads import validate_profile_image
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +72,7 @@ def home(request):
 
 @login_required
 def dashboard(request):
-    """Main dashboard - redirects to last used workspace or shows org overview."""
+    """Open the guided start for staff, retaining the client's scoped workflow."""
     from apps.members.models import WorkspaceMembership
 
     user = request.user
@@ -75,25 +81,43 @@ def dashboard(request):
     # in that workspace. Otherwise the org may have been deleted out from under
     # them and we'd redirect into a 403.
     if user.last_workspace_id:
-        if WorkspaceMembership.objects.filter(
+        membership = WorkspaceMembership.objects.filter(
             user=user,
             workspace_id=user.last_workspace_id,
             workspace__is_archived=False,
-        ).exists():
-            return redirect("calendar:calendar", workspace_id=user.last_workspace_id)
+            workspace__organization__deleted_at__isnull=True,
+        ).first()
+        if membership:
+            landing = _workspace_landing(membership)
+            if landing is not None:
+                return landing
         user.last_workspace_id = None
         user.save(update_fields=["last_workspace_id"])
 
     # Fallback: try to find any workspace the user belongs to
-    membership = (
-        WorkspaceMembership.objects.filter(user=user, workspace__is_archived=False).select_related("workspace").first()
-    )
-    if membership:
-        user.last_workspace_id = membership.workspace.id
-        user.save(update_fields=["last_workspace_id"])
-        return redirect("calendar:calendar", workspace_id=membership.workspace.id)
+    memberships = WorkspaceMembership.objects.filter(
+        user=user, workspace__is_archived=False, workspace__organization__deleted_at__isnull=True
+    ).select_related("workspace")
+    for membership in memberships:
+        landing = _workspace_landing(membership)
+        if landing is not None:
+            user.last_workspace_id = membership.workspace_id
+            user.save(update_fields=["last_workspace_id"])
+            return landing
 
     return render(request, "accounts/dashboard.html")
+
+
+def _workspace_landing(membership):
+    from apps.telegram.permissions import current_member, internal_member
+
+    try:
+        current = current_member(membership.workspace, membership.user)
+    except PermissionDenied:
+        return None
+    can_start = bool(internal_member(current) and current.effective_permissions.get("create_posts", False))
+    route = "studio:workflow" if can_start else "calendar:calendar"
+    return redirect(route, workspace_id=membership.workspace_id)
 
 
 @login_required
@@ -160,26 +184,11 @@ def _handle_photo_update(request, user):
         messages.error(request, "Photo must be under 2 MB.")
         return
 
-    # Validate minimum dimensions (180x180)
-    #
-    # PIL is imported here rather than at module scope because config.urls
-    # imports this module for ``health_check``, so a top-level import loaded
-    # Pillow's _imaging extension into every web AND worker process at boot,
-    # whether or not an avatar was ever touched. Matches how the rest of the
-    # codebase imports PIL (apps.media_library.services, apps.intelligence.views).
-    from PIL import Image
-
     try:
-        with Image.open(avatar) as img:
-            width, height = img.size
-        if width < 180 or height < 180:
-            messages.error(request, "Photo must be at least 180×180 pixels.")
-            return
-    except Exception:
-        messages.error(request, "Could not read image file.")
+        avatar = validate_profile_image(avatar, minimum_dimension=180)
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
         return
-    finally:
-        avatar.seek(0)  # Reset file pointer after reading
 
     # Delete old avatar before saving new one
     if user.avatar:
@@ -192,7 +201,7 @@ def _handle_photo_update(request, user):
 
 def _handle_name_update(request, user):
     """Handle name change."""
-    name = request.POST.get("name", "").strip()
+    name = clean_display_name(request.POST.get("name", ""), max_length=255)
     if not name:
         messages.error(request, "Name cannot be empty.")
         return
@@ -220,12 +229,15 @@ def _handle_password_update(request, user):
         messages.error(request, "New password cannot be empty.")
         return
 
-    if len(password) < 8:
-        messages.error(request, "New password must be at least 8 characters.")
-        return
-
     if password != password_confirm:
         messages.error(request, "New passwords do not match.")
+        return
+
+    try:
+        validate_password(password, user=user)
+    except ValidationError as exc:
+        for error in exc.messages:
+            messages.error(request, error)
         return
 
     user.set_password(password)

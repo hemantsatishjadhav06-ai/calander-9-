@@ -73,20 +73,26 @@ def copywriter(
     )
 
 
-def _style_section(reference: StyleReference) -> str:
+def _style_section(reference: StyleReference, *, image_number: int | None = None) -> str:
+    image_note = (
+        f"Image {image_number} is that post's graphic."
+        if image_number is not None
+        else "The previous post's image could not be loaded."
+    )
     if reference.kind == "studio":
         locked = reference.locked
         return (
-            "<style_lock>\nThe look of the previous post is locked; image 1 is that post's graphic. Keep exactly:\n"
+            f"<style_lock>\nThe look of the previous post is locked. {image_note} Keep exactly:\n"
             f"template = {locked.get('template', '')}\nformat = {locked.get('format', '')}\n"
             f"grade = {locked.get('grade', '')}\npicture_style = {locked.get('picture_style', '')}\n"
-            "Choose the words, the picture's subject and the scrim strength so this post reads as the next one "
+            f"overlay_strength = {locked.get('overlay_strength', '')}\n"
+            "Choose the words and the picture's subject so this post reads as the next one "
             "in the same series.\n</style_lock>"
         )
     if reference.kind == "post":
         palette = ", ".join(reference.palette) or "unknown"
         return (
-            "<style_reference>\nImage 1 is the picture of the brand's previous post. Match its look as closely as "
+            f"<style_reference>\n{image_note} Match the previous post's look as closely as "
             "the layouts allow: choose the template, format and grade that fit it best and describe its kind of "
             f"picture in picture_style. Its main colours: {palette}.\n</style_reference>"
         )
@@ -114,35 +120,60 @@ def art_director(
     reference: StyleReference,
     *,
     source_picture: bytes | None = None,
+    creative_memory: dict[str, Any] | None = None,
+    reference_images: list[bytes] | None = None,
     previous: dict[str, Any] | None = None,
     feedback: str = "",
     fixes: list[str] | None = None,
 ) -> llm.AgentResult[DesignAnswer]:
     content: list[dict[str, Any]] = []
     image_number = 0
-    reference_note = ""
+    style_image_number = None
     if reference.image is not None and reference.kind in ("studio", "post"):
         content.append(llm.image_block(reference.image))
         image_number += 1
+        style_image_number = image_number
     photo_note = ""
     if source_picture is not None:
+        from . import trust
+
+        provenance = (
+            trust.photo_status(brief.source_picture)
+            if getattr(brief, "source_picture", None)
+            else {"label": "Unverified supplied image; no project provenance has been established."}
+        )
         content.append(llm.image_block(source_picture))
         image_number += 1
         photo_note = (
-            f"<supplied_photo>\nImage {image_number} is the photo the person chose for this post. Use it: set "
-            "use_picture to true and picture_prompt to ''. Describe its look in picture_style.\n</supplied_photo>"
+            f"<supplied_photo>\nImage {image_number} is the photo the person chose for this post. Provenance: {provenance['label']}. Use it: set "
+            "use_picture to true and picture_prompt to ''. Preserve the actual subject, architecture and details; "
+            "choose a layout whose crop keeps the important subject visible. This is the source photo, not a "
+            "style sample to replace with a generated scene. Describe its look in picture_style while respecting "
+            "any locked style values.\n</supplied_photo>"
         )
-    if reference.image is None and reference.kind in ("studio", "post"):
-        reference_note = "(The previous post's image could not be loaded; follow the locked values.)"
+    creative_image_notes = []
+    for picture in (reference_images or [])[:3]:
+        content.append(llm.image_block(picture, max_side=768))
+        image_number += 1
+        creative_image_notes.append(f"Image {image_number}: curated creative example, for visual craft and feel only.")
 
     parts = [
         prompts.brief_block(brief),
         prompts.concept_block(concept),
         f"<copy>\n{prompts.copy_block(post_copy)}\n</copy>",
-        _style_section(reference) + (f"\n{reference_note}" if reference_note else ""),
+        _style_section(reference, image_number=style_image_number),
     ]
     if photo_note:
         parts.append(photo_note)
+    if creative_image_notes:
+        parts.append(
+            "<creative_examples>\n"
+            + "\n".join(creative_image_notes)
+            + "\nLearn hierarchy, spacing, light and palette; these are neither the supplied photo nor evidence "
+            "of this post's facts. Keep the style lock and supplied photo requirements above.\n</creative_examples>"
+        )
+    if creative_memory:
+        parts.append(prompts.creative_memory_block(creative_memory))
     if previous:
         parts.append(f"<previous_design>\n{prompts.design_block(previous)}\n</previous_design>")
     guidance = prompts.feedback_block(feedback, fixes or [], "reviewer", untrusted=prompts.from_thread(brief))
@@ -151,7 +182,7 @@ def art_director(
     parts.append(
         "When the post names a specific project or property, don't depict it as if the picture were that "
         "building — choose a neutral scene (the area's skyline, an interior detail, a moment at home) unless a "
-        "photo was supplied."
+        "person-verified project photo was supplied. An unknown or illustrative photo does not establish project identity."
     )
     parts.append("Design the graphic." if not (previous and guidance) else "Revise the design as asked.")
     content.append(llm.text_block("\n\n".join(parts)))

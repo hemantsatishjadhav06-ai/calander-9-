@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "onboarding/base.html" %}
 
 {% block title %}Accounts Connected - {{ org.name }}{% endblock %}
 
@@ -37,7 +37,7 @@
         {% if connected_count %}
             {{ connected_count }} account{{ connected_count|pluralize }} connected to <strong style="color: var(--text-primary);">{{ workspace.name }}</strong>.
         {% else %}
-            Your accounts have been connected to <strong style="color: var(--text-primary);">{{ workspace.name }}</strong>.
+            No accounts have been connected to <strong style="color: var(--text-primary);">{{ workspace.name }}</strong> yet.
         {% endif %}
     </p>
 

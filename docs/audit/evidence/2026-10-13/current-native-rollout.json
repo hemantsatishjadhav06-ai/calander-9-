@@ -1,0 +1,62 @@
+{
+  "record_type": "sm_bean_current_native_rollout",
+  "observed_on": "2026-10-13",
+  "source_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+  "matching_services": {
+    "web": {
+      "deployment": {
+        "id": "aac80bcf-d891-4541-a312-ab5452c8ea13",
+        "status": "SUCCESS",
+        "snapshotId": "3ca29aea-5a7c-4613-8620-d9db88d973fa",
+        "deploymentStopped": false
+      },
+      "native_source_matches": true,
+      "actual_builder": "DOCKERFILE",
+      "actual_Dockerfile": "/Dockerfile",
+      "actual_replica_count": 1,
+      "actual_region": "us-west2",
+      "only_matching_active_deployment": true,
+      "autodeploy_held": true,
+      "predeploy_normal_web_release": true,
+      "predeploy_none": false,
+      "start_command_expected": true
+    },
+    "worker": {
+      "deployment": {
+        "id": "afc72c9f-7640-4273-9f12-d7dc9fd8b222",
+        "status": "SUCCESS",
+        "snapshotId": "14d31340-1d52-4d9f-92ee-f820d61b7bfc",
+        "deploymentStopped": false
+      },
+      "native_source_matches": true,
+      "actual_builder": "DOCKERFILE",
+      "actual_Dockerfile": "/Dockerfile",
+      "actual_replica_count": 1,
+      "actual_region": "us-west2",
+      "only_matching_active_deployment": true,
+      "autodeploy_held": true,
+      "predeploy_normal_web_release": false,
+      "predeploy_none": true,
+      "start_command_expected": true
+    }
+  },
+  "old_deployment_removals": [
+    {
+      "service": "worker",
+      "deployment_id": "4567506a-3740-4683-8400-a9256c40c7f5",
+      "remove_acknowledged": true,
+      "removed_verified": true
+    },
+    {
+      "service": "web",
+      "deployment_id": "67467610-c381-4e7d-aaab-e5c472ce0f3f",
+      "remove_acknowledged": true,
+      "removed_verified": true
+    }
+  ],
+  "service_definitions_preserved": true,
+  "database_cache_volumes_preserved": true,
+  "autodeploy_held": true,
+  "fully_ready_for_unrestricted_customer_launch": false,
+  "variable_values_or_raw_logs_included": false
+}

@@ -35,7 +35,7 @@
             <span class="mk-logo__mark" aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:#C2410C;color:#fff;font-weight:700;">{{ site_name|make_list|first|upper }}</span>
             <span>{{ site_name }}</span>
         </a>
-        <nav class="mk-nav" aria-label="Primary">
+        <nav id="marketing-navigation" class="mk-nav" aria-label="Primary">
             <a href="{% url 'marketing:features' %}" {% if page_key == 'features' %}class="is-active" aria-current="page"{% endif %}>Features</a>
             <a href="{% url 'marketing:how_it_works' %}" {% if page_key == 'how_it_works' %}class="is-active" aria-current="page"{% endif %}>How it works</a>
             <a href="{% url 'marketing:platforms' %}" {% if page_key == 'platforms' %}class="is-active" aria-current="page"{% endif %}>Platforms</a>
@@ -50,12 +50,12 @@
         <div class="mk-header__actions">
             <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
             <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create account{% else %}Request early access{% endif %}</a>
-            <button class="mk-nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-label="Toggle navigation"><span></span></button>
+            <button class="mk-nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="marketing-navigation" aria-label="Toggle navigation"><span></span></button>
         </div>
     </div>
 </header>
 
-<main id="main">
+<main id="main" tabindex="-1">
 {% block content %}{% endblock %}
 </main>
 

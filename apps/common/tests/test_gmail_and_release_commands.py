@@ -150,7 +150,7 @@ def test_import_legacy_media_copies_only_missing_files(tmp_path, settings):
         assert fh.read() == b"png-bytes"
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_backup_database_writes_every_table_and_a_manifest(tmp_path, settings):
     import tarfile
 

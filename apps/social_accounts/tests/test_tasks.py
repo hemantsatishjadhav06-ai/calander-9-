@@ -52,6 +52,46 @@ def connected_account(db, workspace):
 @pytest.mark.django_db
 class TestCheckSocialAccountHealth:
     @patch("providers.get_provider")
+    def test_disconnected_account_is_not_revived_by_a_queued_check(self, mock_get_provider, connected_account):
+        connected_account.connection_status = SocialAccount.ConnectionStatus.DISCONNECTED
+        connected_account.save(update_fields=["connection_status"])
+
+        check_social_account_health.now(str(connected_account.id))
+
+        mock_get_provider.assert_not_called()
+        connected_account.refresh_from_db()
+        assert connected_account.connection_status == SocialAccount.ConnectionStatus.DISCONNECTED
+
+    @patch("providers.get_provider")
+    def test_reconnect_during_profile_check_preserves_new_grant_and_status(self, mock_get_provider, connected_account):
+        connected_account.token_expires_at = timezone.now() + timedelta(days=3)
+        connected_account.save(update_fields=["token_expires_at"])
+        provider = MagicMock()
+        provider.refresh_token.return_value = OAuthTokens(
+            access_token="refreshed", refresh_token="refreshed-refresh", expires_in=3600
+        )
+
+        def reconnect_then_fail(_token):
+            SocialAccount.objects.filter(pk=connected_account.pk).update(
+                oauth_access_token="reconnected",
+                oauth_refresh_token="reconnected-refresh",
+                connection_status=SocialAccount.ConnectionStatus.CONNECTED,
+                last_error="",
+            )
+            raise RuntimeError("old grant failed")
+
+        provider.get_profile.side_effect = reconnect_then_fail
+        mock_get_provider.return_value = provider
+
+        check_social_account_health.now(str(connected_account.id))
+
+        connected_account.refresh_from_db()
+        assert connected_account.oauth_access_token == "reconnected"
+        assert connected_account.oauth_refresh_token == "reconnected-refresh"
+        assert connected_account.connection_status == SocialAccount.ConnectionStatus.CONNECTED
+        assert connected_account.last_error == ""
+
+    @patch("providers.get_provider")
     def test_successful_health_check(self, mock_get_provider, connected_account):
         mock_provider = MagicMock()
         mock_provider.get_profile.return_value = _profile(follower_count=1500)

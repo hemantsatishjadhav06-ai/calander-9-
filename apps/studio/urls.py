@@ -1,6 +1,16 @@
-from django.urls import path
+from django.urls import include, path
 
-from . import urls_agency, urls_autopilot, urls_chat, urls_memory, views
+from . import (
+    opendots_urls,
+    urls_agency,
+    urls_autopilot,
+    urls_chat,
+    urls_customer_workflow,
+    urls_memory,
+    urls_outcomes,
+    urls_trust,
+    views,
+)
 
 app_name = "studio"
 
@@ -9,6 +19,7 @@ urlpatterns = [
     path("new/", views.create, name="create"),
     path("brand/", views.brand_profile, name="brand"),
     path("brand/sample/<str:template>.jpg", views.brand_sample, name="brand_sample"),
+    path("delivery/", include("apps.publisher.urls_delivery")),
     path("<uuid:brief_id>/", views.detail, name="detail"),
     path("<uuid:brief_id>/progress/", views.progress, name="progress"),
     path("<uuid:brief_id>/approve/", views.approve, name="approve"),
@@ -22,4 +33,13 @@ urlpatterns = [
 
 # The agency's own pages, one module each (team roster and jobs, creative
 # memory, autopilot, the team thread).
-urlpatterns += urls_agency.urlpatterns + urls_memory.urlpatterns + urls_autopilot.urlpatterns + urls_chat.urlpatterns
+urlpatterns += (
+    urls_agency.urlpatterns
+    + urls_memory.urlpatterns
+    + urls_autopilot.urlpatterns
+    + urls_chat.urlpatterns
+    + urls_outcomes.urlpatterns
+    + urls_trust.urlpatterns
+    + urls_customer_workflow.urlpatterns
+    + opendots_urls.urlpatterns
+)

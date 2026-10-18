@@ -32,6 +32,8 @@ from urllib.parse import urlsplit
 import httpx
 from django.conf import settings
 
+from apps.common.background import check_worker_lease
+
 logger = logging.getLogger(__name__)
 
 FAL_RUN = "https://fal.run"
@@ -229,6 +231,7 @@ def generate_from_prompt(
     client = client or httpx.Client(timeout=httpx.Timeout(timeout, connect=15.0), follow_redirects=False)
     try:
         try:
+            check_worker_lease()
             response = client.post(f"{FAL_RUN}/{model}", json=_request_body(prompt, image_size), headers=headers)
         except httpx.TimeoutException as exc:
             raise ImageGenerationError(

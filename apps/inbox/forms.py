@@ -55,7 +55,17 @@ class BulkActionForm(forms.Form):
 
     def clean_message_ids(self):
         raw = self.cleaned_data["message_ids"]
-        return [mid.strip() for mid in raw.split(",") if mid.strip()]
+        uuid_field = forms.UUIDField()
+        message_ids = [uuid_field.clean(mid.strip()) for mid in raw.split(",") if mid.strip()]
+        if not message_ids:
+            raise forms.ValidationError("Select at least one message.")
+        return message_ids
+
+    def clean_value(self):
+        value = self.cleaned_data.get("value", "")
+        if self.cleaned_data.get("action") == "assign" and value:
+            return forms.UUIDField().clean(value)
+        return value
 
 
 class SavedReplyForm(forms.ModelForm):

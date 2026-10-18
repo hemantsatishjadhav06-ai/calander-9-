@@ -1,0 +1,28 @@
+{
+  "project": "66526b2a-6a09-43d8-bedb-ecfdd37f8d8a",
+  "environment": "be4c1d8d-84ce-47ce-9e24-56be144551cf",
+  "postgres_service": "c57a86fe-5f9b-4e79-a1de-1b1bc011a6d1",
+  "volume_instance": "f973e047-5cb0-40e9-8812-97de292385b1",
+  "before": [],
+  "after": [
+    {
+      "id": "55cce680-8259-4088-909b-3cf01d65427d",
+      "name": "Daily",
+      "cron": "46 17 * * *",
+      "kind": "DAILY",
+      "retentionSeconds": 518400
+    }
+  ],
+  "requested_kinds": [
+    "DAILY"
+  ],
+  "daily_schedule_verified": true,
+  "all_prior_kinds_preserved": true,
+  "manual_rollback_backup_preserved": true,
+  "all_prior_backup_ids_preserved": true,
+  "documented_daily_retention_days": 6,
+  "docs_url": "https://docs.railway.com/reference/backups",
+  "incremental_storage_billing": true,
+  "no_amount_claimed": true,
+  "deployment_mutation_performed": false
+}

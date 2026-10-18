@@ -18,6 +18,19 @@ from .models import AgencyJob
 
 #: The section kinds a report may have, in the order they are shown.
 SECTION_KINDS = ("went_out", "best", "audience", "next")
+OPERATION_LABELS = {
+    "requested": "Requested briefs",
+    "prepared": "Prepared drafts",
+    "awaiting_approval": "Awaiting approval",
+    "approved": "Approved",
+    "scheduled": "Scheduled",
+    "published": "Published",
+    "failed": "Failed content",
+    "blocked": "Held or blocked deliveries",
+    "job_failures": "Failed work",
+    "paused_weeks": "Paused planning weeks",
+}
+OUTCOME_LABELS = {"enquiry": "Enquiries", "qualified_enquiry": "Qualified enquiries", "site_visit": "Site visits"}
 
 #: Plain network names for people who aren't marketers.
 _NETWORK_NAMES = {
@@ -61,7 +74,7 @@ def client_safe(job: AgencyJob) -> dict[str, Any] | None:
     raw_period, raw_went_out = result.get("period"), result.get("went_out")
     period: dict[str, Any] = raw_period if isinstance(raw_period, dict) else {}
     went_out: dict[str, Any] = raw_went_out if isinstance(raw_went_out, dict) else {}
-    return {
+    report = {
         "id": str(job.pk),
         "title": title,
         "summary": _text(result.get("summary"), 600),
@@ -74,6 +87,40 @@ def client_safe(job: AgencyJob) -> dict[str, Any] | None:
         },
         "created_at": job.finished_at or job.created_at,
     }
+    # Existing historical reports do not contain these snapshots. Do not turn
+    # unavailable history into fabricated zero counts or expose arbitrary JSON.
+    raw_operations = result.get("operations")
+    if isinstance(raw_operations, dict):
+        report["operations"] = {
+            key: value
+            for key, value in raw_operations.items()
+            if key in OPERATION_LABELS and isinstance(value, int) and not isinstance(value, bool) and value >= 0
+        }
+        report["operation_scope"] = _text(result.get("operation_scope"), 800)
+        report["operations_as_of"] = _text(result.get("operations_as_of"), 80)
+    if isinstance(result.get("performance_note"), str):
+        report["performance_note"] = _text(result["performance_note"], 600)
+    raw_backlog = result.get("current_backlog")
+    if isinstance(raw_backlog, dict):
+        report["current_backlog"] = {
+            key: value
+            for key, value in raw_backlog.items()
+            if key in {"awaiting_approval", "blocked", "failed"}
+            and isinstance(value, int)
+            and not isinstance(value, bool)
+            and value >= 0
+        }
+    raw_outcomes = result.get("outcomes")
+    if isinstance(raw_outcomes, dict):
+        report["outcomes"] = {
+            key: value
+            for key, value in raw_outcomes.items()
+            if key in OUTCOME_LABELS and isinstance(value, int) and not isinstance(value, bool) and value >= 0
+        }
+        report["outcome_note"] = (
+            "Manual campaign event totals; attribution is supplied by the team. They are not unique people or automatic conversion rates."
+        )
+    return report
 
 
 def _done_reports(workspace):

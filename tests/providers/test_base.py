@@ -1,5 +1,7 @@
 """Tests for the provider base class and registry."""
 
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -201,6 +203,24 @@ class TestErrorForResponse:
         assert isinstance(exc, RateLimitError)
         assert exc.retry_after is None
 
+    def test_429_accepts_an_http_date_retry_after(self):
+        provider = get_provider("bluesky")
+        header = format_datetime(datetime.now(UTC) + timedelta(hours=2), usegmt=True)
+
+        exc = provider._error_for_response(self._response(429, headers={"Retry-After": header}))
+
+        assert isinstance(exc, RateLimitError)
+        assert 7198 <= exc.retry_after <= 7200
+
+    @pytest.mark.parametrize("header", ["garbage", "1.5", "-5"])
+    def test_429_with_malformed_or_negative_header_is_still_a_rate_limit(self, header):
+        provider = get_provider("bluesky")
+
+        exc = provider._error_for_response(self._response(429, headers={"Retry-After": header}))
+
+        assert isinstance(exc, RateLimitError)
+        assert exc.retry_after is None or exc.retry_after >= 0
+
     @pytest.mark.parametrize("status", [400, 401, 403, 404, 500, 503])
     def test_other_errors_map_to_api_error_carrying_status(self, status):
         provider = get_provider("bluesky")
@@ -210,6 +230,23 @@ class TestErrorForResponse:
         assert isinstance(exc, APIError)
         assert exc.status_code == status
         assert exc.raw_response == {"message": "nope"}
+
+
+def test_worker_lease_is_rechecked_before_each_provider_http_request():
+    from apps.common.background import WorkerLeaseLostError, worker_lease_checks
+
+    provider = get_provider("facebook")
+
+    def lost_lease():
+        raise RuntimeError("worker lease disappeared")
+
+    with (
+        patch("providers.base.httpx.Client") as client,
+        worker_lease_checks(lost_lease),
+        pytest.raises(WorkerLeaseLostError),
+    ):
+        provider._request("POST", "https://graph.facebook.com/example", access_token="test-token")
+    client.assert_not_called()
 
 
 class TestGetPostMetricsBatchDefault:

@@ -7,7 +7,6 @@ needs ``create_posts``.
 
 from __future__ import annotations
 
-from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Max, Q
 from django.http import HttpResponse
@@ -17,7 +16,7 @@ from django_ratelimit.decorators import ratelimit
 
 from apps.members.decorators import require_permission
 
-from . import budget, dashboard, engine, team
+from . import chat, dashboard, engine, opendots, team
 from .models import AgencyJob, AgentRun
 from .views import _perms, _workspace
 
@@ -26,18 +25,15 @@ from .views import _perms, _workspace
 @require_GET
 def team_roster(request, workspace_id):
     workspace = _workspace(request, workspace_id)
-    runs = (
-        AgentRun.objects.filter(workspace=workspace)
-        .values("agent")
-        .annotate(
-            total=Count("id"),
-            working=Count("id", filter=Q(status=AgentRun.Status.RUNNING)),
-            last=Max("started_at"),
-        )
+    visible_runs = chat.web_agent_runs(AgentRun.objects.filter(workspace=workspace))
+    runs = visible_runs.values("agent").annotate(
+        total=Count("id"),
+        working=Count("id", filter=Q(status=AgentRun.Status.RUNNING)),
+        last=Max("started_at"),
     )
     by_agent = {row["agent"]: row for row in runs}
     latest = {}
-    for run in AgentRun.objects.filter(workspace=workspace).exclude(summary="").order_by("-started_at")[:300]:
+    for run in visible_runs.exclude(summary="").order_by("-started_at")[:300]:
         latest.setdefault(run.agent, run)
     departments = []
     for department, agents in team.by_department():
@@ -70,7 +66,9 @@ def team_roster(request, workspace_id):
 
 def _get_job(request, workspace_id, job_id):
     workspace = _workspace(request, workspace_id)
-    job = get_object_or_404(AgencyJob.objects.select_related("requested_by"), pk=job_id, workspace=workspace)
+    job = get_object_or_404(
+        chat.web_jobs(AgencyJob.objects.select_related("requested_by")), pk=job_id, workspace=workspace
+    )
     return workspace, job
 
 
@@ -102,6 +100,7 @@ def _job_context(request, workspace, job):
         "stages": stages,
         "runs": runs,
         "can_act": _perms(request).get("create_posts", False),
+        "assistant_task": opendots.task_record(job),
         "tabs": dashboard.tabs(workspace, "overview"),
     }
 
@@ -128,14 +127,10 @@ def job_progress(request, workspace_id, job_id):
 @ratelimit(key="user", rate="10/m", method="POST", block=True)
 @require_POST
 def job_retry(request, workspace_id, job_id):
+    from .opendots_views import apply_control
+
     workspace, job = _get_job(request, workspace_id, job_id)
-    if job.status != AgencyJob.Status.FAILED:
-        messages.error(request, "Only a job that failed can be retried.")
-    elif not budget.can_spend(workspace):
-        messages.error(request, budget.over_budget_message(workspace))
-    else:
-        engine.restart(job)
-        messages.success(request, "The team is trying again from where it stopped.")
+    apply_control(request, workspace, job.pk, "retry")
     return redirect("studio:job", workspace_id=workspace.id, job_id=job.pk)
 
 
@@ -143,10 +138,10 @@ def job_retry(request, workspace_id, job_id):
 @require_permission("create_posts")
 @require_POST
 def job_cancel(request, workspace_id, job_id):
+    from .opendots_views import apply_control
+
     workspace, job = _get_job(request, workspace_id, job_id)
-    if job.is_active:
-        engine.cancel(job)
-        messages.success(request, "Stopped. Nothing the team had made so far was sent anywhere.")
+    apply_control(request, workspace, job.pk, "cancel")
     return redirect("studio:job", workspace_id=workspace.id, job_id=job.pk)
 
 
@@ -155,5 +150,5 @@ def job_cancel(request, workspace_id, job_id):
 def health(request, workspace_id):
     """A tiny status line for the sidebar or a monitor: how many agents are busy here."""
     workspace = _workspace(request, workspace_id)
-    busy = AgentRun.objects.filter(workspace=workspace, status=AgentRun.Status.RUNNING).count()
+    busy = chat.web_agent_runs(AgentRun.objects.filter(workspace=workspace, status=AgentRun.Status.RUNNING)).count()
     return HttpResponse(f"{busy} working", content_type="text/plain")

@@ -187,6 +187,71 @@ class TestUpload:
 
         assert MediaAsset.objects.count() == 1
 
+    def test_idempotency_rejects_different_bytes_with_the_same_name_and_size(self, client_with_token):
+        first = client_with_token.post("/api/v1/media/", data={"file": _png(), "idempotency_key": "same-metadata"})
+        assert first.status_code == 201, first.content
+        changed = PNG_1X1[:-1] + bytes([PNG_1X1[-1] ^ 1])
+        retry = client_with_token.post(
+            "/api/v1/media/", data={"file": _png(changed), "idempotency_key": "same-metadata"}
+        )
+        assert retry.status_code == 422, retry.content
+        from apps.media_library.models import MediaAsset
+
+        assert MediaAsset.objects.count() == 1
+
+    def test_invalid_folder_does_not_claim_idempotency_key(self, client_with_token):
+        import uuid
+
+        from apps.api.models import IdempotencyRecord
+
+        response = client_with_token.post(
+            "/api/v1/media/",
+            data={"file": _png(), "folder_id": str(uuid.uuid4()), "idempotency_key": "bad-folder"},
+        )
+        assert response.status_code == 404, response.content
+        assert not IdempotencyRecord.objects.filter(key="bad-folder").exists()
+
+    def test_queue_failure_rolls_back_asset_and_allows_retry(self, client_with_token, settings, tmp_path):
+        from unittest.mock import patch
+
+        from background_task.models import Task
+
+        from apps.api.models import IdempotencyRecord
+        from apps.media_library.models import MediaAsset
+
+        settings.MEDIA_ROOT = tmp_path
+        with (
+            patch("apps.media_library.tasks.process_media_asset", side_effect=RuntimeError("queue unavailable")),
+            pytest.raises(RuntimeError, match="queue unavailable"),
+        ):
+            client_with_token.post("/api/v1/media/", data={"file": _png(), "idempotency_key": "retry-after-failure"})
+        assert not MediaAsset.objects.exists()
+        assert not IdempotencyRecord.objects.filter(key="retry-after-failure").exists()
+        assert not list(tmp_path.rglob("*.png"))
+
+        retry = client_with_token.post(
+            "/api/v1/media/", data={"file": _png(), "idempotency_key": "retry-after-failure"}
+        )
+        assert retry.status_code == 201, retry.content
+        assert MediaAsset.objects.count() == 1
+        assert Task.objects.filter(task_name="apps.media_library.tasks.process_media_asset").count() == 1
+
+    def test_oversized_title_is_rejected_without_writing_a_file(self, client_with_token, settings, tmp_path):
+        from apps.media_library.models import MediaAsset
+
+        settings.MEDIA_ROOT = tmp_path
+        response = client_with_token.post("/api/v1/media/", data={"file": _png(), "title": "x" * 256})
+        assert response.status_code == 422, response.content
+        assert not MediaAsset.objects.exists()
+        assert not list(tmp_path.rglob("*.png"))
+
+    def test_oversized_idempotency_header_is_a_validation_error(self, client_with_token):
+        response = client_with_token.post("/api/v1/media/", data={"file": _png()}, HTTP_IDEMPOTENCY_KEY="x" * 129)
+        assert response.status_code == 422, response.content
+        from apps.api.models import IdempotencyRecord
+
+        assert not IdempotencyRecord.objects.exists()
+
 
 # ---------------------------------------------------------------------------
 # Storage quota (Gap 1a)
@@ -309,6 +374,12 @@ def seeded_assets(db, workspace, other_workspace):
 
 @pytest.mark.django_db
 class TestList:
+    @pytest.mark.parametrize("field", ["created_after", "created_before"])
+    def test_impossible_calendar_dates_are_validation_errors(self, client_with_token, field):
+        response = client_with_token.get("/api/v1/media/", {field: "2026-02-30T12:00:00Z"})
+        assert response.status_code == 422, response.content
+        assert field in response.json()["detail"]
+
     def test_default_returns_completed_workspace_and_shared_only(self, client_with_token, seeded_assets):
         body = client_with_token.get("/api/v1/media/").json()
         names = {item["filename"] for item in body["items"]}

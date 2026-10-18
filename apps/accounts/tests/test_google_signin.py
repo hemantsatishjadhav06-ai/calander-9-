@@ -1,4 +1,4 @@
-"""Sign in with Google, from the button to the calendar.
+"""Sign in with Google, from the button to the guided workspace start.
 
 Google itself is never called: the code-for-token exchange and the profile
 lookup are the two network steps, and both are replaced. Everything else —
@@ -110,7 +110,7 @@ def test_the_buttons_send_people_to_google_with_this_sites_callback(client):
 
 @override_settings(SOCIALACCOUNT_PROVIDERS=GOOGLE_CONFIGURED)
 @pytest.mark.django_db
-def test_a_new_person_gets_an_account_accepts_the_terms_and_lands_on_the_calendar(client):
+def test_a_new_person_gets_an_account_accepts_the_terms_and_lands_on_guided_start(client):
     response = _sign_in_with_google(client, _profile())
 
     user = User.objects.get(email="ana@agency.com")
@@ -128,7 +128,7 @@ def test_a_new_person_gets_an_account_accepts_the_terms_and_lands_on_the_calenda
 
     accepted = client.post(reverse("accounts:accept_terms"), {"agree": "on"}, follow=True)
     assert accepted.status_code == 200
-    assert accepted.redirect_chain[-1][0] == reverse("calendar:calendar", kwargs={"workspace_id": workspace.id})
+    assert accepted.redirect_chain[-1][0] == reverse("studio:workflow", kwargs={"workspace_id": workspace.id})
     user.refresh_from_db()
     assert user.tos_accepted_at is not None
 
@@ -161,7 +161,7 @@ def test_an_existing_account_with_the_same_address_signs_straight_in(client):
     assert User.objects.filter(email="ana@agency.com").count() == 1
     assert SocialAccount.objects.filter(user=existing, provider="google").exists()
     landed = client.get(response["Location"], follow=True)
-    assert landed.redirect_chain[-1][0] == reverse("calendar:calendar", kwargs={"workspace_id": workspace.id})
+    assert landed.redirect_chain[-1][0] == reverse("studio:workflow", kwargs={"workspace_id": workspace.id})
 
 
 @override_settings(SOCIALACCOUNT_PROVIDERS=GOOGLE_CONFIGURED, SIGNUP_MODE="invite_only", SIGNUP_ALLOWLIST=[])

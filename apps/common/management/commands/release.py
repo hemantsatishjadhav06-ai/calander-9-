@@ -14,6 +14,7 @@ One management command needs no shell and fails as a unit:
    nothing is approved or scheduled.
 5. ``live_verify`` with ``--verify`` (never fails the release): a PASS/FAIL
    report of the deployment in the deploy log.
+   ``--strict-verify`` instead requires the critical launch checks to pass.
 """
 
 import logging
@@ -32,8 +33,20 @@ class Command(BaseCommand):
         parser.add_argument("--skip-backup", action="store_true", help="Only for databases with nothing to lose.")
         parser.add_argument("--setup-brands", action="store_true", help="Ensure brand workspaces and seed drafts.")
         parser.add_argument("--verify", action="store_true", help="Print the live_verify report.")
+        parser.add_argument(
+            "--strict-verify", action="store_true", help="Require critical live verification to pass; implies --verify."
+        )
 
-    def handle(self, *args, legacy_media_url="", skip_backup=False, setup_brands=False, verify=False, **options):
+    def handle(
+        self,
+        *args,
+        legacy_media_url="",
+        skip_backup=False,
+        setup_brands=False,
+        verify=False,
+        strict_verify=False,
+        **options,
+    ):
         if not skip_backup:
             call_command("backup_database", required=True, stdout=self.stdout, stderr=self.stderr)
         call_command("migrate", interactive=False, stdout=self.stdout, stderr=self.stderr)
@@ -42,7 +55,9 @@ class Command(BaseCommand):
         if setup_brands:
             for name in ("setup_brands", "seed_brand_content"):
                 self._best_effort(name)
-        if verify:
+        if strict_verify:
+            call_command("live_verify", strict=True, stdout=self.stdout, stderr=self.stderr)
+        elif verify:
             self._best_effort("live_verify")
         self.stdout.write(self.style.SUCCESS("Release steps complete."))
 

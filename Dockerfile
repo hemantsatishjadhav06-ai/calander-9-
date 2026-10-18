@@ -1,4 +1,18 @@
-FROM python:3.12-slim AS base
+ARG NODE_IMAGE=node:22-bookworm-slim
+ARG PYTHON_IMAGE=python:3.12-slim-bookworm
+FROM ${NODE_IMAGE} AS frontend
+
+WORKDIR /app
+COPY theme/static_src/package*.json theme/static_src/
+# Keep the canonical recipe compatible with Railway's Dockerfile parser.
+# A generated Dockerfile.cloud adds optional CA-secret mounts for BuildKit.
+RUN cd theme/static_src && npm ci
+COPY templates/ templates/
+COPY apps/ apps/
+COPY theme/ theme/
+RUN cd theme/static_src && npm run build
+
+FROM ${PYTHON_IMAGE} AS base
 
 # Production settings unless the platform says otherwise: manage.py falls back
 # to development settings, so a worker service started without the variable
@@ -6,17 +20,13 @@ FROM python:3.12-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
-    DJANGO_SETTINGS_MODULE=config.settings.production
+    DJANGO_SETTINGS_MODULE=config.settings.production \
+    MALLOC_ARENA_MAX=2
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc curl ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js for Tailwind build
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # The lock, not the ranges: every build installs exactly the versions CI
@@ -27,8 +37,8 @@ RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY . .
 
-# Build Tailwind CSS
-RUN cd theme/static_src && npm ci && npm run build
+# Node and build dependencies stay outside the production runtime image.
+COPY --from=frontend /app/theme/static/css/dist/styles.css theme/static/css/dist/styles.css
 
 # Collect static files
 RUN DJANGO_SETTINGS_MODULE=config.settings.production \
@@ -56,9 +66,12 @@ EXPOSE 8000
 # SIGTERM, nothing drained, and the container was SIGKILLed mid-request.
 # Run as an unprivileged user. Only the local media directory is handed to it
 # (STORAGE_BACKEND=local writes there); the code and collected static files
-# stay root-owned and read-only to the process. Not `chown -R /app`: that
-# would copy every file into a new layer and roughly double the image.
-RUN useradd --create-home --uid 10001 app && mkdir -p /app/media && chown app:app /app/media
+# stay root-owned and read-only to the process. Normalize read permissions so
+# private checkout umasks do not leave the runtime unable to import its code.
+RUN useradd --create-home --uid 10001 app \
+    && chmod -R go-w,a+rX /app \
+    && mkdir -p /app/media \
+    && chown app:app /app/media
 USER app
 
 # `check --deploy` first: its warnings (DEBUG on, a missing secret, an unset

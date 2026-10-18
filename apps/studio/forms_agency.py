@@ -36,13 +36,18 @@ def eligible_leads(workspace) -> list:
     """Members whose name autopilot drafts may carry: active, create and approve posts, not a client."""
     from apps.members.models import WorkspaceMembership
 
+    from .trust import verification_people
+
     people = []
+    permitted = verification_people(workspace)
     memberships = (
         WorkspaceMembership.objects.filter(workspace=workspace, user__is_active=True)
         .select_related("user", "custom_role")
         .order_by("user__name", "user__email")
     )
     for membership in memberships:
+        if membership.user_id not in permitted:
+            continue
         if membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT and membership.custom_role is None:
             continue
         perms = membership.effective_permissions
@@ -123,6 +128,14 @@ class AgencySettingsForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={"class": _FIELD, "step": "1", "inputmode": "decimal"}),
     )
     lead = forms.ChoiceField(label="Send drafts in the name of", required=False, widget=forms.Select())
+    backup = forms.ChoiceField(label="Backup approver", required=False, widget=forms.Select(attrs={"class": _FIELD}))
+    delivery_delay_minutes = forms.IntegerField(
+        label="Hold posts late by more than (minutes)",
+        required=False,
+        min_value=1,
+        max_value=10080,
+        widget=forms.NumberInput(attrs={"class": _FIELD, "min": 1, "max": 10080}),
+    )
 
     class Meta:
         model = AgencySettings
@@ -137,6 +150,8 @@ class AgencySettingsForm(forms.ModelForm):
             "blog_site",
             "monthly_budget_usd",
             "lead",
+            "backup",
+            "delivery_delay_minutes",
             "learn_from_best",
             "inbox_drafts_enabled",
         ]
@@ -171,6 +186,11 @@ class AgencySettingsForm(forms.ModelForm):
         ]
         self.fields["lead"].widget.attrs["class"] = _FIELD
         self.initial["lead"] = str(self.instance.lead_id or "")
+        self.fields["backup"].choices = [("", "Choose a backup approver")] + list(self.fields["lead"].choices[1:])
+        self.initial["backup"] = str(self.instance.backup_id or "")
+        from apps.publisher.delivery import max_lateness_seconds
+
+        self.initial["delivery_delay_minutes"] = max_lateness_seconds(workspace) // 60
 
     def clean_lead(self):
         value = self.cleaned_data.get("lead") or ""
@@ -180,6 +200,8 @@ class AgencySettingsForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if cleaned.get("lead") and cleaned.get("backup") == cleaned["lead"]:
+            self.add_error("backup", "Choose a different person so someone can cover the lead.")
         if cleaned.get("blog_posts_per_month") and not cleaned.get("blog_site"):
             self.add_error("blog_site", "Choose the website the articles are for, or set articles to None.")
         if cleaned.get("autopilot_enabled"):
@@ -192,10 +214,26 @@ class AgencySettingsForm(forms.ModelForm):
     def save(self, commit=True):
         row = super().save(commit=False)
         row.lead = self.cleaned_data.get("lead")
+        row.backup = self.cleaned_data.get("backup")
         if commit:
             row.save()
             self.save_m2m()
+            if self.cleaned_data.get("delivery_delay_minutes") is not None:
+                from apps.publisher.delivery import LATENESS_KEY
+                from apps.settings_manager.models import WorkspaceSetting
+
+                WorkspaceSetting.objects.update_or_create(
+                    workspace=self.workspace,
+                    key=LATENESS_KEY,
+                    defaults={"value": self.cleaned_data["delivery_delay_minutes"] * 60},
+                )
         return row
+
+    def clean_backup(self):
+        value = self.cleaned_data.get("backup") or ""
+        if value and value not in self.lead_objects:
+            raise forms.ValidationError("Choose a current internal approver of this workspace.")
+        return self.lead_objects.get(value)
 
 
 class HouseStyleForm(forms.Form):

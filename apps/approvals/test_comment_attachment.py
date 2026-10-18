@@ -81,6 +81,24 @@ class CommentAttachmentAccessTests(TestCase):
         self.assertEqual(b"".join(response.streaming_content), b"png-bytes")
         self.assertEqual(response["X-Content-Type-Options"], "nosniff")
 
+    def test_client_cannot_download_an_internal_attachment(self):
+        external_client = _make_user("client@example.com")
+        WorkspaceMembership.objects.create(user=external_client, workspace=self.workspace, workspace_role="client")
+        self.client.force_login(external_client)
+
+        self.assertEqual(self.client.get(self._url()).status_code, 404)
+
+    def test_client_can_download_an_external_attachment(self):
+        external_client = _make_user("client@example.com")
+        WorkspaceMembership.objects.create(user=external_client, workspace=self.workspace, workspace_role="client")
+        self.comment.visibility = PostComment.Visibility.EXTERNAL
+        self.comment.save(update_fields=["visibility"])
+        self.client.force_login(external_client)
+
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), b"png-bytes")
+
     def test_anonymous_is_redirected_to_login(self):
         response = self.client.get(self._url())
 

@@ -2,9 +2,10 @@ services:
   - type: web
     name: brightbean-web
     runtime: docker
+    plan: starter
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health/
-    preDeployCommand: "python manage.py migrate"
+    preDeployCommand: "python manage.py check --deploy && python manage.py migrate --noinput"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
@@ -16,16 +17,46 @@ services:
         fromDatabase:
           name: brightbean-db
           property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: brightbean-cache
+          type: keyvalue
+          property: connectionString
+      - key: APP_URL
+        sync: false
       - key: ALLOWED_HOSTS
-        value: "*"
+        sync: false
       - key: STORAGE_BACKEND
         value: s3
+      - key: S3_BUCKET_NAME
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_REGION_NAME
+        sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: ACCOUNT_EMAIL_VERIFICATION
+        value: none
+      - key: BB_TRUSTED_PROXIES
+        sync: false
 
   - type: worker
     name: brightbean-worker
     runtime: docker
+    plan: starter
     dockerfilePath: ./Dockerfile
-    dockerCommand: python manage.py run_worker
+    dockerCommand: sh -c "python manage.py check --deploy && exec python manage.py run_worker --duration 3600"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
@@ -43,9 +74,80 @@ services:
         fromDatabase:
           name: brightbean-db
           property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: brightbean-cache
+          type: keyvalue
+          property: connectionString
+      - key: APP_URL
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: APP_URL
+      - key: ALLOWED_HOSTS
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: ALLOWED_HOSTS
       - key: STORAGE_BACKEND
         value: s3
+      - key: S3_BUCKET_NAME
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: S3_BUCKET_NAME
+      - key: S3_ACCESS_KEY_ID
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: S3_ACCESS_KEY_ID
+      - key: S3_SECRET_ACCESS_KEY
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: S3_SECRET_ACCESS_KEY
+      - key: S3_ENDPOINT_URL
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: S3_ENDPOINT_URL
+      - key: S3_REGION_NAME
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: S3_REGION_NAME
+      - key: EMAIL_HOST
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: EMAIL_HOST
+      - key: EMAIL_HOST_USER
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: EMAIL_HOST_USER
+      - key: EMAIL_HOST_PASSWORD
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: EMAIL_HOST_PASSWORD
+      - key: DEFAULT_FROM_EMAIL
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: DEFAULT_FROM_EMAIL
+      - key: BB_TRUSTED_PROXIES
+        fromService:
+          name: brightbean-web
+          type: web
+          envVarKey: BB_TRUSTED_PROXIES
 
+  - type: keyvalue
+    name: brightbean-cache
+    plan: starter
+    ipAllowList: []
+
+# Paid PostgreSQL avoids expiry of the free database beneath a live service.
 databases:
   - name: brightbean-db
-    plan: free
+    plan: basic-256mb

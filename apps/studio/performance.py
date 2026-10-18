@@ -15,15 +15,19 @@ here is read-only and runs in the worker.
 
 from __future__ import annotations
 
+import math
 import statistics
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from django.db.models import F
 from django.utils import timezone
 
 MIN_AGE = timedelta(days=3)
 MIN_POSTS = 5
 LOOKBACK = timedelta(days=180)
+# A recent publication date does not make an old analytics snapshot current.
+MAX_METRIC_AGE = timedelta(days=7)
 
 
 @dataclass
@@ -37,6 +41,7 @@ class Measured:
     value: float
     percentile: float | None = None
     ratio: float | None = None
+    captured_at: datetime | None = None
 
 
 def score_metric(platform: str) -> str | None:
@@ -47,18 +52,55 @@ def score_metric(platform: str) -> str | None:
     return PLATFORM_PRIMARY.get(platform)
 
 
-def measured(*, workspace=None, account=None, since: datetime | None = None) -> list[Measured]:
+def fresh_post_stats(post_ids, metrics: list[str], *, now: datetime | None = None) -> dict:
+    """Latest successful values captured recently and before the reference time.
+
+    Keep the capture time alongside the value, so memory cards and reports can
+    distinguish fresh evidence from an old stored score. Failed snapshots and
+    measurements captured after a historical cutoff never grant a ranking.
+    """
+    from apps.analytics.models import PostInsightsSnapshot
+
+    now = now or timezone.now()
+    rows = (
+        PostInsightsSnapshot.objects.filter(
+            platform_post_id__in=list(post_ids),
+            metric_key__in=metrics,
+            captured_at__gte=now - MAX_METRIC_AGE,
+            captured_at__lte=now,
+            date__lte=now.date(),
+            errors={},
+        )
+        .order_by("platform_post_id", "metric_key", "-captured_at", "-date", "-pk")
+        .values_list("platform_post_id", "metric_key", "value", "captured_at")
+    )
+    stats: dict = {}
+    for pp_id, metric, value, captured in rows:
+        numeric = float(value)
+        if math.isfinite(numeric) and numeric >= 0:
+            stats.setdefault(pp_id, {}).setdefault(metric, (numeric, captured))
+    return stats
+
+
+def measured(
+    *, workspace=None, account=None, since: datetime | None = None, now: datetime | None = None
+) -> list[Measured]:
     """Published posts with a value on their account's score metric, ranked within the account."""
-    from apps.analytics.services import _latest_post_stats
     from apps.composer.models import PlatformPost
 
-    now = timezone.now()
+    from .jobtypes.plan import zone_of
+
+    now = now or timezone.now()
+    target_workspace = workspace or (account.workspace if account is not None else None)
+    if target_workspace is not None:
+        now = now.astimezone(zone_of(target_workspace))
     since = since or now - LOOKBACK
     published = PlatformPost.objects.filter(
         status=PlatformPost.Status.PUBLISHED,
         published_at__isnull=False,
         published_at__gte=since,
         published_at__lte=now - MIN_AGE,
+        social_account__workspace_id=F("post__workspace_id"),
     )
     if workspace is not None:
         published = published.filter(post__workspace=workspace)
@@ -74,12 +116,15 @@ def measured(*, workspace=None, account=None, since: datetime | None = None) -> 
         metric = score_metric(platform)
         if not metric:
             continue
-        stats = _latest_post_stats([item[0] for item in items], [metric])
+        stats = fresh_post_stats([item[0] for item in items], [metric], now=now)
         for pp_id, post_id, account_id, _platform, published_at in items:
-            value = stats.get(pp_id, {}).get(metric)
-            if value is None:
+            evidence = stats.get(pp_id, {}).get(metric)
+            if evidence is None:
                 continue
-            out.append(Measured(pp_id, post_id, account_id, platform, published_at, metric, float(value)))
+            value, captured_at = evidence
+            out.append(
+                Measured(pp_id, post_id, account_id, platform, published_at, metric, value, captured_at=captured_at)
+            )
     _rank(out)
     return out
 

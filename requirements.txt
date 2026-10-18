@@ -5,7 +5,8 @@ psycopg[binary]>=3.1,<4.0
 gunicorn>=22.0,<23.0
 
 # Auth
-django-allauth[socialaccount]>=65.0,<66.0
+# 65.19.7 permits oauthlib 4, which fixes CVE-2026-49265 in PKCE.
+django-allauth[socialaccount]>=65.19.7,<66.0
 bcrypt>=4.2,<5.0
 
 # Background tasks

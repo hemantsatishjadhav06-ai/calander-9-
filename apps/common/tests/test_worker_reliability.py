@@ -11,6 +11,7 @@
 import signal
 import threading
 from datetime import timedelta
+from unittest import skipUnless
 from unittest.mock import patch
 
 from background_task import background
@@ -74,6 +75,7 @@ class KeepScheduleTests(TestCase):
         from apps.media_library import tasks as media
         from apps.notifications import tasks as notifications
         from apps.publisher import tasks as publisher
+        from apps.social_accounts import tasks as social_accounts
         from apps.studio import tasks as studio
 
         for proxy in (
@@ -85,6 +87,7 @@ class KeepScheduleTests(TestCase):
             media.sweep_pending_uploads,
             media.run_orphaned_media_sweep,
             accounts.clear_expired_sessions,
+            social_accounts.schedule_all_health_checks,
             studio.sweep_stuck_briefs,
             studio.run_agency_cycle,
         ):
@@ -138,12 +141,15 @@ class RunWorkerCommandTests(TestCase):
         self.assertEqual(stale.locked_by, "4242")
 
     def test_boot_puts_back_a_schedule_the_library_deleted(self):
-        Task.objects.filter(verbose_name__in=["run_publish_cycle", "run_inbox_sync_cycle"]).delete()
+        Task.objects.filter(
+            verbose_name__in=["run_publish_cycle", "run_inbox_sync_cycle", "schedule_all_health_checks"]
+        ).delete()
 
         Command.prepare(keep_locks=True)
 
         self.assertEqual(Task.objects.filter(verbose_name="run_publish_cycle").count(), 1)
         self.assertEqual(Task.objects.filter(verbose_name="run_inbox_sync_cycle").count(), 1)
+        self.assertEqual(Task.objects.filter(verbose_name="schedule_all_health_checks").count(), 1)
 
     def test_boot_is_idempotent_on_a_healthy_database(self):
         before = set(Task.objects.values_list("verbose_name", "pk"))
@@ -151,6 +157,7 @@ class RunWorkerCommandTests(TestCase):
         self.assertEqual(set(Task.objects.values_list("verbose_name", "pk")), before)
 
 
+@skipUnless(connection.vendor == "postgresql", "Recurring task registration uses PostgreSQL advisory locks")
 class ConcurrentRegistrationTests(TransactionTestCase):
     def test_parallel_registrations_insert_one_row(self):
         """Web and worker containers both run registration during a deploy."""

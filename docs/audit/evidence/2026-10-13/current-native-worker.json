@@ -1,0 +1,58 @@
+{
+  "record_type": "sm_bean_current_native_worker",
+  "source_commit": "91bef9ec9ff42b47fed80db66ca572fc5b066107",
+  "native_worker_id_matches": true,
+  "native_source_commit_matches": true,
+  "source_anchors_verified": 16,
+  "telegram_webhook_ready": true,
+  "production_debug_disabled": true,
+  "django_settings_production": true,
+  "exact_singleton_lease_holders": 1,
+  "core_task_heartbeats": [
+    {
+      "task_name": "apps.studio.tasks.sweep_stuck_briefs",
+      "state": "ok",
+      "last_success_at": "2026-10-13T15:56:01.753537+00:00",
+      "latest_cycle_successful": true
+    },
+    {
+      "task_name": "apps.publisher.tasks.run_publish_cycle",
+      "state": "ok",
+      "last_success_at": "2026-10-13T15:58:17.136379+00:00",
+      "latest_cycle_successful": true
+    },
+    {
+      "task_name": "apps.studio.tasks.run_agency_cycle",
+      "state": "ok",
+      "last_success_at": "2026-10-13T15:56:03.953344+00:00",
+      "latest_cycle_successful": true
+    },
+    {
+      "task_name": "apps.publisher.tasks.confirm_pending_publishes",
+      "state": "ok",
+      "last_success_at": "2026-10-13T15:57:46.326984+00:00",
+      "latest_cycle_successful": true
+    }
+  ],
+  "task_health": {
+    "publisher": {
+      "healthy": true,
+      "state": "ok",
+      "age_seconds": 0
+    },
+    "agency": {
+      "healthy": true,
+      "state": "ok",
+      "age_seconds": 133
+    },
+    "confirmation": {
+      "healthy": true,
+      "state": "ok",
+      "age_seconds": 31
+    }
+  },
+  "core_registered_task_count": 4,
+  "cache_roundtrip_verified": true,
+  "cache_probe_removed": true,
+  "private_rows_or_credentials_included": false
+}

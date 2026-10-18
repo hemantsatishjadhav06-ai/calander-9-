@@ -52,17 +52,14 @@ def test_site_root_keeps_the_dashboard_url_name():
 
 @pytest.mark.django_db
 def test_signed_in_user_gets_the_dashboard_not_the_landing_page(client, user):
-    """A signed-in visit to "/" behaves exactly as before the marketing pages.
-
-    A fresh user is provisioned a workspace on creation, so the dashboard
-    forwards them to that workspace's calendar rather than rendering a page.
-    """
+    """A newly provisioned owner starts their workspace's guided post workflow."""
+    workspace = user.workspace_memberships.get().workspace
     client.force_login(user)
 
     response = client.get("/")
 
     assert response.status_code == 302
-    assert "/calendar/" in response["Location"]
+    assert response["Location"] == reverse("studio:workflow", kwargs={"workspace_id": workspace.pk})
     assert "marketing/home.html" not in _template_names(response)
 
 

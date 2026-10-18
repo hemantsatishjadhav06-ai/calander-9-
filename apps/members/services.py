@@ -225,51 +225,51 @@ def _release_org_invite_budget(org, day_start) -> None:
     release_budget("invite_org_day", str(org.id), day_start)
 
 
-def accept_invitation(invitation, user, *, require_email_match=True):
+def accept_invitation(invitation, user):
     """Accept an invitation: create org + workspace memberships.
 
     Args:
         invitation: The Invitation to accept.
         user: The User accepting.
-        require_email_match: When True (default), reject if the user's email
-            differs from the invitation's. The signup signal path passes
-            False because the session-bound token is itself proof of email
-            delivery (and social logins return whatever email the provider
-            owns, which often differs from the invited address).
-
     Raises:
         ValueError: If the invitation is expired, already accepted, or the
-            user's email does not match (when require_email_match is True).
+            user's email does not match.
     """
-    if invitation.is_expired:
-        raise ValueError("This invitation has expired.")
-    if invitation.is_accepted:
-        raise ValueError("This invitation has already been accepted.")
-
-    if require_email_match and user.email.lower() != invitation.email.lower():
-        raise ValueError("This invitation was sent to a different email address.")
-
     import uuid as uuid_mod
 
-    # Workspaces are hard-deleted, but the invitation's JSON keeps their ids.
-    # Anything that no longer exists in this org is skipped rather than letting
-    # the FK insert raise halfway through: that left the org membership created,
-    # ``accepted_at`` unset, and every retry hitting the same error.
-    live_workspace_ids = set(
-        Workspace.objects.filter(organization=invitation.organization).values_list("id", flat=True)
-    )
-    assignments = []
-    for assignment in invitation.workspace_assignments:
-        ws_id = uuid_mod.UUID(str(assignment["workspace_id"]))
-        if ws_id in live_workspace_ids:
-            assignments.append((ws_id, assignment.get("role", WorkspaceMembership.WorkspaceRole.VIEWER)))
-
     with transaction.atomic():
+        # Re-read and lock the credential before changing access. A stale model
+        # object must not revive a revoked/rotated link or accept it twice.
+        current_invitation = (
+            Invitation.objects.select_for_update().filter(pk=invitation.pk, token=invitation.token).first()
+        )
+        if current_invitation is None:
+            raise ValueError("This invitation is no longer valid.")
+        if current_invitation.is_expired:
+            raise ValueError("This invitation has expired.")
+        if current_invitation.is_accepted:
+            raise ValueError("This invitation has already been accepted.")
+        if user.email.strip().lower() != current_invitation.email.strip().lower():
+            raise ValueError("This invitation was sent to a different email address.")
+
+        # Invitations retain JSON ids after workspace deletion. Skip unavailable
+        # workspaces without partially applying memberships or granting archives.
+        live_workspace_ids = set(
+            Workspace.objects.filter(organization=current_invitation.organization, is_archived=False).values_list(
+                "id", flat=True
+            )
+        )
+        assignments = []
+        for assignment in current_invitation.workspace_assignments:
+            ws_id = uuid_mod.UUID(str(assignment["workspace_id"]))
+            if ws_id in live_workspace_ids:
+                assignments.append((ws_id, assignment.get("role", WorkspaceMembership.WorkspaceRole.VIEWER)))
+
         # Create org membership (skip if exists, e.g. user was already added)
         org_membership, created = OrgMembership.objects.get_or_create(
             user=user,
-            organization=invitation.organization,
-            defaults={"org_role": invitation.org_role},
+            organization=current_invitation.organization,
+            defaults={"org_role": current_invitation.org_role},
         )
 
         for ws_id, role in assignments:
@@ -279,8 +279,9 @@ def accept_invitation(invitation, user, *, require_email_match=True):
                 defaults={"workspace_role": role},
             )
 
-        invitation.accepted_at = timezone.now()
-        invitation.save(update_fields=["accepted_at"])
+        current_invitation.accepted_at = timezone.now()
+        current_invitation.save(update_fields=["accepted_at"])
+        invitation.accepted_at = current_invitation.accepted_at
 
         # Land the user in the invited workspace. This also makes the org this
         # request resolves to deterministic for a user who now belongs to two

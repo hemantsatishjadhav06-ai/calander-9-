@@ -1,0 +1,45 @@
+{
+  "checks": {
+    "actual_worker_tasks": {
+      "apps.publisher.tasks.confirm_pending_publishes": true,
+      "apps.publisher.tasks.run_publish_cycle": true,
+      "apps.studio.tasks.run_agency_cycle": true,
+      "apps.telegram.tasks.run_telegram_cycle": true
+    },
+    "agency_team": "passed",
+    "authenticated_login": "passed",
+    "autopilot": "passed",
+    "calendar": "passed",
+    "completed_cycles": {
+      "apps.publisher.tasks.confirm_pending_publishes": 2,
+      "apps.publisher.tasks.run_publish_cycle": 3,
+      "apps.studio.tasks.run_agency_cycle": 1,
+      "apps.telegram.tasks.run_telegram_cycle": 2
+    },
+    "duplicate_worker": "rejected",
+    "graceful_worker_stop": "exit_0",
+    "health_postgresql_redis": "passed",
+    "landing": "passed",
+    "lease_released_after_stop": "passed",
+    "login_form": "passed",
+    "merged_source_hashes": 13,
+    "migrations": "passed",
+    "outcomes": "passed",
+    "runtime_permissions_media_no_secrets": "passed",
+    "secure_cookie_flag": "passed",
+    "singleton_lease": "observed_1",
+    "static_css_js_sourcemap": "passed",
+    "synthetic_fixture": "passed",
+    "telegram_settings": "passed",
+    "unknown_deliveries": 0,
+    "verified_facts": "passed",
+    "wrong_webhook_secret": "rejected_403"
+  },
+  "image": "smbean-merged-release:20261013",
+  "paid_provider_calls": false,
+  "passed": true,
+  "production_deployed": false,
+  "public_bot_changes": false,
+  "record_type": "local_production_container_smoke",
+  "synthetic_database": "smbean_release_smoke_20261013_c8de24"
+}

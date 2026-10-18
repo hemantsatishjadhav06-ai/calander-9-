@@ -1,0 +1,19 @@
+{
+  "record_type": "github_final_ci_pytest_log_evidence",
+  "run_id": 38391832886,
+  "job_id": 115277246903,
+  "run_head_sha": "31ae13fc22483759a0f79053417003ac9d9ba4c2",
+  "job_conclusion": "success",
+  "log_sha256": "5dc0077ef30968098247c7db466b5c25fadab5ec30108fedb71733a50d3d4bb9",
+  "log_bytes": 894852,
+  "completed_summaries": [
+    {
+      "passed": 4731,
+      "skipped": 1,
+      "subtests_passed": 194,
+      "warnings": 1388,
+      "duration_seconds": 761.91
+    }
+  ],
+  "secrets_included": false
+}

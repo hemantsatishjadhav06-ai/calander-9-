@@ -23,6 +23,7 @@ schedules or publishes anything.
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -186,8 +187,15 @@ def run_step(job_id: str, revision: int, stage_name: str) -> None:
             .filter(pk=job_id)
             .first()
         )
-        if job is None or job.revision != revision or job.stage != stage_name or not job.is_active:
+        if job is None or job.revision != revision or job.stage != stage_name or job.status != AgencyJob.Status.QUEUED:
             logger.info("Agency: skipping stale stage %s of job %s (r%s)", stage_name, job_id, revision)
+            return
+        from .autopilot import automatic_work_blocker
+
+        blocker = automatic_work_blocker(job.workspace, job=job)
+        if blocker:
+            job.error = blocker
+            job.save(update_fields=["error", "updated_at"])
             return
         job.status = AgencyJob.Status.WORKING
         job.started_at = job.started_at or timezone.now()
@@ -231,15 +239,17 @@ def run_step(job_id: str, revision: int, stage_name: str) -> None:
 
 
 def fail(job: AgencyJob, message: str) -> None:
-    AgencyJob.objects.filter(pk=job.pk, revision=job.revision).exclude(status=AgencyJob.Status.CANCELLED).update(
+    updated = AgencyJob.objects.filter(pk=job.pk, revision=job.revision, status__in=AgencyJob.ACTIVE_STATUSES).update(
         status=AgencyJob.Status.FAILED, error=message[:2000], updated_at=timezone.now()
     )
+    if not updated:
+        return
     _close_running(job, message)
     _after_failure(job, message)
 
 
 def _close_running(job: AgencyJob, message: str, *, status: str = AgentRun.Status.FAILED) -> None:
-    AgentRun.objects.filter(job=job, status=AgentRun.Status.RUNNING).update(
+    AgentRun.objects.filter(job=job, revision=job.revision, status=AgentRun.Status.RUNNING).update(
         status=status, error=message[:2000], finished_at=timezone.now()
     )
 
@@ -283,11 +293,17 @@ def end(
 ) -> None:
     run.status = status
     run.summary = summary[:500]
-    run.output = output or {}
+    reported_cost = (run.output or {}).get("provider_cost_usd")
+    run.output = {**(run.output or {}), **(output or {})}
+    run.output.pop("provider_cost_usd", None)
+    if reported_cost is not None:
+        run.output["provider_cost_usd"] = reported_cost
     run.finished_at = timezone.now()
     run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000)
     fields = ["status", "summary", "output", "finished_at", "duration_ms"]
     if result is not None:
+        if getattr(result, "provider_cost_usd", None) is not None:
+            run.output["provider_cost_usd"] = result.provider_cost_usd
         run.model = result.model
         run.input_tokens = result.input_tokens
         run.output_tokens = result.output_tokens
@@ -312,6 +328,11 @@ def fail_run(run: AgentRun, error: str | Exception) -> None:
     if searches:
         run.output = {**(run.output or {}), "web_searches": searches}
         fields.append("output")
+    provider_cost = getattr(error, "provider_cost_usd", None)
+    if provider_cost is not None:
+        run.output = {**(run.output or {}), "provider_cost_usd": provider_cost}
+        if "output" not in fields:
+            fields.append("output")
     run.save(update_fields=fields)
 
 
@@ -338,7 +359,11 @@ def call(
         result.output_tokens,
         result.cache_read_tokens,
     )
-    run.save(update_fields=["model", "input_tokens", "output_tokens", "cache_read_tokens"])
+    fields = ["model", "input_tokens", "output_tokens", "cache_read_tokens"]
+    if getattr(result, "provider_cost_usd", None) is not None:
+        run.output = {**(run.output or {}), "provider_cost_usd": result.provider_cost_usd}
+        fields.append("output")
+    run.save(update_fields=fields)
     return run, result
 
 
@@ -353,20 +378,82 @@ def _is_model_agent(agent: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _has_pending_task(task_name: str, object_id: str) -> bool:
+def _has_pending_task(task_name: str, object_id: str, *, revision: int | None = None, stage: str | None = None) -> bool:
     """True when the background queue still holds a task for ``object_id`` (it is only waiting)."""
     from background_task.models import Task
 
-    return Task.objects.filter(task_name=task_name, task_params__contains=object_id, failed_at__isnull=True).exists()
+    params = Task.objects.filter(
+        task_name=task_name, task_params__contains=object_id, failed_at__isnull=True
+    ).values_list("task_params", flat=True)
+    for payload in params:
+        try:
+            args, _kwargs = json.loads(payload)
+            if (
+                isinstance(args, list)
+                and len(args) >= 3
+                and args[0] == object_id
+                and (revision is None or args[1] == revision)
+                and (stage is None or args[2] == stage)
+            ):
+                return True
+        except (ValueError, TypeError):
+            continue
+    return False
+
+
+def resume_paused_plans(workspace) -> int:
+    """Resume policy-paused weekly plans once, preserving their revision and progress."""
+    return resume_paused_jobs(workspace, kind=AgencyJob.Kind.PLAN)
+
+
+def resume_paused_jobs(workspace=None, *, kind: str | None = None, limit: int = 100) -> int:
+    """Restore queued policy-paused jobs after re-enabling or unarchiving their workspace."""
+    from .autopilot import PAUSE_REASONS, automatic_work_blocker
+
+    resumed = 0
+    candidates = AgencyJob.objects.filter(status=AgencyJob.Status.QUEUED, error__in=PAUSE_REASONS)
+    if workspace is not None:
+        candidates = candidates.filter(workspace=workspace)
+    if kind is not None:
+        candidates = candidates.filter(kind=kind)
+    from .autopilot import eligible_workspaces
+
+    candidates = candidates.filter(workspace__in=eligible_workspaces()).order_by("updated_at")
+    for candidate in candidates[: max(0, limit)]:
+        with transaction.atomic():
+            job = (
+                AgencyJob.objects.select_for_update(of=("self",))
+                .select_related("workspace", "workspace__organization")
+                .get(pk=candidate.pk)
+            )
+            if job.status != AgencyJob.Status.QUEUED or job.error not in PAUSE_REASONS:
+                continue
+            if automatic_work_blocker(job.workspace, job=job):
+                # Rotate the bounded sweep so many disabled plans cannot keep
+                # a later restored workspace behind them forever.
+                job.save(update_fields=["updated_at"])
+                continue
+            job.error = ""
+            job.save(update_fields=["error", "updated_at"])
+            if not _has_pending_task(
+                "apps.studio.tasks.run_agency_step", str(job.pk), revision=job.revision, stage=job.stage
+            ):
+                enqueue(job, job.stage)
+            resumed += 1
+    return resumed
 
 
 def sweep_stuck() -> int:
     """Fail jobs whose worker died between or during stages, so they can be retried."""
     now = timezone.now()
     failed = 0
-    for job in AgencyJob.objects.filter(status__in=AgencyJob.ACTIVE_STATUSES).only(
-        "pk", "kind", "status", "revision", "updated_at", "workspace_id", "conversation_id"
+    from .autopilot import automatic_work_blocker
+
+    for job in AgencyJob.objects.filter(status__in=AgencyJob.ACTIVE_STATUSES).select_related(
+        "workspace", "workspace__organization"
     ):
+        if job.status == AgencyJob.Status.QUEUED and automatic_work_blocker(job.workspace, job=job):
+            continue
         try:
             limit = job_type(job.kind).stuck_after
         except KeyError:
@@ -374,7 +461,7 @@ def sweep_stuck() -> int:
         if job.updated_at >= now - limit:
             continue
         if job.status == AgencyJob.Status.QUEUED and _has_pending_task(
-            "apps.studio.tasks.run_agency_step", str(job.pk)
+            "apps.studio.tasks.run_agency_step", str(job.pk), revision=job.revision, stage=job.stage
         ):
             continue
         fail(

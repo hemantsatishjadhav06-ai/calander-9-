@@ -47,6 +47,17 @@ class PostForm(forms.ModelForm):
     # as a comma-separated string, not JSON.  clean_tags() converts to a list.
     tags = forms.CharField(required=False, widget=forms.HiddenInput())
 
+    def __init__(self, *args, workspace=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        workspace = workspace or getattr(self.instance, "workspace", None)
+        # Categories are tenant-owned too. A ModelChoiceField's default
+        # queryset otherwise accepts a category from any workspace.
+        self.fields["category"].queryset = (
+            ContentCategory.objects.filter(workspace=workspace)
+            if workspace is not None
+            else ContentCategory.objects.none()
+        )
+
     class Meta:
         model = Post
         fields = ["title", "caption", "first_comment", "internal_notes", "tags", "category"]
@@ -88,6 +99,20 @@ class PostForm(forms.ModelForm):
 
 class ContentCategoryForm(forms.ModelForm):
     """Form for creating/editing content categories."""
+
+    def __init__(self, *args, workspace=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.workspace = workspace or getattr(self.instance, "workspace", None)
+
+    def clean_name(self):
+        name = self.cleaned_data["name"]
+        if self.workspace is not None:
+            existing = ContentCategory.objects.filter(workspace=self.workspace, name=name)
+            if self.instance.pk:
+                existing = existing.exclude(pk=self.instance.pk)
+            if existing.exists():
+                raise forms.ValidationError("A category with this name already exists in this workspace.")
+        return name
 
     class Meta:
         model = ContentCategory

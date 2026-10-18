@@ -15,7 +15,7 @@
     {% include "components/agency_tabs.html" %}
 
     <div class="grid lg:grid-cols-[18rem_minmax(0,1fr)] gap-6 items-start">
-        <nav aria-label="Threads" class="bg-white border border-stone-200 rounded-2xl p-3 shadow-sm">
+        <nav aria-label="Threads" class="bg-white border border-stone-200 rounded-2xl p-3 shadow-sm max-h-56 overflow-y-auto lg:max-h-[70vh]">
             <ul class="space-y-1">
                 {% if not has_general_row %}
                 <li>

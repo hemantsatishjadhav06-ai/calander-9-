@@ -8,7 +8,7 @@ UUID string.
 
 import pytest
 
-from apps.composer.models import PostMedia
+from apps.composer.models import Post, PostMedia
 from apps.composer.services import create_post
 from apps.media_library.models import MediaAsset
 from apps.organizations.models import Organization
@@ -51,3 +51,17 @@ def test_create_post_rejects_unknown_or_invalid_media_id():
     ws, sa, _asset = _setup()
     with pytest.raises(ValueError, match="not found in workspace"):
         create_post(workspace=ws, social_account=sa, caption="hi", media_asset_ids=["not-a-uuid"], status="draft")
+
+
+@pytest.mark.django_db
+def test_create_post_rejects_normalized_duplicate_ids_before_creating_a_post():
+    ws, sa, asset = _setup()
+    with pytest.raises(ValueError, match="must be unique"):
+        create_post(
+            workspace=ws,
+            social_account=sa,
+            caption="hi",
+            media_asset_ids=[asset.id, str(asset.id).upper()],
+            status="draft",
+        )
+    assert not Post.objects.filter(workspace=ws).exists()

@@ -10,6 +10,8 @@ and the notifications behave exactly as they do everywhere else.
 from __future__ import annotations
 
 import logging
+import zoneinfo
+from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
@@ -45,7 +47,25 @@ def sync_status(brief: StudioBrief) -> StudioBrief:
 def can_revise(brief: StudioBrief) -> bool:
     if brief.status not in (StudioBrief.Status.READY, StudioBrief.Status.FAILED):
         return False
+    if has_unconfirmed_delivery(brief):
+        return False
     return post_statuses(brief) <= pipeline.REVISABLE_STATUSES
+
+
+def has_unconfirmed_delivery(brief: StudioBrief) -> bool:
+    """Unknown outcomes and expired approvals retain their recovery evidence."""
+    if brief.post_id is None:
+        return False
+    from apps.composer.models import PlatformPost, Post
+    from apps.publisher import delivery
+
+    post = Post.objects.filter(pk=brief.post_id, workspace_id=brief.workspace_id).first()
+    if post is None:
+        return True
+    if delivery.has_unresolved_holds(post):
+        return True
+    rows = PlatformPost.objects.filter(post=post).select_related("post__workspace", "social_account")
+    return any(delivery.state(row).get("kind") in delivery.UNRESOLVED for row in rows)
 
 
 def reopen(brief: StudioBrief) -> bool:
@@ -60,6 +80,8 @@ def reopen(brief: StudioBrief) -> bool:
     keeps it closed, and a person must put the post on hold first. True when
     the brief can now be revised.
     """
+    if has_unconfirmed_delivery(brief):
+        return False
     if brief.status != StudioBrief.Status.APPROVED:
         return can_revise(brief)
     statuses = post_statuses(brief)
@@ -116,6 +138,10 @@ def create_brief(
             status=StudioBrief.Status.QUEUED if start else StudioBrief.Status.PLANNED,
         )
         brief.social_accounts.set(accounts)
+        from . import trust
+
+        brief.trust_snapshot = trust.capture(brief)
+        brief.save(update_fields=["trust_snapshot", "updated_at"])
         if start:
             pipeline.start(brief, "strategy")
     return brief
@@ -140,63 +166,262 @@ def _new_revision(brief: StudioBrief, **changes) -> None:
     brief.error = ""
     for name, value in changes.items():
         setattr(brief, name, value)
+    from . import trust
+
+    brief.trust_snapshot = trust.capture(brief)
     brief.save()
 
 
-def request_changes(brief: StudioBrief, feedback: str, *, new_picture: bool = False, requested_by=None) -> None:
+def _revision_context(
+    brief: StudioBrief, requested_by, *, staff_only: bool = False, allow_reopen: bool = False
+) -> StudioBrief:
+    """Recheck current access, then lock the fresh creative and channel rows."""
+    from apps.accounts.models import User
+    from apps.approvals.actor import current_actor
+    from apps.composer.models import PlatformPost, Post
+    from apps.members.models import CustomRole, WorkspaceMembership
+    from apps.workspaces.models import Workspace
+
+    from . import chat
+
+    workspace = Workspace.objects.select_for_update().filter(pk=brief.workspace_id, is_archived=False).first()
+    if workspace is None:
+        raise StudioActionError("This workspace is unavailable for revisions.")
+    person_requesting = requested_by if requested_by is not None else current_actor().user
+    if person_requesting is not None:
+        person = User.objects.select_for_update().filter(pk=person_requesting.pk, is_active=True).first()
+        membership = (
+            WorkspaceMembership.objects.select_for_update().filter(workspace=workspace, user=person).first()
+            if person is not None
+            else None
+        )
+        if membership is not None and membership.custom_role_id:
+            membership.custom_role = CustomRole.objects.select_for_update().get(pk=membership.custom_role_id)
+        allowed = chat.is_staff_membership(membership) or (not staff_only and chat.is_client_membership(membership))
+        if not allowed:
+            raise StudioActionError("Your current workspace permissions do not allow this revision.")
+    current = (
+        StudioBrief.objects.select_for_update(of=("self",))
+        .select_related("workspace")
+        .filter(pk=brief.pk, workspace=workspace)
+        .first()
+    )
+    if current is None:
+        raise StudioActionError("This draft is unavailable for revisions.")
+    if current.post_id:
+        post = Post.objects.select_for_update().filter(pk=current.post_id, workspace=workspace).first()
+        if post is None:
+            raise StudioActionError("This draft's post is unavailable in this workspace.")
+        list(PlatformPost.objects.select_for_update().filter(post=post).order_by("pk"))
+        current.post = post
+    if allow_reopen:
+        reopen(current)
+    if not can_revise(current):
+        if has_unconfirmed_delivery(current):
+            raise StudioActionError(
+                "Resolve the previous delivery record before changing this post or its photo. "
+                "Check an unknown outcome, or use Return for review after an expired publishing time."
+            )
+        raise StudioActionError("This post can't be revised now — it is in progress, approved or already out.")
+    return current
+
+
+def _revision_choices(
+    brief: StudioBrief,
+    *,
+    source_picture_mode: str = "keep",
+    source_picture=None,
+    style_mode: str = "",
+    new_picture: bool = False,
+    regenerate_picture: bool = False,
+) -> dict[str, Any]:
+    """Apply explicit keep/clear/replace choices before any creative work."""
+    from apps.media_library.models import MediaAsset
+
+    if source_picture_mode not in {"keep", "clear", "replace"} or style_mode not in {"", "brand", "fresh"}:
+        raise StudioActionError("Choose whether to keep, clear or replace the photo, and choose a supported look.")
+    if source_picture_mode != "replace" and source_picture is not None:
+        raise StudioActionError("Choose Replace photo when supplying a new photo.")
+    # A human's replacement wins over the account manager's generation action.
+    # Otherwise an explicit new-picture request must not reuse a supplied photo.
+    if source_picture_mode == "keep" and new_picture:
+        source_picture_mode = "clear"
+    changes: dict[str, Any] = {"regenerate_picture": regenerate_picture}
+    if source_picture_mode == "replace" or (source_picture_mode == "keep" and brief.source_picture_id):
+        selected = getattr(source_picture, "pk", None) if source_picture_mode == "replace" else brief.source_picture_id
+        if selected is None:
+            raise StudioActionError("Choose an available photo from this workspace's media library.")
+        asset = (
+            MediaAsset.objects.select_for_update()
+            .filter(
+                pk=selected,
+                workspace_id=brief.workspace_id,
+                organization_id=brief.workspace.organization_id,
+                media_type=MediaAsset.MediaType.IMAGE,
+            )
+            .first()
+        )
+        if asset is None:
+            raise StudioActionError("Choose an available photo from this workspace's media library.")
+        if source_picture_mode == "replace":
+            changes.update(source_picture=asset, picture=None, regenerate_picture=False)
+    elif source_picture_mode == "clear":
+        changes.update(source_picture=None, picture=None, regenerate_picture=True)
+    if style_mode:
+        changes["style_lock"] = style_mode == "brand"
+    return changes
+
+
+def _withdraw_revision_review(brief: StudioBrief, feedback: str, requested_by) -> None:
+    """Take the old draft out of review while its replacement is being prepared."""
+    if brief.post_id is None:
+        return
+    from apps.approvals import services as approval_services
+    from apps.approvals.actor import current_actor
+    from apps.composer.models import PlatformPost
+
+    # The normal transition records the human's change request and prevents
+    # the old pending-review version being approved while the team revises it.
+    actor = requested_by or current_actor().user or brief.author
+    approval_services.request_changes(brief.post, actor, brief.workspace, comment=feedback)
+    PlatformPost.objects.filter(post_id=brief.post_id).update(
+        approved_fingerprint="",
+        approved_revision=None,
+        approved_by=None,
+        approved_at=None,
+        approved_publish_at=None,
+        updated_at=timezone.now(),
+    )
+
+
+def request_changes(
+    brief: StudioBrief,
+    feedback: str,
+    *,
+    new_picture: bool = False,
+    requested_by=None,
+    source_picture_mode: str = "keep",
+    source_picture=None,
+    style_mode: str = "",
+    allow_reopen: bool = False,
+) -> None:
     """Send the post back with notes. ``requested_by`` is set when the notes came through the team thread
     (a client's words, or the account manager's relay of them): the agents then read them as untrusted."""
     feedback = (feedback or "").strip()
     if not feedback:
         raise StudioActionError("Say what should change, so the team knows what to do.")
-    if not can_revise(brief):
-        raise StudioActionError("This post can't be revised now — it is in progress, approved or already out.")
     extra = {"requested_by": requested_by} if requested_by is not None else {}
     with transaction.atomic():
-        _new_revision(brief, feedback=feedback[:4000], regenerate_picture=new_picture, **extra)
-        pipeline.start(brief, "copy")
-
-
-def new_angles(brief: StudioBrief, feedback: str = "", *, requested_by=None) -> None:
-    if not can_revise(brief):
-        raise StudioActionError("This post can't be revised now — it is in progress, approved or already out.")
-    extra = {"requested_by": requested_by} if requested_by is not None else {}
-    with transaction.atomic():
-        _new_revision(
-            brief, feedback=(feedback or "").strip()[:4000], chosen_concept=None, regenerate_picture=True, **extra
+        current = _revision_context(
+            brief,
+            requested_by,
+            staff_only=source_picture_mode != "keep" or bool(style_mode),
+            allow_reopen=allow_reopen,
         )
-        pipeline.start(brief, "strategy")
+        choices = _revision_choices(
+            current,
+            source_picture_mode=source_picture_mode,
+            source_picture=source_picture,
+            style_mode=style_mode,
+            new_picture=new_picture,
+            regenerate_picture=new_picture,
+        )
+        _withdraw_revision_review(current, feedback, requested_by)
+        _new_revision(current, feedback=feedback[:4000], **choices, **extra)
+        pipeline.start(current, "copy")
+        brief.refresh_from_db()
+
+
+def new_angles(
+    brief: StudioBrief,
+    feedback: str = "",
+    *,
+    requested_by=None,
+    source_picture_mode: str = "keep",
+    source_picture=None,
+    style_mode: str = "",
+    allow_reopen: bool = False,
+) -> None:
+    extra = {"requested_by": requested_by} if requested_by is not None else {}
+    with transaction.atomic():
+        current = _revision_context(
+            brief,
+            requested_by,
+            staff_only=source_picture_mode != "keep" or bool(style_mode),
+            allow_reopen=allow_reopen,
+        )
+        choices = _revision_choices(
+            current,
+            source_picture_mode=source_picture_mode,
+            source_picture=source_picture,
+            style_mode=style_mode,
+            regenerate_picture=True,
+        )
+        _withdraw_revision_review(current, (feedback or "").strip() or "Try new creative angles.", requested_by)
+        _new_revision(current, feedback=(feedback or "").strip()[:4000], chosen_concept=None, **choices, **extra)
+        pipeline.start(current, "strategy")
+        brief.refresh_from_db()
 
 
 def use_concept(brief: StudioBrief, concept: StudioConcept) -> None:
     if concept.brief_id != brief.pk:
         raise StudioActionError("That angle belongs to another brief.")
-    if not can_revise(brief):
-        raise StudioActionError("This post can't be revised now — it is in progress, approved or already out.")
     with transaction.atomic():
-        _new_revision(brief, feedback="", chosen_concept=concept, regenerate_picture=True)
-        pipeline.start(brief, "copy")
+        current = _revision_context(brief, None)
+        choices = _revision_choices(current, regenerate_picture=True)
+        _withdraw_revision_review(current, "Use the selected creative angle.", None)
+        _new_revision(current, feedback="", chosen_concept=concept, **choices)
+        pipeline.start(current, "copy")
+        brief.refresh_from_db()
 
 
 def retry(brief: StudioBrief) -> None:
-    if brief.status != StudioBrief.Status.FAILED:
-        raise StudioActionError("Only a brief that failed can be retried.")
-    stage = brief.stage if brief.stage in pipeline.STAGES else "strategy"
     with transaction.atomic():
-        pipeline.start(brief, stage)
+        current = StudioBrief.objects.select_for_update().get(pk=brief.pk, workspace_id=brief.workspace_id)
+        if current.status != StudioBrief.Status.FAILED:
+            raise StudioActionError("Only a brief that failed can be retried.")
+        if has_unconfirmed_delivery(current):
+            raise StudioActionError("Resolve the previous delivery record before retrying this brief.")
+        if post_statuses(current) & _APPROVED_STATUSES:
+            raise StudioActionError("This post was approved, so the team cannot retry its creative work.")
+        stage = current.stage if current.stage in pipeline.STAGES else "strategy"
+        # An interrupted paid call can still finish after the person retries.
+        # Give the new execution a different revision so that old callbacks
+        # cannot satisfy its status/revision write guard. Preserve the reviewed
+        # source stamps; a retry must not silently accept changed evidence.
+        current.revision += 1
+        if isinstance(current.trust_snapshot, dict) and current.trust_snapshot:
+            current.trust_snapshot = {**current.trust_snapshot, "revision": current.revision}
+        current.finished_at = None
+        current.save(update_fields=["revision", "trust_snapshot", "finished_at", "updated_at"])
+        pipeline.start(current, stage)
+        brief.refresh_from_db()
 
 
 def discard(brief: StudioBrief) -> None:
     """Stop the team and drop the draft — unless the post was already approved or sent."""
-    statuses = post_statuses(brief)
-    if statuses & _APPROVED_STATUSES:
-        raise StudioActionError("This post was approved, so it can't be discarded here. Manage it in the composer.")
+    from apps.composer.models import PlatformPost, Post
+
     with transaction.atomic():
-        if brief.post is not None:
-            brief.post.delete()
-        brief.status = StudioBrief.Status.DISCARDED
-        brief.post = None
-        brief.save(update_fields=["status", "post", "updated_at"])
+        current = StudioBrief.objects.select_for_update().get(pk=brief.pk, workspace_id=brief.workspace_id)
+        if current.post_id is not None:
+            post = (
+                Post.objects.select_for_update().filter(pk=current.post_id, workspace_id=current.workspace_id).first()
+            )
+            if post is None:
+                raise StudioActionError("This draft's post is unavailable in this workspace.")
+            list(PlatformPost.objects.select_for_update().filter(post=post).order_by("pk"))
+            current.post = post
+        if has_unconfirmed_delivery(current):
+            raise StudioActionError("Resolve the previous delivery record before discarding this brief.")
+        if post_statuses(current) & _APPROVED_STATUSES:
+            raise StudioActionError("This post was approved, so it can't be discarded here. Manage it in the composer.")
+        if current.post is not None:
+            current.post.delete()
+        current.status = StudioBrief.Status.DISCARDED
+        current.post = None
+        current.save(update_fields=["status", "post", "updated_at"])
+        brief.refresh_from_db()
 
 
 def approve(brief: StudioBrief, user, *, publish_now: bool = False, publish_at=None) -> str:
@@ -255,10 +480,14 @@ def approve(brief: StudioBrief, user, *, publish_now: bool = False, publish_at=N
     if problems and not scheduled:
         raise StudioActionError("Approved, but it couldn't be scheduled: " + "; ".join(problems))
     if publish_now:
-        message = f"Approved and publishing now to {scheduled} account(s) — it goes out within a minute."
+        message = f"Approved and queued for publishing now to {scheduled} account(s). Follow publishing status in the calendar."
     else:
-        local = timezone.localtime(when)
-        message = f"Approved and scheduled for {local:%a %d %b, %H:%M} on {scheduled} account(s)."
+        try:
+            zone = zoneinfo.ZoneInfo(workspace.effective_timezone or "UTC")
+        except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+            zone = zoneinfo.ZoneInfo("UTC")
+        local = timezone.localtime(when, zone)
+        message = f"Approved and scheduled for {local:%a %d %b, %H:%M} ({zone.key}) on {scheduled} account(s)."
     if problems:
         message += " Not scheduled: " + "; ".join(problems)
     return message

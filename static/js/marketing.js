@@ -10,6 +10,11 @@
   var nav = document.querySelector("[data-nav]");
   var toggle = document.querySelector("[data-nav-toggle]");
   if (nav && toggle) {
+    function closeNav() {
+      nav.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "false");
+      root.classList.remove("nav-open");
+    }
     toggle.addEventListener("click", function () {
       var open = nav.classList.toggle("is-open");
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
@@ -17,11 +22,19 @@
     });
     nav.querySelectorAll("a").forEach(function (link) {
       link.addEventListener("click", function () {
-        nav.classList.remove("is-open");
-        toggle.setAttribute("aria-expanded", "false");
-        root.classList.remove("nav-open");
+        closeNav();
       });
     });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && nav.classList.contains("is-open")) {
+        closeNav();
+        toggle.focus();
+      }
+    });
+    window.addEventListener("resize", function () {
+      if (window.getComputedStyle(toggle).display === "none") { closeNav(); }
+    });
+    root.classList.add("nav-ready");
   }
 
   /* Sticky nav shadow once the page scrolls ------------------------------ */
@@ -49,20 +62,24 @@
     }, { rootMargin: "0px 0px -10% 0px", threshold: 0.1 });
     revealables.forEach(function (el) { observer.observe(el); });
   }
+  root.classList.add("reveal-ready");
 
   /* Copy buttons on code blocks ------------------------------------------ */
   document.querySelectorAll("[data-copy]").forEach(function (button) {
     button.addEventListener("click", function () {
       var target = document.getElementById(button.getAttribute("data-copy"));
       if (!target || !navigator.clipboard) { return; }
+      var label = button.textContent;
       navigator.clipboard.writeText(target.textContent.trim()).then(function () {
-        var label = button.textContent;
         button.textContent = "Copied";
         button.classList.add("is-done");
         setTimeout(function () {
           button.textContent = label;
           button.classList.remove("is-done");
         }, 1600);
+      }).catch(function () {
+        button.textContent = "Select and copy the code";
+        setTimeout(function () { button.textContent = label; }, 2400);
       });
     });
   });

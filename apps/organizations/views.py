@@ -85,6 +85,8 @@ def workspaces_view(request):
     workspaces = (
         Workspace.objects.filter(organization=org).prefetch_related("memberships__user").order_by("is_archived", "name")
     )
+    if request.org_membership.org_role == OrgMembership.OrgRole.MEMBER:
+        workspaces = workspaces.filter(memberships__user=request.user)
 
     # Build workspace data with members and current user's role
     workspace_data = []

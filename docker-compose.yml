@@ -4,8 +4,12 @@ services:
     command: python manage.py migrate --noinput
     env_file:
       - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   app:
@@ -16,6 +20,8 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -23,14 +29,26 @@ services:
 
   worker:
     build: .
-    command: python manage.py run_worker
+    command: sh -c "python manage.py check --deploy && exec python manage.py run_worker --duration 3600"
     volumes:
       - media_data:/app/media
     env_file:
       - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       migrate:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 128mb --maxmemory-policy volatile-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   postgres:

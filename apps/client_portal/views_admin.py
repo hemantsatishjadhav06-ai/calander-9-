@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.html import escape
 from django.views.decorators.http import require_GET, require_POST
 from django_ratelimit.decorators import ratelimit
 
@@ -111,7 +112,7 @@ def invite_client(request, workspace_id):
         )
     except ValueError as e:
         return HttpResponse(
-            f'<div class="text-red-600 text-sm p-3">{e}</div>',
+            f'<div class="text-red-600 text-sm p-3">{escape(str(e))}</div>',
             status=422,
         )
 
@@ -152,7 +153,7 @@ def send_magic_link(request, workspace_id, membership_id):
         )
     except ValueError as e:
         return HttpResponse(
-            f'<div class="text-red-600 text-sm p-3">{e}</div>',
+            f'<div class="text-red-600 text-sm p-3">{escape(str(e))}</div>',
             status=422,
         )
 
