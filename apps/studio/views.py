@@ -174,52 +174,53 @@ def index(request, workspace_id):
 @ratelimit(key="user", rate="10/m", method="POST", block=True)
 @require_POST
 def create(request, workspace_id):
-    from . import chat
+    """An idea from the form becomes its own conversation with your manager, in the person's own words.
+
+    The form's other choices (direction, goal, accounts, photo, look) travel as
+    fields of the brief, never as sentences put in the person's mouth. The
+    manager answers in the thread with the brief; nothing is made until the
+    person goes ahead (or the workspace is set to go ahead for its team).
+    """
+    import uuid
+
+    from . import chat, customer_workflow
 
     workspace = _workspace(request, workspace_id)
     form = BriefForm(request.POST, workspace=workspace)
-    # The interview can ask for destinations; the legacy endpoint still
-    # validates explicit account/photo choices before they enter the thread.
+    # Destinations are optional here: the brief defaults to the workspace's usual accounts.
     if not request.POST.getlist("accounts"):
         form.fields.pop("accounts")
     if not llm.is_configured():
-        messages.error(request, "Your AI team needs setup. Ask the workspace owner to check Agency readiness.")
+        messages.error(request, "Your team isn't connected yet. Ask the workspace owner to finish Set up.")
         return redirect("studio:index", workspace_id=workspace.id)
     if not budget.can_spend(workspace):
         messages.error(request, budget.over_budget_message(workspace))
         return redirect("studio:index", workspace_id=workspace.id)
     if not form.is_valid():
         return render(request, "studio/index.html", _index_context(request, workspace, form), status=400)
-    parts = ["Create a post and ask me for any missing information.\n" + form.cleaned_data["idea"]]
-    if form.cleaned_data["notes"]:
-        parts.append("My direction and constraints: " + form.cleaned_data["notes"])
-    if form.cleaned_data["goal"]:
-        parts.append("My goal: " + form.cleaned_data["goal"])
-    accounts = form.cleaned_data.get("accounts", [])
-    if accounts:
-        parts.append(
-            "My chosen destinations: "
-            + "; ".join(f"{a.account_name or a.account_handle} ({a.platform}), account {a.pk}" for a in accounts)
-        )
     picture = form.cleaned_data["source_picture"]
-    body = "\n\n".join(parts)
     try:
-        chat.clean_body(body)
-        conversation = chat.general_conversation(workspace, created_by=request.user)
-        posted = chat.post_message(
-            conversation,
+        conversation = customer_workflow.save_idea(
+            workspace, request.user, request_id=uuid.uuid4(), idea=form.cleaned_data["idea"]
+        )
+        started = customer_workflow.start_idea(
+            workspace,
             request.user,
-            body,
+            conversation.pk,
+            create={
+                "notes": form.cleaned_data["notes"],
+                "goal": form.cleaned_data["goal"],
+                "accounts": [str(account.pk) for account in form.cleaned_data.get("accounts", [])],
+            },
             reference_id=str(picture.pk) if picture is not None else "",
             style_mode="brand" if request.POST.get("style_lock") else "",
         )
-    except chat.ChatError as exc:
+    except (chat.ChatError, customer_workflow.WorkflowError) as exc:
         form.add_error(None, str(exc))
         return render(request, "studio/index.html", _index_context(request, workspace, form), status=400)
     messages.info(
         request,
-        posted.note
-        or "Your request is in Ask the team. Answer the questions, check the source facts, then confirm before a draft is generated.",
+        started.note if started.job is None else "Your idea is with your manager. The brief appears here in a moment.",
     )
     return redirect(chat.staff_thread_url(conversation))
 

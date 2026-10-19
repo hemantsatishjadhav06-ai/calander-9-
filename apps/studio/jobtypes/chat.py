@@ -27,6 +27,7 @@ request, before this job runs.
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 import zoneinfo
 from dataclasses import dataclass, field
@@ -60,9 +61,31 @@ ARTICLE_LOCKED = (
     "This article is approved or already live, so the writers can't change it from here. I've asked a person on "
     "the team to look at your request. " + HANDOFF
 )
-#: Posts one person may have in the works at once from the thread.
+#: Posts one person may have in the works at once from the thread; further ones wait their turn (PLANNED),
+#: up to the same number, before the thread says no.
 MAX_ACTIVE_CHAT_POSTS = 2
-SOURCE_MAX_AGE = timedelta(minutes=30)
+SOURCE_MAX_AGE = chat.SOURCE_MAX_AGE
+QUEUED_REPLY = "Queued — the team starts it as soon as a slot frees. It comes back here for your approval."
+TOO_MANY_WAITING = (
+    "The team is still making your earlier posts, and two more are already waiting. Once one is ready, ask again "
+    "and I'll start this one."
+)
+STARTED_REPLY = "The team is on it. The draft comes back here for your approval."
+GO_AHEAD_REPLY = "Here's the brief I'd run with. Change anything, or go ahead."
+#: Words that would claim work the person has not started yet; the reply is replaced when they appear.
+_STARTED_CLAIM = re.compile(
+    r"\b(started|starting|on it|drafting|creating now|underway|in progress|working on it|getting started)\b",
+    re.IGNORECASE,
+)
+#: Why a tap on a brief card did nothing, one plain sentence each (never about other people's work).
+NOT_YOURS = "Only a team member can go ahead with a brief, from the team's own conversation."
+NOT_CURRENT = "That brief card is no longer current. Ask for the brief again."
+NEWER_BRIEF = "There's a newer brief in this conversation. Go ahead from the latest card."
+NEWER_MESSAGE = "You sent a newer message after this brief. Wait for the reply, then go ahead from the latest card."
+INCOMPLETE = "This brief is incomplete. Ask for the brief again."
+ACCOUNTS_CHANGED = "The accounts in this brief changed. Ask for the brief again so it uses the current accounts."
+PHOTO_GONE = "The photo in this brief is no longer available. Choose another or clear it, then ask for the brief again."
+EVIDENCE_EXPIRED = "The evidence behind this brief expired. Ask for the brief again."
 LOCKED = (
     "This post has already been approved or scheduled, so it can't be changed from here. I've asked a person on the "
     "team to pause it and make the change."
@@ -709,15 +732,16 @@ def history(conversation: Conversation, trigger: Message, *, for_client: bool) -
     )
     rows.reverse()
     lines = []
+    limit = chat.HISTORY_CHARS
     for message in rows:
         if message.author_kind == Message.AuthorKind.AGENT:
-            lines.append(f"{message.sender_name} (the team's reply): {message.body[:1500]}")
+            lines.append(f"{message.sender_name} (the team's reply): {message.body[:limit]}")
         elif message.author_kind == Message.AuthorKind.SYSTEM:
-            lines.append(f"(system note) {message.body[:500]}")
+            lines.append(f"(system note) {message.body[: min(limit, 500)]}")
         else:
             who = "client" if message.author_kind == Message.AuthorKind.CLIENT else "team member"
             tag = "internal_note" if message.is_internal else f"{who.replace(' ', '_')}_message"
-            lines.append(base.untrusted(tag, message.body, limit=1500, author=f"{message.sender_name} ({who})"))
+            lines.append(base.untrusted(tag, message.body, limit=limit, author=f"{message.sender_name} ({who})"))
     return lines
 
 
@@ -764,6 +788,19 @@ def perform(
             if not creative_brief.missing(intake.result.get("creative_brief")):
                 intake.status = Message.ActionStatus.NEEDS_HUMAN
                 intake.notify_staff = True
+            return intake
+        if (
+            action == "new_post"
+            and intake.result.get("awaiting_confirmation") is True
+            and _auto_eligible(job, conversation, trigger, speaker)
+        ):
+            # "Go ahead unless I say stop": the brief starts now, inside the same
+            # locked, re-checked transaction a tap on the card would use. The
+            # finished post still waits for a person's approval.
+            started = _start_from_snapshot(job, conversation, requester, intake.result, auto=True)
+            if started.status == Message.ActionStatus.STARTED:
+                return started
+            intake.reply = started.reply
         return intake
     if action == "answer":
         if out.needs_human:
@@ -1002,6 +1039,42 @@ def _selected_accounts(channels, accounts) -> tuple[list, str]:
     return selected, ""
 
 
+def _resolve_channels(channels, accounts) -> tuple[list, list[str]]:
+    """A team member's channel words as connected accounts of this workspace, read generously.
+
+    An exact account (id, label, name or handle) is that account; a platform
+    name is every connected account on it; anything else is dropped and
+    returned so the card can say so. Never reaches outside ``accounts``.
+    """
+    selected: list = []
+    unknown: list[str] = []
+    for channel in channels:
+        value = channel.strip().casefold()
+        exact = [
+            account
+            for account in accounts
+            if value
+            and value
+            in {
+                str(account.pk).casefold(),
+                _account_label(account).casefold(),
+                (account.account_name or "").casefold(),
+                (account.account_handle or "").casefold(),
+            }
+        ]
+        matched = exact if len(exact) == 1 else [a for a in accounts if a.platform.casefold() == value]
+        if not matched:
+            unknown.append(channel.strip()[:60])
+            continue
+        selected.extend(account for account in matched if account not in selected)
+    return selected, unknown
+
+
+def _canonical_channels(selected, accounts) -> list[str]:
+    """The channel words a later strict resolution (:func:`_selected_accounts`) maps back to exactly these accounts."""
+    return [creative_brief.channel_label(account, accounts) for account in selected]
+
+
 def _collect_sources(workspace, profile, accounts) -> dict:
     sources = creative_sources.collect(workspace, profile, accounts)
     sources = (
@@ -1014,6 +1087,19 @@ def _collect_sources(workspace, profile, accounts) -> dict:
     return sources
 
 
+def _create_seed(extras, accounts) -> dict:
+    """The idea form's structured choices as brief fields the account manager starts from."""
+    if not isinstance(extras, dict):
+        return {}
+    chosen = [account for account in accounts if str(account.pk) in {str(pk) for pk in extras.get("accounts") or []}]
+    seed = {
+        "goal": extras.get("goal") or "",
+        "constraints": extras.get("notes") or "",
+        "channels": _canonical_channels(chosen, accounts),
+    }
+    return creative_brief.normalized(seed) if any(seed.values()) else {}
+
+
 def _guided_context(job, conversation, trigger, requester, profile) -> dict:
     # Offer all currently connected Studio accounts, not only autopilot defaults.
     from ..forms import studio_accounts
@@ -1023,26 +1109,14 @@ def _guided_context(job, conversation, trigger, requester, profile) -> dict:
     old = previous.result if previous is not None else {}
     reusable = bool(old.get("creative_brief")) and not (old.get("brief_id") or old.get("confirmed_from"))
     sources = old.get("sources") if reusable else None
-    words = trigger.body.casefold()
-    creative_request = reusable or any(
-        word in words
-        for word in (
-            "post",
-            "draft",
-            "creative",
-            "campaign",
-            "image",
-            "caption",
-            "design",
-            "social",
-            "announce",
-            "publish",
-        )
-    )
-    if (not isinstance(sources, dict) or not sources) and creative_request:
+    # The first creative turn always has evidence on the table (the snapshot is
+    # shared per workspace, so this is cheap); later turns reuse their own.
+    if not isinstance(sources, dict) or not sources:
         sources = _collect_sources(conversation.workspace, profile, accounts)
     return {
-        "creative_brief": old.get("creative_brief", {}) if reusable else {},
+        "creative_brief": old.get("creative_brief", {})
+        if reusable
+        else _create_seed((job.input or {}).get("create"), accounts),
         "sources": sources if isinstance(sources, dict) else {},
         "accounts": accounts,
         "profile": profile,
@@ -1068,25 +1142,77 @@ def _reference(workspace, reference_id):
     ).first()
 
 
+def _sentences(text: str, limit: int = 4) -> str:
+    """The first ``limit`` sentences of ``text`` on one line."""
+    parts = [part for part in re.split(r"(?<=[.!?])\s+", " ".join((text or "").split())) if part]
+    return " ".join(parts[:limit])
+
+
+def _manager_reply(reply: str, *, awaiting: bool) -> str:
+    """The account manager's own words, short; never a claim that work started while the card still waits."""
+    text = _sentences(reply)
+    if awaiting and (not text or _STARTED_CLAIM.search(text)):
+        return GO_AHEAD_REPLY
+    return text
+
+
+def _apply_create_extras(data: dict, extras, accounts) -> dict:
+    """The idea form's own choices win over the model's guesses: goal, direction and destinations."""
+    if not isinstance(extras, dict):
+        return data
+    goal = extras.get("goal") or ""
+    if goal in creative_brief.GOALS:
+        data["goal"] = goal
+    notes = " ".join(str(extras.get("notes") or "").split())
+    if notes and notes not in data["constraints"]:
+        data["constraints"] = f"{notes} {data['constraints']}".strip()[:1000]
+    wanted = {str(pk) for pk in extras.get("accounts") or []}
+    chosen = [account for account in accounts if str(account.pk) in wanted]
+    if chosen:
+        data["channels"] = _canonical_channels(chosen, accounts)
+    return data
+
+
+def _auto_eligible(job, conversation, trigger, speaker: str) -> bool:
+    """Whether this turn may start the brief without a tap: the workspace says so, and this is the team's own thread.
+
+    The team's own threads are the internal web threads and a team member's
+    private Telegram chat. Clients, client threads and Telegram groups always
+    confirm.
+    """
+    if speaker != "staff" or trigger.author_kind != Message.AuthorKind.STAFF:
+        return False
+    if conversation.audience != Conversation.Audience.INTERNAL:
+        return False
+    if (job.input or {}).get("telegram_context") is not None and not chat.is_private_conversation(conversation):
+        return False
+    return chat.creation_mode(conversation.workspace) == AgencySettings.CreationMode.AUTO
+
+
 def _intake(job, conversation, trigger, out, context) -> Outcome:
+    """Turn the account manager's proposal into the stored brief snapshot and the reply above its card.
+
+    For the team, every field the person did not mention is filled from the
+    brand's defaults (recorded in ``creative_defaults``); the only hard
+    requirements are a topic and at least one connected account. Clients keep
+    the full question round.
+    """
+    human_input = job.input or {}
+    staff = trigger.author_kind == Message.AuthorKind.STAFF
     proposed = creative_brief.normalized(out.creative_brief)
     previous = creative_brief.normalized(context["creative_brief"])
     new_topic = bool(previous["topic"] and proposed["topic"] and previous["topic"] != proposed["topic"])
     if new_topic:
         data = creative_brief.merge({}, proposed)
         context["sources"] = _collect_sources(conversation.workspace, context["profile"], context["accounts"])
-        context["reference_id"] = (job.input or {}).get("reference_id", "")
-        context["style_mode"] = (job.input or {}).get("style_mode", "")
+        context["reference_id"] = human_input.get("reference_id", "")
+        context["style_mode"] = human_input.get("style_mode", "")
     else:
         data = creative_brief.merge(previous, proposed)
     if not context["sources"]:
         context["sources"] = _collect_sources(conversation.workspace, context["profile"], context["accounts"])
-    if not data["visual_direction"] and context["style_mode"] in {"brand", "fresh"}:
-        data["visual_direction"] = (
-            "Use a fresh layout within the brand's colours and typography."
-            if context["style_mode"] == "fresh"
-            else "Match the current brand series and its saved creative memory."
-        )
+    if not staff and not data["visual_direction"] and context["style_mode"] in {"brand", "fresh"}:
+        data["visual_direction"] = creative_brief.VISUAL_DIRECTION[context["style_mode"]]
     if not data["topic"] and out.action == "new_post":
         data["topic"] = ((out.instructions or "").strip() or trigger.body)[:1000]
     reference_id = context["reference_id"]
@@ -1100,10 +1226,35 @@ def _intake(job, conversation, trigger, out, context) -> Outcome:
         )
     elif reference_error:
         data["references"] = ""
-    selected, channel_error = _selected_accounts(data["channels"], context["accounts"])
-    if channel_error:
-        data["channels"] = []
-    ready = not creative_brief.missing(data) and bool(selected) and not reference_error
+    filled: list[str] = []
+    channel_error = ""
+    if staff:
+        data = _apply_create_extras(data, human_input.get("create"), context["accounts"])
+        selected, _unknown = _resolve_channels(data["channels"], context["accounts"])
+        data["channels"] = _canonical_channels(selected, context["accounts"])
+        remembered = context["sources"].get("creative_memory") if isinstance(context["sources"], dict) else {}
+        house_style = str((remembered or {}).get("house_style") or "") if isinstance(remembered, dict) else ""
+        data, filled = creative_brief.complete(
+            data,
+            creative_brief.defaults(
+                conversation.workspace,
+                context["profile"],
+                context["accounts"],
+                style_mode=context["style_mode"],
+                memory_house_style=house_style,
+            ),
+        )
+        if "channels" in filled:
+            selected, _unknown = _resolve_channels(data["channels"], context["accounts"])
+        missing = creative_brief.missing(data, required=creative_brief.STAFF_REQUIRED)
+        if not selected:
+            missing.append("channels")
+    else:
+        selected, channel_error = _selected_accounts(data["channels"], context["accounts"])
+        if channel_error:
+            data["channels"] = []
+        missing = creative_brief.missing(data)
+    ready = not missing and bool(selected) and not reference_error
     result = {
         "creative_brief": data,
         "sources": context["sources"],
@@ -1111,7 +1262,24 @@ def _intake(job, conversation, trigger, out, context) -> Outcome:
         "reference_id": str(reference_id or ""),
         "style_mode": context["style_mode"] if context["style_mode"] in {"", "brand", "fresh"} else "",
         "selected_accounts": [_account_info(account) for account in selected],
+        "creative_defaults": filled,
+        "creative_missing": missing,
     }
+    if staff:
+        # The card shows the brief; the reply is the manager's own words.
+        if ready:
+            reply = _manager_reply(out.reply, awaiting=True)
+            if human_input.get("telegram_context") is not None:
+                # Telegram has no card yet: the brief travels in the message, with the way to confirm it.
+                reply += "\n\n" + creative_brief.summary(data) + "\nSend /brief to open the confirmation card."
+        elif "topic" in missing:
+            reply = _manager_reply(out.reply, awaiting=False) if out.action == "answer" else ""
+            reply = reply or "What should this post be about?"
+        elif "channels" in missing:
+            reply = "Connect a social account first, then send the idea again."
+        else:
+            reply = "That photo is no longer available. Choose another or clear it, then send the idea again."
+        return Outcome(reply, "new_post", result=result)
     if ready:
         names = "; ".join(f"{a.get_platform_display()}: {a.account_name or a.account_handle}" for a in selected)
         reply = (
@@ -1119,11 +1287,6 @@ def _intake(job, conversation, trigger, out, context) -> Outcome:
             + creative_brief.summary(data)
         )
         reply += f"\nSelected accounts: {names}.\nUse Confirm brief after checking the source facts. This only starts a draft for human approval."
-        if (job.input or {}).get("telegram_context") is not None and trigger.author_kind == Message.AuthorKind.STAFF:
-            reply = reply.replace(
-                "Use Confirm brief after checking the source facts. This only starts a draft for human approval.",
-                "Send /brief to open the current confirmation card after checking these source facts. Its explicit button only starts a draft for human approval.",
-            )
     else:
         reply = creative_brief.questions(data, _channel_choices(context["accounts"]))
         if reference_error:
@@ -1178,12 +1341,98 @@ def _source_expired(sources) -> bool:
         return True
 
 
-def _confirm(job, conversation, trigger, requester, membership) -> Outcome:
-    denied = Outcome(
-        "This brief cannot be confirmed from this message. Ask the team to show your current complete brief, then check its source facts and confirm it here.",
-        "new_post",
-        Message.ActionStatus.DECLINED,
+def _start_from_snapshot(
+    job, conversation, requester, snapshot: dict, *, confirmed_from: str = "", auto=False
+) -> Outcome:
+    """Create the brief from a stored intake snapshot: the one place a conversation turns into creative work.
+
+    Runs inside the caller's locked transaction, after the author's membership
+    was re-checked. The accounts are resolved again, strictly, from the
+    snapshot's own words and must match what the card showed; the photo must
+    still exist; the budget must allow it. Past the per-person cap the brief
+    waits its turn (PLANNED) for the autopilot feeder, up to the same number.
+    The finished post still waits for a person's approval.
+    """
+    from ..forms import studio_accounts
+
+    workspace = conversation.workspace
+    data = creative_brief.normalized(snapshot.get("creative_brief"))
+    sources = snapshot.get("sources")
+    if creative_brief.missing(data, required=creative_brief.STAFF_REQUIRED) or not isinstance(sources, dict):
+        return Outcome(INCOMPLETE, "new_post", Message.ActionStatus.DECLINED)
+    accounts, error = _selected_accounts(
+        data["channels"], [a for a in studio_accounts(workspace) if not a.needs_reconnect]
     )
+    stored_accounts = snapshot.get("selected_accounts")
+    if (
+        not accounts
+        or error
+        or not isinstance(stored_accounts, list)
+        or {row["id"]: row for row in stored_accounts if isinstance(row, dict) and "id" in row}
+        != {str(account.pk): _account_info(account) for account in accounts}
+    ):
+        return Outcome(ACCOUNTS_CHANGED, "new_post", Message.ActionStatus.DECLINED)
+    reference_id = snapshot.get("reference_id") or ""
+    reference = _reference(workspace, reference_id)
+    if reference_id not in {"", "none"} and reference is None:
+        return Outcome(PHOTO_GONE, "new_post", Message.ActionStatus.DECLINED)
+    if not budget.can_spend(workspace):
+        return Outcome(
+            chat.refusal_text(workspace, "budget", audience=Conversation.Audience.INTERNAL),
+            "new_post",
+            Message.ActionStatus.DECLINED,
+        )
+    _lock_current_job(job)
+    own = StudioBrief.objects.filter(workspace=workspace, origin=StudioBrief.Origin.CHAT, requested_by=requester)
+    start = own.filter(status__in=StudioBrief.ACTIVE_STATUSES).count() < MAX_ACTIVE_CHAT_POSTS
+    if not start and own.filter(status=StudioBrief.Status.PLANNED).count() >= MAX_ACTIVE_CHAT_POSTS:
+        return Outcome(TOO_MANY_WAITING, "new_post", Message.ActionStatus.DECLINED)
+    style_mode = snapshot.get("style_mode") or ""
+    brief = services.create_brief(
+        workspace,
+        requester,
+        idea=data["topic"][:2000],
+        goal=data["goal"],
+        notes=_brief_notes(data, sources, style_mode=style_mode),
+        accounts=accounts,
+        style_lock=style_mode != "fresh",
+        source_picture=reference,
+        origin=StudioBrief.Origin.CHAT,
+        job=job,
+        requested_by=requester,
+        start=start,
+    )
+    if not start:
+        reply = QUEUED_REPLY
+    elif auto:
+        platforms = list(dict.fromkeys(account.get_platform_display() for account in accounts))
+        names = ", ".join(platforms[:-1]) + (" and " if len(platforms) > 1 else "") + platforms[-1]
+        topic = " ".join(data["topic"].split())[:120]
+        reply = f"On it — a post about {topic} for {names}. It comes back here for your approval."
+    else:
+        reply = STARTED_REPLY
+    result = {
+        **snapshot,
+        "brief_id": str(brief.pk),
+        "awaiting_confirmation": False,
+        "queued": not start,
+        "auto_started": bool(auto),
+    }
+    if confirmed_from:
+        result["confirmed_from"] = confirmed_from
+    return Outcome(reply, "new_post", Message.ActionStatus.STARTED, result=result)
+
+
+def _confirm(job, conversation, trigger, requester, membership) -> Outcome:
+    """A tap on the brief card (``kind="confirm_brief"``): re-check everything, then start the team.
+
+    Expired evidence is refreshed silently; the person is asked again only
+    when the website or channel evidence actually changed.
+    """
+
+    def denied(text: str) -> Outcome:
+        return Outcome(text, "new_post", Message.ActionStatus.DECLINED)
+
     telegram_guided = False
     context = (job.input or {}).get("telegram_context")
     if context is not None and (job.input or {}).get("explicit_assistant_request") is True:
@@ -1201,11 +1450,11 @@ def _confirm(job, conversation, trigger, requester, membership) -> Outcome:
         or trigger.is_internal
         or (job.input or {}).get("facts_confirmed") is not True
     ):
-        return denied
+        return denied(NOT_YOURS)
     try:
         source_id = uuid.UUID(str((job.input or {}).get("confirmation_message_id") or ""))
     except (ValueError, TypeError, AttributeError):
-        return denied
+        return denied(NOT_CURRENT)
     # Read-only network work must not hold a conversation row lock. Its
     # candidate and membership are revalidated below before any result is used.
     candidate = (
@@ -1236,12 +1485,12 @@ def _confirm(job, conversation, trigger, requester, membership) -> Outcome:
         refreshed = _collect_sources(conversation.workspace, ensure_profile(conversation.workspace), available)
     with transaction.atomic():
         membership = _current_membership(job, conversation, requester)
-        if (
-            not chat.is_staff_membership(membership)
-            or (conversation.audience != Conversation.Audience.INTERNAL and not telegram_guided)
-            or not budget.can_spend(conversation.workspace)
+        if not chat.is_staff_membership(membership) or (
+            conversation.audience != Conversation.Audience.INTERNAL and not telegram_guided
         ):
-            return denied
+            return denied(NOT_YOURS)
+        if not budget.can_spend(conversation.workspace):
+            return denied(chat.refusal_text(conversation.workspace, "budget", audience=Conversation.Audience.INTERNAL))
         existing = StudioBrief.objects.filter(
             workspace=conversation.workspace,
             origin=StudioBrief.Origin.CHAT,
@@ -1279,10 +1528,10 @@ def _confirm(job, conversation, trigger, requester, membership) -> Outcome:
             or (source_job.result or {}).get("awaiting_confirmation") is not True
             or (source_job.result or {}).get("message_id") != str(source.pk)
         ):
-            return denied
+            return denied(NOT_CURRENT)
         latest = creative_brief.latest_intake(conversation, requester, before=trigger.created_at)
         if latest is None or latest.pk != source_job.pk:
-            return denied
+            return denied(NEWER_BRIEF)
         # A newer request can still be queued; do not confirm the old snapshot
         # while a delayed model turn is collecting the person's changes.
         prior_confirmation_ids = [
@@ -1309,84 +1558,29 @@ def _confirm(job, conversation, trigger, requester, membership) -> Outcome:
             .exclude(pk__in=prior_confirmation_ids)
             .exists()
         ):
-            return denied
-        snapshot = source_job.result
-        data = creative_brief.normalized(snapshot.get("creative_brief"))
+            return denied(NEWER_MESSAGE)
+        snapshot = dict(source_job.result)
         sources = snapshot.get("sources")
-        if creative_brief.missing(data) or not isinstance(sources, dict):
-            return denied
-        from ..forms import studio_accounts
-
-        accounts, error = _selected_accounts(
-            data["channels"], [a for a in studio_accounts(conversation.workspace) if not a.needs_reconnect]
-        )
-        if not accounts or error:
-            return denied
-        stored_accounts = snapshot.get("selected_accounts")
-        if not isinstance(stored_accounts, list) or {
-            a["id"] for a in stored_accounts if isinstance(a, dict) and "id" in a
-        } != {str(a.pk) for a in accounts}:
-            return denied
-        if {row["id"]: row for row in stored_accounts if isinstance(row, dict) and "id" in row} != {
-            str(account.pk): _account_info(account) for account in accounts
-        }:
-            return denied
-        reference_id = snapshot.get("reference_id") or ""
-        reference = _reference(conversation.workspace, reference_id)
-        if reference_id not in {"", "none"} and reference is None:
-            return denied
-        if (
-            StudioBrief.objects.filter(
-                workspace=conversation.workspace,
-                origin=StudioBrief.Origin.CHAT,
-                requested_by=requester,
-                status__in=StudioBrief.ACTIVE_STATUSES,
-            ).count()
-            >= MAX_ACTIVE_CHAT_POSTS
-        ):
-            return Outcome(
-                "The team is still making your previous drafts. Once one is ready, confirm this brief again.",
-                "new_post",
-                Message.ActionStatus.DECLINED,
-            )
-        style_mode = snapshot.get("style_mode") or ""
         if refreshed is not None:
-            updated = {**snapshot, "sources": refreshed, "awaiting_confirmation": True}
-            names = "; ".join(f"{a.get_platform_display()}: {a.account_name or a.account_handle}" for a in accounts)
-            return Outcome(
-                "The source snapshot was older than 30 minutes, so I refreshed it. Check the updated evidence and confirm this brief again before the team starts.\n\n"
-                + creative_brief.summary(data)
-                + f"\nSelected accounts: {names}.",
-                "new_post",
-                result=updated,
-            )
-        if _source_expired(sources):
-            return denied
-        _lock_current_job(job)
-        brief = services.create_brief(
-            conversation.workspace,
-            requester,
-            idea=data["topic"][:2000],
-            goal=data["goal"],
-            notes=_brief_notes(data, sources, style_mode=style_mode),
-            accounts=accounts,
-            style_lock=style_mode != "fresh",
-            source_picture=reference,
-            origin=StudioBrief.Origin.CHAT,
-            job=job,
-            requested_by=requester,
-        )
-        return Outcome(
-            "The confirmed brief is with the creative team. Its draft will appear in this thread for review; a person must approve it before anything is scheduled or published.",
-            "new_post",
-            Message.ActionStatus.STARTED,
-            result={
-                **snapshot,
-                "brief_id": str(brief.pk),
-                "confirmed_from": str(source_id),
-                "awaiting_confirmation": False,
-            },
-        )
+            # Evidence older than a day was read again before the lock. The
+            # person is asked again only when what they checked has changed.
+            what_changed = creative_sources.changes(sources, refreshed)
+            if creative_sources.digest(sources) != creative_sources.digest(refreshed):
+                sentence = what_changed or "Since this brief was proposed, the website or channel evidence changed."
+                return Outcome(
+                    f"{sentence} Check the updated evidence, then go ahead again.",
+                    "new_post",
+                    result={
+                        **snapshot,
+                        "sources": refreshed,
+                        "awaiting_confirmation": True,
+                        "evidence_changed": sentence,
+                    },
+                )
+            snapshot["sources"] = refreshed
+        elif _source_expired(sources):
+            return denied(EVIDENCE_EXPIRED)
+        return _start_from_snapshot(job, conversation, requester, snapshot, confirmed_from=str(source_id))
 
 
 def _new_post(job, workspace, requester, membership, idea: str, reply: str) -> Outcome:
@@ -1413,20 +1607,12 @@ def _new_post(job, workspace, requester, membership, idea: str, reply: str) -> O
             notify_staff=True,
         )
     # One message, one post, and only a couple in the works per person: a thread
-    # can't fan out into a run of paid pipelines.
-    in_progress = StudioBrief.objects.filter(
-        workspace=workspace,
-        origin=StudioBrief.Origin.CHAT,
-        requested_by=requester,
-        status__in=StudioBrief.ACTIVE_STATUSES,
-    ).count()
-    if in_progress >= MAX_ACTIVE_CHAT_POSTS:
-        return Outcome(
-            "The team is still making the last post you asked for. Once it's ready for review, ask again and "
-            "I'll start this one.",
-            "new_post",
-            Message.ActionStatus.DECLINED,
-        )
+    # can't fan out into a run of paid pipelines. The next couple wait their
+    # turn (PLANNED, started by the autopilot feeder); beyond that the thread says no.
+    own = StudioBrief.objects.filter(workspace=workspace, origin=StudioBrief.Origin.CHAT, requested_by=requester)
+    start = own.filter(status__in=StudioBrief.ACTIVE_STATUSES).count() < MAX_ACTIVE_CHAT_POSTS
+    if not start and own.filter(status=StudioBrief.Status.PLANNED).count() >= MAX_ACTIVE_CHAT_POSTS:
+        return Outcome(TOO_MANY_WAITING, "new_post", Message.ActionStatus.DECLINED)
     brief = services.create_brief(
         workspace,
         author,
@@ -1435,8 +1621,14 @@ def _new_post(job, workspace, requester, membership, idea: str, reply: str) -> O
         origin=StudioBrief.Origin.CHAT,
         job=job,
         requested_by=requester,
+        start=start,
     )
-    return Outcome(reply, "new_post", Message.ActionStatus.STARTED, result={"brief_id": str(brief.pk)})
+    return Outcome(
+        reply if start else QUEUED_REPLY,
+        "new_post",
+        Message.ActionStatus.STARTED,
+        result={"brief_id": str(brief.pk), "queued": not start},
+    )
 
 
 def _edit_blog(job, workspace, blog_post, requester, instructions: str, reply: str) -> Outcome:

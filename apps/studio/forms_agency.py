@@ -129,6 +129,13 @@ class AgencySettingsForm(forms.ModelForm):
     )
     lead = forms.ChoiceField(label="Send drafts in the name of", required=False, widget=forms.Select())
     backup = forms.ChoiceField(label="Backup approver", required=False, widget=forms.Select(attrs={"class": _FIELD}))
+    creation_mode = forms.ChoiceField(
+        label="When a team member shares an idea",
+        choices=AgencySettings.CreationMode.choices,
+        required=False,
+        widget=forms.Select(attrs={"class": _FIELD}),
+        help_text="Either way, clients confirm their briefs and every finished post waits for your approval.",
+    )
     delivery_delay_minutes = forms.IntegerField(
         label="Hold posts late by more than (minutes)",
         required=False,
@@ -154,6 +161,7 @@ class AgencySettingsForm(forms.ModelForm):
             "delivery_delay_minutes",
             "learn_from_best",
             "inbox_drafts_enabled",
+            "creation_mode",
         ]
         labels = {
             "autopilot_enabled": "Autopilot",
@@ -197,6 +205,11 @@ class AgencySettingsForm(forms.ModelForm):
         if value and value not in self.lead_objects:
             raise forms.ValidationError("Choose an owner or manager of this workspace.")
         return self.lead_objects.get(value)
+
+    def clean_creation_mode(self):
+        """A form that does not show the field keeps the saved choice."""
+        value = self.cleaned_data.get("creation_mode") or ""
+        return value or self.instance.creation_mode or AgencySettings.CreationMode.CONFIRM
 
     def clean(self):
         cleaned = super().clean()

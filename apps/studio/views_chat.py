@@ -21,13 +21,14 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 from django_ratelimit.decorators import ratelimit
 
 from apps.members.decorators import require_permission
 
-from . import budget, chat, dashboard, inbox_team
-from .models import Conversation, StudioBrief
+from . import budget, chat, dashboard, inbox_team, services
+from .models import AgencySettings, Conversation, StudioBrief
 from .views import _perms, _workspace
 
 
@@ -293,6 +294,70 @@ def blog_thread_send(request, workspace_id, blog_post_id):
         )
 
     return _send(request, workspace, getter, blog_post=blog_post)
+
+
+# ---------------------------------------------------------------------------
+# Stopping work started from the thread, and how ideas start
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_permission("create_posts")
+@require_POST
+def thread_stop_brief(request, workspace_id, conversation_id, brief_id):
+    """ "Stop" on a brief card: drop a post the manager started from this thread before the draft exists.
+
+    The person who asked for it, or an approver, may stop it. The brief is
+    discarded the same way the brief page does it; nothing else changes.
+    """
+    workspace = _staff_workspace(request, workspace_id)
+    conversation = _conversation(workspace, conversation_id)
+    brief = chat.linked_briefs(conversation).filter(pk=brief_id, workspace=workspace).first()
+    if brief is None:
+        raise Http404("No such draft in this thread.")
+    if brief.requested_by_id != request.user.pk and not _perms(request).get("approve_posts", False):
+        raise PermissionDenied("Only the person who asked for this post, or an approver, can stop it.")
+    error = ""
+    if brief.status not in chat.STOPPABLE:
+        error = "This post is past the point where it can be stopped here. Review it from its page."
+    else:
+        try:
+            services.discard(brief)
+        except services.StudioActionError as exc:
+            error = str(exc)
+        else:
+            who = request.user.name or request.user.email
+            chat.post_system_message(conversation, f"{who} stopped this post before the draft was made.")
+    return _after_send(request, workspace, conversation, error=error, full_page=request.POST.get("full") == "1")
+
+
+@login_required
+@require_permission("manage_workspace_settings")
+@require_POST
+def creation_mode(request, workspace_id):
+    """How a team member's ideas start: after a tap on the brief card, or at once ("go unless I say stop").
+
+    Clients always confirm, and every finished post still waits for approval
+    whatever the mode; this only decides whether the team waits for the tap.
+    """
+    workspace = _staff_workspace(request, workspace_id)
+    mode = request.POST.get("mode", "")
+    if mode not in dict(AgencySettings.CreationMode.choices):
+        raise Http404("No such choice.")
+    row, _created = AgencySettings.objects.get_or_create(workspace=workspace)
+    if row.creation_mode != mode:
+        row.creation_mode = mode
+        row.save(update_fields=["creation_mode", "updated_at"])
+    messages.success(
+        request,
+        "From now on your manager goes ahead with the team's ideas. Every finished post still waits for your approval."
+        if mode == AgencySettings.CreationMode.AUTO
+        else "Your manager now shows you each brief first.",
+    )
+    back = request.POST.get("next", "")
+    if not url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        back = _thread_page_url(workspace)
+    return redirect(back)
 
 
 # ---------------------------------------------------------------------------

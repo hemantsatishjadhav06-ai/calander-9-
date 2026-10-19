@@ -1,7 +1,8 @@
 {% comment %}
 The messages of one team thread, oldest first. Context: thread (apps.studio.chat.thread_context).
-Polls itself every 5 seconds while the account manager is answering, then stops (the
-response without hx-trigger replaces this element).
+Polls itself every 3 seconds while the manager is answering or the team is making a draft,
+every 30 seconds while something is going out, then stops (the response without hx-trigger
+replaces this element).
 {% endcomment %}
 {% load tz %}
 <div id="{{ thread.dom_id }}-messages" data-thread-log role="log" aria-live="off" tabindex="-1" aria-label="Messages in {{ thread.title|lower }}"
@@ -21,7 +22,7 @@ response without hx-trigger replaces this element).
         </p>
         <p class="text-sm text-stone-800 mt-0.5 whitespace-pre-line break-words">{{ m.body }}</p>
         {% if m.action_status == 'started' %}
-        <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-800">The team is on it</span>{% if m.created_brief %} <a href="{% url 'studio:detail' workspace_id=thread.workspace.id brief_id=m.created_brief.pk %}" class="text-xs text-stone-700 underline">Creative progress and next action</a>{% elif m.job_id %} <a href="{% url 'studio:job' workspace_id=thread.workspace.id job_id=m.job_id %}" class="text-xs text-stone-700 underline">See the job<span class="sr-only"> behind this reply</span></a>{% endif %}</p>
+        <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-800">{% if m.queued and m.created_brief.status == 'planned' %}Waiting its turn{% else %}The team is on it{% endif %}</span>{% if m.created_brief and not m.auto_started and not m.queued %} <a href="{% url 'studio:detail' workspace_id=thread.workspace.id brief_id=m.created_brief.pk %}" class="text-xs text-stone-700 underline">Creative progress and next action</a>{% elif m.job_id and not m.created_brief %} <a href="{% url 'studio:job' workspace_id=thread.workspace.id job_id=m.job_id %}" class="text-xs text-stone-700 underline">See the job<span class="sr-only"> behind this reply</span></a>{% endif %}</p>
         {% elif m.action_status == 'needs_human' %}
         <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800">Waiting for a person</span></p>
         {% elif m.action_status == 'declined' %}
@@ -50,12 +51,12 @@ response without hx-trigger replaces this element).
     {% endif %}
     </div>
     {% empty %}
-    <p class="text-sm text-stone-600 py-3">{% if thread.is_client_thread %}No messages with the client yet.{% else %}Tell us what you want to post. The team asks focused questions, shows a brief and source facts for your confirmation, then brings the copy and graphic back here for review.{% endif %}</p>
+    <p class="text-sm text-stone-600 py-3">{% if thread.is_client_thread %}No messages with the client yet.{% else %}Tell your manager what you want to post. You get the brief to check, and the finished post comes back here for your approval.{% endif %}</p>
     {% endfor %}
     {% if thread.polling %}
     <p class="flex items-center gap-2 text-xs text-stone-700">
         <span class="w-1.5 h-1.5 rounded-full bg-indigo-700 animate-pulse motion-reduce:animate-none" aria-hidden="true"></span>
-        {% if thread.poll_interval == 'every 30s' %}Checking scheduled delivery and platform results…{% else %}The account manager is writing a reply, or the creative team is preparing your draft…{% endif %}
+        {% if thread.poll_interval == 'every 30s' %}Checking scheduled delivery and platform results…{% else %}Your manager is writing a reply, or the team is preparing your draft…{% endif %}
     </p>
     {% endif %}
 </div>
