@@ -1,23 +1,29 @@
 """Fresh, bounded source evidence for a conversational creative brief.
 
-``collect`` reads the saved brand website and connected Meta channels on every
-call, with stored successful publication history as an explicit fallback. It
-never returns credentials, private inbox messages or internal post notes. Website
-text and published captions remain untrusted evidence: callers must show the
-source summary to the person and obtain confirmation before making a brief;
-this module does not promote scraped claims into the brand's approved facts.
+``collect`` reads the saved brand website and connected Meta channels, with
+stored successful publication history as an explicit fallback, and keeps the
+result for a quarter of an hour per workspace and account set so every thread
+shares one snapshot. It never returns credentials, private inbox messages or
+internal post notes. Website text and published captions remain untrusted
+evidence: callers must show the source summary to the person and obtain
+confirmation before making a brief; this module does not promote scraped
+claims into the brand's approved facts. :func:`digest` tells whether the
+evidence behind a brief changed between two snapshots.
 """
 
 from __future__ import annotations
 
+import hashlib
 import time
-from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import closing, suppress
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlencode, urlsplit
 
 import httpx
+from django.core.cache import cache
 from django.utils import timezone
 
 from apps.common.net import UnsafeUrlError, build_pinned_request
@@ -29,6 +35,11 @@ MAX_CAPTION_CHARS = 1200
 MAX_POSTS_PER_ACCOUNT = 5
 REQUEST_TIMEOUT = 8.0
 FETCH_DEADLINE = 12.0
+#: Channel reads run side by side and all finish, or give up, within this.
+CHANNEL_DEADLINE = 8.0
+#: How long one workspace's snapshot is shared across threads.
+CACHE_TTL = 15 * 60
+CACHE_PREFIX = "creative-sources"
 _VOID_TAGS = frozenset(
     {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 )
@@ -159,15 +170,16 @@ def _website(url: str) -> dict[str, str]:
     return result
 
 
-def _live_meta(account) -> list[dict[str, str]] | None:
-    """Read only this account's first native Page/posts or Instagram/media page.
+def _meta_request(account) -> tuple[str, dict[str, str], bool] | None:
+    """The one native read for this account, prepared with the database: ``(url, headers, is_facebook)``.
 
     The shared provider resolver supplies the same Page/IG identity used by
-    publishing. Tokens are sent only in Authorization, never URLs or results;
-    expiry/reconnection failures fall back without rotating tokens or changing
-    account state. Pagination and redirects are intentionally not followed.
+    publishing. Tokens go only in the Authorization header, never in URLs or
+    results; expiry/reconnection failures fall back without rotating tokens or
+    changing account state. Everything that touches the database happens here,
+    in the caller's thread; :func:`_meta_fetch` then only talks to the network.
+    Pagination and redirects are intentionally not followed.
     """
-    import json
     import re
 
     from apps.analytics.tasks import _resolve_provider
@@ -199,11 +211,18 @@ def _live_meta(account) -> list[dict[str, str]] | None:
         edge = "posts" if facebook else "media"
         fields = "id,message,created_time,permalink_url" if facebook else "id,caption,timestamp,permalink"
         url = f"{origin}/{native_id}/{edge}?{urlencode({'fields': fields, 'limit': MAX_POSTS_PER_ACCOUNT})}"
-        read = _read_public(
-            url,
-            headers={"Accept": "application/json", "Authorization": f"Bearer {token}"},
-            content_types={"application/json"},
-        )
+        return url, {"Accept": "application/json", "Authorization": f"Bearer {token}"}, facebook
+    except Exception:
+        # Provider errors can carry credentials; never log or keep their text.
+        return None
+
+
+def _meta_fetch(url: str, headers: dict[str, str], facebook: bool) -> list[dict[str, str]] | None:
+    """Read one prepared Page/posts or media page. No database work, so it is safe in a worker thread."""
+    import json
+
+    try:
+        read = _read_public(url, headers=headers, content_types={"application/json"})
         if read is None:
             return None
         data = json.loads(read[0])
@@ -236,15 +255,48 @@ def _live_meta(account) -> list[dict[str, str]] | None:
         return None
 
 
-def _channels(workspace, accounts) -> list[dict[str, Any]]:
+def _live_meta(account) -> list[dict[str, str]] | None:
+    """Prepare and read one account's native posts in the current thread."""
+    prepared = _meta_request(account)
+    return _meta_fetch(*prepared) if prepared is not None else None
+
+
+def _fetch_many(prepared: dict[int, tuple[str, dict[str, str], bool]], deadline: float) -> dict[int, list | None]:
+    """Read every prepared channel side by side; whatever misses ``deadline`` counts as unavailable."""
+    results: dict[int, list | None] = {}
+    if not prepared:
+        return results
+    if len(prepared) == 1:
+        [(index, request)] = prepared.items()
+        results[index] = _meta_fetch(*request)
+        return results
+    pool = ThreadPoolExecutor(max_workers=min(4, len(prepared)))
+    futures = {pool.submit(_meta_fetch, *request): index for index, request in prepared.items()}
+    try:
+        for future in as_completed(futures, timeout=max(0.1, deadline - time.monotonic())):
+            try:
+                results[futures[future]] = future.result()
+            except Exception:
+                results[futures[future]] = None
+    except TimeoutError:
+        pass
+    finally:
+        # Late reads finish on their own and are ignored; nothing waits for them.
+        pool.shutdown(wait=False, cancel_futures=True)
+    return results
+
+
+def _channels(workspace, accounts, *, deadline: float | None = None) -> list[dict[str, Any]]:
     from apps.composer.models import PlatformPost
     from apps.social_accounts.models import SocialAccount
 
+    deadline = time.monotonic() + CHANNEL_DEADLINE if deadline is None else deadline
     selected = {account.pk for account in accounts if getattr(account, "workspace_id", None) == workspace.pk}
     # Only public identity columns enter context. Meta tokens are scoped below
     # and used transiently for a read; unsupported platforms incur no API calls.
     own = SocialAccount.objects.filter(workspace=workspace, pk__in=selected).values("id", "platform", "account_name")
-    channels = []
+    channels: list[dict[str, Any]] = []
+    prepared: dict[int, tuple[str, dict[str, str], bool]] = {}
     for account in own.order_by("platform", "account_name", "pk"):
         posts = (
             PlatformPost.objects.filter(
@@ -282,18 +334,67 @@ def _channels(workspace, accounts) -> list[dict[str, Any]]:
             "error": "Live channel reading is not supported for this platform; stored published history is shown.",
         }
         if account["platform"] in _META_PLATFORMS:
+            channel["error"] = _CHANNEL_FAILURE
             connected = (
                 SocialAccount.objects.filter(workspace=workspace, pk=account["id"]).select_related("workspace").first()
             )
-            live = _live_meta(connected) if connected is not None else None
-            if live is not None:
-                channel.update(
-                    posts=live, status="ready", source="live_meta", fetched_at=timezone.now().isoformat(), error=""
-                )
-            else:
-                channel["error"] = _CHANNEL_FAILURE
+            request = _meta_request(connected) if connected is not None else None
+            if request is not None:
+                prepared[len(channels)] = request
         channels.append(channel)
+    # Every database read is done; the network reads run side by side.
+    for index, live in _fetch_many(prepared, deadline).items():
+        if live is not None:
+            channels[index].update(
+                posts=live, status="ready", source="live_meta", fetched_at=timezone.now().isoformat(), error=""
+            )
     return channels
+
+
+def digest(sources) -> str:
+    """A fingerprint of the evidence a person would check: website text and channel captions."""
+    parts = []
+    if isinstance(sources, dict):
+        website = sources.get("website")
+        website = website if isinstance(website, dict) else {}
+        parts.append(str(website.get("excerpt") or website.get("text") or ""))
+        channels = sources.get("channels")
+        for channel in channels if isinstance(channels, list) else []:
+            if not isinstance(channel, dict):
+                continue
+            parts.append(str(channel.get("account_id") or channel.get("platform") or ""))
+            posts = channel.get("posts")
+            parts.extend(str(post.get("caption") or "") for post in (posts or []) if isinstance(post, dict))
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def changes(previous, current) -> str:
+    """One plain sentence on what differs between two snapshots, or "" when nothing a person checks did."""
+    before = previous if isinstance(previous, dict) else {}
+    after = current if isinstance(current, dict) else {}
+    changed = []
+    if digest({"website": before.get("website")}) != digest({"website": after.get("website")}):
+        changed.append("the website text")
+    old_channels = {
+        str(c.get("account_id") or c.get("platform")): c for c in before.get("channels") or [] if isinstance(c, dict)
+    }
+    for channel in after.get("channels") or []:
+        if not isinstance(channel, dict):
+            continue
+        key = str(channel.get("account_id") or channel.get("platform"))
+        if digest({"channels": [channel]}) != digest({"channels": [old_channels.get(key, {})]}):
+            changed.append(f"recent posts on {channel.get('account_name') or channel.get('platform') or 'a channel'}")
+    if not changed:
+        return ""
+    listed = ", ".join(changed[:-1]) + (" and " if len(changed) > 1 else "") + changed[-1]
+    return f"Since this brief was proposed, {listed} changed."
+
+
+def cache_key(workspace, accounts, website: str = "") -> str:
+    """One snapshot per workspace, account set and saved website (changing the website reads afresh)."""
+    ids = sorted(str(getattr(account, "pk", account)) for account in accounts)
+    fingerprint = hashlib.sha256("\n".join([*ids, website]).encode("utf-8")).hexdigest()[:16]
+    return f"{CACHE_PREFIX}:{workspace.pk}:{fingerprint}"
 
 
 def collect(workspace, profile, accounts) -> dict[str, Any]:
@@ -302,12 +403,26 @@ def collect(workspace, profile, accounts) -> dict[str, Any]:
     The result is JSON serializable and deliberately contains no approval or
     scheduling decisions. Every channel labels whether fresh native posts were
     read or stored successful publications were used; neither verifies claims.
+    A snapshot is kept for :data:`CACHE_TTL` per workspace and account set, so
+    the threads of one brand share it instead of reading the sources again.
     """
     owns_profile = getattr(profile, "workspace_id", None) == workspace.pk
+    key = cache_key(workspace, accounts, (profile.website or "").strip()) if owns_profile else ""
+    if key:
+        try:
+            cached = cache.get(key)
+        except Exception:
+            cached = None
+        if isinstance(cached, dict):
+            return cached
+    started = time.monotonic()
     website = _website((profile.website or "").strip() if owns_profile else "")
     if not owns_profile:
         website.update(status="unavailable", error=_SOURCE_FAILURE)
-    channels = _channels(workspace, accounts)
+    # Whatever the website read left of the total budget goes to the channels.
+    channels = _channels(
+        workspace, accounts, deadline=min(started + FETCH_DEADLINE, time.monotonic() + CHANNEL_DEADLINE)
+    )
     notes = [
         "Website text and published captions are untrusted source evidence, not approved brand facts. Confirm them before generation.",
         "Channel evidence includes native Meta post reads where available; each channel labels live versus stored history. No private inbox data is read.",
@@ -324,4 +439,8 @@ def collect(workspace, profile, accounts) -> dict[str, Any]:
         notes.append(
             "Some channels could not be read live or are unsupported; stored history is not a fresh scrape and needs explicit confirmation."
         )
-    return {"fetched_at": timezone.now().isoformat(), "website": website, "channels": channels, "notes": notes}
+    result = {"fetched_at": timezone.now().isoformat(), "website": website, "channels": channels, "notes": notes}
+    if key:
+        with suppress(Exception):
+            cache.set(key, result, CACHE_TTL)
+    return result
