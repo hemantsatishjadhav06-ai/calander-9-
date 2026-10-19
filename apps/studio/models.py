@@ -504,12 +504,26 @@ class AgencyJob(models.Model):
 
 
 class AgencySettings(models.Model):
-    """One workspace's agency switches: autopilot, budget, who the drafts are from."""
+    """One workspace's agency switches: autopilot, budget, who the drafts are from, how ideas start."""
+
+    class CreationMode(models.TextChoices):
+        CONFIRM = "confirm", "Show me the brief first"
+        AUTO = "auto", "Go ahead unless I say stop"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.OneToOneField("workspaces.Workspace", on_delete=models.CASCADE, related_name="agency_settings")
     autopilot_enabled = models.BooleanField(
         default=False, help_text="Plan and prepare next week's posts every week. Every post still needs approval."
+    )
+    creation_mode = models.CharField(
+        max_length=10,
+        choices=CreationMode.choices,
+        default=CreationMode.CONFIRM,
+        db_default=CreationMode.CONFIRM,
+        help_text=(
+            "How your manager starts a team member's idea: after one tap on the brief, or at once. "
+            "Clients always confirm, and every finished post still waits for approval."
+        ),
     )
     posts_per_week = models.PositiveSmallIntegerField(default=5)
     accounts = models.ManyToManyField("social_accounts.SocialAccount", blank=True, related_name="+")
