@@ -241,6 +241,33 @@ img.sidebar-logo-mark {
   }
 }
 
+/* "More" in the sidebar: a native disclosure styled like a nav item */
+.sidebar-more > summary {
+  list-style: none;
+}
+.sidebar-more > summary::-webkit-details-marker {
+  display: none;
+}
+.sidebar-more[open] > summary .sidebar-more-chevron {
+  transform: rotate(180deg);
+}
+.sidebar-more-items {
+  padding-left: 0;
+}
+
+/* Home: the conversation is the main column. Its message log fills about
+   60% of the viewport on desktop and less on a phone, so the composer stays
+   visible without scrolling. */
+.agency-home-thread [data-thread-log] {
+  max-height: 30vh;
+}
+@media (min-width: 1024px) {
+  .agency-home-thread [data-thread-log] {
+    max-height: 60vh;
+    min-height: 16rem;
+  }
+}
+
 /* Focus ring utility */
 .focus-ring:focus {
   outline: none;

@@ -25,13 +25,14 @@ def test_signed_in_landing_preserves_role_boundaries(client, role):
     client.force_login(person)
 
     response = client.get("/")
-    route = "calendar:calendar" if role in {"viewer", "client"} else "studio:workflow"
+    route = "calendar:calendar" if role in {"viewer", "client"} else "studio:index"
     assert response.status_code == 302
     assert response["Location"] == reverse(route, kwargs={"workspace_id": workspace.pk})
     landed = client.get(response["Location"])
     assert landed.status_code == 200
     if role not in {"viewer", "client"}:
-        assert b"From an idea to your next post." in landed.content
+        # Home: the conversation with the team, with the Today card first.
+        assert b"data-home-today" in landed.content and b"data-home-thread" in landed.content
     else:
         assert client.get(reverse("studio:workflow", kwargs={"workspace_id": workspace.pk})).status_code == 403
 

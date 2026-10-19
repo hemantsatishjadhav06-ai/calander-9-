@@ -71,13 +71,11 @@ CURRENT_SOURCE_ANCHORS = (
     "apps/telegram/urls.py",
     "apps/telegram/migrations/0003_telegramchannel_telegramchanneldelivery_and_more.py",
     "apps/telegram/migrations/0004_telegramworkflowprompt.py",
-    "templates/studio/customer_workflow.html",
+    "templates/studio/index.html",
     "templates/studio/partials/customer_workflow_journeys.html",
     "templates/studio/job_detail.html",
     "templates/telegram/settings.html",
     "templates/base.html",
-    "static/css/customer_workflow.css",
-    "static/js/customer_workflow.js",
 )
 SOURCE_MANIFEST_VERSION = 3
 SOURCE_MANIFEST_TYPE = "sm_bean_release_source_manifest"
