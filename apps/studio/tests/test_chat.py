@@ -584,13 +584,13 @@ class TestStaffPages:
         conversation = Conversation.objects.get(workspace=world.workspace, audience=Conversation.Audience.INTERNAL)
         html = response.content.decode()
         assert 'id="thread-home"' in html and "What&#x27;s next week?" in html
-        assert 'hx-trigger="every 5s"' in html and "writing a reply" in html
+        assert 'hx-trigger="every 3s"' in html and "writing a reply" in html
         messages_url = _url("studio:thread_messages", world, conversation_id=conversation.pk)
         assert messages_url in html
 
         drive(AgencyJob.objects.get(conversation=conversation))
         polled = client.get(messages_url, HTTP_HX_REQUEST="true").content.decode()
-        assert manager_agent.reply.replace("'", "&#x27;") in polled and 'hx-trigger="every 5s"' not in polled
+        assert manager_agent.reply.replace("'", "&#x27;") in polled and 'hx-trigger="every 3s"' not in polled
 
     def test_a_brief_thread_is_made_on_first_send(self, client, world, jobs, fake_team):
         brief = run_all(make_brief(world))
@@ -715,18 +715,23 @@ class TestReviewFixes:
         manager_agent.instructions = "A post about Saturday's site visit"
         conversation = chat.general_conversation(world.workspace, audience=Conversation.Audience.CLIENT)
 
-        for _ in range(3):
+        for _ in range(5):
             drive(chat.post_message(conversation, client_user, "Post about the site visit").job)
 
+        # Two in the works, two waiting their turn for the feeder, and then the thread says no.
         made = StudioBrief.objects.filter(workspace=world.workspace, origin=StudioBrief.Origin.CHAT)
-        assert made.count() == 2 and all(b.status == StudioBrief.Status.QUEUED for b in made)
+        assert made.count() == 4
+        assert sorted(b.status for b in made) == ["planned", "planned", "queued", "queued"]
         replies = agent_replies(conversation)
         assert [r.action_status for r in replies] == [
             Message.ActionStatus.STARTED,
             Message.ActionStatus.STARTED,
+            Message.ActionStatus.STARTED,
+            Message.ActionStatus.STARTED,
             Message.ActionStatus.DECLINED,
         ]
-        assert "still making the last post" in replies[-1].body
+        assert replies[2].body.startswith("Queued") and replies[3].body.startswith("Queued")
+        assert "already waiting" in replies[-1].body
 
     def test_words_from_the_thread_reach_the_post_team_as_untrusted(self, world, jobs, fake_team, manager_agent):
         from apps.studio import prompts

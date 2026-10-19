@@ -188,8 +188,14 @@ class StartedIdea:
 
 
 @transaction.atomic
-def start_idea(workspace, user, conversation_id):
-    """Dispatch once, under fresh scope/role locks. Paused and failed jobs keep their review path."""
+def start_idea(workspace, user, conversation_id, *, create=None, reference_id="", style_mode=""):
+    """Dispatch once, under fresh scope/role locks. Paused and failed jobs keep their review path.
+
+    The saved idea goes to the manager as the person's own words (``kind="create"``);
+    ``create`` carries the idea form's structured choices (goal, direction,
+    accounts) and ``reference_id`` / ``style_mode`` the photo and look, as
+    fields of the brief.
+    """
     current, person, _member = current_staff(workspace, user, locked=True)
     conversation = (
         Conversation.objects.select_for_update()
@@ -230,15 +236,18 @@ def start_idea(workspace, user, conversation_id):
     posted = chat.post_message(
         conversation,
         person,
-        "Help me turn this saved idea into a post. Ask only for missing details and references, "
-        "then show me the brief to confirm before creating a draft.\n\n" + original.body,
+        original.body,
+        kind="create",
+        create=create,
+        reference_id=reference_id,
+        style_mode=style_mode,
     )
     if posted.job is not None:
         original.action_status = Message.ActionStatus.STARTED
         original.job = posted.job
         original.save(update_fields=["action_status", "job"])
     return StartedIdea(
-        conversation, posted.job, posted.note or "The team will ask for the details it needs in this conversation."
+        conversation, posted.job, posted.note or "Your manager is on it. The brief appears here in a moment."
     )
 
 

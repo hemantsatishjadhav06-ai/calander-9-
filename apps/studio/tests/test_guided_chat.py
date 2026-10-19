@@ -176,16 +176,18 @@ class TestGuidedIntake:
         assert call["sources"] == job.result["sources"]
         assert len(source_collector) == 1
 
-    def test_missing_information_asks_at_most_three_questions_and_does_not_generate(self, world, jobs, guided_manager):
+    def test_without_a_topic_the_manager_asks_only_for_the_topic(self, world, jobs, guided_manager):
+        guided_manager.action = "answer"
         guided_manager.creative_brief = brief_fields(
-            audience="", key_message="", call_to_action="", channels=[], visual_direction="", references=""
+            topic="", audience="", key_message="", call_to_action="", channels=[], visual_direction="", references=""
         )
-        guided_manager.reply = "Who? What? Where? When? Why? Which platform? What image? Which reference?"
+        guided_manager.reply = "Happy to make one. What should the post be about?"
 
-        conversation, job, reply = intake(world, guided_manager)
+        conversation, job, reply = intake(world, guided_manager, body="Can you make us a post?")
 
         assert job.result["awaiting_confirmation"] is False
-        assert 1 <= reply.body.count("?") <= 3
+        assert job.result["creative_missing"] == ["topic"]
+        assert reply.body == guided_manager.reply
         assert_no_production(world.workspace)
 
     def test_known_fields_and_sources_persist_across_the_same_requesters_intake(
@@ -237,12 +239,16 @@ class TestGuidedIntake:
         assert job.result["awaiting_confirmation"] is True
         assert_no_production(world.workspace)
 
-    def test_invalid_or_unavailable_channels_cannot_reach_confirmation(self, world, jobs, guided_manager):
+    def test_unknown_channel_words_fall_back_to_the_workspaces_own_accounts(self, world, jobs, guided_manager):
         guided_manager.creative_brief = brief_fields(channels=["instagram", "attacker_account_uuid"])
 
         _, job, _ = intake(world, guided_manager)
 
-        assert not job.result["awaiting_confirmation"]
+        assert job.result["awaiting_confirmation"] is True
+        assert set(job.result["creative_brief"]["channels"]) == {"linkedin_company", "x"}
+        assert {a["id"] for a in job.result["selected_accounts"]} == {str(world.linkedin.pk), str(world.x.pk)}
+        assert "attacker" not in str(job.result)
+        assert "channels" in job.result["creative_defaults"]
         assert_no_production(world.workspace)
 
     def test_blank_constraints_are_optional(self, world, jobs, guided_manager):
@@ -252,8 +258,8 @@ class TestGuidedIntake:
 
         assert job.result["awaiting_confirmation"] is True
 
-    def test_a_platform_with_multiple_accounts_requires_an_explicit_account_choice(self, world, jobs, guided_manager):
-        SocialAccount.objects.create(
+    def test_a_platform_name_with_two_pages_means_both_pages(self, world, jobs, fake_team, guided_manager):
+        other = SocialAccount.objects.create(
             workspace=world.workspace,
             platform="linkedin_company",
             account_platform_id="other-page",
@@ -261,10 +267,18 @@ class TestGuidedIntake:
             oauth_access_token="test-only-token",
         )
 
-        _, job, _ = intake(world, guided_manager)
+        conversation, job, reply = intake(world, guided_manager)
 
-        assert not job.result["awaiting_confirmation"]
+        assert job.result["awaiting_confirmation"] is True
+        assert {a["id"] for a in job.result["selected_accounts"]} == {str(world.linkedin.pk), str(other.pk)}
+        assert set(job.result["creative_brief"]["channels"]) == {"neopolis infra", "another company page"}
+        assert "channels" not in job.result["creative_defaults"]
         assert_no_production(world.workspace)
+
+        confirmed = drive(confirmation_job(conversation, world.editor, reply))
+
+        brief = StudioBrief.objects.get(pk=confirmed.result["brief_id"])
+        assert set(brief.social_accounts.all()) == {world.linkedin, other}
 
     def test_an_explicit_account_id_never_fans_out_to_other_pages_on_the_platform(
         self, world, jobs, fake_team, guided_manager
@@ -338,9 +352,12 @@ class TestHumanConfirmation:
         assert StudioBrief.objects.get(pk=confirmed.result["brief_id"]).status == StudioBrief.Status.QUEUED
         assert len(guided_manager.calls) == 1
 
-    def test_a_brief_can_be_confirmed_after_previous_drafts_finish(self, world, jobs, fake_team, guided_manager):
+    def test_a_third_post_waits_its_turn_until_a_slot_frees(self, world, jobs, fake_team, guided_manager):
+        from apps.studio import autopilot
+        from apps.studio.jobtypes import chat as chat_job
+
         conversation, _, reply = intake(world, guided_manager)
-        for number in range(2):
+        earlier = [
             StudioBrief.objects.create(
                 workspace=world.workspace,
                 author=world.editor,
@@ -349,16 +366,24 @@ class TestHumanConfirmation:
                 idea=f"An earlier draft {number}",
                 status=StudioBrief.Status.QUEUED,
             )
-        blocked = drive(confirmation_job(conversation, world.editor, reply))
-        assert not blocked.result.get("brief_id")
-        assert StudioBrief.objects.filter(workspace=world.workspace).count() == 2
-        StudioBrief.objects.filter(workspace=world.workspace).update(status=StudioBrief.Status.READY)
+            for number in range(2)
+        ]
 
-        confirmed = drive(confirmation_job(conversation, world.editor, reply))
+        queued = drive(confirmation_job(conversation, world.editor, reply))
 
-        assert StudioBrief.objects.get(pk=confirmed.result["brief_id"]).status == StudioBrief.Status.QUEUED
+        waiting = StudioBrief.objects.get(pk=queued.result["brief_id"])
+        assert waiting.status == StudioBrief.Status.PLANNED and queued.result["queued"] is True
+        assert Message.objects.get(pk=queued.result["message_id"]).body == chat_job.QUEUED_REPLY
         assert StudioBrief.objects.filter(workspace=world.workspace).count() == 3
+        assert fake_team.queued == []
         assert len(guided_manager.calls) == 1
+
+        StudioBrief.objects.filter(pk__in=[b.pk for b in earlier]).update(status=StudioBrief.Status.READY)
+        assert autopilot.feed_planned_briefs() == 1
+
+        waiting.refresh_from_db()
+        assert waiting.status == StudioBrief.Status.QUEUED
+        assert fake_team.queued == [(waiting.pk, waiting.revision, "strategy")]
 
     @pytest.mark.parametrize("facts_confirmed", [False, None, "false", 1])
     def test_confirmation_requires_an_explicit_boolean_facts_confirmation(
@@ -476,7 +501,8 @@ class TestHumanConfirmation:
         assert len(guided_manager.calls) == 1
 
     def test_an_incomplete_snapshot_cannot_be_forced_into_generation(self, world, jobs, guided_manager):
-        guided_manager.creative_brief = brief_fields(audience="")
+        guided_manager.action = "answer"
+        guided_manager.creative_brief = brief_fields(topic="")
         conversation, intake_job, reply = intake(world, guided_manager)
         result = {**intake_job.result, "awaiting_confirmation": True}
         AgencyJob.objects.filter(pk=intake_job.pk).update(result=result)
@@ -557,25 +583,38 @@ class TestHumanConfirmation:
         assert not guided_manager.calls[-1]["creative_brief"]
         assert StudioBrief.objects.filter(workspace=world.workspace).count() == 1
 
-    def test_expired_source_evidence_is_refreshed_and_requires_another_confirmation(
-        self, world, jobs, fake_team, guided_manager, source_collector
+    def test_day_old_evidence_that_changed_is_shown_once_more_before_the_team_starts(
+        self, world, jobs, fake_team, guided_manager, source_collector, monkeypatch
     ):
         conversation, intake_job, reply = intake(world, guided_manager)
         result = intake_job.result
-        result["sources"]["fetched_at"] = (timezone.now() - timedelta(minutes=31)).isoformat()
+        result["sources"]["fetched_at"] = (timezone.now() - timedelta(hours=25)).isoformat()
         AgencyJob.objects.filter(pk=intake_job.pk).update(result=result)
+        previous_collect = creative_sources.collect
+
+        def changed_website(workspace, profile, accounts):
+            fresh = previous_collect(workspace, profile, accounts)
+            fresh["website"]["text"] = "A new offer appeared on the website."
+            return fresh
+
+        monkeypatch.setattr(creative_sources, "collect", changed_website)
 
         refreshed = drive(confirmation_job(conversation, world.editor, reply))
 
         assert_no_production(world.workspace)
         assert refreshed.result["awaiting_confirmation"] is True
+        assert refreshed.result["evidence_changed"] == "Since this brief was proposed, the website text changed."
+        fresh_reply = Message.objects.get(pk=refreshed.result["message_id"])
+        assert fresh_reply.body.startswith("Since this brief was proposed, the website text changed.")
+        assert "go ahead again" in fresh_reply.body
         assert len(source_collector) == 2
         assert len(guided_manager.calls) == 1
-        fresh_reply = Message.objects.get(pk=refreshed.result["message_id"])
 
         confirmed = drive(confirmation_job(conversation, world.editor, fresh_reply))
 
-        assert StudioBrief.objects.get(pk=confirmed.result["brief_id"]).status == StudioBrief.Status.QUEUED
+        brief = StudioBrief.objects.get(pk=confirmed.result["brief_id"])
+        assert brief.status == StudioBrief.Status.QUEUED
+        assert "A new offer appeared on the website." in brief.notes
         assert len(source_collector) == 2
         assert len(guided_manager.calls) == 1
 

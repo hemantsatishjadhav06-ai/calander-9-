@@ -437,12 +437,12 @@ class TestThreadDraftPolling:
 
         assert chat.has_active_job(conversation)
         working = client.get(messages_url).content.decode()
-        assert 'hx-trigger="every 5s"' in working
+        assert 'hx-trigger="every 3s"' in working
 
         StudioBrief.objects.filter(pk=brief.pk).update(status=StudioBrief.Status.READY)
         ready = client.get(messages_url).content.decode()
         assert not chat.has_active_job(conversation)
-        assert 'hx-trigger="every 5s"' not in ready
+        assert 'hx-trigger="every 3s"' not in ready
         assert graphic.file.url in ready
         assert "Visit the actual site this Saturday." in ready
         assert _url("studio:detail", world, brief_id=brief.pk) in ready
@@ -515,7 +515,7 @@ class TestThreadDraftPolling:
 
 
 class TestCreativeConfirmationCards:
-    def test_complete_intake_shows_fact_checkbox_and_confirmation_for_its_requester(self, client, world):
+    def test_complete_intake_shows_one_go_ahead_button_for_its_requester(self, client, world):
         conversation = chat.general_conversation(world.workspace)
         message = _intake_reply(conversation, world.editor)
         client.force_login(world.editor)
@@ -526,10 +526,10 @@ class TestCreativeConfirmationCards:
         assert response.status_code == 200
         assert f'data-confirm-brief="{message.pk}"' in html
         assert f'name="confirmation_message_id" value="{message.pk}"' in html
-        assert 'name="facts_confirmed" value="1" required' in html
-        assert "I checked the brief, source facts and account choices." in html
-        assert "Confirm brief &amp; create draft" in html
-        assert "finished post still needs human approval and scheduling" in html
+        assert '<input type="hidden" name="facts_confirmed" value="1">' in html
+        assert 'type="checkbox" name="facts_confirmed"' not in html
+        assert ">Go ahead</button>" in html
+        assert "You're confirming the brief and its facts. The finished post still waits for your approval." in html
 
     def test_only_latest_intake_for_this_person_can_be_confirmed(self, client, world):
         conversation = chat.general_conversation(world.workspace)
@@ -557,19 +557,27 @@ class TestCreativeConfirmationCards:
 
         assert f'data-creative-brief="{message.pk}"' in html
         assert "data-confirm-brief=" not in html
-        assert 'hx-trigger="every 5s"' in html
+        assert 'hx-trigger="every 3s"' in html
 
-    @pytest.mark.parametrize("missing_field", ["channels", "call_to_action", "visual_direction", "references"])
-    def test_incomplete_intake_cannot_be_confirmed(self, client, world, missing_field):
+    def test_an_intake_without_a_topic_cannot_be_confirmed(self, client, world):
         conversation = chat.general_conversation(world.workspace)
-        intake = _complete_intake(**{missing_field: [] if missing_field == "channels" else ""})
-        message = _intake_reply(conversation, world.editor, intake=intake)
+        message = _intake_reply(conversation, world.editor, intake=_complete_intake(topic=""))
         client.force_login(world.editor)
 
         html = client.get(_url("studio:thread_messages", world, conversation_id=conversation.pk)).content.decode()
 
         assert f'data-creative-brief="{message.pk}"' in html
         assert "data-confirm-brief=" not in html
+
+    @pytest.mark.parametrize("empty_default", ["goal", "call_to_action"])
+    def test_a_field_the_team_leaves_to_the_specialists_does_not_block_the_tap(self, client, world, empty_default):
+        conversation = chat.general_conversation(world.workspace)
+        message = _intake_reply(conversation, world.editor, intake=_complete_intake(**{empty_default: ""}))
+        client.force_login(world.editor)
+
+        html = client.get(_url("studio:thread_messages", world, conversation_id=conversation.pk)).content.decode()
+
+        assert f'data-confirm-brief="{message.pk}"' in html
 
     def test_consumed_confirmation_is_not_offered_again(self, client, world):
         conversation = chat.general_conversation(world.workspace)

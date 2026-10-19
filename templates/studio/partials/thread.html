@@ -73,7 +73,7 @@ Fits a ~360px column. The conversation may not exist yet: the first message crea
                         <option value="fresh"{% if thread.selected_style_mode == 'fresh' %} selected{% endif %}>Try a fresh layout within the brand</option>
                     </select>
                 </div>
-                <p class="text-xs text-stone-600">Describe the reference look in your message. The team combines your direction with <a href="{% url 'studio:memory' workspace_id=thread.workspace.id %}" class="underline text-orange-800">Creative memory</a> and asks you to confirm before making a new draft.</p>
+                <p class="text-xs text-stone-600">Describe the look you want in your message. Your manager combines it with <a href="{% url 'studio:memory' workspace_id=thread.workspace.id %}" class="underline text-orange-800">Creative memory</a> and shows it in the brief for you to check.</p>
             </div>
         </details>
         {% endif %}
