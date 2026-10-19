@@ -151,3 +151,8 @@ def test_pairing_welcome_and_replies_are_short(hub, monkeypatch):  # noqa: F811
     assert welcome["text"] == conversations.PAIRED_WELCOME and "Nothing publishes" in welcome["text"]
     assert "does not approve" not in send(hub, "/status")["text"]
     assert send(hub, "/help")["text"].count("\n") < 15
+    # A client's help lists only what a client can do; team controls stay out of the client group.
+    client_help = send(hub, "/help", role="client")["text"]
+    assert "/post" in client_help and "sign off" in client_help
+    for staff_only in ("/approvals", "/pause", "/mute", "/week prepare"):
+        assert staff_only not in client_help

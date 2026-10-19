@@ -213,7 +213,7 @@ def analysis_text(preview, *, max_chars=3900) -> str:
     data = preview.get("analysis") or {}
     lines = [
         f"{data.get('workspace', '')} · {data.get('week_start', '')}–{data.get('week_end', '')} ({data.get('timezone', '')})",
-        "Review preparation only. Confirmation queues SM Bean AI analysis; it does not approve or schedule publication.",
+        "The evidence behind the plan. Confirming starts the team's analysis; nothing publishes without your approval.",
         f"Volume: requested {data.get('requested', 0)}, retained {data.get('existing', 0)}, extra {data.get('additional_needed', 0)} (maximum 14).",
         f"AI cost: {data.get('budget', {}).get('recorded_estimated_usd', '?')} USD recorded/estimated; {data.get('budget', {}).get('limit_usd', '?')} USD monthly soft threshold. External/in-flight charges can exceed it.",
         f"Measured history: {data.get('measured_posts', 0)} post(s); AI analysis has not run yet.",
@@ -571,7 +571,7 @@ def queue_week_plan(link, chat, *, week_start=None, confirmed=False, analysis_to
     return {
         "started": False,
         "needs_confirmation": not bool(data["blockers"]),
-        "message": "Review the source evidence, existing work, claims, destinations and soft cost limits before queueing SM Bean analysis. This does not approve publication.",
+        "message": "Check the evidence, existing work, claims, destinations and cost, then confirm to start the analysis.",
         "week_start": monday.isoformat(),
         "analysis": data,
         "analysis_token": token,

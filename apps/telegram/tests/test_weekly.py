@@ -360,7 +360,7 @@ def test_week_card_shows_selected_sources_claims_and_cost_before_confirmation(hu
         "expires 2026-10-25",
         "Owner at",
         "soft threshold",
-        "not approve or schedule",
+        "nothing publishes without your approval",
         "Designer-selected",
     ):
         assert required in text

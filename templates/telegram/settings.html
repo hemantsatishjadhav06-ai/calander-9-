@@ -157,7 +157,7 @@
 
           {% if can_manage %}
           <section id="telegram-channel-setup" class="space-y-3" aria-labelledby="telegram-channel-heading">
-            <h3 id="telegram-channel-heading" class="font-semibold">Status channel (optional)</h3>
+            <h3 id="telegram-channel-heading" class="font-semibold">Broadcast channel (optional)</h3>
             <p class="text-sm text-stone-700">A channel broadcasts fixed status lines (draft ready, approved, scheduled, published) to its subscribers. Add @{{ connection.bot_username|default:'your bot' }} as an administrator with Post Messages, then enter the channel below. Captions, costs and buttons never go there.</p>
             <form method="post" action="{% url 'telegram:connect_channel' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
               {% if channel_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ channel_form.non_field_errors }}{% for field in channel_form %}{{ field.errors }}{% endfor %}</div>{% endif %}

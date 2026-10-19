@@ -44,6 +44,17 @@ HELP = (
     "approval are separate. In a private chat, photos and PDFs need the caption /reference shared because they "
     "enter the shared brand library."
 )
+HELP_CLIENT = (
+    "Tell me what you need. Your agency brings you posts to sign off here.\n"
+    "/brief <idea> — ask for a post\n"
+    "/brainstorm <idea> — think it through first\n"
+    "/reference — send a photo, PDF or short text to use\n"
+    "/status — what is happening in this chat\n"
+    "/week — what is planned for you this week\n"
+    "/post <ID> — one post's sign-off card\n"
+    "/stop — stop your pending requests here\n"
+    "A plain “yes” never approves anything; only a sign-off button does, and your agency gives the final approval."
+)
 PAIRED_WELCOME = (
     "You're paired. Tell me what to post, or send /help.\n"
     "Nothing publishes without your approval, and a plain “yes” never approves anything."
@@ -420,7 +431,7 @@ def handle_message(connection, update_payload) -> dict[str, Any]:
     try:
         current, bound, link, member, context = _bound(connection, message)
         if command == "/help":
-            return _response(HELP)
+            return _response(HELP if internal_member(member) else HELP_CLIENT)
         if command == "/status":
             return _status(bound, member)
         if command == "/week":
