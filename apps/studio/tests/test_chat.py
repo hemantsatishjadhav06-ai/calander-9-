@@ -554,7 +554,7 @@ class TestStaffPages:
         detail = client.get(_url("studio:detail", world, brief_id=brief.id)).content.decode()
 
         assert 'id="thread-home"' in home and _url("studio:thread_start", world) in home
-        assert "Ask the team" in home
+        assert "data-thread-composer" in home  # Home is the conversation: the panel and its composer are there
         assert f'id="thread-brief-{brief.pk}"' in detail and "Ask for changes" in detail
         assert _url("studio:brief_thread_send", world, brief_id=brief.id) in detail
         assert "Send to the team" in detail  # the brief page keeps its own change form below the thread

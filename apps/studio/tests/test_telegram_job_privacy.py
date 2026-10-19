@@ -107,6 +107,7 @@ def test_shared_job_timeline_remains_available_without_private_roster_summaries(
         status="done",
         title="Shared report",
         result={"summary": SHARED_SUMMARY},
+        finished_at=timezone.now(),
     )
     AgentRun.objects.create(
         job=public,
@@ -117,10 +118,12 @@ def test_shared_job_timeline_remains_available_without_private_roster_summaries(
         summary=SHARED_SUMMARY,
     )
     client.force_login(world.owner)
-    for endpoint in ("team", "index"):
+    # The team page shows the shared run's summary; Home's Today card lists the shared job as done
+    # since yesterday. The private job (failed) never reaches either, nor Home's "Needs your review".
+    for endpoint, shared in (("team", SHARED_SUMMARY), ("index", "Shared report")):
         response = client.get(_url(world, endpoint))
         assert response.status_code == 200
-        assert SHARED_SUMMARY in response.content.decode()
+        assert shared in response.content.decode()
         assert PRIVATE_SUMMARY not in response.content.decode() and PRIVATE_TITLE not in response.content.decode()
     response = client.get(_url(world, "job", job_id=public.pk))
     assert response.status_code == 200 and SHARED_SUMMARY in response.content.decode()
