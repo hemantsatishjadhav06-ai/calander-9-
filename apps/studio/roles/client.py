@@ -123,6 +123,10 @@ def account_manager(
             "They want a post made from this idea. Propose the complete brief using the defaults you were given "
             "and ask at most one short question, only if the topic itself is unclear."
         ),
+        "routine": (
+            "This is a standing instruction running on its schedule; nobody is typing. Do the task with the "
+            "defaults you have, ask nothing; if something is impossible, say so in one sentence."
+        ),
     }.get(request_kind, "")
     guide = "\n".join(f"- {name}: {ACTION_GUIDE[name]}" for name in allowed_actions if name in ACTION_GUIDE)
     import json

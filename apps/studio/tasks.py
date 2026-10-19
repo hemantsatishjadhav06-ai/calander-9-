@@ -14,7 +14,9 @@ The recurring ones (registered in ``apps.studio.apps``):
   person can press Retry;
 * ``run_agency_cycle`` is the hourly heartbeat: it plans the week for
   workspaces whose autopilot is due, feeds planned briefs to the team a few at
-  a time, refreshes creative memory and drafts inbox replies where those are on.
+  a time, refreshes creative memory and drafts inbox replies where those are on;
+* ``run_routine_tick`` runs every minute: it settles routines whose run has
+  ended and starts the ones whose time has come (``apps.studio.routines``).
 """
 
 import logging
@@ -27,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 STUCK_SWEEP_INTERVAL_SECONDS = 600
 AGENCY_CYCLE_INTERVAL_SECONDS = 900
+ROUTINE_TICK_INTERVAL_SECONDS = 60
 
 
 @background(schedule=0)
@@ -65,3 +68,11 @@ def run_agency_cycle():
     from .autopilot import run_cycle
 
     run_cycle()
+
+
+@background(schedule=0)
+@keep_schedule
+def run_routine_tick():
+    from .routines import tick
+
+    tick()

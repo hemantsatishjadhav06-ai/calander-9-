@@ -70,9 +70,10 @@ STAFF_NOTIFY_EVERY = timedelta(minutes=30)
 CLIENT_NOTIFY_EVERY = timedelta(hours=1)
 READ_KEY_PREFIX = "thread.read."
 #: How the message was asked: from a post card (``change``, ``question``), as a new idea
-#: (``create``: the person wants a post made from their words), or the one-tap
-#: confirmation of a brief card (``confirm_brief``). The account manager reads it.
-REQUEST_KINDS = ("change", "question", "confirm_brief", "create")
+#: (``create``: the person wants a post made from their words), the one-tap
+#: confirmation of a brief card (``confirm_brief``), or a routine's standing instruction
+#: running on its schedule (``routine``). The account manager reads it.
+REQUEST_KINDS = ("change", "question", "confirm_brief", "create", "routine")
 #: Source evidence behind a brief counts as current for this long; after that it is refreshed silently.
 SOURCE_MAX_AGE = timedelta(hours=24)
 #: A draft the thread keeps an eye on: something is going out, or went wrong going out.

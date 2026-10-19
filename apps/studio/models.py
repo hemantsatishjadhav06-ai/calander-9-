@@ -13,6 +13,7 @@ review; only an approver signed in to the dashboard can send it out (see
 ``apps.approvals.gate``).
 """
 
+import datetime
 import uuid
 
 from django.conf import settings
@@ -818,3 +819,109 @@ class Message(models.Model):
         if self.author is not None:
             return self.author.name or self.author.email.split("@")[0]
         return "Team"
+
+
+# ---------------------------------------------------------------------------
+# Routines: standing instructions in plain words that run on their own
+# ---------------------------------------------------------------------------
+
+
+class Routine(models.Model):
+    """A standing instruction that runs on its own schedule (``apps.studio.routines``).
+
+    An *instruction* routine posts its words in the team thread as the
+    person who wrote it, on time, and the manager does the task; a
+    *briefing* routine sends the code-built daily briefing. Times are
+    workspace-local. A routine never approves, schedules or publishes: the
+    work it starts ends in Approvals like everything else.
+    """
+
+    class Kind(models.TextChoices):
+        INSTRUCTION = "instruction", "Instruction"
+        BRIEFING = "briefing", "Morning briefing"
+
+    class Cadence(models.TextChoices):
+        DAILY = "daily", "Every day"
+        WEEKDAYS = "weekdays", "Weekdays"
+        WEEKLY = "weekly", "Once a week"
+
+    class Status(models.TextChoices):
+        IDLE = "idle", "Idle"
+        RUNNING = "running", "Running"
+        INTERRUPTED = "interrupted", "Interrupted"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("workspaces.Workspace", on_delete=models.CASCADE, related_name="routines")
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="routines",
+        help_text="The thread the instruction is posted in. Empty means the general team thread.",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="routines"
+    )
+    title = models.CharField(max_length=120, blank=True, default="", db_default="")
+    instruction = models.TextField(max_length=2000, blank=True, default="", db_default="")
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.INSTRUCTION, db_default=Kind.INSTRUCTION)
+    cadence = models.CharField(
+        max_length=20, choices=Cadence.choices, default=Cadence.WEEKDAYS, db_default=Cadence.WEEKDAYS
+    )
+    weekday = models.PositiveSmallIntegerField(null=True, blank=True, help_text="0 is Monday; only for weekly.")
+    time = models.TimeField(default=datetime.time(8, 30), db_default="08:30:00")
+    enabled = models.BooleanField(default=True, db_default=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.IDLE, db_default=Status.IDLE)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    last_run_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True, default="", db_default="")
+    next_run_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = WorkspaceScopedManager()
+
+    class Meta:
+        db_table = "studio_routine"
+        ordering = ["next_run_at", "created_at"]
+        indexes = [models.Index(fields=["workspace", "enabled", "next_run_at"], name="idx_routine_ws_enabled_next")]
+
+    def __str__(self):
+        return f"Routine({self.cadence} {self.time:%H:%M}): {self.display_title[:50]}"
+
+    @property
+    def display_title(self) -> str:
+        if self.title:
+            return self.title
+        if self.kind == self.Kind.BRIEFING:
+            return "Morning briefing"
+        return (self.instruction or "").strip().splitlines()[0][:120] if self.instruction else "Routine"
+
+
+class RoutineRun(models.Model):
+    """One run of a routine: the job it started (if any) and how it ended."""
+
+    class Status(models.TextChoices):
+        RUNNING = "running", "Running"
+        FINISHED = "finished", "Finished"
+        FAILED = "failed", "Failed"
+        INTERRUPTED = "interrupted", "Interrupted"
+        SKIPPED = "skipped", "Skipped"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    routine = models.ForeignKey(Routine, on_delete=models.CASCADE, related_name="runs")
+    job = models.ForeignKey(AgencyJob, on_delete=models.SET_NULL, null=True, blank=True, related_name="routine_runs")
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.RUNNING, db_default=Status.RUNNING)
+    summary = models.CharField(max_length=500, blank=True, default="", db_default="")
+
+    class Meta:
+        db_table = "studio_routine_run"
+        ordering = ["-started_at"]
+        indexes = [models.Index(fields=["routine", "started_at"], name="idx_routine_run_started")]
+
+    def __str__(self):
+        return f"RoutineRun({self.status}): {self.summary[:50]}"
