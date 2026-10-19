@@ -142,6 +142,8 @@ DEFAULT_CHANNELS: dict[str, dict[str, bool]] = {
     EventType.CLIENT_CONNECTED_ACCOUNTS: {Channel.IN_APP: True, Channel.EMAIL: True},
     EventType.TEAM_MESSAGE: {Channel.IN_APP: True, Channel.EMAIL: True},
     EventType.AUTOPILOT_PLANNED: {Channel.IN_APP: True, Channel.EMAIL: True},
+    EventType.AGENCY_ALERT: {Channel.IN_APP: True, Channel.EMAIL: True},
+    EventType.DAILY_BRIEFING: {Channel.IN_APP: True, Channel.EMAIL: False},
 }
 
 # Event types considered non-critical (suppressed during quiet hours).
@@ -149,6 +151,7 @@ NON_CRITICAL_EVENTS = {
     EventType.POST_PUBLISHED,
     EventType.REPORT_GENERATED,
     EventType.ENGAGEMENT_ALERT,
+    EventType.DAILY_BRIEFING,
 }
 
 

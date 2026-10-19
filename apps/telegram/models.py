@@ -63,6 +63,9 @@ class TelegramUserLink(models.Model):
     telegram_user_id = models.PositiveBigIntegerField()
     telegram_username = models.CharField(max_length=100, blank=True, default="")
     is_active = models.BooleanField(default=True)
+    # /mute switches off "the team needs you" messages for this person; the
+    # morning briefing and their own replies still arrive.
+    notify_needs_you = models.BooleanField(default=True, db_default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

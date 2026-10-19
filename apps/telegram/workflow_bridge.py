@@ -32,10 +32,10 @@ PREFIX = "workflow-prompt:"
 PROMPT_TTL = timedelta(days=7)
 _KEY = re.compile(r"^workflow-prompt:([0-9a-f-]{36}):part:0$")
 CONTROL_TEXT = {
-    "pause": "Your assistant task was paused. Open SM Bean to review its current state.",
-    "resume": "Your assistant task was resumed. Open SM Bean to review its current state.",
-    "retry": "A new attempt was requested for your assistant task. Open SM Bean to review its current state.",
-    "cancel": "Your assistant task was cancelled. Open SM Bean to review its current state.",
+    "pause": "Your task was paused. Open SM Bean to see where it stands.",
+    "resume": "Your task was resumed. Open SM Bean to see where it stands.",
+    "retry": "A new attempt was requested for your task. Open SM Bean to see where it stands.",
+    "cancel": "Your task was stopped. Open SM Bean to see where it stands.",
 }
 
 
@@ -289,7 +289,7 @@ def queue_workflow_message(message_id):
         else:
             text = "Your brief is ready for review. Check the brief and source facts in SM Bean before confirming draft preparation."
     else:
-        text = "Your assistant added a workflow update. Open your saved idea in SM Bean for its current status."
+        text = "The team added an update to your idea. Open it in SM Bean for its current status."
     try:
         prefix = "question" if question else "message"
         return _queue(

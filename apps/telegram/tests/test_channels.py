@@ -327,8 +327,8 @@ def test_settings_guides_channel_setup_without_native_reads_and_post_connects(hu
     client.force_login(hub[1])
     url = reverse("telegram:settings", kwargs={"workspace_id": hub[0].pk})
     result = client.get(url)
-    assert result.status_code == 200 and b"Connect a channel for status updates" in result.content
-    assert b"Questions, answers and approval buttons stay" in result.content
+    assert result.status_code == 200 and b"Broadcast channel (optional)" in result.content
+    assert b"Captions, costs and buttons never go there." in result.content
     assert TOKEN.encode() not in result.content and result["Cache-Control"] == "no-store"
     hub[-1].get_me.assert_not_called()
     result = client.post(

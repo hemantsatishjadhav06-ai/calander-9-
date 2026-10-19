@@ -45,8 +45,10 @@ def test_personal_pairing_has_fresh_one_use_telegram_link(client, hub):
     url = urlsplit(response.context["pairing_url"])
     assert url.scheme == "https" and url.netloc == "t.me" and url.path == "/fake_test_bot"
     assert parse_qs(url.query) == {"start": [nonce]}
-    assert "Open Telegram and link my account" in response.content.decode()
-    assert TOKEN not in response.content.decode() and connection.webhook_secret not in response.content.decode()
+    html = response.content.decode()
+    assert f'href="{response.context["pairing_url"]}"' in html and ">Open Telegram and pair</a>" in html
+    assert response.context["pairing_seconds"] > 540 and 'x-data="{ left:' in html
+    assert TOKEN not in html and connection.webhook_secret not in html
     next_response = client.get(reverse("telegram:settings", args=[workspace.pk]))
     assert nonce not in next_response.content.decode()
     ticket = TelegramPairing.objects.get(connection=connection)
@@ -59,12 +61,14 @@ def test_client_gets_simple_personal_link_without_internal_controls(client, hub)
     client.force_login(user)
     response = client.get(reverse("telegram:settings", args=[workspace.pk]))
     html = response.content.decode()
-    assert "Create my personal Telegram link" in html
+    assert "Open Telegram and pair" in html
     assert 'name="purpose" value="user"' in html
     assert 'name="audience" value="private"' in html
     assert "Which group are you linking?" not in html
     assert "Validate and connect bot" not in html
-    assert "/week prepare" not in html
+    assert "/week prepare" not in html and "/approvals" not in html
+    assert "Deployment ready" not in html and "Approvals from Telegram" not in html
+    assert "TELEGRAM_WEBHOOK" not in html
     assert "Client sign-off" not in html or "agency" in html
 
 
@@ -91,7 +95,7 @@ def test_group_code_is_shown_in_group_section_without_private_start_link(client,
     assert response.context["pairing_purpose"] == "chat"
     assert "pairing_url" not in response.context
     assert "internal team group" in response.content.decode()
-    assert "Open Telegram and link my account" not in response.content.decode()
+    assert ">Open Telegram and pair</a>" not in response.content.decode()
 
 
 @pytest.mark.parametrize("audience", ["team", "client"])
@@ -120,9 +124,11 @@ def test_inactive_connection_keeps_pair_button_disabled_with_clear_next_action(c
     connection.save(update_fields=["is_active"])
     client.force_login(user)
     response = client.get(reverse("telegram:settings", args=[workspace.pk]))
-    assert "Bot setup needs attention" in response.content.decode()
-    assert "Finish the deployed HTTPS connection" in response.content.decode()
-    assert 'type="submit" disabled>Create my personal Telegram link' in response.content.decode()
+    html = response.content.decode()
+    assert "Bot setup needs attention" in html and "not listening yet" in html
+    assert "Retry webhook" in html
+    assert "disabled>Open Telegram and pair</button>" in html
+    assert "Available once the bot is listening." in html
 
 
 def test_malformed_bot_username_cannot_be_used_as_external_pairing_url(client, hub):
@@ -133,7 +139,8 @@ def test_malformed_bot_username_cannot_be_used_as_external_pairing_url(client, h
     response = client.post(reverse("telegram:pair", args=[workspace.pk]), {"purpose": "user", "audience": "private"})
     assert response.status_code == 200
     assert response.context["pairing_url"] == ""
-    assert "Open Telegram and link my account" not in response.content.decode()
+    assert ">Open Telegram and pair</a>" not in response.content.decode()
+    assert "evil.example" not in response.content.decode().replace("@evil.example/path?start=payload", "")
 
 
 def test_reconnect_form_preserves_existing_approval_preference(client, hub):

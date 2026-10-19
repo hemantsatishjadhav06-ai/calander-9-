@@ -29,6 +29,14 @@ def send_delivery(delivery_id):
 
 
 @background(schedule=0)
+def send_brief_card(message_id, chat_id):
+    """Issue the brief's confirm button outside agency work, where the guards allow a person-facing card."""
+    from .notifications import brief_card
+
+    brief_card(message_id, chat_id)
+
+
+@background(schedule=0)
 @keep_schedule
 def run_telegram_cycle():
     from .notifications import sweep_receipts

@@ -185,6 +185,41 @@ def test_photo_caption_limit_counts_telegram_utf16_units():
     session.post.assert_not_called()
 
 
+def test_command_menu_is_published_as_a_bounded_list_or_not_at_all():
+    api, session = client(response(True))
+    assert api.set_my_commands([("brief", "Start a post"), ("help", "What you can say")]) is True
+    kwargs = session.post.call_args.kwargs
+    assert session.post.call_args.args[0].endswith("/setMyCommands")
+    assert kwargs["json"] == {
+        "commands": [
+            {"command": "brief", "description": "Start a post"},
+            {"command": "help", "description": "What you can say"},
+        ]
+    }
+    with pytest.raises(TelegramAPIError) as caught:
+        api.set_my_commands([("Bad Name", "x")])
+    assert caught.value.kind == "invalid_commands" and session.post.call_count == 1
+
+
+def test_album_upload_attaches_every_photo_once_with_the_caption_on_the_first():
+    api, session = client(response([{"message_id": 20}, {"message_id": 21}]))
+    sent = api.send_media_group(123, [b"one", b"two"], caption="Two graphics")
+    assert [row["message_id"] for row in sent] == [20, 21]
+    kwargs = session.post.call_args.kwargs
+    media = json.loads(kwargs["data"]["media"])
+    assert [item["media"] for item in media] == ["attach://photo0", "attach://photo1"]
+    assert media[0]["caption"] == "Two graphics" and "caption" not in media[1]
+    assert set(kwargs["files"]) == {"photo0", "photo1"} and kwargs["allow_redirects"] is False
+    for photos in ([b"one"], [b"x"] * 11, [b"one", "two"]):
+        with pytest.raises(TelegramAPIError):
+            api.send_media_group(123, photos)
+    assert session.post.call_count == 1
+    api, _ = client(response([{"message_id": 20}]))
+    with pytest.raises(TelegramAPIError) as caught:
+        api.send_media_group(123, [b"one", b"two"])
+    assert caught.value.ambiguous is True
+
+
 def test_bool_cannot_impersonate_telegram_user_id():
     api, _ = client(response({"user": {"id": True}, "status": "administrator"}))
     with pytest.raises(TelegramAPIError):

@@ -548,6 +548,7 @@ def announce_planned_weeks() -> int:
     not two). A plan that failed or was cancelled marks the week FAILED; a
     person retrying the plan puts it back to PLANNING.
     """
+    from . import alerts
     from .models import AgencyJob, AutopilotWeek, StudioBrief
 
     announced = 0
@@ -571,6 +572,7 @@ def announce_planned_weeks() -> int:
             AutopilotWeek.objects.filter(pk=week.pk, status=AutopilotWeek.Status.PLANNING).update(
                 status=AutopilotWeek.Status.FAILED, note=(note or "The plan failed.")[:500], updated_at=timezone.now()
             )
+            alerts.week_failed(week)  # once per week and reason; never raises
             continue
         if job.status != AgencyJob.Status.DONE:
             continue
@@ -603,6 +605,7 @@ def announce_planned_weeks() -> int:
                 note=f"{ready} of {requested} posts are ready; {'; '.join(details)}. {' '.join(guidance)}",
                 updated_at=timezone.now(),
             )
+            alerts.week_failed(week)
             continue
         if not ready:
             AutopilotWeek.objects.filter(pk=week.pk, status=AutopilotWeek.Status.PLANNING).update(
@@ -610,6 +613,7 @@ def announce_planned_weeks() -> int:
                 note="The team couldn't finish any of the week's posts. Open the plan to see why.",
                 updated_at=timezone.now(),
             )
+            alerts.week_failed(week)
             continue
         moved = AutopilotWeek.objects.filter(pk=week.pk, status=week.status).update(
             status=AutopilotWeek.Status.PLANNED, note="", updated_at=timezone.now()

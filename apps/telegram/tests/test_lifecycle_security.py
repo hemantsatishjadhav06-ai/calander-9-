@@ -230,4 +230,4 @@ def test_unsupported_video_fields_survive_ingress_and_do_not_start_paid_work(hub
     assert kind in row.payload["message"]
     assert processing.process_one(row.pk) == "processed"
     assert not Message.objects.exists() and not AgencyJob.objects.exists()
-    assert "Video and voice transcription are not available" in TelegramDelivery.objects.get(chat=chat).payload["text"]
+    assert "Voice and video are not available here yet" in TelegramDelivery.objects.get(chat=chat).payload["text"]

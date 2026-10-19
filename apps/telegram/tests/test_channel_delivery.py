@@ -581,14 +581,20 @@ def test_completed_canonical_web_draft_notice_queues_fixed_status_without_raw_id
         body="SECRET raw idea and cost",
         data={"post_id": str(brief.post_id), "studio_brief_id": str(brief.pk), "workspace_id": str(brief.workspace_id)},
     )
-    assert notifications.notification_event(notice.pk) == 2
-    assert notifications.notification_event(notice.pk) == 2
+    # Two fixed channel lines, plus the draft in the paired approver's own manager inbox.
+    assert notifications.notification_event(notice.pk) == 3
+    assert notifications.notification_event(notice.pk) == 3
     rows = list(TelegramChannelDelivery.objects.order_by("created_at"))
     assert [row.payload["event"] for row in rows] == ["draft", "review"]
     assert all("SECRET" not in row.payload["text"] for row in rows)
     assert rows[0].payload["_post"]["draft_brief_id"] == str(brief.pk)
     assert rows[0].payload["_post"]["draft_revision"] == brief.revision
-    assert not TelegramDelivery.objects.exists()
+    inbox_row = TelegramDelivery.objects.get()
+    assert inbox_row.chat_id == hub[2].pk and inbox_row.source_key.startswith("inbox:")
+    # The approver sees the post itself, never the notification body, the idea or the cost notes.
+    text = inbox_row.payload["text"]
+    assert "Draft ready" in text and "SECRET raw idea" not in text and "SECRET cost" not in text
+    assert "SECRET brief idea" not in text
 
 
 def test_normal_review_notice_announces_committed_draft_before_review(hub):
@@ -596,11 +602,12 @@ def test_normal_review_notice_announces_committed_draft_before_review(hub):
     notice = Notification.objects.create(
         user=hub[3].user, event_type="post_submitted", title="SECRET raw title", data={"post_id": str(brief.post_id)}
     )
-    assert notifications.notification_event(notice.pk) == 2
+    assert notifications.notification_event(notice.pk) == 3  # draft + review channel lines, one inbox draft
     assert [row.payload["event"] for row in TelegramChannelDelivery.objects.order_by("created_at")] == [
         "draft",
         "review",
     ]
+    assert TelegramDelivery.objects.filter(source_key__startswith="inbox:").count() == 1
 
 
 def test_recurring_draft_sweep_recovers_queryset_handoff_once_per_revision(hub):
@@ -608,16 +615,18 @@ def test_recurring_draft_sweep_recovers_queryset_handoff_once_per_revision(hub):
     assert notifications.sweep_receipts(limit=1) == 0
     post = Post.objects.create(workspace=hub[0].workspace, author=hub[3].user)
     StudioBrief.objects.filter(pk=brief.pk).update(post=post, status="ready", stage="done", finished_at=timezone.now())
-    assert notifications.sweep_receipts(limit=1) == 1
+    assert notifications.sweep_receipts(limit=1) == 2  # the channel line and the approver's inbox draft
     assert TelegramChannelDelivery.objects.count() == 1
     notifications.sweep_receipts(limit=1)
     notifications.sweep_receipts(limit=1)
     assert TelegramChannelDelivery.objects.count() == 1
+    assert TelegramDelivery.objects.filter(source_key__startswith="inbox:").count() == 1
     StudioBrief.objects.filter(pk=brief.pk).update(revision=2)
     notifications.sweep_receipts(limit=1)
     notifications.sweep_receipts(limit=1)
     assert TelegramChannelDelivery.objects.count() == 2
     assert {row.payload["_post"]["draft_revision"] for row in TelegramChannelDelivery.objects.all()} == {1, 2}
+    assert TelegramDelivery.objects.filter(source_key__startswith="inbox:").count() == 2
 
 
 @pytest.mark.parametrize(
@@ -641,14 +650,20 @@ def test_draft_ready_hook_rejects_unfinished_private_and_unknown_lineage(hub, mu
     else:
         job = AgencyJob.objects.create(workspace=brief.workspace, kind="chat")
         StudioBrief.objects.filter(pk=brief.pk).update(job=job)
-    assert notifications.ready_draft(brief.pk) == 0
-    assert notifications.sweep_receipts(limit=1) == 0
+    # Channels and the author's idea thread refuse every one of these. A finished
+    # draft that still belongs to this workspace does reach the approver's own
+    # inbox, whatever thread asked for it: the post is in the approval queue and
+    # the message names the post, never the conversation.
+    told = 1 if mutation in {"private", "missing_job_origin"} else 0
+    assert notifications.ready_draft(brief.pk) == told
+    assert notifications.sweep_receipts(limit=1) == told
     assert not TelegramChannelDelivery.objects.exists()
+    assert TelegramDelivery.objects.filter(source_key__startswith="inbox:").count() == told
 
 
 def test_draft_revision_drift_after_queue_fails_before_send(hub, native):
     brief = completed_brief(hub)
-    assert notifications.ready_draft(brief.pk) == 1
+    assert notifications.ready_draft(brief.pk) == 2  # the channel line and the approver's inbox draft
     row = TelegramChannelDelivery.objects.get()
     StudioBrief.objects.filter(pk=brief.pk).update(revision=2)
     assert channel_outbox.send_one(row.pk) == "failed"

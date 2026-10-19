@@ -464,6 +464,17 @@ def test_week_confirmation_keeps_large_signed_analysis_out_of_callback_data(worl
     preview = week_preview(world)
     preview["analysis_token"] = "signed-analysis-" + "long" * 500
     card = actions.issue_week_confirmation(world["chat"], world["link"], preview)
+    # The first card is a short summary: volume, cost, what to check, the footer.
+    for summary in ("2 new", "1 already planned", "3 wanted", "25 of 100 USD", "Nothing publishes"):
+        assert summary in card["text"]
+    assert "585141221346435" not in card["text"]
+    labels = [button["text"] for row in card["inline_keyboard"] for button in row]
+    assert labels == ["Confirm analysis & prepare week", "Show evidence"]
+    # The complete evidence sits behind its own one-use button, never in callback data.
+    evidence_payload = callback(world, "week_evidence", card)
+    assert len(evidence_payload["data"].encode()) < 64
+    shown = actions.handle_callback(world["conn"], evidence_payload)
+    assert shown["ok"]
     for evidence in (
         "585141221346435",
         "West Hyderabad",
@@ -473,7 +484,8 @@ def test_week_confirmation_keeps_large_signed_analysis_out_of_callback_data(worl
         "requested 3",
         "25 USD",
     ):
-        assert evidence in card["text"]
+        assert evidence in shown["text"]
+    assert not actions.handle_callback(world["conn"], evidence_payload)["ok"]  # one use
     payload = callback(world, "week_plan", card)
     assert len(payload["data"].encode()) < 64
     with (
