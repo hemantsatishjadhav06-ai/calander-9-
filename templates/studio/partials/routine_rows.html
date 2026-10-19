@@ -1,0 +1,50 @@
+{% comment %}
+Compact routine rows with their controls. Context:
+  routines  — list of dicts from apps.studio.routines.rows(workspace, limit, viewer=..., perms=...)
+  workspace — the workspace
+  can_manage — True when the viewer manages the workspace's settings (may pause or delete any routine)
+Each row's own `can_change` (the viewer wrote it) also unlocks Pause and Delete.
+{% endcomment %}
+{% if routines %}
+<ul class="divide-y divide-stone-200" aria-label="Routines">
+    {% for row in routines %}
+    <li class="py-3 flex flex-wrap items-start gap-x-4 gap-y-2" id="routine-{{ row.id }}">
+        <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+                <p class="text-sm font-semibold text-stone-900 break-words">{{ row.title }}</p>
+                {% if row.running %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-800">Running</span>
+                {% elif row.needs_attention %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-800">Needs you</span>
+                {% elif not row.enabled %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-700">Paused</span>
+                {% endif %}
+            </div>
+            <p class="text-xs text-stone-600 mt-0.5">
+                {{ row.cadence_words }}{% if row.enabled and row.next_run_words %} · next {{ row.next_run_words }}{% endif %}
+            </p>
+            <p class="text-xs text-stone-700 mt-1 break-words">{{ row.last_result }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <form method="post" action="{% url 'studio:routines_run_now' workspace_id=workspace.id routine_id=row.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" {% if row.running %}disabled aria-disabled="true"{% endif %} class="px-3 py-1.5 text-xs font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700" aria-label="Run “{{ row.title }}” now">Run now</button>
+            </form>
+            {% if can_manage or row.can_change %}
+            <form method="post" action="{% url 'studio:routines_toggle' workspace_id=workspace.id routine_id=row.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-stone-800 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700" aria-label="{% if row.enabled %}Pause{% else %}Resume{% endif %} “{{ row.title }}”">{% if row.enabled %}Pause{% else %}Resume{% endif %}</button>
+            </form>
+            <form method="post" action="{% url 'studio:routines_delete' workspace_id=workspace.id routine_id=row.id %}" x-data x-on:submit="if (!confirm('Delete this routine? Work it already started finishes as usual.')) $event.preventDefault()">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-stone-700 bg-white border border-stone-300 rounded-lg hover:bg-red-50 hover:text-red-800 hover:border-red-200 focus-visible:outline-2 focus-visible:outline-orange-700" aria-label="Delete “{{ row.title }}”">Delete</button>
+            </form>
+            {% endif %}
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}

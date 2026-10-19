@@ -50,6 +50,7 @@ def tabs(workspace, active: str) -> list[dict[str, Any]]:
     """The agency's tabs (pages that are not available simply don't show)."""
     items = [
         ("overview", "Overview", "studio:index"),
+        ("routines", "Routines", "studio:routines"),
         ("team", "Team", "studio:team"),
         ("memory", "Creative memory", "studio:memory"),
         ("autopilot", "Autopilot", "studio:autopilot"),
