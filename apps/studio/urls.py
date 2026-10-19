@@ -8,6 +8,7 @@ from . import (
     urls_customer_workflow,
     urls_memory,
     urls_outcomes,
+    urls_setup,
     urls_trust,
     views,
 )
@@ -41,5 +42,6 @@ urlpatterns += (
     + urls_outcomes.urlpatterns
     + urls_trust.urlpatterns
     + urls_customer_workflow.urlpatterns
+    + urls_setup.urlpatterns
     + opendots_urls.urlpatterns
 )

@@ -27,6 +27,12 @@ def production_config():
         SUPPORT_EMAIL="support@example.com",
         ACCOUNT_EMAIL_VERIFICATION="mandatory",
         ADMIN_ALLOWED_IPS=["10.0.0.0/8"],
+        STUDIO_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY="configured",
+        OPENROUTER_API_KEY="",
+        FAL_KEY="configured",
+        TELEGRAM_WEBHOOK_READY=True,
+        TELEGRAM_WEBHOOK_BASE_URL="https://app.example.com",
     ):
         yield
 
@@ -109,6 +115,28 @@ def test_optional_operations_are_warnings():
         checks = check_production_config(None)
     assert checks
     assert not any(isinstance(check, Error) for check in checks)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [
+        ({"ANTHROPIC_API_KEY": ""}, "smbean.W012"),
+        ({"STUDIO_PROVIDER": "openrouter", "OPENROUTER_API_KEY": ""}, "smbean.W012"),
+        ({"TELEGRAM_WEBHOOK_BASE_URL": "http://localhost:8000"}, "smbean.W013"),
+        ({"TELEGRAM_WEBHOOK_BASE_URL": ""}, "smbean.W013"),
+        ({"FAL_KEY": ""}, "smbean.W014"),
+    ],
+)
+def test_the_agency_services_warn_but_never_block_a_deploy(overrides, expected):
+    with override_settings(**overrides):
+        checks = check_production_config(None)
+    assert expected in {check.id for check in checks}
+    assert not any(isinstance(check, Error) for check in checks)
+
+
+def test_a_switched_off_telegram_webhook_needs_no_base_url():
+    with override_settings(TELEGRAM_WEBHOOK_READY=False, TELEGRAM_WEBHOOK_BASE_URL=""):
+        assert "smbean.W013" not in ids()
 
 
 def test_development_does_not_require_production_services():
