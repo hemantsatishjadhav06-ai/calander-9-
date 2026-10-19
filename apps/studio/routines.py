@@ -7,7 +7,8 @@ market update" becomes a :class:`~apps.studio.models.Routine`. A worker tick
 1. :func:`settle_running` closes routines whose run has ended: the job is done
    (idle, with the reply as the run's summary), failed or cancelled (failed),
    or its 45-minute lease ran out while the job is still active (interrupted,
-   never retried on its own — a person checks what it did and runs it again);
+   not started again, not even at its next time, until a person checks what it
+   did and runs it again);
 2. :func:`run_due` starts routines whose time has come, under a row lock that
    a second tick skips, after the same gates every other automatic action
    passes (eligible workspace, provider configured, budget, the author still
@@ -51,7 +52,6 @@ MAX_TITLE = 120
 INTERRUPTED = "The worker stopped during this run. Check what it did, then run it again."
 BRIEFING_UNAVAILABLE = "Briefing is not available yet"
 BRIEFING_FAILED = "The briefing could not be sent. Run it again."
-SETUP_NEEDED = "Your team isn't connected yet. Open Set up to connect it."
 AUTHOR_GONE = "The person who wrote this routine is no longer on your team. Delete it, or write it again."
 WORKSPACE_PAUSED = "This workspace is paused, so the routine waited."
 ALREADY_RUNNING = "This routine is already running."
@@ -159,7 +159,7 @@ def _local(when: dt.datetime | None, workspace) -> dt.datetime | None:
     return when.astimezone(zone_of(workspace)) if when else None
 
 
-def _when_words(when: dt.datetime | None, workspace) -> str:
+def when_words(when: dt.datetime | None, workspace) -> str:
     local = _local(when, workspace)
     return f"{local:%a %-d %b, %H:%M}" if local else ""
 
@@ -304,29 +304,35 @@ def last_result(routine: Routine, run: RoutineRun | None) -> str:
         return f"Failed: {routine.last_error}" if routine.last_error else "Failed last time"
     if run is None:
         return "Hasn't run yet"
-    when = _when_words(run.finished_at or run.started_at, workspace)
+    when = when_words(run.finished_at or run.started_at, workspace)
     if run.status == RoutineRun.Status.SKIPPED:
         return f"Skipped {when}: {run.summary}" if run.summary else f"Skipped {when}"
     return f"Last run {when}: {run.summary}" if run.summary else f"Last run {when}"
 
 
-def rows(workspace, limit: int | None = None) -> list[dict[str, Any]]:
-    """The workspace's routines for a page: on first, soonest first, then paused ones."""
+def rows(workspace, limit: int | None = None, *, viewer=None, perms: dict | None = None) -> list[dict[str, Any]]:
+    """The workspace's routines for a page: on first, soonest first, then paused ones.
+
+    Each row is a plain dict for templates (``studio/routines.html`` and
+    ``studio/partials/routine_rows.html``). With ``viewer`` and their
+    ``perms``, ``can_change`` says whether that person may pause or delete
+    the row (see :func:`can_change`); without them it is False.
+    """
     routines = list(
         Routine.objects.filter(workspace=workspace)
         .select_related("created_by", "workspace")
         .order_by("-enabled", "next_run_at", "created_at")[: limit or None]
     )
     latest: dict[Any, RoutineRun] = {}
-    for run in (
+    for newest in (
         RoutineRun.objects.filter(routine__in=[r.pk for r in routines])
         .order_by("routine_id", "-started_at")
         .distinct("routine_id")
     ):
-        latest[run.routine_id] = run
+        latest[newest.routine_id] = newest
     out = []
     for routine in routines:
-        run = latest.get(routine.pk)
+        run: RoutineRun | None = latest.get(routine.pk)
         out.append(
             {
                 "id": str(routine.pk),
@@ -337,7 +343,7 @@ def rows(workspace, limit: int | None = None) -> list[dict[str, Any]]:
                 "is_briefing": routine.kind == Routine.Kind.BRIEFING,
                 "cadence_words": cadence_words(routine),
                 "next_run": _local(routine.next_run_at, workspace),
-                "next_run_words": _when_words(routine.next_run_at, workspace) if routine.enabled else "",
+                "next_run_words": when_words(routine.next_run_at, workspace) if routine.enabled else "",
                 "enabled": routine.enabled,
                 "status": routine.status,
                 "running": routine.status == Routine.Status.RUNNING,
@@ -346,6 +352,7 @@ def rows(workspace, limit: int | None = None) -> list[dict[str, Any]]:
                 "last_job_id": str(run.job_id) if run is not None and run.job_id else "",
                 "created_by_id": routine.created_by_id,
                 "created_by_name": routine.created_by.name if routine.created_by else "",
+                "can_change": can_change(routine, viewer, perms) if viewer is not None else False,
             }
         )
     return out
@@ -359,9 +366,11 @@ def rows(workspace, limit: int | None = None) -> list[dict[str, Any]]:
 def _reply_summary(job: AgencyJob) -> str:
     message_id = (job.result or {}).get("message_id")
     if message_id:
-        body = Message.objects.filter(pk=message_id, conversation__workspace_id=job.workspace_id).values_list(
-            "body", flat=True
-        ).first()
+        body = (
+            Message.objects.filter(pk=message_id, conversation__workspace_id=job.workspace_id)
+            .values_list("body", flat=True)
+            .first()
+        )
         if body:
             return " ".join(body.split())[:SUMMARY_CHARS]
     skipped = (job.result or {}).get("skipped")
@@ -451,8 +460,10 @@ def _blocker(routine: Routine) -> str:
     if author is None or not author.is_active or not chat.is_staff(author, workspace):
         return AUTHOR_GONE
     if routine.kind == Routine.Kind.INSTRUCTION:
+        # A briefing is built by code and costs nothing, so only an
+        # instruction (a model turn) needs the provider and the budget.
         if not llm.is_configured():
-            return SETUP_NEEDED
+            return autopilot.PROVIDER_PAUSED
         if not budget.can_spend(workspace):
             return budget.over_budget_message(workspace)
     return ""
@@ -553,6 +564,7 @@ def run_due(limit: int = DUE_PER_TICK, now: dt.datetime | None = None) -> int:
     The due rows are locked with ``skip_locked``, so two ticks (two workers,
     or a tick and "Run now") never start the same routine twice; a routine
     that can't start is skipped with a sentence and moved to its next time.
+    An interrupted routine is left alone until a person runs it again.
     """
     now = now or timezone.now()
     started = 0
@@ -561,7 +573,7 @@ def run_due(limit: int = DUE_PER_TICK, now: dt.datetime | None = None) -> int:
             Routine.objects.select_for_update(of=("self",), skip_locked=True)
             .select_related("workspace", "workspace__organization", "created_by")
             .filter(enabled=True, next_run_at__lte=now)
-            .exclude(status=Routine.Status.RUNNING)
+            .exclude(status__in=(Routine.Status.RUNNING, Routine.Status.INTERRUPTED))
             .order_by("next_run_at", "created_at")[: max(0, limit)]
         )
         for routine in due:
@@ -621,7 +633,10 @@ def _notify_creator(routine: Routine, run: RoutineRun | None, body: str) -> bool
     if user is None or not user.is_active:
         return False
     run_id = str(run.pk) if run is not None else ""
-    if run_id and Notification.objects.filter(user=user, event_type=EventType.TEAM_MESSAGE, data__run_id=run_id).exists():
+    if (
+        run_id
+        and Notification.objects.filter(user=user, event_type=EventType.TEAM_MESSAGE, data__run_id=run_id).exists()
+    ):
         return False
     try:
         path = reverse("studio:routines", kwargs={"workspace_id": routine.workspace_id})

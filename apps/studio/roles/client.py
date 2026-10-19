@@ -116,6 +116,7 @@ def account_manager(
     kind = {
         "change": "They pressed 'Request a change' on this post: they want it changed.",
         "question": "They pressed 'Ask a question' on this post.",
+        "routine": "This is a standing instruction running on its schedule; nobody is typing. Do the task with the defaults you have, ask nothing; if something is impossible, say so in one sentence.",
     }.get(request_kind, "")
     guide = "\n".join(f"- {name}: {ACTION_GUIDE[name]}" for name in allowed_actions if name in ACTION_GUIDE)
     import json

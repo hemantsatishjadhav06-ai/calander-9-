@@ -68,7 +68,7 @@ STAFF_NOTIFY_EVERY = timedelta(minutes=30)
 CLIENT_NOTIFY_EVERY = timedelta(hours=1)
 READ_KEY_PREFIX = "thread.read."
 #: How a client asked from a post card; the account manager reads it.
-REQUEST_KINDS = ("change", "question", "confirm_brief")
+REQUEST_KINDS = ("change", "question", "confirm_brief", "routine")
 
 CLIENT_ROLE = "client"
 

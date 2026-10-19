@@ -16,8 +16,10 @@ class StudioConfig(AppConfig):
         from apps.common.background import register_recurring_task
         from apps.studio.tasks import (
             AGENCY_CYCLE_INTERVAL_SECONDS,
+            ROUTINE_TICK_INTERVAL_SECONDS,
             STUCK_SWEEP_INTERVAL_SECONDS,
             run_agency_cycle,
+            run_routine_tick,
             sweep_stuck_briefs,
         )
 
@@ -36,4 +38,12 @@ class StudioConfig(AppConfig):
             run_agency_cycle,
             repeat=AGENCY_CYCLE_INTERVAL_SECONDS,
             verbose_name="run_agency_cycle",
+        )
+        # Routines (standing instructions) run to the minute: settle runs
+        # that ended, start the ones that are due. Reads plus a few short
+        # writes; the model work it starts runs as ordinary chat jobs.
+        register_recurring_task(
+            run_routine_tick,
+            repeat=ROUTINE_TICK_INTERVAL_SECONDS,
+            verbose_name="run_routine_tick",
         )
