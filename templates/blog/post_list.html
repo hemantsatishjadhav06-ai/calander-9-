@@ -26,7 +26,7 @@
     {% if not has_sites %}
     <div class="text-center py-16 border border-dashed border-stone-300 rounded-xl">
         <p class="text-sm font-medium text-stone-700 mb-1">No website is connected to this workspace yet</p>
-        <p class="text-sm text-stone-600 max-w-md mx-auto">An administrator connects one with <code class="text-xs bg-stone-100 px-1 py-0.5 rounded">manage.py ensure_blog_sites</code>. Blog posts are written for, approved for and published to that site.</p>
+        <p class="text-sm text-stone-600 max-w-md mx-auto">Articles are written for, approved for and published to your website. <a href="{% url 'studio:setup' workspace_id=workspace.id %}" class="font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">Open Set up</a> to see how to connect one.</p>
     </div>
     {% else %}
 
