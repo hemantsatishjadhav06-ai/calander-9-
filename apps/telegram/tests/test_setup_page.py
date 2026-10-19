@@ -34,6 +34,24 @@ def test_connect_publishes_the_command_menu_and_a_menu_failure_never_blocks(hub,
     assert no_live_bot.set_my_commands.call_args.args[0] == provisioning.BOT_COMMANDS
 
 
+def test_set_commands_command_publishes_the_menu_for_existing_bots_only(hub, no_live_bot, capsys):  # noqa: F811
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    workspace, user, conn = hub
+    no_live_bot.set_my_commands.return_value = True
+    out = StringIO()
+    call_command("telegram_set_commands", stdout=out)
+    assert no_live_bot.set_my_commands.call_args.args[0] == provisioning.BOT_COMMANDS
+    assert "@fake_test_bot menu published" in out.getvalue() and "1 bot(s) updated" in out.getvalue()
+    assert TOKEN not in out.getvalue()
+    TelegramConnection.objects.filter(pk=conn.pk).update(is_active=False)
+    out = StringIO()
+    call_command("telegram_set_commands", stdout=out)
+    assert "No active Telegram bot" in out.getvalue() and no_live_bot.set_my_commands.call_count == 1
+
+
 def test_retry_webhook_activates_a_saved_bot_without_moving_its_epoch(hub, ready, no_live_bot):  # noqa: F811
     workspace, user, conn = hub
     TelegramConnection.objects.filter(pk=conn.pk).update(is_active=False, webhook_status="pending_deployment")

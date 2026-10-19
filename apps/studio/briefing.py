@@ -53,9 +53,11 @@ def build(workspace) -> dict[str, Any]:
 
     zone = inbox.zone_of(workspace)
     now = timezone.now()
-    waiting = [row for row in dashboard.waiting(workspace) if row["kind"] == "post"]
-    blogs = sum(1 for row in dashboard.waiting(workspace) if row["kind"] == "blog")
-    today = dashboard.week(workspace)[0]["items"] if dashboard.week(workspace) else []
+    pending = dashboard.waiting(workspace)
+    waiting = [row for row in pending if row["kind"] == "post"]
+    blogs = sum(1 for row in pending if row["kind"] == "blog")
+    days = dashboard.week(workspace)
+    today = days[0]["items"] if days else []
     going_out = [item for item in today if item["tone"] == "scheduled"]
     made = StudioBrief.objects.filter(
         workspace=workspace,
