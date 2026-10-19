@@ -272,7 +272,18 @@ class TestHonestReadOnlyProgress:
         assert not first.json()["active"]
         assert "<script>alert" not in first.json()["html"]
         assert "&lt;script&gt;" in first.json()["html"]
+        # The compact In progress rows, the same partial Home renders.
+        assert 'id="workflow-journeys"' in first.json()["html"]
+        assert f'data-workflow-journey="{conversation.pk}"' in first.json()["html"]
         assert conversation.messages.count() == 1 and not queued
+
+    def test_the_guided_page_is_home_now(self, client, world):
+        client.force_login(world.editor)
+        response = client.get(url(world, "workflow"))
+        assert response.status_code == 302 and response["Location"] == url(world, "index")
+        # Viewers and clients never reach the staff entry points.
+        client.force_login(world.viewer)
+        assert client.get(url(world, "workflow")).status_code == 403
 
     def test_create_without_provider_keeps_an_actionable_saved_idea(self, client, world, queued, settings):
         settings.ANTHROPIC_API_KEY = ""

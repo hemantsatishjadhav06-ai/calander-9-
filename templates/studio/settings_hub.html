@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl min-w-0">
+    <header class="mb-5">
+        <h1 class="text-2xl sm:text-3xl text-stone-900" style="font-family: var(--font-display)">Settings</h1>
+        <p class="text-sm text-stone-600 mt-1">How your team works for {{ workspace.name }}. Missing something? <a href="{{ setup_url }}" class="font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">Open Set up</a>.</p>
+    </header>
+
+    {% include "components/agency_tabs.html" %}
+
+    <ul class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" data-settings-cards>
+        {% for card in cards %}
+        <li>
+            <a href="{{ card.url }}" class="block h-full bg-white border border-stone-200 rounded-2xl p-5 shadow-sm hover:shadow-lg hover:border-transparent focus-visible:outline-2 focus-visible:outline-orange-700 transition-all duration-200 group" data-settings-card="{{ card.key }}">
+                <h2 class="text-base font-semibold text-stone-900 group-hover:underline">{{ card.label }}</h2>
+                <p class="text-sm text-stone-600 mt-1">{{ card.blurb }}</p>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

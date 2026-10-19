@@ -36,9 +36,10 @@ class TestPages:
 
         assert response.status_code == 200
         html = response.content.decode()
-        assert "Your agency team" in html and "Waiting for your approval" in html
+        assert "Good " in html and "Today" in html and "Recent work" in html
         # A viewer can look but not brief the team.
         assert response.context["can_create"] is False
+        assert response.context["journeys"] == []
         assert BrandProfile.objects.filter(workspace=world.workspace).exists()
 
     def test_outsiders_are_kept_out(self, client, world):
@@ -46,13 +47,16 @@ class TestPages:
 
         assert response.status_code in (403, 404)
 
-    def test_the_page_says_when_claude_is_not_set_up(self, client, world, settings):
+    def test_the_status_line_counts_the_set_up_steps_left(self, client, world, settings):
         settings.ANTHROPIC_API_KEY = ""
 
         response = _as(client, world.owner).get(_url("index", world))
 
-        assert response.context["setup"]["claude_ready"] is False
-        assert "AI service needs administrator setup" in response.content.decode()
+        html = response.content.decode()
+        assert response.context["setup_left"] >= 1
+        assert f"Set-up: {response.context['setup_left']} steps left" in html and "Open Set up" in html
+        # No service or setting is named on Home; that is the Set up page's job.
+        assert "ANTHROPIC_API_KEY" not in html and "administrator" not in html
 
 
 class TestBriefing:

@@ -687,16 +687,11 @@
             <nav class="sidebar-nav flex-1 overflow-y-auto py-2 px-3" :class="sidebarCollapsed ? 'px-2' : 'px-3'" aria-label="Main">
                 {% block sidebar_nav %}
                 {% if request.workspace %}
-                {# The agency team and the approvals queue come first: they are where a client's work starts and ends. #}
-                {% if request.workspace_membership.effective_permissions.create_posts %}
-                <a href="{% url 'studio:workflow' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'workflow' %}active{% endif %}"{% if request.resolver_match.url_name == 'workflow' %} aria-current="page"{% endif %}>
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M5 17h4M5 21h10"/></svg>
-                    <span class="sidebar-nav-label">Start a post</span>
-                </a>
-                {% endif %}
-                <a href="{% url 'studio:index' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.app_name == 'studio' and request.resolver_match.url_name != 'workflow' %}active{% endif %}"{% if request.resolver_match.app_name == 'studio' and request.resolver_match.url_name != 'workflow' %} aria-current="page"{% endif %}>
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
-                    <span class="sidebar-nav-label">Agency</span>
+                {% with match=request.resolver_match %}
+                {# Seven places, then More. Home is the conversation with your team. #}
+                <a href="{% url 'studio:index' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.app_name == 'studio' and match.url_name != 'setup' %}active{% endif %}"{% if match.app_name == 'studio' and match.url_name != 'setup' %} aria-current="page"{% endif %}>
+                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
+                    <span class="sidebar-nav-label">Home</span>
                 </a>
                 <a href="{% url 'calendar:calendar' workspace_id=request.workspace.id %}?mode=list&amp;tab=approvals" class="mb-1 sidebar-nav-item"
                    aria-label="Approvals{% if sidebar_pending_approvals %}, {{ sidebar_pending_approvals }} waiting{% endif %}">
@@ -704,36 +699,26 @@
                     <span class="sidebar-nav-label">Approvals</span>
                     {% if sidebar_pending_approvals %}<span class="sidebar-badge">{{ sidebar_pending_approvals }}</span>{% endif %}
                 </a>
-                <a href="{% url 'calendar:calendar' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'calendar' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <span class="sidebar-nav-label">Publish</span>
+                <a href="{% url 'calendar:calendar' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.url_name == 'calendar' %}active{% endif %}"{% if match.url_name == 'calendar' %} aria-current="page"{% endif %}>
+                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span class="sidebar-nav-label">Calendar</span>
                 </a>
-                <a href="{% url 'composer:create_landing' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'create_landing' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 00-4 12.73V16a1 1 0 001 1h6a1 1 0 001-1v-1.27A7 7 0 0012 2z"/><path d="M9 18h6"/><path d="M10 22h4"/><path d="M10 8.5c0 1.5 2 2.5 2 4"/><path d="M14 8.5c0 1.5-2 2.5-2 4"/></svg>
-                    <span class="sidebar-nav-label">Create Idea</span>
-                </a>                
-                {# Drafts, Queues, Posting Schedule, Templates, Categories and CSV Import are real pages that had no link anywhere in the product. Posting Schedule defines the slots the composer's default "Next available" mode depends on. #}
-                <a href="{% url 'composer:drafts_list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'drafts_list' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    <span class="sidebar-nav-label">Drafts</span>
+                <a href="{% url 'inbox:feed' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.app_name == 'inbox' %}active{% endif %}"{% if match.app_name == 'inbox' %} aria-current="page"{% endif %}>
+                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    <span class="sidebar-nav-label">Inbox</span>
+                    {% if sidebar_unread_inbox_count %}<span class="sidebar-badge">{{ sidebar_unread_inbox_count }}</span>{% endif %}
                 </a>
-                <a href="{% url 'blog:list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.app_name == 'blog' %}active{% endif %}">
+                <a href="{% url 'blog:list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.app_name == 'blog' %}active{% endif %}"{% if match.app_name == 'blog' %} aria-current="page"{% endif %}>
                     <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="14" y2="11"/></svg>
                     <span class="sidebar-nav-label">Blog &amp; SEO</span>
                 </a>
-                <a href="{% url 'calendar:queue_list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'queue_list' or request.resolver_match.url_name == 'queue_detail' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                    <span class="sidebar-nav-label">Queues</span>
+                {% if analytics_enabled_platforms %}
+                <a href="{% url 'analytics:index' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.app_name == 'analytics' %}active{% endif %}"{% if match.app_name == 'analytics' %} aria-current="page"{% endif %}>
+                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 12l4-4 4 4 6-6"/></svg>
+                    <span class="sidebar-nav-label">Analytics</span>
                 </a>
-                <a href="{% url 'calendar:posting_slots' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'posting_slots' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    <span class="sidebar-nav-label">Posting Schedule</span>
-                </a>
-                <a href="{% url 'inbox:feed' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.app_name == 'inbox' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                    <span class="sidebar-nav-label">Social Inbox</span>
-                    {% if sidebar_unread_inbox_count %}<span class="sidebar-badge">{{ sidebar_unread_inbox_count }}</span>{% endif %}
-                </a>
+                {% endif %}
+                {% endwith %}
                 {% endif %}
 
                 <a href="{% url 'notifications:list' %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'list' and request.resolver_match.app_name == 'notifications' %}active{% endif %}"
@@ -745,123 +730,67 @@
                 </a>
 
                 {% if request.workspace %}
-                {% if analytics_enabled_platforms %}
-                <a href="{% url 'analytics:index' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.app_name == 'analytics' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 12l4-4 4 4 6-6"/></svg>
-                    <span class="sidebar-nav-label">Analytics</span>
+                {% with match=request.resolver_match %}
+                <a href="{% url 'studio:setup' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.url_name == 'setup' %}active{% endif %}"{% if match.url_name == 'setup' %} aria-current="page"{% endif %}>
+                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                    <span class="sidebar-nav-label">Set up</span>
                 </a>
-                {% endif %}
+                {# Everything else lives behind More, so the sidebar stays short. #}
+                <details class="sidebar-more" data-sidebar-more{% if match.url_name in "create_landing,drafts_list,queue_list,queue_detail,posting_slots,template_list,category_list,csv_upload" or match.app_name == 'media_library' %} open{% endif %}>
+                    <summary class="mb-1 sidebar-nav-item" aria-label="More pages">
+                        <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+                        <span class="sidebar-nav-label">More</span>
+                        <svg class="sidebar-nav-label sidebar-more-chevron ml-auto flex-shrink-0" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                    </summary>
+                    <div class="sidebar-more-items">
+                        <a href="{% url 'composer:create_landing' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.url_name == 'create_landing' %}active{% endif %}">
+                            <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a7 7 0 00-4 12.73V16a1 1 0 001 1h6a1 1 0 001-1v-1.27A7 7 0 0012 2z"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                            <span class="sidebar-nav-label">Create Idea</span>
+                        </a>
+                        <a href="{% url 'composer:drafts_list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.url_name == 'drafts_list' %}active{% endif %}">
+                            <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            <span class="sidebar-nav-label">Drafts</span>
+                        </a>
+                        <a href="{% url 'calendar:queue_list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.url_name == 'queue_list' or match.url_name == 'queue_detail' %}active{% endif %}">
+                            <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            <span class="sidebar-nav-label">Queues</span>
+                        </a>
+                        <a href="{% url 'calendar:posting_slots' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.url_name == 'posting_slots' %}active{% endif %}">
+                            <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span class="sidebar-nav-label">Posting Schedule</span>
+                        </a>
+                        <a href="{% url 'composer:template_list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.url_name == 'template_list' %}active{% endif %}">
+                            <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                            <span class="sidebar-nav-label">Templates</span>
+                        </a>
+                        <a href="{% url 'composer:category_list' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.url_name == 'category_list' %}active{% endif %}">
+                            <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                            <span class="sidebar-nav-label">Categories</span>
+                        </a>
+                        <a href="{% url 'composer:csv_upload' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.url_name == 'csv_upload' %}active{% endif %}">
+                            <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span class="sidebar-nav-label">Import CSV</span>
+                        </a>
+                        <a href="{% url 'media_library:index' workspace_id=request.workspace.id %}" class="mb-1 sidebar-nav-item {% if match.app_name == 'media_library' %}active{% endif %}">
+                            <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                            <span class="sidebar-nav-label">Media</span>
+                        </a>
+                    </div>
+                </details>
+                {% endwith %}
                 {% endif %}
 
                 {% comment %}
                   Intelligence — opt-in via env. INTELLIGENCE_ENABLED is False
                   for self-hosters who haven't configured the integration, so
-                  they see no Stripe / billing surface at all. (Django's {# #}
-                  comment syntax is single-line only; this used to be a {# #}
-                  block spanning three lines, which rendered as literal text
-                  in the sidebar.)
+                  they see no Stripe / billing surface at all.
                 {% endcomment %}
                 {% if INTELLIGENCE_ENABLED and request.org %}
                 <a href="{% url 'intelligence:playground' org_id=request.org.id %}"
                    class="mb-1 sidebar-nav-item {% if request.resolver_match.app_name == 'intelligence' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="16.24 7.76 13.41 13.41 7.76 16.24 10.59 10.59 16.24 7.76"/></svg>
+                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polygon points="16.24 7.76 13.41 13.41 7.76 16.24 10.59 10.59 16.24 7.76"/></svg>
                     <span class="sidebar-nav-label">Intelligence</span>
                 </a>
-                {% endif %}
-
-                {% if request.workspace %}
-                {% if sidebar_channels or sidebar_unhealthy_channels %}
-                <!-- Channels -->
-                <div class="group flex items-center justify-between mt-3.5 sidebar-section-label-wrap">
-                    <div class="sidebar-section-label" style="padding-top:0">Channels</div>
-                    <a aria-label="Connect a channel" href="{% url 'social_accounts:connect' workspace_id=request.workspace.id %}"
-                       class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 w-5 h-5 flex items-center justify-center rounded text-stone-400 hover:text-stone-600 transition-all mr-2 sidebar-nav-label"
-                       title="Connect a channel">
-                        <svg aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    </a>
-                </div>
-                {% for channel in sidebar_channels %}
-                <a href="{% url 'social_accounts:list' workspace_id=request.workspace.id %}" class="sidebar-nav-item" title="{{ channel.queued_post_count|default:0 }} upcoming post{{ channel.queued_post_count|default:0|pluralize }} in the queue for {{ channel.account_name|default:channel.account_handle }}">
-                    <div class="relative flex-shrink-0">
-                        {% if channel.avatar_url %}
-                        <img src="{{ channel.avatar_url }}" alt="" class="w-7 h-7 rounded-full object-cover">
-                        {% else %}
-                        <div class="w-7 h-7 rounded-full bg-stone-200 flex items-center justify-center text-[11px] font-semibold text-stone-500">{{ channel.account_name|default:channel.account_handle|make_list|first|upper }}</div>
-                        {% endif %}
-                        <div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                            {% include "partials/_platform_icon.html" with platform=channel.platform size="sm" %}
-                        </div>
-                    </div>
-                    <span class="sidebar-nav-label truncate">{{ channel.account_name|default:channel.account_handle }}</span>
-                    <span class="sidebar-badge">{{ channel.queued_post_count|default:0 }}</span>
-                </a>
-                {% endfor %}
-                {% endif %}
-
-                {% for channel in sidebar_unhealthy_channels %}
-                <div class="sidebar-nav-item flex items-center gap-2">
-                    <div class="relative flex-shrink-0 opacity-60">
-                        {% if channel.avatar_url %}
-                        <img src="{{ channel.avatar_url }}" alt="" class="w-7 h-7 rounded-full object-cover grayscale" x-data @error="$el.style.display='none';$el.nextElementSibling.style.display='flex'">
-                        <div class="w-7 h-7 rounded-full bg-stone-200 items-center justify-center text-[11px] font-semibold text-stone-500" style="display:none">{{ channel.account_name|default:channel.account_handle|make_list|first|upper }}</div>
-                        {% else %}
-                        <div class="w-7 h-7 rounded-full bg-stone-200 flex items-center justify-center text-[11px] font-semibold text-stone-500">{{ channel.account_name|default:channel.account_handle|make_list|first|upper }}</div>
-                        {% endif %}
-                        <div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                            {% include "partials/_platform_icon.html" with platform=channel.platform size="sm" %}
-                        </div>
-                    </div>
-                    <span class="sidebar-nav-label truncate flex-1 text-stone-500 opacity-60">{{ channel.account_name|default:channel.account_handle }}</span>
-                    <form method="post" action="{% url 'social_accounts:reconnect' workspace_id=request.workspace.id account_id=channel.id %}" class="sidebar-nav-label">
-                        {% csrf_token %}
-                        <button type="submit" class="inline-flex items-center px-2 py-0.5 text-[11px] font-semibold text-orange-700 bg-orange-50 rounded-full hover:bg-orange-100 transition-colors cursor-pointer" title="Reconnect {{ channel.account_name|default:channel.account_handle }}">
-                            Reconnect
-                        </button>
-                    </form>
-                </div>
-                {% endfor %}
-
-                <div class="sidebar-connect-channels" x-show="!sidebarCollapsed">
-                <div class="sidebar-section-label">Library</div>
-                <a href="{% url 'composer:template_list' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'template_list' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                    <span class="sidebar-nav-label">Templates</span>
-                </a>
-                <a href="{% url 'composer:category_list' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'category_list' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                    <span class="sidebar-nav-label">Categories</span>
-                </a>
-                <a href="{% url 'composer:csv_upload' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'csv_upload' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <span class="sidebar-nav-label">Import CSV</span>
-                </a>
-                </div>
-
-                <!-- Connect channels (hidden when collapsed) -->
-                {% if sidebar_connectable_platforms %}
-                <div class="sidebar-connect-channels" x-show="!sidebarCollapsed">
-                <div class="sidebar-section-label">Connect channels</div>
-                {% for platform_key, platform_label in sidebar_connectable_platforms|slice:":3" %}
-                <a href="{% url 'social_accounts:connect' workspace_id=request.workspace.id %}" class="sidebar-nav-item">
-                    <div class="relative flex-shrink-0">
-                        <div class="w-4 h-4 flex items-center justify-center rounded-lg bg-stone-100">
-                            {% include "partials/_platform_icon.html" with platform=platform_key size="sm" %}
-                        </div>
-                        <div class="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-orange-500 flex items-center justify-center ring-1 ring-white">
-                            <svg viewBox="0 0 24 24" fill="none" width="6" height="6" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12H19M12 5V19"/></svg>
-                        </div>
-                    </div>
-                    <span class="sidebar-nav-label">{{ platform_label }}</span>
-                </a>
-                {% endfor %}
-                <a href="{% url 'social_accounts:connect' workspace_id=request.workspace.id %}" class="sidebar-nav-item">
-                    <div class="w-4 h-4 flex items-center justify-center flex-shrink-0 rounded-lg bg-stone-100">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    </div>
-                    <span class="sidebar-nav-label">More channels</span>
-                </a>
-                </div>
-                {% endif %}
                 {% endif %}
                 {% endblock %}
             </nav>
@@ -999,15 +928,12 @@
                     {% endfor %}
                 </div>
                 {% endif %}
-                <div class="flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden"{% if not checklist_dismissed and checklist_items %} style="padding-bottom: 96px;"{% endif %}>
+                <div class="flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden">
                 {% block content %}{% endblock %}
                 </div>
             </main>
         </div>
     </div>
-
-    <!-- Onboarding checklist popup (fixed bottom-right) -->
-    {% if not telegram_client_view %}{% include "onboarding/partials/_checklist.html" %}{% endif %}
 
     {% else %}
     <main id="main-content" tabindex="-1" class="auth-bg min-h-screen flex flex-col items-center justify-center py-12 px-4" style="font-family: var(--font-body);">

@@ -1,4 +1,4 @@
-"""The AI Studio pages: brief the team, watch it work, approve what it made.
+"""The agency's pages: talk to your team, watch it work, approve what it made.
 
 Every URL is under ``/workspace/<workspace_id>/studio/``; the RBAC middleware
 has already refused non-members by the time a view runs. Creating and revising
@@ -94,8 +94,7 @@ def _detail_redirect(brief):
 
 
 def _setup(workspace) -> dict:
-    from .readiness import operational_readiness
-
+    """What the brief page needs to know about the services behind the team."""
     accounts = studio_accounts(workspace)
     return {
         "claude_ready": llm.is_configured(),
@@ -103,8 +102,6 @@ def _setup(workspace) -> dict:
         "pictures_ready": images.is_configured(),
         "has_accounts": bool(accounts),
         "has_linkedin": any(a.platform.startswith("linkedin") for a in accounts),
-        "model": llm.model_id(),
-        "operational": operational_readiness(workspace),
     }
 
 
@@ -120,31 +117,63 @@ def _greeting(request, workspace) -> str:
     return f"Good {part}, {name}" if name else f"Good {part}"
 
 
-def _index_context(request, workspace, form):
+def _journeys(request, workspace) -> list[dict]:
+    """The In progress rows: every shared idea thread, one state and one button each."""
+    from . import customer_workflow
+
+    if not _perms(request).get("create_posts", False):
+        return []
+    configured, spend_allowed = llm.is_configured(), budget.can_spend(workspace)
+    threads = (
+        customer_workflow.workflow_threads(workspace)
+        .select_related("workspace")
+        .order_by("-last_message_at", "-created_at")[:12]
+    )
+    return [
+        customer_workflow._journey(
+            workspace, request.user, conversation, configured=configured, spend_allowed=spend_allowed
+        )
+        for conversation in threads
+    ]
+
+
+def _index_context(request, workspace, form=None):
+    """Home: greeting and one status line, Today, the conversation, In progress, Routines, Recent work."""
     from . import dashboard
+    from .views_setup import checklist, status_line
 
     profile = ensure_profile(workspace)
     briefs = list(
         StudioBrief.objects.filter(workspace=workspace)
         .exclude(status__in=(StudioBrief.Status.DISCARDED, StudioBrief.Status.PLANNED))
-        .select_related("graphic", "author", "chosen_concept")[:12]
+        .select_related("graphic", "author", "chosen_concept")[:8]
     )
     perms = _perms(request)
+    progress = checklist(request, workspace)
+    thread = _thread_panel(request, workspace)
+    if thread is not None:
+        thread["home_panel"] = True  # Home's main column; the partial may size itself for it.
     return {
         "workspace": workspace,
         "profile": profile,
         "form": form,
         "briefs": briefs,
-        "setup": _setup(workspace),
-        "reference": style.preview(workspace),
+        "setup_left": progress["left"],
+        "setup_done": progress["done"],
+        "setup_total": progress["total"],
+        "status_parts": status_line(request, workspace, steps_left=progress["left"]),
+        "today": dashboard.today(workspace, request.user),
+        "journeys": _journeys(request, workspace),
+        "routine_rows": None,  # filled in by the Routines integration
         "can_create": perms.get("create_posts", False),
         "can_approve": perms.get("approve_posts", False),
         "can_edit_brand": _can_edit_brand(request),
         "greeting": _greeting(request, workspace),
         "tzname": workspace.effective_timezone or "UTC",
         "tabs": dashboard.tabs(workspace, "overview"),
-        "thread": _thread_panel(request, workspace),
-        **dashboard.overview(workspace),
+        "thread": thread,
+        "agency_settings": dashboard.settings_for(workspace),
+        "checklist_on_home": True,
     }
 
 
@@ -290,6 +319,7 @@ def _detail_context(request, workspace, brief, *, feedback_form=None, schedule_f
     if current_runs and current_runs[-1].finished_at:
         elapsed = max(1, round((current_runs[-1].finished_at - current_runs[0].started_at).total_seconds() / 60))
     return {
+        "next_step": _next_step(brief, platform_posts, workspace),
         "workspace": workspace,
         "brief": brief,
         "team": _team_progress(brief),
@@ -330,6 +360,34 @@ def _detail_context(request, workspace, brief, *, feedback_form=None, schedule_f
         "tabs": [],
         "thread": _brief_thread(request, brief),
     }
+
+
+def _next_step(brief, platform_posts, workspace) -> str:
+    """One sentence on what happens next to an approved post ("Goes out Mon 12 Oct 09:24 on LinkedIn")."""
+    if brief.status != StudioBrief.Status.APPROVED:
+        return ""
+    statuses = {pp.status for pp in platform_posts}
+
+    def when(moment):
+        local = _in_workspace_zone(moment, workspace)
+        return local.strftime("%a %-d %b %H:%M") if local else ""
+
+    def where(rows):
+        return ", ".join(sorted({pp.social_account.get_platform_display() for pp in rows}))
+
+    published = [pp for pp in platform_posts if pp.status == "published" and pp.published_at]
+    if published and statuses <= {"published"}:
+        return f"Went out {when(min(pp.published_at for pp in published))} on {where(published)}."
+    if "pending_client" in statuses:
+        return "Approved by you. Waiting for the client's sign-off before it is scheduled."
+    if "on_hold" in statuses:
+        return "Approved, but held: open Approvals to pick a fresh time."
+    if "failed" in statuses:
+        return "Approved, but delivery failed on one account. Open Approvals to retry."
+    scheduled = [pp for pp in platform_posts if pp.status in ("scheduled", "publishing") and pp.scheduled_at]
+    if scheduled:
+        return f"Goes out {when(min(pp.scheduled_at for pp in scheduled))} on {where(scheduled)}."
+    return "Approved. Pick a posting time on the Approvals page and it goes out then."
 
 
 def _brief_thread(request, brief):

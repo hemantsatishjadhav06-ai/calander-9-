@@ -20,6 +20,33 @@ from django.core.checks import Warning as CheckWarning
 from django.http.request import validate_host
 
 
+def public_https_origin(url: str) -> bool:
+    """Is ``url`` a bare public https origin (scheme, host, optional port, nothing else)?
+
+    Shared by the deploy checks and the owner's Set up page, so both say the
+    same thing about ``APP_URL`` and the Telegram webhook base URL. No network.
+    """
+    try:
+        origin = urlsplit(url or "")
+        host = origin.hostname or ""
+        _port = origin.port  # Validate the port as well as the hostname.
+    except ValueError:
+        return False
+    try:
+        public_host = ip_address(host).is_global
+    except ValueError:
+        public_host = bool(host and "." in host and host != "localhost" and not host.endswith(".localhost"))
+    return (
+        origin.scheme == "https"
+        and public_host
+        and not origin.username
+        and not origin.password
+        and origin.path in ("", "/")
+        and not origin.query
+        and not origin.fragment
+    )
+
+
 @register(Tags.security, deploy=True)
 def check_production_config(app_configs, **kwargs):
     if settings.DEBUG:
@@ -27,25 +54,8 @@ def check_production_config(app_configs, **kwargs):
 
     errors: list[CheckMessage] = []
     app_url = getattr(settings, "APP_URL", "") or ""
-    try:
-        origin = urlsplit(app_url)
-        host = origin.hostname or ""
-        _port = origin.port  # Validate the port as well as the hostname.
-        try:
-            public_host = ip_address(host).is_global
-        except ValueError:
-            public_host = bool(host and "." in host and host != "localhost" and not host.endswith(".localhost"))
-        valid_origin = (
-            origin.scheme == "https"
-            and public_host
-            and not origin.username
-            and not origin.password
-            and origin.path in ("", "/")
-            and not origin.query
-            and not origin.fragment
-        )
-    except ValueError:
-        valid_origin = False
+    valid_origin = public_https_origin(app_url)
+    host = (urlsplit(app_url).hostname or "") if valid_origin else ""
     if not valid_origin:
         errors.append(
             CheckError(
@@ -243,6 +253,37 @@ def check_production_config(app_configs, **kwargs):
                 "The Django admin is reachable from any address.",
                 hint="Set ADMIN_ALLOWED_IPS (addresses or CIDR ranges) and consider a non-default ADMIN_URL.",
                 id="smbean.W010",
+            )
+        )
+
+    # The agency's own services. Warnings, never errors: the product serves
+    # requests without them, but the team cannot work until they are set.
+    provider = (getattr(settings, "STUDIO_PROVIDER", "anthropic") or "anthropic").strip().lower()
+    key_name = {"anthropic": "ANTHROPIC_API_KEY", "openrouter": "OPENROUTER_API_KEY"}.get(provider)
+    if key_name and not (getattr(settings, key_name, "") or "").strip():
+        errors.append(
+            CheckWarning(
+                f"STUDIO_PROVIDER is '{provider}' but {key_name} is not set.",
+                hint=f"The agency team cannot work. Set {key_name} on the web and worker services.",
+                id="smbean.W012",
+            )
+        )
+    if getattr(settings, "TELEGRAM_WEBHOOK_READY", False) and not public_https_origin(
+        getattr(settings, "TELEGRAM_WEBHOOK_BASE_URL", "") or ""
+    ):
+        errors.append(
+            CheckWarning(
+                "TELEGRAM_WEBHOOK_READY is true but TELEGRAM_WEBHOOK_BASE_URL is not a public HTTPS origin.",
+                hint="Telegram cannot reach the webhook. Set TELEGRAM_WEBHOOK_BASE_URL to the deployed origin.",
+                id="smbean.W013",
+            )
+        )
+    if not (getattr(settings, "FAL_KEY", "") or "").strip():
+        errors.append(
+            CheckWarning(
+                "FAL_KEY is not set: the team cannot generate pictures.",
+                hint="Posts use supplied photos or the brand background until FAL_KEY is set.",
+                id="smbean.W014",
             )
         )
 
