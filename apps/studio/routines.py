@@ -343,7 +343,10 @@ def rows(workspace, limit: int | None = None, *, viewer=None, perms: dict | None
                 "is_briefing": routine.kind == Routine.Kind.BRIEFING,
                 "cadence_words": cadence_words(routine),
                 "next_run": _local(routine.next_run_at, workspace),
-                "next_run_words": when_words(routine.next_run_at, workspace) if routine.enabled else "",
+                # An interrupted routine waits for a person, so it has no next time to show.
+                "next_run_words": when_words(routine.next_run_at, workspace)
+                if routine.enabled and routine.status != Routine.Status.INTERRUPTED
+                else "",
                 "enabled": routine.enabled,
                 "status": routine.status,
                 "running": routine.status == Routine.Status.RUNNING,

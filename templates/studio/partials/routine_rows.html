@@ -8,8 +8,8 @@ Each row's own `can_change` (the viewer wrote it) also unlocks Pause and Delete.
 {% if routines %}
 <ul class="divide-y divide-stone-200" aria-label="Routines">
     {% for row in routines %}
-    <li class="py-3 flex flex-wrap items-start gap-x-4 gap-y-2" id="routine-{{ row.id }}">
-        <div class="flex-1 min-w-0">
+    <li class="py-3 flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4" id="routine-{{ row.id }}">
+        <div class="min-w-0 sm:flex-1">
             <div class="flex flex-wrap items-center gap-2">
                 <p class="text-sm font-semibold text-stone-900 break-words">{{ row.title }}</p>
                 {% if row.running %}

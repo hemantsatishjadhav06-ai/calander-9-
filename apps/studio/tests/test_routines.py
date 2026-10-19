@@ -430,7 +430,8 @@ class TestLease:
         assert job.is_active  # the job is left for a person to look at
         notice = _notices(world.editor).get()
         assert "stopped during this run" in notice.body
-        assert routines.rows(world.workspace)[0]["last_result"] == routines.INTERRUPTED
+        row = routines.rows(world.workspace)[0]
+        assert row["last_result"] == routines.INTERRUPTED and row["next_run_words"] == "" and row["needs_attention"]
 
         # Neither the next tick nor the next scheduled time starts it again...
         assert routines.settle_running(now=late + dt.timedelta(minutes=1)) == 0
