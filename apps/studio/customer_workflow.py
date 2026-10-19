@@ -452,7 +452,8 @@ def context(workspace, user, *, form=None):
     telegram_ready = bool(connection and connection.webhook_status == "active" and paired)
     return {
         "workspace": current,
-        "workflow_form": form or IdeaForm(),
+        # A paired author gets Telegram updates by default; the box stays visible to switch off.
+        "workflow_form": form or IdeaForm(initial={"telegram_updates": telegram_ready}),
         "journeys": journeys,
         "active": any(row["state"] in {"queued", "working", "delivering"} for row in journeys),
         # Waiting on a person is still a saved workflow. Read-only polling

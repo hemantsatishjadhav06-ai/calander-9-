@@ -40,6 +40,31 @@ from .permissions import (
 )
 
 PAIRING_TTL = timedelta(minutes=10)
+#: The menu Telegram shows next to the composer; published at connect and by ``telegram_set_commands``.
+BOT_COMMANDS = [
+    ("brief", "Start a post from an idea"),
+    ("brainstorm", "Think an idea through first"),
+    ("approvals", "Posts waiting for you"),
+    ("status", "What is happening here"),
+    ("week", "This week's plan"),
+    ("reference", "Send a photo, PDF or text to use"),
+    ("pause", "Pause your latest task"),
+    ("resume", "Resume a paused task"),
+    ("retry", "Retry a failed task"),
+    ("stop", "Stop your pending requests here"),
+    ("mute", "Pause messages from the team"),
+    ("unmute", "Resume messages from the team"),
+    ("help", "What you can say"),
+]
+
+
+def register_commands(api_or_token) -> bool:
+    """Publish the command menu. Best effort: a failure never blocks connecting or pairing."""
+    try:
+        api = api_or_token if hasattr(api_or_token, "set_my_commands") else BotAPI(api_or_token)
+        return api.set_my_commands(BOT_COMMANDS) is True
+    except Exception:
+        return False
 
 
 def channel_authority_digest(member):
@@ -422,6 +447,7 @@ def connect(
             raise ProvisioningError(
                 "Webhook setup failed. Check the remote webhook before retrying; the previous saved configuration was kept."
             ) from None
+        register_commands(api)
     try:
         with transaction.atomic():
             member = _owner(workspace, user, locked=True, connection=reserved)
@@ -541,6 +567,72 @@ def _invalidate_queues(
         error="Telegram access changed during a send. Inspect the chat before requesting another attempt.",
         updated_at=timezone.now(),
     )
+
+
+def refresh_webhook(connection, user):
+    """Register the webhook again for a saved bot, e.g. after the deployment became ready.
+
+    Keeps the row's epoch when the registration simply succeeds, so cards and
+    channels already bound to this connection stay valid.
+    """
+    member = _owner(connection.workspace, user, connection=connection)
+    current = TelegramConnection.objects.filter(pk=connection.pk, workspace=member.workspace).first()
+    if current is None or not current.token or not current.webhook_secret or not current.bot_id:
+        raise ProvisioningError("Connect the bot with its token first.")
+    url = _webhook_url(current.pk)
+    if url is None:
+        raise ProvisioningError("The public address is not ready yet. Finish the deployment step, then retry.")
+    try:
+        api = BotAPI(current.token)
+        bot = api.get_me()
+        if not isinstance(bot, dict) or bot.get("id") != current.bot_id:
+            raise ProvisioningError("This token belongs to a different bot. Connect the bot again.")
+        if api.set_webhook(url, current.webhook_secret) is not True:
+            raise ProvisioningError("Telegram did not accept the webhook. Try again in a minute.")
+    except ProvisioningError:
+        raise
+    except Exception:
+        raise ProvisioningError("Telegram could not be reached. Check the token and try again.") from None
+    with transaction.atomic():
+        _owner(current.workspace, user, locked=True, connection=current)
+        row = TelegramConnection.objects.select_for_update().get(pk=current.pk)
+        if row.updated_at != current.updated_at or not row.token:
+            raise ProvisioningError("Bot configuration changed meanwhile. Refresh the page before retrying.")
+        TelegramConnection.objects.filter(pk=row.pk).update(is_active=True, webhook_status="active")
+    register_commands(api)
+    return TelegramConnection.objects.get(pk=current.pk)
+
+
+def set_approvals(connection, user, enabled):
+    """Switch approving from Telegram cards on or off; on needs the workspace's approval gate."""
+    with transaction.atomic():
+        member = _owner(connection.workspace, user, locked=True, connection=connection)
+        row = TelegramConnection.objects.select_for_update().get(pk=connection.pk)
+        if enabled and not member.workspace.require_dashboard_approval:
+            raise ProvisioningError("Switch on the approval gate under Settings → Approvals first.")
+        if enabled and not row.is_active:
+            raise ProvisioningError("Connect the bot before approving from Telegram.")
+        # QuerySet.update keeps updated_at: outstanding cards stay bound to this connection.
+        TelegramConnection.objects.filter(pk=row.pk).update(approvals_enabled=bool(enabled))
+    return TelegramConnection.objects.get(pk=connection.pk)
+
+
+def send_test_message(connection, user):
+    """One plain line to the person's own paired chat, so they can see it works."""
+    from .outbox import queue_message
+
+    link = TelegramUserLink.objects.filter(connection=connection, user=user, is_active=True).first()
+    if link is None or not connection.is_active:
+        raise ProvisioningError("Pair your own account first.")
+    chat = private_chat(connection, link)
+    rows = queue_message(
+        chat,
+        "Hello from your team. This chat works: you will hear from me here when something needs you.",
+        source_key=f"test:{user.pk}:{timezone.now():%Y%m%d%H%M}",
+    )
+    if not rows:
+        raise ProvisioningError("This chat cannot receive messages right now. Pair again.")
+    return rows
 
 
 def disconnect(connection, user):

@@ -396,7 +396,10 @@ def test_confirmed_publication_requires_native_receipt_and_private_lineage_is_de
     assert workflow_bridge.queue_post_event(post, "review", "new-event") == 0
 
 
-def test_real_ready_draft_entrypoint_notifies_original_web_author(hub):
+def test_real_ready_draft_entrypoint_notifies_original_web_author(hub, monkeypatch):
+    from apps.telegram import inbox
+
+    monkeypatch.setattr(inbox, "is_quiet", lambda *a, **k: False)
     post = Post.objects.create(workspace=hub[0].workspace, author=hub[2].user)
     brief = StudioBrief.objects.create(
         workspace=post.workspace,
@@ -407,9 +410,16 @@ def test_real_ready_draft_entrypoint_notifies_original_web_author(hub):
         stage="done",
         finished_at=timezone.now(),
     )
-    assert notifications.ready_draft(brief.pk) == 1
+    # The author's idea thread gets its continuation prompt, and the same person,
+    # as the workspace's approver, gets the draft in their manager inbox.
+    assert notifications.ready_draft(brief.pk) == 2
     text = TelegramWorkflowPrompt.objects.get().delivery.payload["text"]
     assert "ready" in text and "continue" in text.lower()
+    inbox_row = TelegramDelivery.objects.filter(source_key__startswith="inbox:").get()
+    assert inbox_row.chat_id == hub[3].pk and "Draft ready" in inbox_row.payload["text"]
+    # A repeat creates nothing new: the prompt is one-use and the inbox row is keyed by draft and person.
+    notifications.ready_draft(brief.pk)
+    assert TelegramDelivery.objects.count() == 2
     brief.revision += 1
     brief.save(update_fields=["revision"])
     assert outbox.send_one(TelegramWorkflowPrompt.objects.get().delivery_id) == "failed"

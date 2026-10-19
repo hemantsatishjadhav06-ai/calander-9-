@@ -257,6 +257,9 @@ def _close_running(job: AgencyJob, message: str, *, status: str = AgentRun.Statu
 def _after_failure(job: AgencyJob, message: str) -> None:
     """Tell the person waiting in a thread that their request failed."""
     if job.kind != AgencyJob.Kind.CHAT or job.conversation_id is None:
+        from . import alerts
+
+        alerts.job_failed(job)  # the lead and backup hear about unprompted work; never raises
         return
     try:
         from .chat import post_failure_note

@@ -43,6 +43,7 @@ _METHODS = frozenset(
         "getUpdates",
         "sendMessage",
         "sendPhoto",
+        "sendMediaGroup",
         "sendDocument",
         "answerCallbackQuery",
         "editMessageReplyMarkup",
@@ -230,6 +231,15 @@ class BotAPI:
             },
         )
 
+    def set_my_commands(self, commands: list[tuple[str, str]]):
+        """Publish the bot's command menu; a failure here never blocks a connection."""
+        rows = []
+        for name, description in commands[:100]:
+            if not re.fullmatch(r"[a-z0-9_]{1,32}", name) or not 1 <= len(description) <= 256:
+                raise TelegramAPIError("The bot command menu is invalid.", kind="invalid_commands")
+            rows.append({"command": name, "description": description})
+        return self.call("setMyCommands", {"commands": rows})
+
     def get_chat_member(self, chat_id: int, user_id: int) -> dict:
         data = self.call("getChatMember", {"chat_id": chat_id, "user_id": user_id})
         if (
@@ -312,5 +322,28 @@ class BotAPI:
         if not isinstance(data, dict):
             raise TelegramAPIError(
                 "The graphic delivery could not be confirmed.", kind="invalid_response", ambiguous=True
+            )
+        return data
+
+    def send_media_group(self, chat_id: int, photos: list[bytes], caption: str = "") -> list:
+        """Send 2–10 photos as one album; the caption rides on the first one. Returns the sent messages."""
+        if not isinstance(photos, list) or not 2 <= len(photos) <= 10:
+            raise TelegramAPIError("An album needs between two and ten photos.", kind="invalid_file")
+        if any(not isinstance(item, bytes) or not 1 <= len(item) <= MAX_PHOTO_BYTES for item in photos):
+            raise TelegramAPIError("A photo exceeds Telegram's size limit.", kind="invalid_file")
+        if len(caption.encode("utf-16-le")) // 2 > 1024:
+            raise TelegramAPIError("The album caption is too long.", kind="invalid_caption")
+        media, files = [], {}
+        for index, content in enumerate(photos):
+            name = f"photo{index}"
+            entry: dict[str, Any] = {"type": "photo", "media": f"attach://{name}"}
+            if index == 0 and caption:
+                entry["caption"] = caption
+            media.append(entry)
+            files[name] = (f"{name}.jpg", content, "application/octet-stream")
+        data = self._request("sendMediaGroup", {"chat_id": chat_id, "media": json.dumps(media)}, files=files)
+        if not isinstance(data, list) or len(data) != len(photos) or not all(isinstance(row, dict) for row in data):
+            raise TelegramAPIError(
+                "The album delivery could not be confirmed.", kind="invalid_response", ambiguous=True
             )
         return data

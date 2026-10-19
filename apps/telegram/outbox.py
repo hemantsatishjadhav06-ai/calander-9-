@@ -3,7 +3,9 @@
 import hashlib
 import re
 from datetime import timedelta
+from urllib.parse import urlsplit
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -18,7 +20,69 @@ from .processing import connection_epoch
 MAX_SEND_ATTEMPTS = 4
 SEND_CLAIM_TIMEOUT = timedelta(minutes=5)
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
+MAX_ALBUM_PHOTOS = 10
 _CALLBACK = re.compile(r"^tg:a:[A-Za-z0-9_-]{32}$")
+
+
+def app_origin():
+    """The app's own public origin; the only place a Telegram link button may point."""
+    base = (getattr(settings, "APP_URL", "") or "").rstrip("/")
+    try:
+        parsed = urlsplit(base)
+    except ValueError:
+        return ""
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or not re.fullmatch(r"[A-Za-z0-9.-]+(?::[0-9]{1,5})?", parsed.netloc)
+    ):
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def app_link(path):
+    """An absolute link into the app, or "" when no public origin is configured."""
+    origin = app_origin()
+    if not origin or not isinstance(path, str) or not path.startswith("/") or path.startswith("//"):
+        return ""
+    return origin + path
+
+
+def link_button(label, path):
+    """A URL button into the app; None when the app has no usable public origin."""
+    url = app_link(path)
+    return {"text": str(label)[:80], "url": url} if url else None
+
+
+def link_keyboard(*buttons):
+    rows = [[button] for button in buttons if button]
+    return {"inline_keyboard": rows} if rows else None
+
+
+def _clean_url_button(label, url):
+    origin = app_origin()
+    if (
+        not origin
+        or not isinstance(label, str)
+        or not 1 <= len(label) <= 80
+        or not isinstance(url, str)
+        or not 1 <= len(url) <= 512
+        or not url.startswith(origin + "/")
+        or any(char.isspace() or char == "\x00" for char in url)
+    ):
+        raise ValueError("Invalid Telegram link button.")
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        raise ValueError("Invalid Telegram link button.") from None
+    if parsed.username or parsed.password or f"{parsed.scheme}://{parsed.netloc}" != origin:
+        raise ValueError("Invalid Telegram link button.")
+    return {"text": label, "url": url}
 
 
 def _chunks(text, limit=4096):
@@ -59,6 +123,10 @@ def _keyboard(value):
             raise ValueError("Invalid Telegram keyboard.")
         buttons = []
         for button in row:
+            if isinstance(button, dict) and set(button) == {"text", "url"}:
+                # A link button opens the app itself; it never acts on anything.
+                buttons.append(_clean_url_button(button["text"], button["url"]))
+                continue
             if not isinstance(button, dict) or set(button) != {"text", "callback_data"}:
                 raise ValueError("Invalid Telegram callback.")
             label, callback = button["text"], button["callback_data"]
@@ -210,6 +278,31 @@ def queue_photo(chat, asset_id, *, caption="", source_key, reply_markup=None):
     return _insert(current, _source_key(source_key), payload, kind="photo")
 
 
+def queue_album(chat, asset_ids, *, caption="", source_key):
+    """Queue 2–10 pictures as one album. Albums cannot carry buttons; send those in a following message."""
+    from apps.media_library.models import MediaAsset
+
+    current = _fresh_chat(chat.pk)
+    if current is None or not permitted_chat(current):
+        return None
+    wanted = [str(item) for item in (asset_ids or [])]
+    if not 2 <= len(wanted) <= MAX_ALBUM_PHOTOS or len(set(wanted)) != len(wanted):
+        return None
+    found = {
+        str(asset.pk): asset
+        for asset in MediaAsset.objects.filter(
+            pk__in=wanted,
+            workspace_id=current.connection.workspace_id,
+            organization_id=current.connection.workspace.organization_id,
+        )
+    }
+    assets = [found.get(item) for item in wanted]
+    if any(asset is None or not asset.is_image or asset.processing_status != "completed" for asset in assets):
+        return None
+    payload = {"method": "sendMediaGroup", "photo_asset_ids": wanted, "caption": (_chunks(caption, 1024) or [""])[0]}
+    return _insert(current, _source_key(source_key), payload, kind="album")
+
+
 def queue_response(connection, payload, response):
     if not isinstance(response, dict) or response.get("silent"):
         return []
@@ -357,10 +450,14 @@ def _suspend_recipient(row, reason):
 
 
 def _photo_content(row, chat):
+    return _asset_content(row.payload.get("photo_asset_id"), chat)
+
+
+def _asset_content(asset_id, chat):
     from apps.media_library.models import MediaAsset
 
     asset = MediaAsset.objects.filter(
-        pk=row.payload.get("photo_asset_id"),
+        pk=asset_id,
         workspace_id=chat.connection.workspace_id,
         organization_id=chat.connection.workspace.organization_id,
         media_type="image",
@@ -436,6 +533,22 @@ def send_one(delivery_id):
                 caption=_photo_caption(asset, payload.get("caption", "")),
                 reply_markup=_keyboard(payload.get("reply_markup")),
             )
+        elif method == "sendMediaGroup" and row.kind == "album":
+            asset_ids = payload.get("photo_asset_ids")
+            if not isinstance(asset_ids, list) or not 2 <= len(asset_ids) <= MAX_ALBUM_PHOTOS:
+                raise ValueError("Invalid album.")
+            photos, first = [], None
+            for asset_id in asset_ids:
+                content, asset = _asset_content(asset_id, chat)
+                first = first or asset
+                photos.append(content)
+            chat = _before_transport(row, chat)
+            if chat is None:
+                return "unknown"
+            api = BotAPI(chat.connection.token)
+            attempted = True
+            sent = api.send_media_group(chat.chat_id, photos, caption=_photo_caption(first, payload.get("caption", "")))
+            result = sent[0] if sent else None
         elif method == "sendMessage" and row.kind == "message":
             text = payload.get("text")
             if not isinstance(text, str) or not text or len(text.encode("utf-16-le")) // 2 > 4096:

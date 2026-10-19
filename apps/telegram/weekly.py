@@ -254,6 +254,17 @@ def analysis_text(preview, *, max_chars=3900) -> str:
     return result
 
 
+def week_role_ok(member) -> bool:
+    """Who may prepare a week: the lead or backup, or an internal approver who also creates posts."""
+    if member is None or not internal_member(member) or not is_internal_approver(member.user, member.workspace):
+        return False
+    row = _settings(member.workspace)
+    if row is not None and member.user_id in {row.lead_id, row.backup_id}:
+        return True
+    permissions = member.effective_permissions or {}
+    return bool(permissions.get("approve_posts") and permissions.get("create_posts"))
+
+
 def _paired(link, chat, *, locked=False):
     member = fresh_member(link, "create_posts", locked=locked)
     current_chat = (
@@ -267,12 +278,31 @@ def _paired(link, chat, *, locked=False):
         or current_chat.audience not in {TelegramChat.Audience.TEAM, TelegramChat.Audience.PRIVATE}
         or current_chat.conversation.audience != "internal"
         or (current_chat.audience == TelegramChat.Audience.PRIVATE and current_chat.private_user_id != member.user_id)
-        or not internal_member(member)
-        or not member.effective_permissions.get("manage_workspace_settings")
-        or not is_internal_approver(member.user, member.workspace)
+        or not week_role_ok(member)
     ):
-        raise PermissionDenied("A current paired workspace manager must prepare the week in a team/private chat.")
+        raise PermissionDenied(
+            "A current paired lead, backup or approver must prepare the week in a team or private chat."
+        )
     return member, current_chat
+
+
+def summary_card_text(preview) -> str:
+    """The short card a person sees first: volume, blockers and cost. Evidence sits behind its own button."""
+    data = preview.get("analysis") or {}
+    budget_info = data.get("budget") or {}
+    lines = [
+        f"Week of {data.get('week_start', '')} · {data.get('workspace', '')}",
+        f"Posts: {data.get('additional_needed', 0)} new, {data.get('existing', 0)} already planned, {data.get('requested', 0)} wanted.",
+        f"Accounts: {len(data.get('accounts') or [])}.",
+        f"Cost so far this month: {budget_info.get('recorded_estimated_usd', '?')} of {budget_info.get('limit_usd', '?')} USD.",
+    ]
+    blockers = data.get("blockers") or []
+    warnings = data.get("warnings") or []
+    if blockers:
+        lines.append("Blocked: " + " ".join(str(item) for item in blockers[:3]))
+    elif warnings:
+        lines.append(f"{len(warnings)} thing{'s' if len(warnings) != 1 else ''} to check in the evidence.")
+    return "\n".join(lines)
 
 
 def _digest(workspace, monday, row, profile, accounts) -> str:

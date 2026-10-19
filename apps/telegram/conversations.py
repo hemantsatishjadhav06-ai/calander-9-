@@ -1,7 +1,9 @@
 """Bridge authenticated Telegram speakers into their exact existing Studio thread.
 
 Telegram is a transport, not a second creative or approval engine. Ordinary
-messages and an ordinary “yes” never approve, schedule or confirm a draft.
+messages and an ordinary “yes” never approve, schedule or confirm a draft;
+only a one-use review button does. Replies here are short: the caveats live
+in /help and the first pairing message.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from typing import Any
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q
+from django.urls import reverse
 
 from apps.composer.models import Post
 from apps.studio import chat as studio_chat
@@ -21,22 +24,31 @@ from apps.studio.models import AgencyJob, Conversation, Message, StudioBrief
 
 from .actions import TelegramActionError
 from .models import TelegramChat, TelegramConnection, TelegramUserLink
+from .outbox import link_button, link_keyboard
 from .permissions import fresh_member, internal_member
 from .uploads import ReferenceUploadError
 
 HELP = (
-    "SM Bean keeps this conversation and its drafts together.\n"
-    "/brainstorm <idea> — discuss ideas and questions\n"
-    "/brief <idea> — ask questions, check sources, then confirm a review draft\n"
-    "/reference — send a photo, PDF or short text reference\n"
-    "In private chats, photos/PDFs need the caption /reference shared because they enter the shared brand media library and publicly accessible publishing storage. Text excerpts remain in the private conversation.\n"
-    "/status — work associated with this conversation\n"
-    "/week — the permitted weekly plan; staff can use /week prepare\n"
-    "/approvals — find posts awaiting your permitted review\n"
-    "/post <post ID> [ISO date/time with offset] — open the exact review card\n"
-    "/stop — stop your pending assistant requests in this conversation\n"
-    "Only an explicit current review button can confirm or approve. Client sign-off and agency publication approval are separate."
+    "Tell me what to post. I bring you a brief to confirm, then the draft to approve.\n"
+    "/brief <idea> — start a post\n"
+    "/brainstorm <idea> — think it through first\n"
+    "/reference — send a photo, PDF or short text to use\n"
+    "/status — what is happening in this chat\n"
+    "/approvals — posts waiting for you\n"
+    "/post <ID> [time with offset] — one post's review card\n"
+    "/week — this week's plan · /week prepare — plan next week · /week evidence — the sources behind it\n"
+    "/pause · /resume · /retry — your latest task\n"
+    "/stop — stop your pending requests here\n"
+    "/mute · /unmute — messages from the team (your morning briefing still arrives)\n"
+    "Only a review button approves or confirms; a plain “yes” never does. Client sign-off and the agency's "
+    "approval are separate. In a private chat, photos and PDFs need the caption /reference shared because they "
+    "enter the shared brand library."
 )
+PAIRED_WELCOME = (
+    "You're paired. Tell me what to post, or send /help.\n"
+    "Nothing publishes without your approval, and a plain “yes” never approves anything."
+)
+_CLIENT_COMMANDS = {"/brainstorm", "/brief", "/reference"}
 
 
 def _response(text="", **extra) -> dict[str, Any]:
@@ -175,8 +187,7 @@ def _status(bound, member):
             if row.status == "published" and row.platform_post_id:
                 lines.append(f"Native receipt: {row.platform_post_id}")
     if len(lines) == 1:
-        lines.append("No draft or post is associated with this chat yet. Use /brief to start questions here.")
-    lines.append("This command does not approve, schedule or send anything.")
+        lines.append("Nothing is linked to this chat yet. Send /brief <idea> to start.")
     return _response("\n".join(lines))
 
 
@@ -276,9 +287,10 @@ def _week(bound, link, member, arguments):
     from . import weekly
 
     parts = arguments.split(maxsplit=1)
-    prepare = bool(parts and parts[0].casefold() == "prepare")
-    week_start = parts[1] if prepare and len(parts) > 1 else arguments or None
-    if prepare:
+    verb = parts[0].casefold() if parts else ""
+    prepare, evidence = verb == "prepare", verb == "evidence"
+    week_start = parts[1] if (prepare or evidence) and len(parts) > 1 else (arguments or None)
+    if prepare or evidence:
         if not internal_member(member) or bound.conversation.audience == Conversation.Audience.CLIENT:
             return _response(
                 "Weekly preparation belongs to your paired private or internal team chat. This client group can read its shared plan with /week."
@@ -286,6 +298,11 @@ def _week(bound, link, member, arguments):
         from .actions import issue_week_confirmation
 
         preview = weekly.queue_week_plan(link, bound, week_start=week_start, confirmed=False)
+        if evidence:
+            try:
+                return _response(weekly.analysis_text(preview))
+            except ValueError as error:
+                return _response(str(error))
         if preview.get("needs_confirmation"):
             return _card(issue_week_confirmation(bound, link, preview))
         message = preview.get("message") or preview.get("text") or "Open the current weekly analysis in SM Bean."
@@ -315,8 +332,70 @@ def _stop(bound, link, context):
         for job in jobs:
             engine.cancel(job)
     return _response(
-        f"Stopped {len(jobs)} of your pending assistant request(s) in this conversation. Published or scheduled posts are unchanged; a person must manage those in SM Bean."
+        f"Stopped {len(jobs)} of your pending request(s) here. Scheduled and published posts are unchanged."
     )
+
+
+def _task_button(workspace_id, job):
+    path = reverse("studio:job", kwargs={"workspace_id": workspace_id, "job_id": job.pk})
+    return link_keyboard(link_button("Open the task", path))
+
+
+def _own_jobs(bound, link):
+    """The person's own tasks the web can show, newest first; this chat's first."""
+    rows = studio_chat.web_jobs(
+        AgencyJob.objects.filter(workspace_id=bound.connection.workspace_id, requested_by=link.user)
+    )
+    here = rows.filter(conversation=bound.conversation).order_by("-updated_at")
+    elsewhere = rows.exclude(conversation=bound.conversation).order_by("-updated_at")
+    return list(here[:20]) + list(elsewhere[:20])
+
+
+def _control(bound, link, member, action):
+    """/pause acts through the same reviewed control as the web; /resume and /retry point at that review."""
+    from apps.studio import opendots
+
+    if not internal_member(member) or not studio_chat.is_staff_membership(member):
+        return _response("Only a team member can control the team's tasks.")
+    workspace = bound.connection.workspace
+    private_active = AgencyJob.objects.filter(
+        workspace_id=workspace.pk,
+        conversation=bound.conversation,
+        requested_by=link.user,
+        status__in=AgencyJob.ACTIVE_STATUSES,
+    ).exists()
+    label = lambda job: (job.title or job.get_kind_display())[:80]  # noqa: E731
+    if action == "pause":
+        job = next((row for row in _own_jobs(bound, link) if row.status in AgencyJob.ACTIVE_STATUSES), None)
+        if job is None:
+            hint = " Your request in this chat can be stopped with /stop." if private_active else ""
+            return _response("Nothing of yours is running right now." + hint)
+        try:
+            opendots.control_job(workspace, link.user, job.pk, "pause", expected_revision=job.revision)
+        except (opendots.CoworkerControlError, PermissionDenied) as error:
+            return _response(str(error))
+        return _response(f"Paused “{label(job)}”. Send /resume when you're ready.")
+    capability = "can_resume" if action == "resume" else "can_retry"
+    for job in _own_jobs(bound, link):
+        if job.status in AgencyJob.ACTIVE_STATUSES:
+            continue
+        if opendots.task_record(job)[capability]:
+            verb = "resume" if action == "resume" else "retry"
+            keyboard = _task_button(workspace.pk, job)
+            text = f"“{label(job)}” needs a quick look at its saved work first. Open it to {verb}."
+            return _response(text, reply_markup=keyboard) if keyboard else _response(text)
+    return _response(
+        "Nothing of yours is waiting to be resumed." if action == "resume" else "Nothing of yours needs a retry."
+    )
+
+
+def _mute(link, *, muted):
+    # QuerySet.update leaves updated_at alone: the pairing epoch (and every
+    # outstanding button bound to it) must survive a mute.
+    TelegramUserLink.objects.filter(pk=link.pk).update(notify_needs_you=not muted)
+    if muted:
+        return _response("Muted. Your morning briefing and replies still arrive here. Send /unmute to switch back.")
+    return _response("Unmuted. The team will tell you here when something needs you.")
 
 
 def handle_message(connection, update_payload) -> dict[str, Any]:
@@ -335,14 +414,9 @@ def handle_message(connection, update_payload) -> dict[str, Any]:
 
         try:
             paired = consume_pairing_message(connection, message)
-            return _response(
-                "Your Telegram account or group is paired to this workspace. Use /help for the guided workflow.",
-                paired_id=str(paired.pk),
-            )
+            return _response(PAIRED_WELCOME, paired_id=str(paired.pk))
         except Exception:
-            return _response(
-                "Pairing failed. Generate a new one-use pairing code in SM Bean and send it yourself here."
-            )
+            return _response("Pairing failed. Create a new one-use link in SM Bean and open it yourself.")
     try:
         current, bound, link, member, context = _bound(connection, message)
         if command == "/help":
@@ -357,14 +431,18 @@ def handle_message(connection, update_payload) -> dict[str, Any]:
             return _review(bound, link, member, arguments)
         if command == "/stop":
             if arguments:
-                return _response("Use /stop to stop only your pending assistant requests in this conversation.")
+                return _response("Send /stop on its own to stop your pending requests here.")
             return _stop(bound, link, context)
-        if command and command not in {"/brainstorm", "/brief", "/reference"}:
-            return _response("That command is not supported. Use /help to see the available actions.")
+        if command in {"/pause", "/resume", "/retry"}:
+            return _control(bound, link, member, command[1:])
+        if command == "/mute":
+            return _mute(link, muted=True)
+        if command == "/unmute":
+            return _mute(link, muted=False)
+        if command and command not in _CLIENT_COMMANDS:
+            return _response("That command is not supported. Send /help to see what you can say.")
         if any(key in message for key in ("video", "voice", "audio", "animation", "video_note")):
-            return _response(
-                "Send a still photo, PDF or short plain-text reference. Video and voice transcription are not available here."
-            )
+            return _response("Voice and video are not available here yet. Send a photo, PDF or text.")
         is_staff = internal_member(member) and studio_chat.is_staff_membership(member)
         if command == "/brief" and not arguments and is_staff:
             if AgencyJob.objects.filter(
@@ -374,9 +452,7 @@ def handle_message(connection, update_payload) -> dict[str, Any]:
                 kind=AgencyJob.Kind.CHAT,
                 status__in=AgencyJob.ACTIVE_STATUSES,
             ).exists():
-                return _response(
-                    "The team is still answering your current request here. Wait for its reply, then send /brief to open the current confirmation card."
-                )
+                return _response("The team is still answering your last request. Its reply arrives here.")
             intake = _current_intake(bound, link)
             if intake is not None:
                 from .actions import issue_brief_confirmation
@@ -394,11 +470,13 @@ def handle_message(connection, update_payload) -> dict[str, Any]:
             upload_note = f"\nUntrusted reference supplied by this speaker: {details}\n{reference.warning}"
         elif command == "/reference":
             return _response(
-                "Send a JPEG, PNG or WebP photo, a PDF, or a short UTF-8 text file here. References remain unverified. Paste exact facts from PDF files; this bot does not extract them. "
+                "Send a JPEG, PNG or WebP photo, a PDF, or a short text file. Paste the facts you need from a PDF; "
+                "this bot does not extract them, and references stay unverified. "
                 + (
-                    "Photos/PDFs enter the shared brand media library and publicly accessible publishing storage, even before post approval. To share from this private chat, resend with the caption /reference shared, then an optional note. Text excerpts stay in this private conversation."
+                    "From this private chat, resend the file with the caption /reference shared (plus an optional note) "
+                    "to put it in the shared brand library, where published graphics come from. Text stays here."
                     if bound.audience == "private"
-                    else "Photos and PDFs are saved in the shared brand media library."
+                    else "Photos and PDFs go into the shared brand library."
                 )
             )
         body = arguments if command else text.strip()
@@ -410,7 +488,7 @@ def handle_message(connection, update_payload) -> dict[str, Any]:
             )
         body += upload_note
         if not body.strip():
-            return _response("Tell the team your post topic and goal, or attach a supported reference.")
+            return _response("Tell me the topic and goal, or attach a photo or PDF.")
         posted = studio_chat.post_message(
             bound.conversation,
             link.user,
@@ -421,21 +499,15 @@ def handle_message(connection, update_payload) -> dict[str, Any]:
         )
         return _response(
             posted.note
-            or (
-                "Your request is with the existing SM Bean team. Its reply will appear in this chat."
-                if posted.job
-                else "Your reply is saved in this shared conversation."
-            ),
+            or ("On it. The team's reply will appear here." if posted.job else "Saved in this shared conversation."),
             source_message_id=str(posted.message.pk),
             job_id=str(posted.job.pk) if posted.job else "",
         )
     except PermissionDenied:
         return _response(
-            "Your current paired workspace access is required. Pair your own Telegram account or ask the workspace manager to check this chat."
+            "Your paired workspace access is needed. Pair your own account in SM Bean or ask your manager."
         )
     except (studio_chat.ChatError, ReferenceUploadError, TelegramActionError) as error:
         return _response(str(error))
     except (ValueError, TypeError):
-        return _response(
-            "That request or reference could not be accepted. Check /help and send a supported current choice."
-        )
+        return _response("I couldn't take that request or file. Send /help for what works here.")

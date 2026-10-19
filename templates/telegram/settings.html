@@ -5,157 +5,225 @@
 {% block sidebar_nav %}
 {% if internal %}{{ block.super }}{% else %}
 <a href="{% url 'telegram:settings' workspace_id=workspace.id %}" class="sidebar-nav-item active" aria-current="page">My Telegram connection</a>
-<p class="px-3 py-3 text-sm text-stone-600">Send ideas and references in your paired client chat. The agency shares posts for your sign-off there.</p>
+<p class="px-3 py-3 text-sm text-stone-600">Send ideas and references in your paired chat. Your agency shares posts for your sign-off there.</p>
 {% endif %}
 {% endblock %}
 {% block content %}
-<div class="max-w-4xl space-y-5" data-telegram-onboarding>
+<div class="max-w-3xl space-y-6" data-telegram-onboarding>
   <div>
-    <h1 class="text-2xl font-semibold">Telegram for {{ workspace.name }}</h1>
-    <p class="mt-2 text-sm text-stone-700">Keep ideas, references, draft review and status in this client's conversation. Preparing a draft and approving publication are separate human choices.</p>
+    <h1 class="text-2xl font-semibold" style="font-family: var(--font-display)">Set up Telegram</h1>
+    <p class="mt-2 text-sm text-stone-700">{% if internal %}Run your team from your phone: it tells you when something needs you and brings you the draft to approve.{% else %}Talk to your agency from your phone and sign off on posts there.{% endif %}</p>
+    {% if internal %}<p class="mt-1 text-sm font-semibold text-stone-800" data-telegram-progress>{{ steps_done }} of {{ steps_total }} done</p>{% endif %}
   </div>
   {% if internal %}{% include "components/agency_tabs.html" %}{% endif %}
 
-  <section class="rounded-xl border p-4 {% if connection.is_active %}border-green-200 bg-green-50{% else %}border-amber-300 bg-amber-50{% endif %}" aria-label="Telegram setup status">
-    {% if connection.is_active %}
-    <h2 class="font-semibold text-green-950">Bot connected{% if connection.bot_username %}: @{{ connection.bot_username }}{% endif %}</h2>
-    <p class="mt-1 text-sm text-green-950">{% if own_link %}Your identity is paired. Open your chat and send <code>/help</code> to check that replies arrive.{% else %}Link your own Telegram account below to start using it.{% endif %}</p>
-    {% else %}
-    <h2 class="font-semibold text-amber-950">{% if connection %}Bot setup needs attention{% else %}Your agency has not connected a bot yet{% endif %}</h2>
-    <p class="mt-1 text-sm text-amber-950">{% if can_manage %}{% if connection %}The saved bot is inactive. Finish the deployed HTTPS connection before pairing people or groups.{% else %}Connect a separate client bot below, then link people and the two groups.{% endif %}{% else %}Ask your agency owner to connect this client's bot. You can link your own account here once it is active.{% endif %}</p>
+  <ol class="space-y-4" aria-label="Telegram set-up steps">
+
+    {% if internal %}
+    <li class="rounded-2xl border bg-white p-5 {% if deployment_ready %}border-green-200{% else %}border-stone-200{% endif %}" data-step="deployment">
+      <div class="flex items-start gap-3">
+        <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold {% if deployment_ready %}bg-green-100 text-green-900{% else %}bg-stone-100 text-stone-700{% endif %}" aria-hidden="true">{% if deployment_ready %}✓{% else %}1{% endif %}</span>
+        <div class="min-w-0 flex-1">
+          <h2 class="font-semibold">Deployment ready</h2>
+          {% if deployment_ready %}
+          <p class="mt-1 text-sm text-stone-700">Ready. This app can receive Telegram messages.</p>
+          {% elif can_manage %}
+          <p class="mt-1 text-sm text-stone-700">Not ready. Set <code>TELEGRAM_WEBHOOK_BASE_URL</code> to this app's public https address{% if webhook_base %} (now <code>{{ webhook_base }}</code>){% endif %} and <code>TELEGRAM_WEBHOOK_READY=true</code>{% if webhook_flag %} (set){% else %} (not set){% endif %} on both services, deploy, then come back.</p>
+          {% else %}
+          <p class="mt-1 text-sm text-stone-700">Not ready yet. Ask your owner.</p>
+          {% endif %}
+        </div>
+      </div>
+    </li>
     {% endif %}
-    {% if can_manage %}
-    <ol class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm" aria-label="Client Telegram setup checklist">
-      <li>{% if connection.is_active %}✓{% else %}○{% endif %} 1. Client bot connected</li>
-      <li>{% if connection.is_active and own_link %}✓{% else %}○{% endif %} 2. Your own account linked</li>
-      <li>{% if client_group_count %}✓{% else %}○{% endif %} 3. Client group linked</li>
-      <li>{% if team_group_count %}✓{% else %}○{% endif %} 4. Internal team group linked</li>
-      <li>{% if channel_count %}✓{% else %}○{% endif %} Optional: status channel connected</li>
-    </ol>
+
+    <li class="rounded-2xl border bg-white p-5 {% if bot_state == 'listening' %}border-green-200{% else %}border-stone-200{% endif %}" data-step="bot">
+      <div class="flex items-start gap-3">
+        <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold {% if bot_state == 'listening' %}bg-green-100 text-green-900{% else %}bg-stone-100 text-stone-700{% endif %}" aria-hidden="true">{% if bot_state == 'listening' %}✓{% else %}2{% endif %}</span>
+        <div class="min-w-0 flex-1 space-y-3">
+          <h2 class="font-semibold">Bot connected</h2>
+          {% if bot_state == 'listening' %}
+          <p class="text-sm text-stone-700">Listening as <strong>@{{ connection.bot_username }}</strong>.</p>
+          {% elif bot_state == 'connecting' %}
+          <p class="text-sm text-amber-900">Bot setup needs attention: the last connection attempt did not finish. Retry the webhook.</p>
+          {% elif bot_state == 'saved' %}
+          <p class="text-sm text-amber-900">Bot setup needs attention: <strong>@{{ connection.bot_username }}</strong> is saved but not listening yet.{% if can_manage %} Finish the deployment step, then retry the webhook.{% else %} Ask your owner.{% endif %}</p>
+          {% elif can_manage %}
+          <p class="text-sm text-stone-700">No bot yet. Create one with BotFather and paste its token here.</p>
+          {% else %}
+          <p class="text-sm text-stone-700">No bot yet. Ask your {% if internal %}owner{% else %}agency{% endif %} to connect one.</p>
+          {% endif %}
+          {% if can_manage and connection and connection.token %}
+          <form method="post" action="{% url 'telegram:refresh_webhook' workspace_id=workspace.id %}">{% csrf_token %}<button type="submit" class="rounded-lg {% if bot_state == 'listening' %}border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-800{% else %}bg-orange-700 px-4 py-3 text-sm font-semibold text-white{% endif %}">Retry webhook</button></form>
+          {% endif %}
+          {% if can_manage %}
+          <details id="telegram-bot-setup" class="rounded-xl border border-stone-200 bg-stone-50 p-4"{% if bot_state == 'missing' and not managed_creation_url %} open{% endif %}>
+            <summary class="cursor-pointer text-sm font-semibold">{% if connection and connection.token %}Replace or disconnect the bot{% else %}Connect a bot with its token{% endif %}</summary>
+            <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-stone-700">
+              <li>Open <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" class="font-semibold text-orange-800 underline">BotFather</a> and send <code>/newbot</code>.</li>
+              <li>Name it for this client; one bot per workspace.</li>
+              <li>Paste its token below. Never post the token in a group.</li>
+            </ol>
+            <form method="post" action="{% url 'telegram:connect' workspace_id=workspace.id %}" class="mt-3 space-y-3">{% csrf_token %}
+              {% if connect_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ connect_form.non_field_errors }}{% for field in connect_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
+              <div><label for="{{ connect_form.token.id_for_label }}" class="mb-1 block text-sm font-semibold">{{ connect_form.token.label }}</label>{{ connect_form.token }}</div>
+              <label class="flex items-start gap-2 text-sm">{{ connect_form.approvals_enabled }}<span>Allow approving from Telegram cards (needs the <a href="{% url 'workspaces:approvals_settings' workspace_id=workspace.id %}" class="underline text-orange-800">approval gate</a>).</span></label>
+              <button class="w-full rounded-lg bg-orange-700 px-4 py-3 font-semibold text-white sm:w-auto" type="submit">Validate and connect bot</button>
+            </form>
+            {% if connection %}<form method="post" action="{% url 'telegram:disconnect' workspace_id=workspace.id %}" class="mt-3">{% csrf_token %}<button class="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-800" type="submit">Disconnect and clear the token</button><p class="mt-1 text-xs text-stone-600">Every pairing in this workspace is cleared too.</p></form>{% endif %}
+          </details>
+          {% endif %}
+        </div>
+      </div>
+    </li>
+
+    <li class="rounded-2xl border bg-white p-5 {% if paired %}border-green-200{% else %}border-stone-200{% endif %}" data-step="pairing" id="telegram-personal-setup">
+      <div class="flex items-start gap-3">
+        <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold {% if paired %}bg-green-100 text-green-900{% else %}bg-stone-100 text-stone-700{% endif %}" aria-hidden="true">{% if paired %}✓{% else %}3{% endif %}</span>
+        <div class="min-w-0 flex-1 space-y-3">
+          <h2 class="font-semibold">You are paired</h2>
+          {% if paired %}
+          <p class="text-sm text-stone-700">Paired{% if own_link.telegram_username %} as @{{ own_link.telegram_username }}{% endif %}. {% if internal %}The team tells you here when something needs you.{% else %}Your agency shares posts with you here.{% endif %}</p>
+          <div class="flex flex-wrap gap-2">
+            <form method="post" action="{% url 'telegram:test_message' workspace_id=workspace.id %}">{% csrf_token %}<button type="submit" class="rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white">Send me a test message</button></form>
+            <form method="post" action="{% url 'telegram:unpair' workspace_id=workspace.id %}">{% csrf_token %}<button type="submit" class="rounded-lg border border-stone-300 px-4 py-2 text-sm">Unpair</button></form>
+          </div>
+          {% else %}
+          <p class="text-sm text-stone-700">Open the one-use link on your phone and press Start. It expires in ten minutes.</p>
+          {% endif %}
+          {% if pairing_purpose == 'user' %}
+          <div role="status" class="space-y-2 rounded-xl border border-orange-200 bg-orange-50 p-4" data-personal-pairing x-data="{ left: {{ pairing_seconds|default:0 }} }" x-init="setInterval(() => { if (left > 0) left -= 1 }, 1000)">
+            {% if pairing_url %}<a href="{{ pairing_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white">Open Telegram and pair</a>
+            <p class="text-sm">Or send this in the private chat with @{{ connection.bot_username }}:</p>{% else %}<p class="text-sm">Send this in the bot's private chat:</p>{% endif %}
+            <code class="block select-all break-all text-sm">{{ pairing_command }}</code>
+            <p class="text-xs text-stone-700">Expires <span x-text="left > 0 ? 'in ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') : 'now'">at {{ expires_at|date:"H:i T" }}</span>. One use; shown only now.</p>
+          </div>
+          {% endif %}
+          <form method="post" action="{% url 'telegram:pair' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
+            {{ pair_form.purpose }}{{ pair_form.audience }}
+            {% if pair_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ pair_form.non_field_errors }}{% for field in pair_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
+            <button class="w-full rounded-lg {% if paired %}border border-stone-300 text-stone-800{% else %}bg-orange-700 text-white{% endif %} px-4 py-3 text-sm font-semibold disabled:opacity-50 sm:w-auto" type="submit"{% if bot_state != 'listening' %} disabled{% endif %}>{% if paired %}Pair again{% else %}Open Telegram and pair{% endif %}</button>
+            {% if bot_state != 'listening' %}<p class="text-sm text-stone-600">Available once the bot is listening.</p>{% endif %}
+          </form>
+        </div>
+      </div>
+    </li>
+
+    {% if internal %}
+    <li class="rounded-2xl border bg-white p-5 {% if approvals_on %}border-green-200{% else %}border-stone-200{% endif %}" data-step="approvals">
+      <div class="flex items-start gap-3">
+        <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold {% if approvals_on %}bg-green-100 text-green-900{% else %}bg-stone-100 text-stone-700{% endif %}" aria-hidden="true">{% if approvals_on %}✓{% else %}4{% endif %}</span>
+        <div class="min-w-0 flex-1 space-y-3">
+          <h2 class="font-semibold">Approvals from Telegram</h2>
+          {% if approvals_on %}
+          <p class="text-sm text-stone-700">On. Approve, reject or ask for changes from the card; nothing publishes without you.</p>
+          {% elif not approval_gate_on %}
+          <p class="text-sm text-stone-700">Off. Switch on the <a href="{% url 'workspaces:approvals_settings' workspace_id=workspace.id %}" class="underline text-orange-800">approval gate</a> first; cards still arrive meanwhile.</p>
+          {% else %}
+          <p class="text-sm text-stone-700">Off. Cards still arrive; approving happens in SM Bean.</p>
+          {% endif %}
+          {% if can_manage and connection %}
+          <form method="post" action="{% url 'telegram:toggle_approvals' workspace_id=workspace.id %}">{% csrf_token %}
+            {% if approvals_on %}<button type="submit" class="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-800">Turn off</button>{% else %}<input type="hidden" name="enabled" value="on"><button type="submit" class="rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"{% if not approval_gate_on or bot_state != 'listening' %} disabled{% endif %}>Turn on</button>{% endif %}
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </li>
     {% endif %}
-  </section>
 
-  {% if can_manage %}
-  {% if managed_enabled %}
-  <section class="rounded-xl border border-indigo-200 bg-indigo-50/30 p-4 space-y-3" aria-labelledby="telegram-managed-heading">
-    <h2 id="telegram-managed-heading" class="font-semibold">Create this client's bot with Telegram confirmation</h2>
-    <p class="text-sm text-stone-700">A supported manager bot can create a separate bot for this workspace after you confirm in Telegram. SM Bean then connects the new bot automatically. This requires Telegram's bot-management capability; a normal bot cannot silently create other bots.</p>
-    {% if managed_latest_request %}
-    <div role="status" class="rounded-lg border bg-white p-3 text-sm" data-managed-bot-status>
-      <p class="font-semibold">{% if managed_request_expired %}Telegram confirmation expired{% else %}{{ managed_latest_request.get_status_display }}{% endif %} · {{ managed_latest_request.requested_name }}</p>
-      {% if managed_latest_request.error %}<p class="mt-1 break-words">{{ managed_latest_request.error }}</p>{% endif %}
-      {% if managed_latest_request.status == 'pending' %}<p class="mt-1">Confirm using your personally linked Telegram account before {{ managed_latest_request.expires_at|date:"j M Y, H:i T" }}.</p>{% endif %}
-      <a class="inline-block mt-2 font-semibold text-orange-800 underline" href="{% url 'telegram:settings' workspace_id=workspace.id %}">Check bot setup status</a>
-    </div>
+    {% if can_pair_group or can_manage %}
+    <li class="rounded-2xl border border-stone-200 bg-white p-5" data-step="advanced">
+      <details>
+        <summary class="cursor-pointer font-semibold">Advanced: team group, client group, status channel</summary>
+        <div class="mt-4 space-y-6">
+
+          {% if can_pair_group %}
+          <section id="telegram-group-setup" class="space-y-3" aria-labelledby="telegram-group-heading">
+            <h3 id="telegram-group-heading" class="font-semibold">Team and client groups</h3>
+            <p class="text-sm text-stone-700">Add @{{ connection.bot_username|default:'your bot' }} to the group, make sure you are its administrator, then create a one-use group code and send it there yourself. Keep the client group and the team group separate; you control who is in each.</p>
+            {% if pairing_purpose == 'chat' %}<div role="status" class="space-y-2 rounded-xl border border-orange-200 bg-orange-50 p-4" data-group-pairing><p class="text-sm font-semibold">Send this yourself in the {% if pairing_audience == 'client' %}client{% else %}internal team{% endif %} group:</p><code class="block select-all break-all text-sm">{{ pairing_command }}</code><p class="text-xs">Expires {{ expires_at|date:"j M Y, H:i T" }}. Only in that group.</p></div>{% endif %}
+            <form method="post" action="{% url 'telegram:pair' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
+              {{ group_pair_form.purpose }}
+              {% if group_pair_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ group_pair_form.non_field_errors }}{% for field in group_pair_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
+              <div><label for="{{ group_pair_form.audience.id_for_label }}" class="mb-1 block text-sm font-semibold">Which group are you linking?</label>{{ group_pair_form.audience }}</div>
+              <label class="flex items-start gap-2 text-sm">{{ group_pair_form.group_membership_confirmed }}<span>{{ group_pair_form.group_membership_confirmed.label }}</span></label>
+              <button class="w-full rounded-lg border border-stone-400 px-4 py-3 text-sm font-semibold disabled:opacity-50 sm:w-auto" type="submit"{% if bot_state != 'listening' or not own_link %} disabled{% endif %}>Create one-use group code</button>
+              {% if not own_link %}<p class="text-sm text-amber-900">Link your own Telegram account before creating a group code.</p>{% endif %}
+            </form>
+            <p class="text-sm text-stone-600">Linked: {{ client_group_count }} client group{{ client_group_count|pluralize }}, {{ team_group_count }} team group{{ team_group_count|pluralize }}. <a href="{% url 'studio:autopilot' workspace_id=workspace.id %}" class="underline text-orange-800">Choose the lead and backup approvers</a> so the right people get told.</p>
+          </section>
+          {% endif %}
+
+          {% if can_manage %}
+          <section id="telegram-channel-setup" class="space-y-3" aria-labelledby="telegram-channel-heading">
+            <h3 id="telegram-channel-heading" class="font-semibold">Status channel (optional)</h3>
+            <p class="text-sm text-stone-700">A channel broadcasts fixed status lines (draft ready, approved, scheduled, published) to its subscribers. Add @{{ connection.bot_username|default:'your bot' }} as an administrator with Post Messages, then enter the channel below. Captions, costs and buttons never go there.</p>
+            <form method="post" action="{% url 'telegram:connect_channel' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
+              {% if channel_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ channel_form.non_field_errors }}{% for field in channel_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
+              <div><label for="{{ channel_form.channel_reference.id_for_label }}" class="mb-1 block text-sm font-semibold">{{ channel_form.channel_reference.label }}</label>{{ channel_form.channel_reference }}<p class="mt-1 text-xs text-stone-600">{{ channel_form.channel_reference.help_text }}</p></div>
+              <label class="flex items-start gap-2 text-sm">{{ channel_form.visibility_confirmed }}<span>{{ channel_form.visibility_confirmed.label }}</span></label>
+              <button type="submit" class="w-full rounded-lg bg-orange-700 px-4 py-3 font-semibold text-white disabled:opacity-50 sm:w-auto"{% if not channel_pairing_ready %} disabled{% endif %}>Verify and connect channel</button>
+              {% if not channel_pairing_ready %}<p class="text-sm text-stone-700">Pair your own account and press Start in the bot's chat first.</p>{% endif %}
+            </form>
+            {% for channel in channels %}<div class="space-y-2 rounded-lg border p-3"><p class="break-words text-sm font-semibold">{{ channel.title }}{% if channel.username %} · @{{ channel.username }}{% endif %} · {% if channel.proof_current %}connected{% elif channel.is_active %}verification needed{% else %}disabled{% endif %}</p>{% if channel.is_active and not channel.proof_current %}<p class="text-sm text-amber-900">The bot, your pairing or permissions changed. Verify this channel again above.</p>{% endif %}{% if channel.is_active %}<form method="post" action="{% url 'telegram:disconnect_channel' workspace_id=workspace.id channel_id=channel.id %}">{% csrf_token %}<button type="submit" class="rounded-lg border px-4 py-2 text-sm">Disable channel updates</button></form>{% endif %}</div>{% empty %}<p class="text-sm text-stone-600">No status channel connected.</p>{% endfor %}
+            {% for item in channel_deliveries %}<div role="status" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">Channel delivery {{ item.status }} · {{ item.attempts }} attempt(s). {{ item.error }}</div>{% endfor %}
+          </section>
+
+          {% if managed_enabled and managed_managers or managed_latest_request or managed_creation_url %}
+          <section class="space-y-3" aria-labelledby="telegram-managed-heading">
+            <h3 id="telegram-managed-heading" class="font-semibold">Create this client's bot with Telegram confirmation</h3>
+            <p class="text-sm text-stone-700">A manager bot you have paired with can create a separate bot for this workspace after you confirm in Telegram. SM Bean then connects it for you.</p>
+            {% if managed_latest_request %}
+            <div role="status" class="rounded-lg border bg-white p-3 text-sm" data-managed-bot-status>
+              <p class="font-semibold">{% if managed_request_expired %}Telegram confirmation expired{% else %}{{ managed_latest_request.get_status_display }}{% endif %} · {{ managed_latest_request.requested_name }}</p>
+              {% if managed_latest_request.error %}<p class="mt-1 break-words">{{ managed_latest_request.error }}</p>{% endif %}
+              {% if managed_latest_request.status == 'pending' %}<p class="mt-1">Confirm with your paired Telegram account before {{ managed_latest_request.expires_at|date:"j M Y, H:i T" }}.</p>{% endif %}
+            </div>
+            {% endif %}
+            {% if managed_creation_url %}<div role="status" class="space-y-2 rounded-lg border border-indigo-200 bg-white p-3" data-managed-bot-consent><a href="{{ managed_creation_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white">Open Telegram and confirm client bot creation</a><p class="text-xs text-stone-600">Telegram asks for your confirmation. Come back here afterwards. This ten-minute link is shown only now.</p></div>{% endif %}
+            {% if not connection.is_active and managed_managers %}
+            <form method="post" action="{% url 'telegram:managed_create' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
+              {% if managed_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ managed_form.non_field_errors }}{% for field in managed_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
+              <label for="{{ managed_form.manager_connection.id_for_label }}" class="block text-sm font-semibold">{{ managed_form.manager_connection.label }}</label>{{ managed_form.manager_connection }}
+              <button type="submit" class="w-full rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white sm:w-auto">Request client bot creation</button>
+            </form>
+            {% elif connection.is_active %}<p class="text-sm text-stone-700">This workspace already has an active bot.</p>{% endif %}
+          </section>
+          {% endif %}
+
+          <section class="space-y-3" aria-labelledby="telegram-status-heading">
+            <h3 id="telegram-status-heading" class="font-semibold">Linked chats and messages needing attention</h3>
+            {% for chat in chats %}<div class="rounded-lg border border-stone-200 p-3"><p class="break-words text-sm font-semibold">{{ chat.title|default:chat.chat_type }} · {{ chat.get_audience_display }} · {% if chat.is_active %}active{% else %}inactive{% endif %}</p>{% if chat.is_active %}<form method="post" class="mt-2" action="{% url 'telegram:deactivate_chat' workspace_id=workspace.id chat_id=chat.id %}">{% csrf_token %}<button type="submit" class="rounded-lg border px-4 py-2 text-sm">Disable this chat</button></form>{% endif %}</div>{% empty %}<p class="text-sm text-stone-600">No chats paired yet.</p>{% endfor %}
+            {% for item in deliveries %}<div role="status" class="break-words rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">Delivery {{ item.status }} · {{ item.attempts }} attempt(s). {{ item.error }}{% if item.native_message_id %} Receipt {{ item.native_message_id }}.{% endif %}</div>{% endfor %}
+            {% for item in updates %}<p class="text-sm text-red-800">Incoming message failed after {{ item.attempts }} attempt(s): {{ item.error }}</p>{% endfor %}
+            <p class="text-sm text-stone-600">For an unknown send, look at the chat before asking for another attempt.</p>
+          </section>
+          {% endif %}
+        </div>
+      </details>
+    </li>
     {% endif %}
-    {% if managed_creation_url %}<div role="status" class="rounded-lg border border-indigo-200 bg-white p-3 space-y-2" data-managed-bot-consent><a href="{{ managed_creation_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white">Open Telegram and confirm client bot creation</a><p class="text-xs text-stone-600">Telegram asks for your confirmation. Return here and check the status afterward. This ten-minute link is shown only in this response.</p></div>{% endif %}
-    {% if not connection.is_active %}
-    <form method="post" action="{% url 'telegram:managed_create' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
-      {% if managed_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ managed_form.non_field_errors }}{% for field in managed_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
-      {% if managed_managers %}<label for="{{ managed_form.manager_connection.id_for_label }}" class="block text-sm font-semibold">{{ managed_form.manager_connection.label }}</label>{{ managed_form.manager_connection }}<button type="submit" class="w-full sm:w-auto rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white">Request client bot creation</button><p class="text-xs text-stone-600">We check Telegram's manager capability before issuing a link. If it is unavailable, use the BotFather option below.</p>{% else %}<p class="text-sm text-stone-700">No personally linked manager bot is available. First connect and personally pair an agency manager bot in a workspace you manage, then return. <a class="underline text-orange-800" href="{% url 'workspaces:list' %}">Open your workspaces</a>. You can also connect a BotFather-created bot below.</p>{% endif %}
-    </form>
-    {% else %}<p class="text-sm text-stone-700">This workspace already has an active bot. Use a new client workspace to create another bot, or explicitly disconnect this one before replacing it.</p>{% endif %}
-  </section>
-  {% endif %}
-  <section id="telegram-bot-setup" class="rounded-xl border bg-white p-4 space-y-3" aria-labelledby="telegram-bot-heading">
-    <h2 id="telegram-bot-heading" class="font-semibold">1. Connect this client's bot</h2>
-    <ol class="list-decimal pl-5 space-y-2 text-sm text-stone-700">
-      <li>Open <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" class="font-semibold text-orange-800 underline">BotFather</a> in Telegram and send <code>/newbot</code>.</li>
-      <li>Give it this client's name and a unique username ending in <code>bot</code>. Keep a separate bot for every client workspace.</li>
-      <li>Paste its BotFather token below. SM Bean validates the bot and connects its deployed message endpoint. Do not post the token in a group.</li>
-    </ol>
-    <p class="text-sm text-stone-600">This form connects an existing bot; it does not create Telegram bots or groups. A bot already used by another application is protected from being overwritten.</p>
-    <form method="post" action="{% url 'telegram:connect' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
-      {% if connect_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ connect_form.non_field_errors }}{% for field in connect_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
-      <div><label for="{{ connect_form.token.id_for_label }}" class="block mb-1 text-sm font-semibold">{{ connect_form.token.label }}</label>{{ connect_form.token }}</div>
-      <label class="flex gap-2 items-start text-sm">{{ connect_form.approvals_enabled }}<span>{{ connect_form.approvals_enabled.label }}. Enable <a href="{% url 'workspaces:approvals_settings' workspace_id=workspace.id %}" class="underline text-orange-800">exact human approval</a> first.</span></label>
-      <button class="w-full sm:w-auto rounded-lg bg-orange-700 px-4 py-3 font-semibold text-white" type="submit">Validate and connect bot</button>
-    </form>
-    {% if connection %}<details class="text-sm"><summary class="cursor-pointer text-red-800 font-semibold">Disconnect this client's bot</summary><p class="my-2">This stops new Telegram work, clears the saved token and disables every person and group pairing for this workspace. Existing production still needs its normal review.</p><form method="post" action="{% url 'telegram:disconnect' workspace_id=workspace.id %}">{% csrf_token %}<button class="rounded-lg border border-red-300 px-4 py-3 text-red-800" type="submit">Disable Telegram and clear saved token</button></form></details>{% endif %}
-  </section>
-  {% endif %}
+  </ol>
 
-  <section id="telegram-personal-setup" class="rounded-xl border bg-white p-4 space-y-3" aria-labelledby="telegram-personal-heading">
-    <h2 id="telegram-personal-heading" class="font-semibold">{% if can_manage %}2. {% endif %}Link your own Telegram account</h2>
-    <p class="text-sm text-stone-700">Create your personal link, open it in Telegram and press Start. Use your own account. Each person needs their own link; it expires in ten minutes and works once.</p>
-    {% if own_link %}<p class="text-sm font-semibold text-green-800">Your Telegram account is linked.</p><form method="post" action="{% url 'telegram:unpair' workspace_id=workspace.id %}">{% csrf_token %}<button type="submit" class="rounded-lg border px-4 py-3 text-sm">Disconnect my identity</button></form>{% endif %}
-    {% if pairing_purpose == 'user' %}
-    <div role="status" class="rounded-lg border border-orange-200 bg-orange-50 p-3 space-y-2" data-personal-pairing>
-      {% if pairing_url %}<a href="{{ pairing_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white">Open Telegram and link my account</a>{% endif %}
-      <p class="text-sm">{% if pairing_url %}Or open @{{ connection.bot_username }} and send this command in its private chat:{% else %}Send this command yourself in the bot's private chat:{% endif %}</p>
-      <code class="block break-all select-all text-sm">{{ pairing_command }}</code>
-      <p class="text-xs text-stone-700">Expires {{ expires_at|date:"j M Y, H:i T" }}. Keep this one-use link and code private; they are shown only now.</p>
-    </div>
-    {% endif %}
-    <form method="post" action="{% url 'telegram:pair' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
-      {{ pair_form.purpose }}{{ pair_form.audience }}
-      {% if pair_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ pair_form.non_field_errors }}{% for field in pair_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
-      <button class="w-full sm:w-auto rounded-lg border border-stone-400 px-4 py-3 text-sm font-semibold disabled:opacity-50" type="submit"{% if not connection.is_active %} disabled{% endif %}>{% if own_link %}Create a fresh personal link{% else %}Create my personal Telegram link{% endif %}</button>
-    </form>
-    <p class="text-xs text-stone-600">Your paired private conversation stays private. Photos and PDFs shared to the brand library have a separate explicit sharing step.</p>
-  </section>
-
-  {% if can_pair_group %}
-  <section id="telegram-group-setup" class="rounded-xl border bg-white p-4 space-y-3" aria-labelledby="telegram-group-heading">
-    <h2 id="telegram-group-heading" class="font-semibold">3. Link separate client and team groups</h2>
-    <ol class="list-decimal pl-5 space-y-2 text-sm text-stone-700">
-      <li>Create the client group and a separate internal team group in Telegram. Add @{{ connection.bot_username|default:'your client bot' }} to each.</li>
-      <li>Check every group member. You must be a Telegram group administrator and personally linked above.</li>
-      <li>Select one audience below, confirm its membership and create a group code. Send the <code>/pair</code> command yourself in that exact group. Repeat for the other audience.</li>
-    </ol>
-    <p class="text-sm text-stone-600">Telegram verifies your administrator status when you use the code. The group keeps its client or internal audience until you disconnect it. Telegram cannot list every passive viewer for SM Bean; you control who stays in the group.</p>
-    {% if pairing_purpose == 'chat' %}<div role="status" class="rounded-lg border border-orange-200 bg-orange-50 p-3 space-y-2" data-group-pairing><p class="text-sm font-semibold">Send this yourself in the {% if pairing_audience == 'client' %}client{% else %}internal team{% endif %} group:</p><code class="block break-all select-all text-sm">{{ pairing_command }}</code><p class="text-xs">Expires {{ expires_at|date:"j M Y, H:i T" }}. Do not send this group code in a private chat or another group.</p></div>{% endif %}
-    <form method="post" action="{% url 'telegram:pair' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
-      {{ group_pair_form.purpose }}
-      {% if group_pair_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ group_pair_form.non_field_errors }}{% for field in group_pair_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
-      <div><label for="{{ group_pair_form.audience.id_for_label }}" class="block mb-1 text-sm font-semibold">Which group are you linking?</label>{{ group_pair_form.audience }}</div>
-      <label class="flex gap-2 items-start text-sm">{{ group_pair_form.group_membership_confirmed }}<span>{{ group_pair_form.group_membership_confirmed.label }}</span></label>
-      <button class="w-full sm:w-auto rounded-lg border border-stone-400 px-4 py-3 text-sm font-semibold disabled:opacity-50" type="submit"{% if not connection.is_active or not own_link %} disabled{% endif %}>Create one-use group code</button>
-      {% if not own_link %}<p class="text-sm text-amber-900">Link your own Telegram account before creating a group code.</p>{% endif %}
-    </form>
-    <p class="text-sm text-stone-700">Ask the lead, backup and each team member to link their own account. <a href="{% url 'studio:autopilot' workspace_id=workspace.id %}" class="underline text-orange-800">Select the current lead and backup approvers</a> in agency settings. Client sign-off stays separate from agency permission to publish.</p>
-  </section>
-  {% endif %}
-
-  {% if can_manage %}
-  <section id="telegram-channel-setup" class="rounded-xl border bg-white p-4 space-y-3" aria-labelledby="telegram-channel-heading">
-    <h2 id="telegram-channel-heading" class="font-semibold">4. Connect a channel for status updates (optional)</h2>
-    <p class="text-sm text-stone-700">A channel broadcasts brief draft, review, scheduling and delivery status updates to its subscribers. Questions, answers and approval buttons stay in your personally linked private chat or the appropriate client or team group.</p>
-    <ol class="list-decimal pl-5 space-y-2 text-sm text-stone-700">
-      <li>Link your own Telegram account above and press Start. Use an account that is a channel administrator.</li>
-      <li>In the channel's administrator settings, add @{{ connection.bot_username|default:'your client bot' }} and enable <strong>Post Messages</strong>.</li>
-      <li>Enter the channel's public @username or its private numeric channel ID. Confirm that its subscribers may see these status updates, then verify it below.</li>
-    </ol>
-    <p class="text-sm text-stone-600">We verify both administrator identities. Telegram cannot list every passive subscriber; you control that audience. Private conversation content, post captions, internal costs and approval buttons are never broadcast here. Use a separate channel for each client workspace.</p>
-    <form method="post" action="{% url 'telegram:connect_channel' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
-      {% if channel_form.errors %}<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ channel_form.non_field_errors }}{% for field in channel_form %}{{ field.errors }}{% endfor %}</div>{% endif %}
-      <div><label for="{{ channel_form.channel_reference.id_for_label }}" class="block mb-1 text-sm font-semibold">{{ channel_form.channel_reference.label }}</label>{{ channel_form.channel_reference }}<p class="mt-1 text-xs text-stone-600">{{ channel_form.channel_reference.help_text }}</p></div>
-      <label class="flex gap-2 items-start text-sm">{{ channel_form.visibility_confirmed }}<span>{{ channel_form.visibility_confirmed.label }}</span></label>
-      <button type="submit" class="w-full sm:w-auto rounded-lg bg-orange-700 px-4 py-3 font-semibold text-white disabled:opacity-50"{% if not channel_pairing_ready %} disabled{% endif %}>Verify and connect channel</button>
-      {% if not channel_pairing_ready %}<p class="text-sm text-stone-700">Create your personal Telegram link above and press Start in the bot's private chat before connecting a channel. A disabled private chat needs a fresh link.</p>{% endif %}
-    </form>
-    {% for channel in channels %}<div class="rounded-lg border p-3 space-y-2"><p class="break-words text-sm font-semibold">{{ channel.title }}{% if channel.username %} · @{{ channel.username }}{% endif %} · {% if channel.proof_current %}connected{% elif channel.is_active %}verification needed{% else %}disabled{% endif %}</p>{% if channel.is_active and not channel.proof_current %}<p class="text-sm text-amber-900">The bot, account pairing or permissions changed. Verify this channel again above before new updates can be sent.</p>{% endif %}{% if channel.is_active %}<form method="post" action="{% url 'telegram:disconnect_channel' workspace_id=workspace.id channel_id=channel.id %}">{% csrf_token %}<button type="submit" class="rounded-lg border px-4 py-2 text-sm">Disable channel updates</button></form>{% endif %}</div>{% empty %}<p class="text-sm text-stone-600">No status channel connected. Your private chats and groups work independently.</p>{% endfor %}
-    {% for item in channel_deliveries %}<div role="status" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">Channel delivery {{ item.status }} · {{ item.attempts }} attempt(s). {{ item.error }}{% if item.status == 'unknown' %} Check the channel before requesting another update.{% endif %}</div>{% endfor %}
-  </section>
-  {% endif %}
-
-  <section class="rounded-xl border bg-white p-4 space-y-3" aria-labelledby="telegram-commands-heading">
-    <h2 id="telegram-commands-heading" class="font-semibold">Start in your Telegram conversation</h2>
-    <dl class="grid gap-3 text-sm sm:grid-cols-2">
-      <div><dt class="font-semibold"><code>/brainstorm An idea for this client</code></dt><dd class="text-stone-700">Discuss ideas and missing information before creative work.</dd></div>
-      <div><dt class="font-semibold"><code>/brief The post I need</code></dt><dd class="text-stone-700">Answer the team's questions. {% if internal %}A permitted lead confirms the brief before a draft starts.{% else %}Your agency lead confirms preparation and shares the draft for your sign-off.{% endif %}</dd></div>
-      <div><dt class="font-semibold"><code>/reference</code></dt><dd class="text-stone-700">See supported photo, PDF and text choices. In a private chat, a photo/PDF needs your own <code>/reference shared</code> caption to enter the shared brand library and publishing storage. Paste important PDF facts; automatic PDF extraction and voice/video transcription are unavailable.</dd></div>
-      <div><dt class="font-semibold"><code>/status</code> and <code>/week</code></dt><dd class="text-stone-700">See this conversation's work and your permitted weekly plan.</dd></div>
-      {% if internal %}<div><dt class="font-semibold"><code>/week prepare</code></dt><dd class="text-stone-700">In your private or internal team chat, inspect weekly source evidence and confirm draft preparation. Every finished post still needs approval.</dd></div><div><dt class="font-semibold"><code>/approvals</code> and <code>/post</code></dt><dd class="text-stone-700">Current permitted approvers inspect the exact post, destination and time before using its review button. Complex formats may need the full SM Bean review.</dd></div>{% endif %}
+  <section class="rounded-2xl border border-stone-200 bg-white p-5" aria-labelledby="telegram-commands-heading">
+    <h2 id="telegram-commands-heading" class="font-semibold">What you can say</h2>
+    <p class="mt-1 text-sm text-stone-700">In your paired chat, plain text is an instruction: say what you want posted and the team brings you a brief to confirm, then the draft to approve.</p>
+    <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+      <div><dt class="font-semibold"><code>/brief An idea</code></dt><dd class="text-stone-700">Start a post.</dd></div>
+      <div><dt class="font-semibold"><code>/brainstorm An idea</code></dt><dd class="text-stone-700">Think it through first.</dd></div>
+      <div><dt class="font-semibold"><code>/reference</code></dt><dd class="text-stone-700">Send a photo, PDF or short text to use.</dd></div>
+      <div><dt class="font-semibold"><code>/status</code></dt><dd class="text-stone-700">What is happening in this chat.</dd></div>
+      {% if internal %}
+      <div><dt class="font-semibold"><code>/approvals</code> · <code>/post &lt;ID&gt;</code></dt><dd class="text-stone-700">Posts waiting for you, with their review card.</dd></div>
+      <div><dt class="font-semibold"><code>/week</code> · <code>/week prepare</code></dt><dd class="text-stone-700">This week's plan; prepare next week.</dd></div>
+      <div><dt class="font-semibold"><code>/pause</code> · <code>/resume</code> · <code>/retry</code></dt><dd class="text-stone-700">Your latest task.</dd></div>
+      <div><dt class="font-semibold"><code>/mute</code> · <code>/unmute</code></dt><dd class="text-stone-700">Messages from the team; the morning briefing still arrives.</dd></div>
+      {% else %}
+      <div><dt class="font-semibold"><code>/week</code></dt><dd class="text-stone-700">What is planned for you this week.</dd></div>
+      {% endif %}
     </dl>
-    <p class="text-sm text-stone-600">With Telegram privacy mode on, use commands, mention the bot or reply to its message in a group. Ordinary group messages may not reach it. Use <code>/help</code> for command details and <code>/stop</code> to stop only your own pending assistant requests in this chat.</p>
+    <p class="mt-3 text-sm text-stone-600">Nothing publishes without your approval, and a plain “yes” never approves anything. In a group, use commands or mention the bot; send <code>/help</code> for everything.</p>
   </section>
-
-  {% if can_manage %}<section class="rounded-xl border bg-white p-4 space-y-3" aria-labelledby="telegram-status-heading"><h2 id="telegram-status-heading" class="font-semibold">Linked chats and messages needing attention</h2>
-    {% for chat in chats %}<div class="rounded-lg border border-stone-200 p-3"><p class="break-words text-sm font-semibold">{{ chat.title|default:chat.chat_type }} · {{ chat.get_audience_display }} · {% if chat.is_active %}active{% else %}inactive{% endif %}</p>{% if chat.is_active %}<form method="post" class="mt-2" action="{% url 'telegram:deactivate_chat' workspace_id=workspace.id chat_id=chat.id %}">{% csrf_token %}<button type="submit" class="rounded-lg border px-4 py-2 text-sm">Disable this chat</button></form>{% endif %}</div>{% empty %}<p class="text-sm text-stone-600">No chats paired yet. Link your account, then the client and team groups above.</p>{% endfor %}
-    {% for item in deliveries %}<div role="status" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm break-words">Delivery {{ item.status }} · {{ item.attempts }} attempt(s). {{ item.error }}{% if item.native_message_id %} Receipt {{ item.native_message_id }}.{% endif %}</div>{% endfor %}
-    {% for item in updates %}<p class="text-sm text-red-800">Incoming message failed after {{ item.attempts }} attempt(s): {{ item.error }}</p>{% endfor %}
-    <p class="text-sm text-stone-600">For an unknown send, inspect Telegram before requesting another attempt. A connected bot or passing local test does not prove a live client reply or successful social publication.</p>
-  </section>{% endif %}
 </div>
 {% endblock %}
