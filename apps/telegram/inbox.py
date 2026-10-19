@@ -32,8 +32,9 @@ logger = logging.getLogger(__name__)
 DAILY_CAP = 40
 #: Workspace-local hours in which only urgent messages go out; the briefing covers the rest.
 QUIET_START, QUIET_END = 22, 7
-#: Events that may interrupt quiet hours.
-URGENT_EVENTS = frozenset({"approval_reminder", "approval_stalled", "delivery_failed"})
+#: Events that may interrupt quiet hours: reminders, failed deliveries, and the
+#: briefing itself (a person chose its time; it must not vanish at 06:30).
+URGENT_EVENTS = frozenset({"approval_reminder", "approval_stalled", "delivery_failed", "daily_briefing"})
 PREFIX = "inbox:"
 FOOTER = "Nothing publishes without your approval."
 
@@ -110,6 +111,15 @@ def _key(source_key, user_id):
     return f"{PREFIX}{inner}:user:{user_id}"
 
 
+def post_label(post):
+    """What a person calls this post: its title, else the first line of its caption (both publish as is)."""
+    title = (post.title or "").strip()[:100]
+    if title:
+        return title
+    caption = " ".join((post.caption or "").split())
+    return caption[:80] + ("…" if len(caption) > 80 else "") if caption else "Your post"
+
+
 def post_path(post):
     """The exact page a person approves this post on: its brief page when the team made it, else Approvals."""
     brief_id = (
@@ -156,7 +166,7 @@ def _post_preview(post, reason):
     images = [item.media_asset for item in attachments if item.media_asset.is_image]
     row = post.platform_posts.select_related("social_account").order_by("pk").first()
     caption = (row.effective_caption if row is not None else post.caption) or ""
-    lines = [f"Draft ready: {post.title[:100] or 'Your post'}"]
+    lines = [f"Draft ready: {post_label(post)}"]
     if caption:
         lines.append(caption[:400] + ("…" if len(caption) > 400 else ""))
     if len(attachments) > len(images):
@@ -186,14 +196,26 @@ def _queue_card(chat, card, key):
 
 
 def _queue_post(chat, link, post, key, *, fallback_text):
+    """The review card, led by ``fallback_text`` when there is one (a reminder's line); else a preview and a link."""
     card, reason = _review_card(chat, link, post)
     if card is not None:
+        if fallback_text:
+            card = {**card, "text": f"{fallback_text}\n{card['text']}"}
         return _queue_card(chat, card, key)
     text, album = _post_preview(post, reason) if fallback_text is None else (fallback_text, [])
+    prerequisites = []
     if album:
-        queue_album(chat, album, caption=post.title[:100] or "Your post", source_key=f"{key}:album")
+        # The pictures go first as one album; albums cannot carry buttons, so
+        # the link follows in its own message once the album is delivered.
+        row = queue_album(chat, album, caption=post_label(post), source_key=f"{key}:album")
+        if row is not None:
+            prerequisites.append(row.source_key)
     return queue_message(
-        chat, text, source_key=key, reply_markup=link_keyboard(link_button("Open to approve", post_path(post)))
+        chat,
+        text,
+        source_key=key,
+        reply_markup=link_keyboard(link_button("Open to approve", post_path(post))),
+        after_source_keys=prerequisites,
     )
 
 

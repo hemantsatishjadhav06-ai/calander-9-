@@ -237,3 +237,35 @@ def test_link_buttons_only_point_at_the_app(agency):
                 chat, "x", source_key=f"link:{url}", reply_markup={"inline_keyboard": [[{"text": "x", "url": url}]]}
             )
     assert outbox.link_button("Open", "//evil.example") is None
+
+
+def test_a_reminder_brings_a_fresh_card_once_a_day_and_never_a_notification_body(agency, monkeypatch):
+    from apps.notifications.models import Notification
+    from apps.telegram import notifications
+
+    post = _pending(agency.ws, agency.users["editor"], agency.account, when=timezone.now() + timedelta(days=2))
+    notice = Notification.objects.create(
+        user=agency.users["lead"],
+        event_type="approval_reminder",
+        title="SECRET title",
+        body="SECRET body naming costs",
+        data={"post_id": str(post.pk), "workspace_id": str(agency.ws.pk), "stage": "pending_review"},
+    )
+    assert notifications.notification_event(notice.pk) == 3
+    rows = list(TelegramDelivery.objects.select_related("chat"))
+    approvers = {agency.users[key].pk for key in ("lead", "backup", "approver")}
+    assert {row.chat.private_user_id for row in rows} == approvers
+    text = rows[0].payload["text"]
+    assert text.startswith("Landlord-share flats in West Hyderabad\nStill waiting for your approval.")
+    assert "Exact post review" in text and "SECRET" not in text
+    labels = [button["text"] for line in rows[0].payload["reply_markup"]["inline_keyboard"] for button in line]
+    assert labels[0] == "Approve only"
+    # Another reviewer's copy of the same day's reminder adds nothing; tomorrow's brings a fresh card.
+    again = Notification.objects.create(user=agency.users["backup"], event_type="approval_reminder", data=notice.data)
+    notifications.notification_event(again.pk)
+    assert TelegramDelivery.objects.count() == 3
+    monkeypatch.setattr(timezone, "now", lambda: NOON + timedelta(days=1))
+    later = Notification.objects.create(user=agency.users["lead"], event_type="approval_reminder", data=notice.data)
+    notifications.notification_event(later.pk)
+    assert TelegramDelivery.objects.count() == 6
+    assert post.platform_posts.get().status == "pending_review"

@@ -161,8 +161,8 @@ def _post_chats(post):
 
 
 def _post_label(post):
-    # Titles are customer-facing composer content; internal_notes never leave.
-    return post.title[:100] or "Your post"
+    # Titles and captions are customer-facing composer content; internal_notes never leave.
+    return inbox.post_label(post)
 
 
 def _channel_post_event(post, event, *, source_key, brief=None):
@@ -380,12 +380,18 @@ def notification_event(notification_id):
     inbox_count = 0
     reminder = notice.event_type in {"approval_reminder", "approval_stalled"}
     if notice.event_type in _INBOX_WORDING and (reminder or not ready_brief):
+        # A reminder brings a fresh card (the earlier buttons have expired) and
+        # reaches Telegram once per post, revision and workspace-local day.
+        inbox_key = (
+            f"{key}:{timezone.localtime(timezone.now(), inbox.zone_of(post.workspace)):%Y-%m-%d}" if reminder else key
+        )
         inbox_count = inbox.tell(
             post.workspace,
             f"{_post_label(post)}\n{_INBOX_WORDING[notice.event_type]}",
-            source_key=key,
+            source_key=inbox_key,
             event=notice.event_type,
             reply_markup=_open_button("Open to approve", inbox.post_path(post)),
+            post=post if reminder else None,
         )
     base = draft_count + private_count + inbox_count
     # The triggering recipient must remain paired to this exact workspace.
