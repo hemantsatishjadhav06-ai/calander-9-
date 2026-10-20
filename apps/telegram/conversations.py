@@ -407,6 +407,9 @@ def _routines(bound, member):
 
     if not internal_member(member) or not studio_chat.is_staff_membership(member):
         return _response("Routines are for the team. Ask your agency what runs on its own.")
+    if bound.audience == "client":
+        # The list names the team's standing instructions; a client group never reads them.
+        return _response("Send /routines in your private chat or the team group.")
     workspace = bound.connection.workspace
     keyboard = link_keyboard(
         link_button("Open routines", reverse("studio:routines", kwargs={"workspace_id": workspace.pk}))

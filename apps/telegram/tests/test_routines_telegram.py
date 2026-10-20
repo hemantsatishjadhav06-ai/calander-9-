@@ -73,6 +73,10 @@ def test_routines_is_for_the_team_not_clients(hub):  # noqa: F811
     response = send(hub, "/routines", role="client")
     assert "Routines are for the team" in response["text"] and "reply_markup" not in response
     assert "/routines" not in conversations.HELP_CLIENT
+    # A team member in the client group is answered without the list: clients read that chat.
+    in_client_group = send(hub, "/routines", role="owner", bound=hub.client_chat)
+    assert "private chat or the team group" in in_client_group["text"] and "reply_markup" not in in_client_group
+    assert "What runs on its own" in send(hub, "/routines", role="owner", bound=hub.team_chat)["text"]
 
 
 # ---------------------------------------------------------------------------
