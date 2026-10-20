@@ -18,7 +18,7 @@ from apps.organizations.models import Organization
 from apps.publisher.delivery import delivery_write
 from apps.social_accounts.models import SocialAccount
 from apps.studio.models import AgencyJob, Conversation, Message, StudioBrief
-from apps.telegram import channel_outbox, notifications, outbox, provisioning
+from apps.telegram import channel_outbox, inbox, notifications, outbox, provisioning
 from apps.telegram.api import TelegramAPIError
 from apps.telegram.models import (
     TelegramChannel,
@@ -32,6 +32,12 @@ from apps.telegram.tests.test_webhooks import create_hub
 from apps.workspaces.models import Workspace
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _daytime(monkeypatch):
+    """The manager inbox holds non-urgent messages during quiet hours; these counts assume the day."""
+    monkeypatch.setattr(inbox, "is_quiet", lambda *a, **k: False)
 
 
 @pytest.fixture

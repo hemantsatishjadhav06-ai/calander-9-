@@ -223,7 +223,8 @@ def test_confirmed_destination_disconnected_while_refreshing_evidence_stays_unse
 ):
     conversation, intake_job, reply = intake(world, guided_manager)
     snapshot = intake_job.result
-    snapshot["sources"]["fetched_at"] = (timezone.now() - timedelta(hours=1)).isoformat()
+    # Evidence is good for a day; older than that it is refreshed before the team starts.
+    snapshot["sources"]["fetched_at"] = (timezone.now() - timedelta(hours=25)).isoformat()
     intake_job.result = snapshot
     intake_job.save(update_fields=["result"])
     original = chat_job._collect_sources

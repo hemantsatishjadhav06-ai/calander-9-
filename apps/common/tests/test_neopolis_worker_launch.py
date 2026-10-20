@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 from background_task.models import Task
 from django.core.management.base import CommandError
 from django.db import connections
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from apps.common.background import (
@@ -184,7 +184,8 @@ class NeopolisWorkerLaunchTests(TransactionTestCase):
     def test_reenabled_plan_resumes_once_without_losing_progress(self):
         job = self.job(kind="plan", input={"week_id": "week"})
         AgencyJob.objects.filter(pk=job.pk).update(error=AUTOPILOT_PAUSED, state={"research": "saved"}, revision=3)
-        with patch.object(engine, "enqueue") as enqueue:
+        # Unprompted work also waits for the AI team to be connected; this test is about the autopilot switch.
+        with override_settings(ANTHROPIC_API_KEY="sk-ant-test"), patch.object(engine, "enqueue") as enqueue:
             self.assertEqual(engine.resume_paused_plans(self.workspace), 1)
             self.assertEqual(engine.resume_paused_plans(self.workspace), 0)
         enqueue.assert_called_once()
