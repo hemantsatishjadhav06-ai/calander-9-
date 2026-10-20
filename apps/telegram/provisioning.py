@@ -51,6 +51,7 @@ BOT_COMMANDS = [
     ("pause", "Pause your latest task"),
     ("resume", "Resume a paused task"),
     ("retry", "Retry a failed task"),
+    ("routines", "What runs on its own, and when"),
     ("stop", "Stop your pending requests here"),
     ("mute", "Pause messages from the team"),
     ("unmute", "Resume messages from the team"),

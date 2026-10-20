@@ -27,23 +27,32 @@ def _setup_url(workspace) -> str:
 def telegram_state(workspace, user=None) -> dict:
     """How far Telegram is from listening for this workspace (and this person, when given).
 
-    ``state`` is one of ``setup_needed`` (no active bot), ``pairing_needed``
-    (a bot, but not this person's phone) or ``ready``. Without a person the
-    pairing check is skipped and the state stops at ``connected``.
+    The one function behind the Set up row, Home's status line and the
+    readiness block. ``state`` is one of ``deployment_needed`` (this
+    deployment cannot receive updates yet), ``setup_needed`` (no listening
+    bot), ``pairing_needed`` (a bot, but not this person's phone), ``ready``,
+    or ``connected`` when no person is given. ``deployment_ready`` and
+    ``bot_state`` are the two facts ``apps.telegram.state`` reads for the
+    guided Telegram page too.
     """
+    from apps.telegram import state as telegram
     from apps.telegram.models import TelegramConnection, TelegramUserLink
 
     connection = (
         TelegramConnection.objects.filter(workspace=workspace, is_active=True)
-        .only("id", "webhook_status", "bot_username")
+        .only("id", "is_active", "token", "webhook_status", "bot_username")
         .first()
     )
-    listening = bool(connection and connection.webhook_status == "active")
+    deployment_ready = telegram.deployment_ready()
+    bot_state = telegram.bot_state(connection)
+    listening = bot_state == "listening"
     bot = f"@{connection.bot_username}" if connection and connection.bot_username else "your bot"
     paired = None
     if connection is not None and getattr(user, "pk", None):
         paired = TelegramUserLink.objects.filter(connection=connection, user=user, is_active=True).exists()
-    if not listening:
+    if not deployment_ready:
+        state, label = "deployment_needed", "Telegram: not ready on this deployment yet"
+    elif not listening:
         state, label = "setup_needed", "Telegram: connect your bot"
     elif paired is None:
         state, label = "connected", f"Telegram: listening as {bot}"
@@ -54,6 +63,8 @@ def telegram_state(workspace, user=None) -> dict:
     return {
         "state": state,
         "label": label,
+        "deployment_ready": deployment_ready,
+        "bot_state": bot_state,
         "connected": listening,
         "paired": bool(paired),
         "bot": bot if connection else "",

@@ -31,6 +31,7 @@ import re
 import uuid
 import zoneinfo
 from dataclasses import dataclass, field
+from datetime import time as dt_time
 from datetime import timedelta
 from typing import Any
 
@@ -48,7 +49,7 @@ from ..roles import client as client_roles
 logger = logging.getLogger(__name__)
 
 REVISION_ACTIONS = ("revise_copy", "revise_design", "new_picture", "new_angles")
-ALL_ACTIONS = ("answer", *REVISION_ACTIONS, "new_post", "edit_blog", "escalate")
+ALL_ACTIONS = ("answer", *REVISION_ACTIONS, "new_post", "edit_blog", "set_routine", "escalate")
 #: What a client may ask for: changes to their own posts and new posts (which still need the agency's approval).
 CLIENT_ACTIONS = frozenset({"answer", *REVISION_ACTIONS, "new_post", "escalate"})
 #: Anyone else who somehow wrote (a viewer, an ex-member): an answer, or a person.
@@ -72,6 +73,10 @@ TOO_MANY_WAITING = (
 )
 STARTED_REPLY = "The team is on it. The draft comes back here for your approval."
 GO_AHEAD_REPLY = "Here's the brief I'd run with. Change anything, or go ahead."
+ROUTINE_PROPOSED = "Here's the routine. Turn it on and it runs by itself; the results land in this thread."
+#: Telegram has no brief card in the reply itself; the mirror removes this line when it attaches the button.
+TELEGRAM_BRIEF_HINT = "Send /brief to open the confirmation card."
+ROUTINE_NOT_MADE = "I couldn't set that routine up:"
 #: Words that would claim work the person has not started yet; the reply is replaced when they appear.
 _STARTED_CLAIM = re.compile(
     r"\b(started|starting|on it|drafting|creating now|underway|in progress|working on it|getting started)\b",
@@ -615,8 +620,19 @@ def allowed_actions(membership, conversation: Conversation, target: Target) -> t
     offered.append("new_post")
     if target.blog_post is not None:
         offered.append("edit_blog")
+    if _may_set_routine(membership, conversation):
+        offered.append("set_routine")
     offered.append("escalate")
     return tuple(action for action in offered if action in permitted)
+
+
+def _may_set_routine(membership, conversation: Conversation) -> bool:
+    """Standing instructions are the team's own: staff who may create posts, in an internal thread."""
+    return (
+        chat.is_staff_membership(membership)
+        and bool((membership.effective_permissions or {}).get("create_posts"))
+        and conversation.audience == Conversation.Audience.INTERNAL
+    )
 
 
 def _zone(workspace):
@@ -837,6 +853,8 @@ def perform(
         outcome = _new_post(job, conversation.workspace, requester, membership, instructions, reply)
     elif action == "edit_blog":
         outcome = _edit_blog(job, conversation.workspace, target.blog_post, requester, instructions, reply)
+    elif action == "set_routine":
+        outcome = _set_routine(conversation, requester, membership, out, trigger, reply)
     else:  # pragma: no cover - the schema allows nothing else
         return Outcome(NOT_ALLOWED, action, Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
     if out.needs_human:
@@ -1271,7 +1289,7 @@ def _intake(job, conversation, trigger, out, context) -> Outcome:
             reply = _manager_reply(out.reply, awaiting=True)
             if human_input.get("telegram_context") is not None:
                 # Telegram has no card yet: the brief travels in the message, with the way to confirm it.
-                reply += "\n\n" + creative_brief.summary(data) + "\nSend /brief to open the confirmation card."
+                reply += "\n\n" + creative_brief.summary(data) + "\n" + TELEGRAM_BRIEF_HINT
         elif "topic" in missing:
             reply = _manager_reply(out.reply, awaiting=False) if out.action == "answer" else ""
             reply = reply or "What should this post be about?"
@@ -1628,6 +1646,47 @@ def _new_post(job, workspace, requester, membership, idea: str, reply: str) -> O
         "new_post",
         Message.ActionStatus.STARTED,
         result={"brief_id": str(brief.pk), "queued": not start},
+    )
+
+
+def _routine_time(value: str) -> dt_time | None:
+    """The model's HH:MM as a time; None when it isn't one (the routine then says so)."""
+    try:
+        return dt_time.fromisoformat((value or "").strip())
+    except ValueError:
+        return None
+
+
+def _set_routine(conversation, requester, membership, out, trigger, reply: str) -> Outcome:
+    """Save the standing instruction the manager heard, switched off; the person turns it on from the card.
+
+    Nothing runs here: the routine starts the same work a person could start
+    by typing, on its schedule, once a person has turned it on. A private
+    Telegram chat's routine runs in the workspace's general team thread, as
+    every routine does when its own thread is not a shared one.
+    """
+    from .. import routines
+
+    if not _may_set_routine(membership, conversation):
+        return Outcome(NOT_ALLOWED, "set_routine", Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
+    instruction = (out.routine_instruction or "").strip() or (out.instructions or "").strip() or trigger.body
+    weekday = out.routine_weekday if out.routine_cadence == "weekly" and 0 <= out.routine_weekday <= 6 else None
+    try:
+        routine = routines.propose(
+            conversation.workspace,
+            requester,
+            instruction=instruction,
+            cadence=out.routine_cadence or "",
+            weekday=weekday,
+            time=_routine_time(out.routine_time),
+            conversation=None if chat.is_private_conversation(conversation) else conversation,
+        )
+    except routines.RoutineError as exc:
+        return Outcome(f"{ROUTINE_NOT_MADE} {exc}", "set_routine", Message.ActionStatus.DECLINED)
+    return Outcome(
+        _sentences(reply) or ROUTINE_PROPOSED,
+        "set_routine",
+        result={"routine_id": str(routine.pk), "routine_cadence": routines.cadence_words(routine)},
     )
 
 

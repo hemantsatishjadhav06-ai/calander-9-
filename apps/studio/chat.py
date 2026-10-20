@@ -734,6 +734,52 @@ def _creative_message_context(conversation, messages, viewer, *, selected_draft_
     return briefs
 
 
+def _routine_message_context(conversation, messages, viewer, membership) -> None:
+    """Attach the "Routine proposed · Turn on" card to the manager replies that proposed one.
+
+    A reply whose chat job carries ``routine_id`` gets ``message.routine``: the
+    routine's words, its schedule, whether it is on, and whether this viewer
+    may turn it on (the person who asked for it, or a settings manager).
+    """
+    if conversation is None or conversation.audience != Conversation.Audience.INTERNAL:
+        return
+    from . import routines
+    from .models import Routine
+
+    wanted: dict[str, list] = {}
+    for message in messages:
+        message.routine = None
+        if message.author_kind != Message.AuthorKind.AGENT or message.job_id is None:
+            continue
+        if message.job.workspace_id != conversation.workspace_id or message.job.conversation_id != conversation.pk:
+            continue
+        result = message.job.result if isinstance(message.job.result, dict) else {}
+        routine_id = str(result.get("routine_id") or "")
+        if routine_id:
+            wanted.setdefault(routine_id, []).append(message)
+    if not wanted:
+        return
+    perms = membership.effective_permissions if membership is not None else {}
+    workspace_id = conversation.workspace_id
+    for routine in Routine.objects.filter(workspace_id=workspace_id, pk__in=list(wanted)).select_related(
+        "workspace", "created_by"
+    ):
+        card = {
+            "id": str(routine.pk),
+            "title": routine.display_title,
+            "instruction": routine.instruction,
+            "cadence_words": routines.cadence_words(routine),
+            "enabled": routine.enabled,
+            "can_change": routines.can_change(routine, viewer, perms),
+            "toggle_url": reverse(
+                "studio:routines_toggle", kwargs={"workspace_id": workspace_id, "routine_id": routine.pk}
+            ),
+            "url": reverse("studio:routines", kwargs={"workspace_id": workspace_id}),
+        }
+        for message in wanted[str(routine.pk)]:
+            message.routine = card
+
+
 def creation_mode(workspace) -> str:
     """How the workspace starts a team member's ideas: ``confirm`` (a tap on the brief card) or ``auto``."""
     from .models import AgencySettings
@@ -1424,6 +1470,7 @@ def thread_context(
         request.user,
         selected_draft_id=str(selected_draft.pk) if selected_draft is not None else "",
     )
+    _routine_message_context(conversation, messages, request.user, membership)
     mark_read(request.user, conversation)
     selected_reference_id = (
         request.POST.get("reference_id")
@@ -1468,6 +1515,10 @@ def thread_context(
             for receipt in _publication_receipts(selected_draft)
         )
     working = has_active_job(conversation)
+    # The panel on Home polls with ``?home=1`` so a card's "Turn on" returns to Home, not the thread page.
+    home_panel = request.GET.get("home") == "1"
+    if home_panel and messages_url:
+        messages_url += "?home=1"
     return {
         "template": PANEL_TEMPLATE,
         "workspace": workspace,
@@ -1476,6 +1527,8 @@ def thread_context(
         "dom_id": dom_id(conversation, brief=brief, blog_post=blog_post),
         "send_url": send_url,
         "messages_url": messages_url,
+        "home_panel": home_panel,
+        "home_url": reverse("studio:index", kwargs={"workspace_id": workspace_id}),
         "polling": working or delivery_pending,
         "poll_interval": "every 3s" if working else "every 30s",
         "creation_mode": creation_mode(workspace),
@@ -1507,8 +1560,13 @@ def thread_context(
 
 
 def home_thread_context(request, workspace) -> dict[str, Any] | None:
-    """The agency home's "Ask the team" panel: the workspace's general internal thread."""
-    return thread_context(request, find_general(workspace), workspace=workspace)
+    """The agency home's conversation panel: the workspace's general internal thread."""
+    context = thread_context(request, find_general(workspace), workspace=workspace)
+    if context is not None:
+        context["home_panel"] = True
+        if context["messages_url"] and "home=1" not in context["messages_url"]:
+            context["messages_url"] += "?home=1"
+    return context
 
 
 def brief_thread_context(request, brief: StudioBrief) -> dict[str, Any] | None:

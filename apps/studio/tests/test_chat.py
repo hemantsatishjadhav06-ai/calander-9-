@@ -66,6 +66,10 @@ class FakeAccountManager:
     instructions: str = ""
     needs_human: bool = False
     fail: str = ""
+    routine_instruction: str = ""
+    routine_cadence: str = ""
+    routine_weekday: int = -1
+    routine_time: str = ""
     calls: list = field(default_factory=list)
 
     def __call__(self, profile, **kwargs):
@@ -80,6 +84,10 @@ class FakeAccountManager:
                 needs_human=self.needs_human,
                 reason="Test.",
                 creative_brief=None,
+                routine_instruction=self.routine_instruction,
+                routine_cadence=self.routine_cadence,
+                routine_weekday=self.routine_weekday,
+                routine_time=self.routine_time,
             ),
             model="claude-opus-5-5",
             input_tokens=900,

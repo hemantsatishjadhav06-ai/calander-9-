@@ -30,6 +30,25 @@ replaces this element).
         {% endif %}
         {% if m.creative_request %}{% include "studio/partials/thread_creative_brief.html" %}{% endif %}
         {% if m.created_brief %}{% include "studio/partials/thread_draft.html" with draft=m.created_brief %}{% endif %}
+        {% if m.routine %}
+        {# The routine card: proposed switched off; one tap turns it on (apps.studio.chat._routine_message_context). #}
+        <div class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3" data-routine-card="{{ m.routine.id }}" data-routine-state="{% if m.routine.enabled %}on{% else %}proposed{% endif %}">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p class="text-sm font-semibold text-stone-900">{% if m.routine.enabled %}Routine on{% else %}Routine proposed{% endif %} <span class="font-normal text-stone-700">· {{ m.routine.cadence_words }}</span></p>
+                {% if m.routine.can_change and not m.routine.enabled %}
+                <form method="post" action="{{ m.routine.toggle_url }}" class="sm:ml-auto" data-routine-turn-on="{{ m.routine.id }}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% if thread.home_panel %}{{ thread.home_url }}{% else %}{{ thread.thread_url }}{% endif %}">
+                    <button type="submit" class="rounded-lg bg-orange-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-orange-700">Turn on</button>
+                </form>
+                {% else %}
+                <a href="{{ m.routine.url }}" class="sm:ml-auto text-xs font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">All routines</a>
+                {% endif %}
+            </div>
+            <p class="mt-1 text-xs text-stone-800 break-words">{{ m.routine.instruction }}</p>
+            {% if not m.routine.enabled %}<p class="mt-1 text-xs text-stone-600">Nothing runs until it is on. Its results come back here, and every post still waits for your approval.</p>{% endif %}
+        </div>
+        {% endif %}
     </div>
     {% elif m.is_internal %}
     <div class="ml-6 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">

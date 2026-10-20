@@ -94,6 +94,14 @@
                         {% if form.blog_site.errors %}<p class="text-sm text-red-800">{{ form.blog_site.errors|join:" " }}</p>{% endif %}
                     </div>
                 </div>
+
+                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4" data-creation-mode-field>
+                    <div>
+                        <label for="{{ form.creation_mode.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.creation_mode.label }}</label>
+                        <p class="text-xs text-stone-600">{{ form.creation_mode.help_text }}</p>
+                    </div>
+                    <div class="w-full sm:w-64">{{ form.creation_mode }}{% if form.creation_mode.errors %}<p class="mt-1 text-sm text-red-800">{{ form.creation_mode.errors|join:" " }}</p>{% endif %}</div>
+                </div>
             </fieldset>
 
             <details class="py-4 border-t border-stone-200" data-autopilot-advanced{% if form.errors %} open{% endif %}>

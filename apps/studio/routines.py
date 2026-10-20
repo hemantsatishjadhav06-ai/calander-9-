@@ -626,7 +626,11 @@ def tick(now: dt.datetime | None = None) -> dict[str, int]:
 
 
 def _notify_creator(routine: Routine, run: RoutineRun | None, body: str) -> bool:
-    """One in-app notice to the routine's author per run (Telegram delivery is wired elsewhere)."""
+    """One in-app notice to the routine's author per run.
+
+    The notice's ``kind`` is ``routine``: ``apps.telegram.notifications`` turns
+    it into one line in every approver's manager inbox, with a link to Routines.
+    """
     from apps.notifications.engine import notify
     from apps.notifications.models import EventType, Notification
 

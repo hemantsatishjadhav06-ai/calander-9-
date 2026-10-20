@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.composer.models import PlatformPost
-from apps.studio.models import AgencyJob, BrandProfile, Conversation, StudioBrief
+from apps.studio.models import AgencyJob, BrandProfile, Conversation, Message, StudioBrief
 from apps.studio.tests.conftest import make_brief, run_all
 
 
@@ -72,7 +72,10 @@ class TestBriefing:
         assert response["Location"].startswith(_url("thread", world))
         assert job.requested_by == world.editor
         assert conversation.audience == Conversation.Audience.INTERNAL
-        assert str(world.linkedin.pk) in conversation.messages.get().body
+        # The idea is the person's own words; the form's choices travel as fields of the brief, not as sentences.
+        assert Message.objects.get(pk=job.input["message_id"]).body == "Why landlord shares cost less"
+        assert job.input["kind"] == "create" and job.input["create"]["accounts"] == [str(world.linkedin.pk)]
+        assert job.input["style_mode"] == "brand"
         assert not StudioBrief.objects.exists() and not fake_team.queued
 
     def test_an_empty_idea_is_sent_back(self, client, world, fake_team):
@@ -92,7 +95,7 @@ class TestBriefing:
             follow=True,
         )
 
-        assert "check Agency readiness" in _messages(response)
+        assert "Your team isn't connected yet" in _messages(response)
         assert not StudioBrief.objects.exists()
 
     def test_viewers_cannot_brief(self, client, world, fake_team):

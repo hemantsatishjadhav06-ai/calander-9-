@@ -95,7 +95,12 @@ def brief_card(message_id, chat_id):
             card = None
     if card is None:
         return len(queue_message(chat, f"{message.sender_name}:\n{message.body}", source_key=key))
-    text = card["text"].replace(_BRIEF_HINT, "").replace("\n\n\n", "\n\n").strip()
+    from apps.studio.jobtypes.chat import TELEGRAM_BRIEF_HINT
+
+    text = card["text"]
+    for hint in (_BRIEF_HINT, TELEGRAM_BRIEF_HINT):
+        text = text.replace(hint, "")
+    text = text.replace("\n\n\n", "\n\n").strip()
     return len(queue_message(chat, text, source_key=key, reply_markup=card.get("reply_markup")))
 
 
@@ -324,6 +329,8 @@ def notification_event(notification_id):
     if notice.event_type in {"team_message", "post_failed", "post_published"}:
         if data.get("platform_post_id"):
             return platform_receipt(data["platform_post_id"])
+        if notice.event_type == "team_message" and data.get("kind") == "routine":
+            return _routine_notice(notice)
         return 0
     wording = {
         "post_submitted": "The team submitted this post for review. Final human approval is still required.",
@@ -414,6 +421,35 @@ def notification_event(notification_id):
             count += 1
     count += _channel_post_event(post, channel_event, source_key=key)
     return count
+
+
+def _routine_notice(notice):
+    """A routine that failed or was interrupted: one line to every approver's inbox, with a link to Routines.
+
+    The in-app notice goes to the routine's author once per run
+    (``apps.studio.routines._notify_creator``); its body is the routine's own
+    plain sentence, never a quote from the thread. The run id keys the inbox
+    message, so a repeated notice never reaches Telegram twice.
+    """
+    from apps.studio.models import Routine
+
+    data = notice.data
+    try:
+        routine_id, workspace_id = UUID(str(data.get("routine_id"))), UUID(str(data.get("workspace_id")))
+    except (ValueError, TypeError, AttributeError):
+        return 0
+    routine = Routine.objects.select_related("workspace").filter(pk=routine_id, workspace_id=workspace_id).first()
+    if routine is None:
+        return 0
+    body = " ".join(str(notice.body or "").split())[:300] or "This routine needs a look."
+    run_id = str(data.get("run_id") or "") or f"notice:{notice.pk}"
+    return inbox.tell(
+        routine.workspace,
+        f"Routine “{routine.display_title}” needs you: {body}",
+        source_key=f"routine:{routine.pk}:{run_id}",
+        event="routine",
+        reply_markup=_open_button("Open routines", reverse("studio:routines", kwargs={"workspace_id": workspace_id})),
+    )
 
 
 def _week_notification(notice):

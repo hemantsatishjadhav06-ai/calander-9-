@@ -33,6 +33,7 @@
                 {% if row.action.method == 'post' %}
                 <form method="post" action="{{ row.action.url }}" x-data="{ busy: false }" x-on:submit="busy = true">
                     {% csrf_token %}
+                    {% for name, value in row.action.fields.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
                     <button type="submit" x-bind:disabled="busy" class="w-full sm:w-auto px-3.5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></button>
                 </form>
                 {% else %}

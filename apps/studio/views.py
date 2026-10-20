@@ -153,6 +153,7 @@ def _index_context(request, workspace, form=None):
     thread = _thread_panel(request, workspace)
     if thread is not None:
         thread["home_panel"] = True  # Home's main column; the partial may size itself for it.
+    routine_rows = _routine_rows(request, workspace, perms)
     return {
         "workspace": workspace,
         "profile": profile,
@@ -164,7 +165,8 @@ def _index_context(request, workspace, form=None):
         "status_parts": status_line(request, workspace, steps_left=progress["left"]),
         "today": dashboard.today(workspace, request.user),
         "journeys": _journeys(request, workspace),
-        "routine_rows": None,  # filled in by the Routines integration
+        "routine_rows": routine_rows,
+        "can_manage_settings": bool(perms.get("manage_workspace_settings")),
         "can_create": perms.get("create_posts", False),
         "can_approve": perms.get("approve_posts", False),
         "can_edit_brand": _can_edit_brand(request),
@@ -175,6 +177,15 @@ def _index_context(request, workspace, form=None):
         "agency_settings": dashboard.settings_for(workspace),
         "checklist_on_home": True,
     }
+
+
+def _routine_rows(request, workspace, perms) -> list[dict] | None:
+    """Home's Routines section: the next three, for people who may write one; None for everyone else."""
+    if not perms.get("create_posts", False):
+        return None
+    from . import routines
+
+    return routines.rows(workspace, limit=3, viewer=request.user, perms=perms)
 
 
 def _thread_panel(request, workspace):

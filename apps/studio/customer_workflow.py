@@ -440,9 +440,7 @@ def _journey(workspace, user, conversation, *, configured, spend_allowed):
 
 def context(workspace, user, *, form=None):
     """Read-only status for the launchpad and its polling fragment; no prompt or job is created."""
-    from apps.telegram.models import TelegramConnection, TelegramUserLink
-
-    from .readiness import operational_readiness
+    from .readiness import operational_readiness, telegram_state
 
     current, person, member = current_staff(workspace, user)
     configured, spend_allowed = llm.is_configured(), budget.can_spend(current)
@@ -452,13 +450,9 @@ def context(workspace, user, *, form=None):
         .select_related("workspace")
         .order_by("-last_message_at", "-created_at")[:30]
     ]
-    connection = (
-        TelegramConnection.objects.filter(workspace=current, is_active=True).only("id", "webhook_status").first()
-    )
-    paired = bool(
-        connection and TelegramUserLink.objects.filter(connection=connection, user=person, is_active=True).exists()
-    )
-    telegram_ready = bool(connection and connection.webhook_status == "active" and paired)
+    # Updates reach a paired person through a listening bot; the webhook's public address is the Set up page's concern.
+    telegram = telegram_state(current, person)
+    telegram_ready = telegram["connected"] and telegram["paired"]
     return {
         "workspace": current,
         # A paired author gets Telegram updates by default; the box stays visible to switch off.
@@ -472,11 +466,11 @@ def context(workspace, user, *, form=None):
         "readiness": operational_readiness(current),
         "can_create": bool(member.effective_permissions.get("create_posts")),
         "telegram_url": reverse("telegram:settings", kwargs={"workspace_id": current.pk}),
-        "telegram_state": "ready" if telegram_ready else "pairing_needed" if connection else "setup_needed",
+        "telegram_state": "ready" if telegram_ready else "pairing_needed" if telegram["connected"] else "setup_needed",
         "telegram_label": "Your Telegram account is paired"
         if telegram_ready
         else "Pair your Telegram account"
-        if connection
+        if telegram["connected"]
         else "Connect your Telegram bot",
         "telegram_description": "Requests and review updates can use your paired Telegram conversation. Channel delivery needs its own verified destination."
         if telegram_ready

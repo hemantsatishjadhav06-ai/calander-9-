@@ -28,8 +28,17 @@ ACCOUNT_MANAGER_EFFORT = "low"
 ACCOUNT_MANAGER_MAX_TOKENS = 6000
 
 ChatAction = Literal[
-    "answer", "revise_copy", "revise_design", "new_picture", "new_angles", "new_post", "edit_blog", "escalate"
+    "answer",
+    "revise_copy",
+    "revise_design",
+    "new_picture",
+    "new_angles",
+    "new_post",
+    "edit_blog",
+    "set_routine",
+    "escalate",
 ]
+RoutineCadence = Literal["daily", "weekdays", "weekly", ""]
 
 #: What each action means, in the words the account manager reads.
 ACTION_GUIDE = {
@@ -40,6 +49,7 @@ ACTION_GUIDE = {
     "new_angles": "start this post over from three new angles",
     "new_post": "make a new post from scratch about what they describe",
     "edit_blog": "revise this blog article",
+    "set_routine": "they want something done on a schedule (every day/weekday/week at a time)",
     "escalate": "a person on the team must decide or answer (see below)",
 }
 
@@ -63,6 +73,12 @@ ACCOUNT_MANAGER = (
     "- revise_copy, revise_design, new_picture and new_angles change the post in <item>; use them only when the "
     "person asks for that change to that post.\n"
     "- new_post when they ask for a new post. edit_blog when they ask for changes to the article in <item>.\n"
+    "- set_routine when they want something done on a schedule (\"every weekday at 8:30 tell me what's "
+    'waiting", "every Monday at 9 draft a market update"). Fill routine_instruction with what to do each time, '
+    "in their words; routine_cadence with daily, weekdays or weekly; routine_weekday with 0 (Monday) to 6 "
+    "(Sunday) for weekly, else -1; routine_time with the time of day as HH:MM (24-hour, their local time; 09:00 "
+    "when they name none). It only proposes: the person turns the routine on with one tap, so never say it is "
+    'running. For every other action these four fields are empty, "", -1 and "".\n'
     "- escalate (and needs_human true) for anything a person must decide or confirm: a fact, price, offer, date "
     "or claim that isn't in the brand facts (never add one yourself — ask the team to confirm it), complaints, "
     "money, contracts, legal or medical questions, requests to approve, schedule, publish, pause or delete, and "
@@ -89,6 +105,18 @@ class ChatAnswer(base.Answer):
             "For guided new-post requests, the intake fields known from the person's words; unknown fields empty "
             "(the software fills a team member's empty fields from the brand's defaults). Null for other work."
         )
+    )
+    routine_instruction: str = Field(
+        description="For set_routine, what to do each time, in the person's words; empty for every other action."
+    )
+    routine_cadence: RoutineCadence = Field(
+        description="For set_routine: daily, weekdays or weekly; empty for every other action."
+    )
+    routine_weekday: int = Field(
+        description="For a weekly set_routine, the day: 0 is Monday, 6 is Sunday; -1 otherwise."
+    )
+    routine_time: str = Field(
+        description="For set_routine, the time of day as HH:MM in 24-hour local time; empty for every other action."
     )
 
 

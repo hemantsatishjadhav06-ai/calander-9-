@@ -38,6 +38,7 @@ HELP = (
     "/post <ID> [time with offset] — one post's review card\n"
     "/week — this week's plan · /week prepare — plan next week · /week evidence — the sources behind it\n"
     "/pause · /resume · /retry — your latest task\n"
+    "/routines — what runs on its own, and when\n"
     "/stop — stop your pending requests here\n"
     "/mute · /unmute — messages from the team (your morning briefing still arrives)\n"
     "Only a review button approves or confirms; a plain “yes” never does. Client sign-off and the agency's "
@@ -400,6 +401,39 @@ def _control(bound, link, member, action):
     )
 
 
+def _routines(bound, member):
+    """/routines: the workspace's standing instructions in one line each, with a link to change them."""
+    from apps.studio import routines
+
+    if not internal_member(member) or not studio_chat.is_staff_membership(member):
+        return _response("Routines are for the team. Ask your agency what runs on its own.")
+    workspace = bound.connection.workspace
+    keyboard = link_keyboard(
+        link_button("Open routines", reverse("studio:routines", kwargs={"workspace_id": workspace.pk}))
+    )
+    rows = routines.rows(workspace, limit=10)
+    if not rows:
+        return _response(
+            "Nothing runs on its own yet. Open Routines to add a morning briefing or a Monday plan.",
+            reply_markup=keyboard,
+        )
+    lines = []
+    for row in rows:
+        if row["running"]:
+            state = "running now"
+        elif row["needs_attention"]:
+            state = "needs you"
+        elif not row["enabled"]:
+            state = "paused"
+        else:
+            state = f"next {row['next_run_words']}" if row["next_run_words"] else "on"
+        lines.append(f"• {row['title']} — {row['cadence_words'].lower()} · {state}")
+    text = "What runs on its own:\n" + "\n".join(lines)
+    if len(text) > 3500:
+        text = text[:3500].rsplit("\n", 1)[0] + "\n…"
+    return _response(text, reply_markup=keyboard)
+
+
 def _mute(link, *, muted):
     # QuerySet.update leaves updated_at alone: the pairing epoch (and every
     # outstanding button bound to it) must survive a mute.
@@ -446,6 +480,8 @@ def handle_message(connection, update_payload) -> dict[str, Any]:
             return _stop(bound, link, context)
         if command in {"/pause", "/resume", "/retry"}:
             return _control(bound, link, member, command[1:])
+        if command == "/routines":
+            return _routines(bound, member)
         if command == "/mute":
             return _mute(link, muted=True)
         if command == "/unmute":

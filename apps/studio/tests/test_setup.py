@@ -61,6 +61,7 @@ class TestSetupPage:
             "accounts",
             "approvers",
             "autopilot",
+            "creation_mode",
             "telegram",
             "email",
             "facts",
@@ -69,8 +70,9 @@ class TestSetupPage:
         }
         assert rows["ai_team"] == "done" and rows["accounts"] == "done" and rows["budget"] == "done"
         assert rows["pictures"] == "todo" and rows["approvers"] == "todo" and rows["autopilot"] == "todo"
+        assert rows["creation_mode"] == "done"
         done = sum(1 for state in rows.values() if state == "done")
-        assert f"{done} of 10 steps done" in html
+        assert f"{done} of 11 steps done" in html
         assert response["Cache-Control"] == "no-store, private"
 
     def test_states_follow_the_services_in_words(self, client, world, settings):
@@ -406,6 +408,8 @@ class TestToday:
 
 def test_readiness_speaks_plainly_and_points_at_set_up(world, settings):
     settings.ANTHROPIC_API_KEY = ""
+    settings.TELEGRAM_WEBHOOK_READY = True  # the deployment is ready; there is just no bot yet
+    settings.TELEGRAM_WEBHOOK_BASE_URL = "https://app.example.com"
     world.linkedin.delete()
     world.x.delete()
 
@@ -453,3 +457,94 @@ def test_the_pages_pass_the_accessibility_sweep(client, world):
         assert audit.unnamed_buttons == [] and audit.unnamed_controls == [], name
         faint = [m.group(3) for m in FAINT_TEXT.finditer(html) if m.group(3).strip() not in ("•", "·", "&bull;")]
         assert faint == [], name
+
+
+# ---------------------------------------------------------------------------
+# Integration: creation mode on Set up and Autopilot, one Telegram state helper
+# ---------------------------------------------------------------------------
+
+
+class TestCreationMode:
+    def test_the_row_switches_the_mode_with_one_tap_and_comes_back(self, client, world):
+        client.force_login(world.owner)
+
+        html = _page(client, world, "setup")
+        assert _rows(html)["creation_mode"] == "done"
+        assert "Ask me first:" in html and "Switch to “Just go ahead”" in html
+        assert 'name="mode" value="auto"' in html and f'name="next" value="{_url("setup", world)}"' in html
+
+        response = client.post(_url("creation_mode", world), {"mode": "auto", "next": _url("setup", world)})
+
+        assert response.status_code == 302 and response["Location"] == _url("setup", world)
+        assert AgencySettings.objects.get(workspace=world.workspace).creation_mode == "auto"
+        html = _page(client, world, "setup")
+        assert "Just go ahead:" in html and "Switch to “Ask me first”" in html and 'name="mode" value="confirm"' in html
+
+    def test_only_settings_managers_get_the_button(self, client, world):
+        client.force_login(world.editor)
+        html = _page(client, world, "setup")
+        assert _rows(html)["creation_mode"] == "done"
+        assert "Switch to" not in html and "Ask your manager to change it." in html
+        assert client.post(_url("creation_mode", world), {"mode": "auto"}).status_code == 403
+        assert not AgencySettings.objects.filter(workspace=world.workspace, creation_mode="auto").exists()
+
+    def test_the_autopilot_page_shows_and_saves_the_mode(self, client, world):
+        from apps.studio.tests.test_autopilot import _form
+
+        client.force_login(world.owner)
+        html = client.get(_url("autopilot", world)).content.decode()
+        assert "data-creation-mode-field" in html and 'name="creation_mode"' in html
+        assert "Go ahead unless I say stop" in html and "Show me the brief first" in html
+
+        response = client.post(_url("autopilot", world), _form(world, creation_mode="auto"))
+
+        assert response.status_code == 302
+        assert AgencySettings.objects.get(workspace=world.workspace).creation_mode == "auto"
+        # A save without the field keeps the choice.
+        client.post(_url("autopilot", world), _form(world))
+        assert AgencySettings.objects.get(workspace=world.workspace).creation_mode == "auto"
+
+
+class TestTelegramState:
+    def test_one_helper_feeds_set_up_the_status_line_readiness_and_the_telegram_page(self, client, world, settings):
+        from apps.telegram import state as telegram
+
+        settings.TELEGRAM_WEBHOOK_READY = False
+        state = readiness.telegram_state(world.workspace, world.owner)
+        assert state["state"] == "deployment_needed" and state["deployment_ready"] is False
+        assert state["bot_state"] == "missing" and not telegram.deployment_ready()
+        client.force_login(world.owner)
+        assert _rows(_page(client, world, "setup"))["telegram"] == "todo"
+        assert "connect your bot" in client.get(_url("index", world)).content.decode()
+
+        settings.TELEGRAM_WEBHOOK_READY = True
+        settings.TELEGRAM_WEBHOOK_BASE_URL = "https://app.example.com"
+        assert readiness.telegram_state(world.workspace, world.owner)["state"] == "setup_needed"
+        assert telegram.deployment_ready()
+        connection = TelegramConnection.objects.create(
+            workspace=world.workspace,
+            bot_id=4321,
+            bot_username="neopolis_bot",
+            token="local-only-placeholder",
+            webhook_secret="local-only-placeholder",
+            is_active=True,
+            webhook_status="active",
+        )
+        state = readiness.telegram_state(world.workspace, world.owner)
+        assert (
+            state["state"] == "pairing_needed" and state["bot_state"] == telegram.bot_state(connection) == "listening"
+        )
+        assert "pair your phone" in client.get(_url("index", world)).content.decode()
+
+        TelegramUserLink.objects.create(connection=connection, user=world.owner, telegram_user_id=99)
+        state = readiness.telegram_state(world.workspace, world.owner)
+        assert state["state"] == "ready" and state["paired"] and state["label"].endswith("you're paired")
+        assert readiness.operational_readiness(world.workspace, world.owner)["telegram"] == state
+        assert state["label"] in _page(client, world, "index")
+        page = client.get(reverse("telegram:settings", kwargs={"workspace_id": world.workspace.id}))
+        assert page.status_code == 200 and page.context["bot_state"] == "listening"
+        assert page.context["deployment_ready"] is True and page.context["paired"] is True
+
+        TelegramConnection.objects.filter(pk=connection.pk).update(webhook_status="setup_in_progress")
+        assert readiness.telegram_state(world.workspace, world.owner)["bot_state"] == "connecting"
+        assert readiness.telegram_state(world.workspace)["state"] == "setup_needed"

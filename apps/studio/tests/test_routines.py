@@ -964,3 +964,171 @@ class TestProviderGate:
         assert autopilot.automatic_work_blocker(world.workspace) == ""
         job = AgencyJob.objects.create(workspace=world.workspace, kind=AgencyJob.Kind.CHAT)
         assert autopilot.automatic_work_blocker(world.workspace, job=job) == ""
+
+
+# ---------------------------------------------------------------------------
+# Integration: the chat action, the card, and Home
+# ---------------------------------------------------------------------------
+
+
+def _staff_membership(world, user):
+    return WorkspaceMembership.objects.get(workspace=world.workspace, user=user)
+
+
+class TestChatAction:
+    """ "Every weekday at 8:30 tell me what's waiting" in the thread becomes a routine, switched off."""
+
+    def test_set_routine_is_offered_to_staff_in_internal_threads_only(self, world):
+        internal = chat.general_conversation(world.workspace, created_by=world.editor)
+        client_thread = chat.general_conversation(world.workspace, audience=Conversation.Audience.CLIENT)
+        target = chat_job.Target()
+
+        assert "set_routine" in chat_job.allowed_actions(_staff_membership(world, world.editor), internal, target)
+        assert "set_routine" in chat_job.allowed_actions(_staff_membership(world, world.owner), internal, target)
+        assert "set_routine" not in chat_job.allowed_actions(
+            _staff_membership(world, world.editor), client_thread, target
+        )
+        assert "set_routine" not in chat_job.allowed_actions(_staff_membership(world, world.viewer), internal, target)
+        assert "set_routine" in client_roles.ACTION_GUIDE and "schedule" in client_roles.ACTION_GUIDE["set_routine"]
+
+    def test_the_manager_proposes_a_routine_and_the_person_turns_it_on_from_the_card(
+        self, client, world, manager_agent, jobs
+    ):
+        manager_agent.action = "set_routine"
+        manager_agent.reply = "Every weekday at 08:30 I'll tell you what's waiting. Turn it on when you're ready."
+        manager_agent.routine_instruction = "Tell me what is waiting for me today."
+        manager_agent.routine_cadence = "weekdays"
+        manager_agent.routine_weekday = -1
+        manager_agent.routine_time = "08:30"
+        conversation = chat.general_conversation(world.workspace, created_by=world.editor)
+
+        posted = chat.post_message(conversation, world.editor, "Every weekday at 8:30 tell me what's waiting")
+        job = drive(posted.job)
+
+        assert "set_routine" in manager_agent.calls[0]["allowed_actions"]
+        routine = Routine.objects.get(workspace=world.workspace)
+        assert routine.created_by == world.editor and routine.conversation == conversation
+        assert not routine.enabled and routine.cadence == Routine.Cadence.WEEKDAYS and routine.time == dt.time(8, 30)
+        assert routine.instruction == "Tell me what is waiting for me today."
+        assert job.result["routine_id"] == str(routine.pk) and job.result["routine_cadence"] == "Weekdays at 08:30"
+        reply = Message.objects.get(job=job, author_kind=Message.AuthorKind.AGENT)
+        assert reply.action == "set_routine" and reply.action_status == "" and "Turn it on" in reply.body
+        assert not AgencyJob.objects.filter(kind=AgencyJob.Kind.CHAT).exclude(pk=job.pk).exists()
+
+        client.force_login(world.editor)
+        html = client.get(_url("studio:thread", world) + f"?c={conversation.pk}").content.decode()
+        toggle = _url("studio:routines_toggle", world, routine_id=routine.pk)
+        assert f'data-routine-card="{routine.pk}"' in html and 'data-routine-state="proposed"' in html
+        assert "Routine proposed" in html and "Weekdays at 08:30" in html and ">Turn on<" in html
+        assert toggle in html and "Nothing runs until it is on." in html
+
+        response = client.post(toggle, {"next": _url("studio:thread", world) + f"?c={conversation.pk}"})
+        assert response.status_code == 302 and response["Location"].endswith(f"?c={conversation.pk}")
+        routine.refresh_from_db()
+        assert routine.enabled and routine.next_run_at is not None
+        html = client.get(_url("studio:thread", world) + f"?c={conversation.pk}").content.decode()
+        assert 'data-routine-state="on"' in html and "Routine on" in html and ">Turn on<" not in html
+        assert_nothing_approved(world.workspace)
+
+    def test_on_home_the_card_returns_to_home(self, client, world, manager_agent, jobs):
+        manager_agent.action = "set_routine"
+        manager_agent.routine_instruction = "Draft replies to new comments."
+        manager_agent.routine_cadence = "weekly"
+        manager_agent.routine_weekday = 0
+        manager_agent.routine_time = "09:00"
+        conversation = chat.general_conversation(world.workspace, created_by=world.owner)
+        drive(chat.post_message(conversation, world.owner, "Every Monday at 9 draft replies to new comments").job)
+        routine = Routine.objects.get()
+        assert routine.cadence == Routine.Cadence.WEEKLY and routine.weekday == 0
+        client.force_login(world.owner)
+
+        response = client.get(_url("studio:index", world))
+        home = response.content.decode()
+
+        assert 'data-routine-state="proposed"' in home
+        assert f'name="next" value="{_url("studio:index", world)}"' in home
+        # The panel polls with ?home=1 while the manager answers, so a refreshed card keeps Home as its return address.
+        assert response.context["thread"]["home_panel"] and response.context["thread"]["messages_url"].endswith(
+            "?home=1"
+        )
+        polled = client.get(
+            reverse(
+                "studio:thread_messages",
+                kwargs={"workspace_id": world.workspace.id, "conversation_id": conversation.pk},
+            )
+            + "?home=1"
+        ).content.decode()
+        assert f'name="next" value="{_url("studio:index", world)}"' in polled
+
+    def test_someone_else_sees_the_card_without_the_button(self, client, world, manager_agent, jobs):
+        manager_agent.action = "set_routine"
+        manager_agent.routine_instruction = "Tell me what is waiting."
+        manager_agent.routine_cadence = "daily"
+        manager_agent.routine_time = "08:30"
+        conversation = chat.general_conversation(world.workspace, created_by=world.editor)
+        drive(chat.post_message(conversation, world.editor, "Every day at 8:30 tell me what's waiting").job)
+        routine = Routine.objects.get()
+
+        client.force_login(world.manager)  # neither the author nor a settings manager
+        html = client.get(_url("studio:thread", world) + f"?c={conversation.pk}").content.decode()
+        assert "Routine proposed" in html and ">Turn on<" not in html and "All routines" in html
+
+        client.force_login(world.owner)  # manages the workspace's settings
+        html = client.get(_url("studio:thread", world) + f"?c={conversation.pk}").content.decode()
+        assert _url("studio:routines_toggle", world, routine_id=routine.pk) in html
+
+    def test_a_time_the_manager_could_not_read_declines_in_one_sentence(self, world, manager_agent, jobs):
+        manager_agent.action = "set_routine"
+        manager_agent.routine_instruction = "Tell me what is waiting."
+        manager_agent.routine_cadence = "weekdays"
+        manager_agent.routine_time = "later"
+        conversation = chat.general_conversation(world.workspace, created_by=world.editor)
+
+        job = drive(chat.post_message(conversation, world.editor, "Tell me what's waiting, later every day").job)
+
+        assert not Routine.objects.exists() and "routine_id" not in job.result
+        reply = Message.objects.get(job=job, author_kind=Message.AuthorKind.AGENT)
+        assert reply.action_status == Message.ActionStatus.DECLINED
+        assert reply.body == f"{chat_job.ROUTINE_NOT_MADE} Choose the time of day."
+
+    def test_a_private_telegram_chats_routine_runs_in_the_general_thread(self, world, manager_agent, jobs):
+        """The model's choice is validated in code: a routine never binds to a private thread."""
+        private = Conversation.objects.create(
+            workspace=world.workspace, audience=Conversation.Audience.INTERNAL, is_private=True, title="Private"
+        )
+        manager_agent.action = "set_routine"
+        manager_agent.routine_instruction = "Tell me what is waiting."
+        manager_agent.routine_cadence = "daily"
+        manager_agent.routine_time = "08:30"
+        out = manager_agent(None).output
+        trigger = Message(conversation=private, author=world.editor, author_kind=Message.AuthorKind.STAFF, body="x")
+
+        outcome = chat_job._set_routine(private, world.editor, _staff_membership(world, world.editor), out, trigger, "")
+
+        routine = Routine.objects.get(pk=outcome.result["routine_id"])
+        assert routine.conversation_id is None
+
+
+class TestHomeRows:
+    def test_home_shows_the_next_three_routines_with_a_link_to_all(self, client, world):
+        for index in range(4):
+            make_routine(world, user=world.editor, time=dt.time(7 + index, 0), title=f"Routine {index}")
+        client.force_login(world.editor)
+
+        html = client.get(_url("studio:index", world)).content.decode()
+
+        assert "data-home-routines" in html and _url("studio:routines", world) in html
+        assert sum(f"Routine {index}" in html for index in range(4)) == 3  # the next three, whatever the clock says
+        assert html.index("data-home-thread") < html.index("data-home-routines") < html.index("data-home-recent")
+        assert "All routines" in html and "Run now" in html
+
+    def test_without_routines_home_says_how_to_start_one(self, client, world):
+        client.force_login(world.editor)
+        html = client.get(_url("studio:index", world)).content.decode()
+        assert "data-home-routines-empty" in html and _url("studio:routines", world) in html
+
+    def test_a_viewer_gets_no_routines_section(self, client, world):
+        make_routine(world, user=world.editor, title="Mornings")
+        client.force_login(world.viewer)
+        html = client.get(_url("studio:index", world)).content.decode()
+        assert "data-home-routines" not in html and "Mornings" not in html

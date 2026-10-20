@@ -137,11 +137,20 @@
             </section>
             {% endif %}
 
-            {# ---- Routines (filled by the Routines integration) ---- #}
-            {% if routine_rows %}
+            {# ---- Routines: the next three standing instructions (apps.studio.routines.rows) ---- #}
+            {% if routine_rows is not None %}
             <section aria-labelledby="routines-heading" class="mb-5" data-home-routines>
-                <h2 id="routines-heading" class="text-lg text-stone-900 mb-2" style="font-family: var(--font-display)">Routines</h2>
-                {% include "studio/partials/routine_rows.html" %}
+                <div class="flex items-baseline justify-between gap-3 mb-2">
+                    <h2 id="routines-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">Routines</h2>
+                    <a href="{% url 'studio:routines' workspace_id=workspace.id %}" class="text-xs font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">All routines</a>
+                </div>
+                {% if routine_rows %}
+                <div class="bg-white border border-stone-200 rounded-2xl px-4 shadow-sm">
+                    {% include "studio/partials/routine_rows.html" with routines=routine_rows can_manage=can_manage_settings %}
+                </div>
+                {% else %}
+                <p class="text-sm text-stone-600" data-home-routines-empty>Nothing runs on its own yet. Tell your manager “every weekday at 8:30 tell me what's waiting”, or <a href="{% url 'studio:routines' workspace_id=workspace.id %}" class="underline font-semibold text-orange-800 rounded focus-visible:outline-2 focus-visible:outline-orange-700">pick a routine</a>.</p>
+                {% endif %}
             </section>
             {% endif %}
         </div>

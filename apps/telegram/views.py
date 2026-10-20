@@ -1,5 +1,4 @@
 import re
-import uuid
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -14,7 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 from apps.studio import dashboard
 from apps.workspaces.models import Workspace
 
-from . import provisioning
+from . import provisioning, state
 from .forms import ChannelForm, ConnectForm, ManagedBotCreationForm, PairingForm
 from .models import (
     TelegramChannel,
@@ -32,24 +31,6 @@ def _bot_url(username):
     if isinstance(username, str) and re.fullmatch(r"[A-Za-z0-9_]{5,32}", username):
         return f"https://t.me/{username}"
     return ""
-
-
-def _deployment_ready(connection):
-    """Whether this deployment can receive Telegram messages at a public https address."""
-    try:
-        return provisioning._webhook_url(connection.pk if connection else uuid.uuid4()) is not None
-    except Exception:
-        return False
-
-
-def _bot_state(connection):
-    if connection is None:
-        return "missing"
-    if connection.is_active and connection.webhook_status == "active":
-        return "listening"
-    if connection.webhook_status == "setup_in_progress":
-        return "connecting"
-    return "saved" if connection.token else "missing"
 
 
 def _context(request, workspace_id):
@@ -97,8 +78,9 @@ def _context(request, workspace_id):
             pass
         else:
             channel_pairing_ready = True
-    deployment_ready = _deployment_ready(connection)
-    bot_state = _bot_state(connection)
+    # The same two facts the agency's Set up row and Home's status line read (apps.telegram.state).
+    deployment_ready = state.deployment_ready()
+    bot_state = state.bot_state(connection)
     paired = own_link is not None
     approvals_on = bool(connection and connection.approvals_enabled)
     internal = internal_member(member)

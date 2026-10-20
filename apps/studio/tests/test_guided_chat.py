@@ -68,6 +68,10 @@ class GuidedManager:
                 creative_brief=CreativeBrief(**self.creative_brief) if self.creative_brief is not None else None,
                 needs_human=False,
                 reason="Confirm the person's creative direction before producing a draft.",
+                routine_instruction="",
+                routine_cadence="",
+                routine_weekday=-1,
+                routine_time="",
             ),
             model="anthropic/claude-sonnet-4.5",
             input_tokens=200,
@@ -796,6 +800,10 @@ class TestCreativeBriefSchema:
             "instructions": "",
             "needs_human": False,
             "reason": "General question.",
+            "routine_instruction": "",
+            "routine_cadence": "",
+            "routine_weekday": -1,
+            "routine_time": "",
         }
         with pytest.raises(ValidationError):
             client_roles.ChatAnswer(**fields)

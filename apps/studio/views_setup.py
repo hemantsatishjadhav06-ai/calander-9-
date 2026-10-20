@@ -21,8 +21,6 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.common.checks import public_https_origin
-
 from . import budget, dashboard, images, llm, readiness, trust
 from .forms import studio_accounts
 from .forms_agency import WEEKDAYS, eligible_leads
@@ -59,8 +57,9 @@ def _link(label: str, url: str) -> dict[str, str] | None:
     return {"label": label, "url": url, "method": "get"} if url else None
 
 
-def _post(label: str, url: str) -> dict[str, str] | None:
-    return {"label": label, "url": url, "method": "post"} if url else None
+def _post(label: str, url: str, **fields: str) -> dict[str, Any] | None:
+    """A one-button POST; ``fields`` travel as hidden inputs (a mode, a return address)."""
+    return {"label": label, "url": url, "method": "post", "fields": fields} if url else None
 
 
 def _row(key, title, state, status, *, action=None, detail="", note="") -> dict[str, Any]:
@@ -196,17 +195,50 @@ def _autopilot_row(workspace, row: AgencySettings, can_manage: bool) -> dict[str
     return _row("autopilot", "Autopilot", "todo", status, note="Ask your manager to turn it on.")
 
 
+def _creation_mode_row(workspace, row: AgencySettings, can_manage: bool) -> dict[str, Any]:
+    """How a team member's idea starts: after a tap on the brief card, or at once. Always a chosen state."""
+    auto = row.creation_mode == AgencySettings.CreationMode.AUTO
+    if auto:
+        status = (
+            "Just go ahead: your manager starts a team member's idea at once, with sensible defaults. "
+            "The finished post still waits for your approval."
+        )
+        other_label, other_mode = "Switch to “Ask me first”", AgencySettings.CreationMode.CONFIRM
+    else:
+        status = (
+            "Ask me first: your manager shows the brief and waits for your tap. "
+            "Clients always confirm, whichever you choose."
+        )
+        other_label, other_mode = "Switch to “Just go ahead”", AgencySettings.CreationMode.AUTO
+    action = None
+    if can_manage:
+        action = _post(
+            other_label,
+            _url("studio:creation_mode", workspace_id=workspace.pk),
+            mode=other_mode,
+            next=_url("studio:setup", workspace_id=workspace.pk),
+        )
+    return _row(
+        "creation_mode",
+        "Creation mode",
+        "done",
+        status,
+        action=action,
+        note="" if can_manage else "Ask your manager to change it.",
+    )
+
+
 def telegram_deployment_ready() -> bool:
     """The deployment can receive Telegram updates (a public https origin, switched on)."""
-    return bool(getattr(django_settings, "TELEGRAM_WEBHOOK_READY", False)) and public_https_origin(
-        getattr(django_settings, "TELEGRAM_WEBHOOK_BASE_URL", "") or ""
-    )
+    from apps.telegram.state import deployment_ready
+
+    return deployment_ready()
 
 
 def _telegram_row(request, workspace, owner: bool) -> dict[str, Any]:
     telegram_url = _url("telegram:settings", workspace_id=workspace.pk)
     state = readiness.telegram_state(workspace, request.user)
-    if not telegram_deployment_ready():
+    if state["state"] == "deployment_needed":
         return _row(
             "telegram",
             "Telegram",
@@ -379,6 +411,7 @@ def checklist(request, workspace) -> dict[str, Any]:
         _accounts_row(workspace),
         _approvers_row(request, workspace, row, can_manage),
         _autopilot_row(workspace, row, can_manage),
+        _creation_mode_row(workspace, row, can_manage),
         _telegram_row(request, workspace, owner),
         _email_row(request, owner),
         _facts_row(workspace),
