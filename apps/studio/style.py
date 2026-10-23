@@ -140,7 +140,7 @@ def resolve(brief, profile) -> StyleReference:
         when = previous_when.isoformat() if previous_when else ""
         return StyleReference(
             kind="studio",
-            label=f"the last AI Studio post: “{previous.title[:80]}”",
+            label=f"the team's last post: “{previous.title[:80]}”",
             locked=locked,
             defaults=defaults,
             image=read_asset(previous.graphic),
@@ -188,7 +188,7 @@ def preview(workspace) -> dict[str, Any]:
     previous_when = (previous.finished_at or previous.created_at) if previous else None
     post_when = getattr(post, "when", None)
     if previous is not None and (post_when is None or (previous_when and previous_when >= post_when)):
-        return {"label": f"the last AI Studio post, “{previous.title[:70]}”", "asset": previous.graphic}
+        return {"label": f"the team's last post, “{previous.title[:70]}”", "asset": previous.graphic}
     if post is not None:
         attachment = (
             post.media_attachments.filter(media_asset__media_type="image")

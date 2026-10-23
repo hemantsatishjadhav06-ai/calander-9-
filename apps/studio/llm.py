@@ -215,7 +215,7 @@ def configuration_error() -> str:
         return "STUDIO_PROVIDER must be anthropic or openrouter on the web and worker services."
     key_name = "OPENROUTER_API_KEY" if provider == "openrouter" else "ANTHROPIC_API_KEY"
     if not (getattr(settings, key_name, "") or "").strip():
-        return f"The AI Studio needs {key_name} on the SM Bean web and worker services. Ask your admin to add it."
+        return f"Your team needs {key_name} on the SM Bean web and worker services. Ask your admin to add it."
     if provider == "openrouter" and "/" not in model_id():
         return "OpenRouter needs a namespaced STUDIO_MODEL, such as anthropic/claude-sonnet-4.5."
     return ""

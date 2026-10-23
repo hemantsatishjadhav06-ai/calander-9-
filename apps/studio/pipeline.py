@@ -1065,7 +1065,7 @@ def account_overrides(account, caption: str, post_copy: dict[str, Any]) -> tuple
 def _internal_notes(brief: StudioBrief) -> str:
     concept = brief.chosen_concept
     review = brief.review_notes or {}
-    lines = [f"Made in the AI Studio from the idea: {brief.idea.strip()[:500]}"]
+    lines = [f"Made by your team from the idea: {brief.idea.strip()[:500]}"]
     if concept is not None:
         lines.append(f"Angle: {concept.title}")
     if review.get("score"):
@@ -1202,7 +1202,7 @@ def _notify_author(brief: StudioBrief, post) -> None:
         notify(
             user=brief.author,
             event_type=EventType.POST_SUBMITTED,
-            title="Your AI Studio post is ready for approval",
+            title="A post from your team is ready for approval",
             body=f"The team turned “{brief.idea.strip()[:80]}” into a post and sent it for approval.",
             data={"post_id": str(post.pk), "workspace_id": str(brief.workspace_id), "studio_brief_id": str(brief.pk)},
         )

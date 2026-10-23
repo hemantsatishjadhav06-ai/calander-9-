@@ -450,7 +450,7 @@ def approve(brief: StudioBrief, user, *, publish_now: bool = False, publish_at=N
         sync_status(brief)
         raise StudioActionError("This post was already approved. Schedule it from the calendar or the composer.")
     try:
-        moved = approval_services.approve_post(post, user, workspace, comment="Approved in the AI Studio.")
+        moved = approval_services.approve_post(post, user, workspace, comment="Approved on the post page in Agency.")
     except ValueError as exc:
         raise StudioActionError(str(exc)) from exc
     if not moved:
