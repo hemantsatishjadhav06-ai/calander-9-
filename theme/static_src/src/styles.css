@@ -882,7 +882,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-segment[aria-current="page"], .ui-segment[aria-selected="true"], .ui-segment.is-active {
     background: var(--surface-0); color: var(--ink-950); font-weight: 600; box-shadow: var(--shadow-segment);
   }
-  @media (max-width: 1023px) { .ui-segment { min-height: 40px; } }
+  @media (max-width: 1023px) { .ui-segment { min-height: 44px; } }
 
   /* Section tabs (Queue / Drafts / Approvals / Sent): ink underline, never the accent */
   .ui-tabs { display: flex; gap: 24px; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: none; }

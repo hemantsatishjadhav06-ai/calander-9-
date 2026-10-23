@@ -51,7 +51,7 @@ schedules the exact proposed time, and only a person can press either.
                 <span>By {{ post.author.display_name|default:"Unknown" }}</span>
                 <span aria-hidden="true" class="text-ink-400">·</span>
                 <button type="button" @click="expanded = !expanded" :aria-expanded="expanded.toString()"
-                        class="inline-flex items-center gap-0.5 font-medium text-ink-600 hover:text-ink-900 rounded min-h-6">
+                        class="relative inline-flex items-center gap-0.5 font-medium text-ink-600 hover:text-ink-900 rounded min-h-6 max-lg:before:absolute max-lg:before:inset-x-0 max-lg:before:-inset-y-2.5">
                     <span x-text="expanded ? 'Hide details' : 'Details'">Details</span>
                     <svg class="w-3 h-3 transition-transform duration-200" :class="expanded && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
                 </button>
