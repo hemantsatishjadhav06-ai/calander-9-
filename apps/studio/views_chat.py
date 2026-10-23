@@ -144,7 +144,7 @@ def thread_page(request, workspace_id):
             "general_selected": selected is None or (general is not None and selected.pk == general.pk),
             "general_url": _thread_page_url(workspace),
             "has_general_row": general is not None and any(r["conversation"].pk == general.pk for r in rows),
-            "tabs": dashboard.tabs(workspace, "thread"),
+            "tabs": dashboard.tabs(workspace, "thread", perms=_perms(request)),
             "tzname": workspace.effective_timezone or "UTC",
         },
     )

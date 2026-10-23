@@ -49,16 +49,24 @@ def _maybe_url(name: str, **kwargs) -> str | None:
 #: Pages that live behind the Settings tab: their views keep their own
 #: ``active`` key, and the tab bar lights up Settings for all of them.
 SETTINGS_PAGES = frozenset({"settings", "brand", "trust", "memory", "outcomes", "autopilot", "telegram", "budget"})
+#: Appended to the Autopilot page's URL by links whose target (approvers, budget) sits in its Advanced section.
+ADVANCED_OPEN = "?open=advanced"
 
 
-def tabs(workspace, active: str) -> list[dict[str, Any]]:
-    """The agency's four tabs (a page that is not available simply doesn't show)."""
+def tabs(workspace, active: str, perms: dict | None = None) -> list[dict[str, Any]]:
+    """The agency's four tabs (a page that is not available simply doesn't show).
+
+    With the viewer's ``perms``, Routines is left out for people who may not
+    write one (its page needs ``create_posts``), so no tab leads to a refusal.
+    """
     items = [
         ("overview", "Home", "studio:index"),
         ("routines", "Routines", "studio:routines"),
         ("team", "Team", "studio:team"),
         ("settings", "Settings", "studio:settings_hub"),
     ]
+    if perms is not None and not perms.get("create_posts"):
+        items = [item for item in items if item[0] != "routines"]
     if active in SETTINGS_PAGES:
         active = "settings"
     elif active in ("workflow", "thread"):
@@ -85,6 +93,8 @@ def settings_cards(workspace) -> list[dict[str, Any]]:
     out = []
     for key, label, blurb, name in items:
         url = _maybe_url(name, workspace_id=workspace.id)
+        if url and key == "budget":
+            url += ADVANCED_OPEN  # the budget lives in the Autopilot page's Advanced section
         if url:
             out.append({"key": key, "label": label, "blurb": blurb, "url": url})
     return out
@@ -324,14 +334,14 @@ def _job_title(job: AgencyJob) -> str:
 
 def needs_review(workspace, limit: int = 5) -> list[dict[str, Any]]:
     """Paused, failed or interrupted tasks a person has to look at, newest first."""
-    from .opendots import task_record
+    from .opendots import task_status
 
     rows: list[dict[str, Any]] = []
     jobs = chat.web_jobs(
         AgencyJob.objects.filter(workspace=workspace, status__in=(AgencyJob.Status.FAILED, AgencyJob.Status.CANCELLED))
     ).order_by("-updated_at")[: limit * 3]
     for job in jobs:
-        record = task_record(job)
+        record = task_status(job)  # a list reads the label only, never the signed effect review
         if record["status"] not in ("paused", "failed", "interrupted"):
             continue
         rows.append(

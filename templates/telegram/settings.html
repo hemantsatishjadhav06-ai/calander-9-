@@ -27,7 +27,7 @@
           <h2 class="font-semibold">Deployment ready</h2>
           {% if deployment_ready %}
           <p class="mt-1 text-sm text-stone-700">Ready. This app can receive Telegram messages.</p>
-          {% elif can_manage %}
+          {% elif can_manage and is_owner %}
           <p class="mt-1 text-sm text-stone-700">Not ready. Set <code>TELEGRAM_WEBHOOK_BASE_URL</code> to this app's public https address{% if webhook_base %} (now <code>{{ webhook_base }}</code>){% endif %} and <code>TELEGRAM_WEBHOOK_READY=true</code>{% if webhook_flag %} (set){% else %} (not set){% endif %} on both services, deploy, then come back.</p>
           {% else %}
           <p class="mt-1 text-sm text-stone-700">Not ready yet. Ask your owner.</p>
@@ -151,7 +151,7 @@
               <button class="w-full rounded-lg border border-stone-400 px-4 py-3 text-sm font-semibold disabled:opacity-50 sm:w-auto" type="submit"{% if bot_state != 'listening' or not own_link %} disabled{% endif %}>Create one-use group code</button>
               {% if not own_link %}<p class="text-sm text-amber-900">Link your own Telegram account before creating a group code.</p>{% endif %}
             </form>
-            <p class="text-sm text-stone-600">Linked: {{ client_group_count }} client group{{ client_group_count|pluralize }}, {{ team_group_count }} team group{{ team_group_count|pluralize }}. <a href="{% url 'studio:autopilot' workspace_id=workspace.id %}" class="underline text-orange-800">Choose the lead and backup approvers</a> so the right people get told.</p>
+            <p class="text-sm text-stone-600">Linked: {{ client_group_count }} client group{{ client_group_count|pluralize }}, {{ team_group_count }} team group{{ team_group_count|pluralize }}. <a href="{% url 'studio:autopilot' workspace_id=workspace.id %}?open=advanced" class="underline text-orange-800">Choose the lead and backup approvers</a> so the right people get told.</p>
           </section>
           {% endif %}
 

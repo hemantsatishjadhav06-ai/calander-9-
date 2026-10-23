@@ -54,7 +54,7 @@ def _context(request, workspace, *, form=None, error="") -> dict:
     perms = _perms(request)
     return {
         "workspace": workspace,
-        "tabs": dashboard.tabs(workspace, "routines"),
+        "tabs": dashboard.tabs(workspace, "routines", perms=perms),
         "routines": routines.rows(workspace, viewer=request.user, perms=perms),
         "suggestions": [{"key": key, **preset} for key, preset in routines.SUGGESTIONS.items()],
         "cadences": CADENCES,

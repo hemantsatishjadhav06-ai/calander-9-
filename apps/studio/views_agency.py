@@ -59,7 +59,7 @@ def team_roster(request, workspace_id):
             "departments": departments,
             "agent_count": len(team.AGENTS),
             "working_now": working_now,
-            "tabs": dashboard.tabs(workspace, "team"),
+            "tabs": dashboard.tabs(workspace, "team", perms=_perms(request)),
         },
     )
 
@@ -101,7 +101,7 @@ def _job_context(request, workspace, job):
         "runs": runs,
         "can_act": _perms(request).get("create_posts", False),
         "assistant_task": opendots.task_record(job),
-        "tabs": dashboard.tabs(workspace, "overview"),
+        "tabs": dashboard.tabs(workspace, "overview", perms=_perms(request)),
     }
 
 

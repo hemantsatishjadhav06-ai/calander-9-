@@ -172,7 +172,7 @@ def _index_context(request, workspace, form=None):
         "can_edit_brand": _can_edit_brand(request),
         "greeting": _greeting(request, workspace),
         "tzname": workspace.effective_timezone or "UTC",
-        "tabs": dashboard.tabs(workspace, "overview"),
+        "tabs": dashboard.tabs(workspace, "overview", perms=perms),
         "thread": thread,
         "agency_settings": dashboard.settings_for(workspace),
         "checklist_on_home": True,

@@ -104,7 +104,7 @@
                 </div>
             </fieldset>
 
-            <details class="py-4 border-t border-stone-200" data-autopilot-advanced{% if form.errors %} open{% endif %}>
+            <details class="py-4 border-t border-stone-200" data-autopilot-advanced{% if advanced_open %} open{% endif %}>
                 <summary class="cursor-pointer text-sm font-semibold text-stone-900 rounded focus-visible:outline-2 focus-visible:outline-orange-700">Advanced <span class="font-normal text-stone-600">· approvers, budget, hold time, pillars, learning, inbox drafts</span></summary>
                 <fieldset {% if not can_save %}disabled{% endif %} class="divide-y divide-stone-200 mt-2">
                     <legend class="sr-only">Advanced autopilot settings</legend>

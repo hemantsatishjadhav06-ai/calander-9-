@@ -736,7 +736,8 @@
                     <span class="sidebar-nav-label">Set up</span>
                 </a>
                 {# Everything else lives behind More, so the sidebar stays short. #}
-                <details class="sidebar-more" data-sidebar-more{% if match.url_name in "create_landing,drafts_list,queue_list,queue_detail,posting_slots,template_list,category_list,csv_upload" or match.app_name == 'media_library' %} open{% endif %}>
+                {# Open only on one of its own pages: an exact name each, since "in" on a string is a substring test. #}
+                <details class="sidebar-more" data-sidebar-more{% if match.url_name == 'create_landing' or match.url_name == 'drafts_list' or match.url_name == 'queue_list' or match.url_name == 'queue_detail' or match.url_name == 'posting_slots' or match.url_name == 'template_list' or match.url_name == 'category_list' or match.url_name == 'csv_upload' or match.app_name == 'media_library' %} open{% endif %}>
                     <summary class="mb-1 sidebar-nav-item" aria-label="More pages">
                         <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
                         <span class="sidebar-nav-label">More</span>

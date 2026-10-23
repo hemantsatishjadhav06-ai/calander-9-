@@ -116,6 +116,38 @@ def test_owner_sees_the_five_rows_with_state_in_words_and_progress(client, hub):
     assert "does not approve, schedule or send" not in html
 
 
+def test_the_exact_names_to_set_are_for_owners_only_as_on_set_up(client, hub, settings):  # noqa: F811
+    """A settings manager who is not an owner reads "Ask your owner" here too, never the two names."""
+    from django.utils import timezone
+
+    from apps.accounts.models import User
+    from apps.members.models import CustomRole, OrgMembership, WorkspaceMembership
+
+    workspace, owner, connection = hub
+    settings.TELEGRAM_WEBHOOK_READY = False
+    manager = User.objects.create_user(
+        email="settings-manager@example.test", password="not-used", name="Settings", tos_accepted_at=timezone.now()
+    )
+    role = CustomRole.objects.create(
+        organization=workspace.organization,
+        name="Settings manager",
+        permissions={"manage_workspace_settings": True, "create_posts": True, "approve_posts": True},
+    )
+    OrgMembership.objects.create(organization=workspace.organization, user=manager, org_role="member")
+    WorkspaceMembership.objects.create(workspace=workspace, user=manager, workspace_role="manager", custom_role=role)
+    url = reverse("telegram:settings", args=[workspace.pk])
+
+    client.force_login(manager)
+    html = client.get(url).content.decode()
+    assert "Not ready yet. Ask your owner." in html
+    assert "TELEGRAM_WEBHOOK_BASE_URL" not in html and "TELEGRAM_WEBHOOK_READY" not in html
+    assert "Retry webhook" in html  # they still manage the bot itself
+
+    client.force_login(owner)
+    html = client.get(url).content.decode()
+    assert "Not ready. Set <code>TELEGRAM_WEBHOOK_BASE_URL</code>" in html
+
+
 def test_approvals_toggle_and_test_message_are_one_post_each(client, hub):  # noqa: F811
     workspace, user, connection = hub
     client.force_login(user)

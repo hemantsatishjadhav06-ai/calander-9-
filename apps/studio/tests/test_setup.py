@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+import pytest
 from django.urls import reverse
 from django.utils import timezone
 
@@ -197,6 +198,21 @@ class TestUseMeAsLead:
         assert client.post(_url("setup_lead", world)).status_code == 302
         assert AgencySettings.objects.get(workspace=world.workspace).lead == world.owner
 
+    def test_a_lead_who_left_the_team_counts_as_no_lead_so_the_button_shown_works(self, client, world):
+        """The row and the button agree: a departed lead's name is not a seat another eligible person cannot take."""
+        AgencySettings.objects.create(workspace=world.workspace, lead=world.owner)
+        WorkspaceMembership.objects.filter(workspace=world.workspace, user=world.owner).delete()
+        client.force_login(world.manager)
+
+        html = _page(client, world, "setup")
+        assert _rows(html)["approvers"] == "todo" and "Use me as lead" in html
+
+        response = client.post(_url("setup_lead", world))
+
+        assert response.status_code == 302
+        assert AgencySettings.objects.get(workspace=world.workspace).lead == world.manager
+        assert "Lead: Manager" in _page(client, world, "setup")
+
 
 class TestAutopilotDefaults:
     def test_the_owner_turns_it_on_with_sensible_defaults(self, client, world):
@@ -214,13 +230,23 @@ class TestAutopilotDefaults:
         assert not StudioBrief.objects.exists() and not AgencyJob.objects.exists()
 
     def test_an_existing_lead_and_posts_per_week_are_kept(self, client, world):
+        """The button turns autopilot on; it never quietly makes the presser the lead when one is already chosen."""
         AgencySettings.objects.create(workspace=world.workspace, lead=world.manager, posts_per_week=3)
         client.force_login(world.owner)
 
         client.post(_url("setup_autopilot", world))
 
         row = AgencySettings.objects.get(workspace=world.workspace)
-        assert row.autopilot_enabled and row.lead == world.owner and row.posts_per_week == 3
+        assert row.autopilot_enabled and row.lead == world.manager and row.posts_per_week == 3
+
+    def test_a_saved_lead_who_no_longer_qualifies_is_replaced_by_the_presser(self, client, world):
+        AgencySettings.objects.create(workspace=world.workspace, lead=world.editor)  # cannot approve: not eligible
+        client.force_login(world.owner)
+
+        client.post(_url("setup_autopilot", world))
+
+        row = AgencySettings.objects.get(workspace=world.workspace)
+        assert row.autopilot_enabled and row.lead == world.owner
 
     def test_only_settings_managers_may_turn_it_on(self, client, world):
         client.force_login(world.manager)
@@ -274,6 +300,26 @@ def test_the_agency_tabs_are_home_routines_team_settings(world):
     assert [tab["key"] for tab in dashboard.tabs(world.workspace, "thread") if tab["active"]] == ["overview"]
 
 
+def test_the_routines_tab_is_only_shown_to_people_who_may_open_it(client, world):
+    """A viewer reaches Home; the Routines page needs create_posts, so no tab sends them to a refusal."""
+    without = [tab["key"] for tab in dashboard.tabs(world.workspace, "overview", perms={"create_posts": False})]
+    assert without == ["overview", "team", "settings"]
+    assert "routines" in [
+        tab["key"] for tab in dashboard.tabs(world.workspace, "overview", perms={"create_posts": True})
+    ]
+
+    client.force_login(world.viewer)
+    response = client.get(_url("index", world))
+    assert response.status_code == 200
+    assert _url("routines", world) not in response.content.decode()
+    assert client.get(_url("routines", world)).status_code == 403
+    for name in ("settings_hub", "team"):
+        assert _url(name, world) not in response.content.decode() or client.get(_url(name, world)).status_code == 200
+
+    client.force_login(world.editor)
+    assert _url("routines", world) in client.get(_url("index", world)).content.decode()
+
+
 def test_settings_pages_light_up_the_settings_tab(client, world):
     client.force_login(world.owner)
 
@@ -288,18 +334,42 @@ def test_settings_pages_light_up_the_settings_tab(client, world):
 
 
 class TestHome:
-    def test_the_status_line_says_set_up_autopilot_and_telegram(self, client, world):
+    def test_the_status_line_says_set_up_autopilot_and_telegram(self, client, world, settings):
         client.force_login(world.owner)
 
         html = client.get(_url("index", world)).content.decode()
 
         assert "Set-up:" in html and "steps left" in html and "Open Set up" in html
         assert "Autopilot off" in html and "Turn on" in html
-        assert "connect your bot" in html
+        assert "Telegram: not ready on this deployment yet" in html  # the test deployment has no public origin
+        settings.TELEGRAM_WEBHOOK_READY = True
+        settings.TELEGRAM_WEBHOOK_BASE_URL = "https://app.example.com"
+        assert "connect your bot" in client.get(_url("index", world)).content.decode()
 
         client.post(_url("setup_autopilot", world))
         html = client.get(_url("index", world)).content.decode()
         assert "Autopilot on · 5 a week" in html
+
+    def test_the_status_line_only_links_to_what_this_person_can_do(self, client, world, settings):
+        settings.TELEGRAM_WEBHOOK_READY = True
+        settings.TELEGRAM_WEBHOOK_BASE_URL = "https://app.example.com"
+        telegram_url = reverse("telegram:settings", kwargs={"workspace_id": world.workspace.id})
+        client.force_login(world.editor)  # may create posts, manages nothing
+
+        html = _page(client, world, "index")
+        line = html.split("data-home-status>")[1].split("</p>")[0]
+
+        assert "Telegram: ask your owner to connect the bot" in line and telegram_url not in line
+        assert "Autopilot off" in line and "Turn on" not in line and "Open Set up" in line
+        # The parts wrap on a phone; only a part's link stays on one line.
+        assert 'class="whitespace-nowrap">' not in line
+
+        settings.TELEGRAM_WEBHOOK_READY = False
+        line = _page(client, world, "index").split("data-home-status>")[1].split("</p>")[0]
+        assert "Telegram: not ready on this deployment yet" in line and telegram_url not in line
+        client.force_login(world.owner)
+        line = _page(client, world, "index").split("data-home-status>")[1].split("</p>")[0]
+        assert "Telegram: not ready on this deployment yet" in line and "Open Set up" in line
 
     def test_the_old_guided_page_redirects_home(self, client, world):
         client.force_login(world.editor)
@@ -332,6 +402,31 @@ class TestHome:
         assert "Start a post" not in html and "customer_workflow" not in html
         for name in ("composer:drafts_list", "calendar:queue_list", "composer:csv_upload", "media_library:index"):
             assert reverse(name, kwargs={"workspace_id": world.workspace.id}) in html
+
+    def test_more_opens_itself_only_on_its_own_pages(self, client, world, fake_team):
+        """ "detail" and "list" are not "queue_detail" and "drafts_list": a brief page keeps More closed."""
+        client.force_login(world.owner)
+        brief = make_brief(world)
+
+        for name, kwargs in (("studio:detail", {"brief_id": brief.pk}), ("studio:index", {}), ("blog:list", {})):
+            html = client.get(reverse(name, kwargs={"workspace_id": world.workspace.id, **kwargs})).content.decode()
+            assert '<details class="sidebar-more" data-sidebar-more>' in html, name
+        drafts = client.get(reverse("composer:drafts_list", kwargs={"workspace_id": world.workspace.id}))
+        assert '<details class="sidebar-more" data-sidebar-more open>' in drafts.content.decode()
+
+    def test_links_to_approvers_and_budget_open_the_advanced_section(self, client, world):
+        AgencySettings.objects.create(workspace=world.workspace, lead=world.manager)
+        client.force_login(world.owner)
+        advanced = _url("autopilot", world) + "?open=advanced"
+
+        setup = client.get(_url("setup", world)).content.decode()
+        assert setup.count(advanced) == 2  # the approvers' Change, and the budget's Change
+        hub = client.get(_url("settings_hub", world)).content.decode()
+        assert advanced in hub
+        closed = client.get(_url("autopilot", world)).content.decode()
+        assert "data-autopilot-advanced>" in closed and "data-autopilot-advanced open>" not in closed
+        opened = client.get(advanced).content.decode()
+        assert "data-autopilot-advanced open>" in opened
 
 
 class TestToday:
@@ -368,8 +463,9 @@ class TestToday:
         failed = engine.create(world.workspace, "report", title="Weekly report", requested_by=world.owner)
         AgencyJob.objects.filter(pk=failed.pk).update(status=AgencyJob.Status.FAILED, error="Boom.")
         interrupted = engine.create(world.workspace, "report", title="Plan", requested_by=world.owner)
+        assert "worker" not in engine.INTERRUPTED_ERROR
         AgencyJob.objects.filter(pk=interrupted.pk).update(
-            status=AgencyJob.Status.FAILED, error="The team stopped part-way — the background worker restarted."
+            status=AgencyJob.Status.FAILED, error=engine.INTERRUPTED_ERROR
         )
         paused = engine.create(world.workspace, "report", title="Learn", requested_by=world.owner)
         AgencyJob.objects.filter(pk=paused.pk).update(
@@ -387,6 +483,24 @@ class TestToday:
             "Paused by you",
         }
         assert all(row["url"] for row in rows)
+
+    def test_lists_read_the_task_state_without_the_signed_effect_review(self, world, monkeypatch):
+        """Home's rows and the briefing's counts never hash a job's runs and briefs: only the task page does."""
+        from apps.studio import briefing
+
+        monkeypatch.setattr(engine, "enqueue", lambda job, stage: None)
+        for n in range(3):
+            job = engine.create(world.workspace, "report", title=f"Report {n}", requested_by=world.owner)
+            AgencyJob.objects.filter(pk=job.pk).update(status=AgencyJob.Status.FAILED, error="Boom.")
+
+        def never(job):
+            raise AssertionError("a list computed the effect digest")
+
+        monkeypatch.setattr(opendots, "_effect_digest", never)
+        assert len(dashboard.needs_review(world.workspace)) == 3
+        assert briefing._task_counts(world.workspace) == {"paused": 0, "failed": 3, "interrupted": 0}
+        with pytest.raises(AssertionError):
+            opendots.task_record(AgencyJob.objects.first())
 
     def test_private_telegram_jobs_stay_out_of_the_card(self, world, monkeypatch):
         from apps.studio.models import Conversation
@@ -445,6 +559,23 @@ def test_a_queued_job_held_by_the_autopilot_switch_shows_as_waiting_on_policy(cl
     assert "data-task-waiting-policy" in html and "open Autopilot" in html
 
 
+def test_a_queued_job_held_for_the_provider_points_at_set_up_not_autopilot(client, world, monkeypatch):
+    monkeypatch.setattr(engine, "enqueue", lambda job, stage: None)
+    job = engine.create(world.workspace, "plan", title="Plan", requested_by=world.editor)
+    AgencyJob.objects.filter(pk=job.pk).update(error=autopilot.PROVIDER_PAUSED)
+    job.refresh_from_db()
+
+    record = opendots.task_record(job)
+
+    assert record["status"] == "waiting_setup" and record["label"] == "Waiting for Set up"
+    assert record["policy_url"] == _url("setup", world) and record["policy_link"] == "open Set up"
+    assert "autopilot" not in record["label"].lower() and "autopilot" not in record["policy_note"].lower()
+    assert record["can_pause"] and record["can_cancel"] and not record["can_resume"]
+    client.force_login(world.editor)
+    html = client.get(_url("job", world, job_id=job.pk)).content.decode()
+    assert "Waiting for Set up" in html and "open Set up" in html and "open Autopilot" not in html
+
+
 def test_the_pages_pass_the_accessibility_sweep(client, world):
     from apps.common.tests.test_a11y_sweep import FAINT_TEXT, _Audit
 
@@ -480,11 +611,23 @@ class TestCreationMode:
         html = _page(client, world, "setup")
         assert "Just go ahead:" in html and "Switch to “Ask me first”" in html and 'name="mode" value="confirm"' in html
 
+    def test_the_thread_header_matches_the_mode(self, client, world):
+        """Home's conversation header promises a tap only when there is one."""
+        client.force_login(world.owner)
+        assert "one tap starts it" in _page(client, world, "index")
+
+        client.post(_url("creation_mode", world), {"mode": "auto"})
+
+        home = _page(client, world, "index")
+        assert "goes ahead with sensible defaults" in home and "one tap starts it" not in home
+
     def test_only_settings_managers_get_the_button(self, client, world):
         client.force_login(world.editor)
         html = _page(client, world, "setup")
         assert _rows(html)["creation_mode"] == "done"
-        assert "Switch to" not in html and "Ask your manager to change it." in html
+        # "Your manager" is the AI manager everywhere on Home; a person with the permission is named as such.
+        assert "Switch to" not in html and "Ask someone who manages this workspace's settings to change it." in html
+        assert "Ask your manager" not in html
         assert client.post(_url("creation_mode", world), {"mode": "auto"}).status_code == 403
         assert not AgencySettings.objects.filter(workspace=world.workspace, creation_mode="auto").exists()
 
@@ -515,7 +658,7 @@ class TestTelegramState:
         assert state["bot_state"] == "missing" and not telegram.deployment_ready()
         client.force_login(world.owner)
         assert _rows(_page(client, world, "setup"))["telegram"] == "todo"
-        assert "connect your bot" in client.get(_url("index", world)).content.decode()
+        assert "Telegram: not ready on this deployment yet" in client.get(_url("index", world)).content.decode()
 
         settings.TELEGRAM_WEBHOOK_READY = True
         settings.TELEGRAM_WEBHOOK_BASE_URL = "https://app.example.com"

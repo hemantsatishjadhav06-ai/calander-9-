@@ -34,6 +34,8 @@ def _bot_url(username):
 
 
 def _context(request, workspace_id):
+    from apps.studio.views_setup import is_owner
+
     workspace = get_object_or_404(Workspace, pk=workspace_id)
     member = current_member(workspace, request.user)
     connection = TelegramConnection.objects.filter(workspace=member.workspace).first()
@@ -94,7 +96,9 @@ def _context(request, workspace_id):
         "can_pair_group": can_pair_group(member),
         "internal": internal,
         "telegram_client_view": not internal,
-        "tabs": dashboard.tabs(member.workspace, "telegram"),
+        "tabs": dashboard.tabs(member.workspace, "telegram", perms=member.effective_permissions),
+        # The exact names to set are for the people who can set them (the same rule as Set up).
+        "is_owner": is_owner(request.user, member.workspace),
         "deployment_ready": deployment_ready,
         "webhook_base": (getattr(settings, "TELEGRAM_WEBHOOK_BASE_URL", "") or "").strip(),
         "webhook_flag": bool(getattr(settings, "TELEGRAM_WEBHOOK_READY", False)),

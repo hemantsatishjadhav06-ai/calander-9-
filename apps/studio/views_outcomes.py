@@ -17,7 +17,7 @@ from . import dashboard, outcomes
 from .forms_outcomes import OutcomeForm
 from .jobtypes.plan import zone_of
 from .models import CampaignOutcome
-from .views import _workspace
+from .views import _perms, _workspace
 
 
 @login_required
@@ -71,7 +71,7 @@ def outcome_page(request, workspace_id):
         "studio/outcomes.html",
         {
             "workspace": workspace,
-            "tabs": dashboard.tabs(workspace, "outcomes"),
+            "tabs": dashboard.tabs(workspace, "outcomes", perms=_perms(request)),
             "form": form,
             "can_record": writable,
             "outcomes": rows,

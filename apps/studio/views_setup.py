@@ -33,6 +33,8 @@ DEFAULT_PLAN_HOUR = 16
 DEFAULT_POSTS_PER_WEEK = 5
 
 ASK_OWNER = "Ask your owner."
+#: "Your manager" is the AI account manager everywhere else, so a person with the settings permission is named by it.
+SETTINGS_PERSON = "someone who manages this workspace's settings"
 
 
 def is_owner(user, workspace) -> bool:
@@ -138,10 +140,17 @@ def _accounts_row(workspace) -> dict[str, Any]:
     )
 
 
+def _advanced_url(workspace) -> str:
+    """The Autopilot page opened on its Advanced section, where the approvers and the budget live."""
+    url = _url("studio:autopilot", workspace_id=workspace.pk)
+    return url + dashboard.ADVANCED_OPEN if url else ""
+
+
 def _approvers_row(request, workspace, row: AgencySettings, can_manage: bool) -> dict[str, Any]:
     leads = {user.pk for user, _role in eligible_leads(workspace)}
     eligible = request.user.pk in leads
-    autopilot_url = _url("studio:autopilot", workspace_id=workspace.pk)
+    autopilot_url = _advanced_url(workspace)
+    # A saved lead who left the team or lost the rights is no lead: the row and the button agree on that.
     if row.lead is not None and row.lead_id in leads:
         backup = row.backup.display_name if row.backup is not None else ""
         status = f"Lead: {row.lead.display_name}" + (f" · Backup: {backup}" if backup else " · No backup yet")
@@ -163,7 +172,7 @@ def _approvers_row(request, workspace, row: AgencySettings, can_manage: bool) ->
         )
     if can_manage:
         return _row("approvers", "Approvers", "todo", status, action=_link("Choose a lead", autopilot_url))
-    return _row("approvers", "Approvers", "todo", status, note="Ask your manager to choose one.")
+    return _row("approvers", "Approvers", "todo", status, note=f"Ask {SETTINGS_PERSON} to choose one.")
 
 
 def _weekday_name(index: int) -> str:
@@ -192,7 +201,7 @@ def _autopilot_row(workspace, row: AgencySettings, can_manage: bool) -> dict[str
             action=_post("Turn on with sensible defaults", _url("studio:setup_autopilot", workspace_id=workspace.pk)),
             note="5 posts a week on your connected accounts, planned on Fridays at 16:00. You can change it after.",
         )
-    return _row("autopilot", "Autopilot", "todo", status, note="Ask your manager to turn it on.")
+    return _row("autopilot", "Autopilot", "todo", status, note=f"Ask {SETTINGS_PERSON} to turn it on.")
 
 
 def _creation_mode_row(workspace, row: AgencySettings, can_manage: bool) -> dict[str, Any]:
@@ -224,7 +233,7 @@ def _creation_mode_row(workspace, row: AgencySettings, can_manage: bool) -> dict
         "done",
         status,
         action=action,
-        note="" if can_manage else "Ask your manager to change it.",
+        note="" if can_manage else f"Ask {SETTINGS_PERSON} to change it.",
     )
 
 
@@ -379,7 +388,7 @@ def _budget_row(workspace, can_manage: bool) -> dict[str, Any]:
         workspace=workspace, started_at__gte=budget.month_start(workspace), output__has_key="provider_cost_usd"
     ).exists()
     qualifier = "" if reported else " (estimated)"
-    action = _link("Change", _url("studio:autopilot", workspace_id=workspace.pk)) if can_manage else None
+    action = _link("Change", _advanced_url(workspace)) if can_manage else None
     if not budget.can_spend(workspace):
         return _row(
             "budget",
@@ -423,42 +432,48 @@ def checklist(request, workspace) -> dict[str, Any]:
 
 
 def status_line(request, workspace, *, steps_left: int) -> list[dict[str, str]]:
-    """The one line under the Home greeting: set-up, autopilot, Telegram. Each part may carry a link."""
+    """The one line under the Home greeting: set-up, autopilot, Telegram.
+
+    Each part may carry a link, and only to something this person can do:
+    an editor is not sent to connect a bot they cannot connect.
+    """
     parts: list[dict[str, str]] = []
+    setup_url = _url("studio:setup", workspace_id=workspace.pk)
     if steps_left:
         parts.append(
             {
                 "text": f"Set-up: {steps_left} step{'s' if steps_left != 1 else ''} left",
                 "link": "Open Set up",
-                "url": _url("studio:setup", workspace_id=workspace.pk),
+                "url": setup_url,
             }
         )
+    can_manage = bool(_perms(request).get("manage_workspace_settings"))
     row = AgencySettings.objects.filter(workspace=workspace).only("autopilot_enabled", "posts_per_week").first()
     if row is not None and row.autopilot_enabled:
         parts.append({"text": f"Autopilot on · {row.posts_per_week} a week", "link": "", "url": ""})
-    else:
+    elif can_manage:
         parts.append(
             {"text": "Autopilot off", "link": "Turn on", "url": _url("studio:autopilot", workspace_id=workspace.pk)}
         )
+    else:
+        parts.append({"text": "Autopilot off", "link": "", "url": ""})
     telegram = readiness.telegram_state(workspace, request.user)
+    telegram_url = _url("telegram:settings", workspace_id=workspace.pk)
     if telegram["state"] == "ready":
         parts.append({"text": telegram["label"], "link": "", "url": ""})
     elif telegram["state"] == "pairing_needed":
         parts.append(
-            {
-                "text": f"Telegram: listening as {telegram['bot']}",
-                "link": "pair your phone",
-                "url": _url("telegram:settings", workspace_id=workspace.pk),
-            }
+            {"text": f"Telegram: listening as {telegram['bot']}", "link": "pair your phone", "url": telegram_url}
         )
-    else:
+    elif telegram["state"] == "deployment_needed":
+        owner = is_owner(request.user, workspace)
         parts.append(
-            {
-                "text": "Telegram",
-                "link": "connect your bot",
-                "url": _url("telegram:settings", workspace_id=workspace.pk),
-            }
+            {"text": telegram["label"], "link": "Open Set up" if owner else "", "url": setup_url if owner else ""}
         )
+    elif can_manage:
+        parts.append({"text": "Telegram", "link": "connect your bot", "url": telegram_url})
+    else:
+        parts.append({"text": "Telegram: ask your owner to connect the bot", "link": "", "url": ""})
     return parts
 
 
@@ -496,7 +511,7 @@ def settings_hub(request, workspace_id):
         {
             "workspace": workspace,
             "cards": dashboard.settings_cards(workspace),
-            "tabs": dashboard.tabs(workspace, "settings"),
+            "tabs": dashboard.tabs(workspace, "settings", perms=_perms(request)),
             "setup_url": _url("studio:setup", workspace_id=workspace.pk),
         },
     )
@@ -516,11 +531,14 @@ def _back(workspace):
 def use_me_as_lead(request, workspace_id):
     """Make the person the lead approver, when they may carry the team's drafts in their name."""
     workspace = _workspace(request, workspace_id)
-    if request.user.pk not in {user.pk for user, _role in eligible_leads(workspace)}:
+    leads = {user.pk for user, _role in eligible_leads(workspace)}
+    if request.user.pk not in leads:
         raise PermissionDenied("Only someone who creates and approves posts here can be the lead.")
     row, _created = AgencySettings.objects.get_or_create(workspace=workspace)
-    if row.lead_id and row.lead_id != request.user.pk and not _perms(request).get("manage_workspace_settings"):
-        raise PermissionDenied("Someone else is the lead. Only a person who manages settings can change it.")
+    # The same rule as the Set up row: a saved lead who is no longer eligible counts as no lead.
+    current_lead = row.lead_id if row.lead_id in leads else None
+    if current_lead and current_lead != request.user.pk and not _perms(request).get("manage_workspace_settings"):
+        raise PermissionDenied(f"Someone else is the lead. Only {SETTINGS_PERSON} can change it.")
     row.lead = request.user
     row.save(update_fields=["lead", "updated_at"])
     messages.success(request, "You are the lead approver. Drafts the team makes on its own carry your name.")
@@ -533,10 +551,11 @@ def autopilot_defaults(request, workspace_id):
     """Switch autopilot on with sensible defaults, or say exactly what is still missing."""
     workspace = _workspace(request, workspace_id)
     if not _perms(request).get("manage_workspace_settings"):
-        raise PermissionDenied("Only someone who manages this workspace's settings can turn autopilot on.")
+        raise PermissionDenied(f"Only {SETTINGS_PERSON} can turn autopilot on.")
     row, _created = AgencySettings.objects.get_or_create(workspace=workspace)
     leads = {user.pk for user, _role in eligible_leads(workspace)}
-    lead_id = request.user.pk if request.user.pk in leads else row.lead_id if row.lead_id in leads else None
+    # The lead stays whoever was chosen, as long as they still qualify; the presser only fills an empty seat.
+    lead_id = row.lead_id if row.lead_id in leads else request.user.pk if request.user.pk in leads else None
     accounts = [a for a in studio_accounts(workspace) if not a.needs_reconnect and a.account_platform_id]
     missing = []
     if lead_id is None:
