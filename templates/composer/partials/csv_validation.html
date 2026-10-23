@@ -1,33 +1,33 @@
 <!-- Step 3: Validation Preview (loaded via HTMX after mapping) -->
 <div class="space-y-6">
-    <div class="bg-white rounded-xl border border-ink-200 p-6">
+    <section class="ui-card" aria-labelledby="csv-step-3">
         <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background: var(--primary-strong);">3</div>
-            <h2 class="text-sm font-semibold text-ink-800">Validation Results</h2>
+            <span class="w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center text-xs font-semibold tabular-nums" aria-hidden="true">3</span>
+            <h2 id="csv-step-3" class="text-h3 text-ink-950">Check the rows</h2>
         </div>
 
         <!-- Summary -->
-        <div class="flex items-center gap-4 mb-5">
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-success-50 border border-success-200">
-                <svg class="w-4 h-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                <span class="text-sm font-semibold text-success-600">{{ valid_count }} valid</span>
-            </div>
+        <div class="flex flex-wrap items-center gap-2 mb-5">
+            <span class="ui-pill ui-pill-success tabular-nums">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                {{ valid_count }} valid
+            </span>
             {% if errors %}
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-danger-50 border border-danger-200">
-                <svg class="w-4 h-4 text-danger-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                <span class="text-sm font-semibold text-danger-600">{{ errors|length }}{% if has_more_errors %}+{% endif %} error{{ errors|length|pluralize }}</span>
-            </div>
+            <span class="ui-pill ui-pill-danger tabular-nums">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><path stroke-linecap="round" d="m15 9-6 6M9 9l6 6"/></svg>
+                {{ errors|length }}{% if has_more_errors %}+{% endif %} error{{ errors|length|pluralize }}
+            </span>
             {% endif %}
-            <span class="text-xs text-ink-500">{{ total_rows }} total rows</span>
+            <span class="text-xs text-ink-600 tabular-nums">{{ total_rows }} total rows</span>
         </div>
 
         <!-- Errors list -->
         {% if errors %}
-        <div class="mb-5 max-h-64 overflow-y-auto rounded-lg border border-danger-200">
+        <div class="mb-5 max-h-64 overflow-y-auto rounded-xl ring-1 ring-inset ring-danger-200 bg-danger-50 divide-y divide-danger-100">
             {% for err in errors %}
-            <div class="flex items-start gap-2 px-3 py-2 text-xs {% if not forloop.last %}border-b border-danger-50{% endif %} bg-danger-50">
-                <span class="font-mono font-semibold text-danger-600 flex-shrink-0">Row {{ err.row }}</span>
-                <div class="text-danger-600">
+            <div class="flex items-start gap-3 px-3 py-2.5 text-[13px]">
+                <span class="font-mono font-semibold text-danger-600 flex-shrink-0 tabular-nums">Row {{ err.row }}</span>
+                <div class="text-danger-700">
                     {% for e in err.errors %}
                     <span>{{ e }}{% if not forloop.last %}; {% endif %}</span>
                     {% endfor %}
@@ -36,7 +36,7 @@
             {% endfor %}
         </div>
         {% if has_more_errors %}
-        <p class="text-xs text-ink-500 mb-4">Showing first 50 errors. Fix and re-upload for the full list.</p>
+        <p class="text-xs text-ink-600 mb-4">Showing first 50 errors. Fix and re-upload for the full list.</p>
         {% endif %}
         {% endif %}
 
@@ -46,23 +46,25 @@
               hx-target="#csv-import-container"
               hx-swap="innerHTML">
             {% csrf_token %}
-            <div class="flex items-center justify-between p-4 bg-ink-50 rounded-lg">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-ink-50 rounded-xl ring-1 ring-inset ring-ink-200">
                 <div>
-                    <p class="text-sm font-medium text-ink-800">Ready to import {{ valid_count }} post{{ valid_count|pluralize }}</p>
+                    <p class="text-sm font-semibold text-ink-900">Ready to import {{ valid_count }} post{{ valid_count|pluralize }}</p>
                     {% if errors %}
-                    <p class="text-xs text-ink-500 mt-0.5">{{ errors|length }} invalid row{{ errors|length|pluralize }} will be skipped.</p>
+                    <p class="text-xs text-ink-600 mt-0.5">{{ errors|length }} invalid row{{ errors|length|pluralize }} will be skipped.</p>
                     {% endif %}
                 </div>
-                <button type="submit" class="btn-brand text-sm py-2 px-5">
+                <button type="submit" class="ui-btn ui-btn-primary flex-shrink-0">
                     Confirm Import
                 </button>
             </div>
         </form>
         {% else %}
-        <div class="p-4 bg-danger-50 rounded-lg text-center">
-            <p class="text-sm font-medium text-danger-600">No valid rows to import.</p>
-            <p class="text-xs text-danger-600 mt-1">Fix the errors in your CSV and re-upload.</p>
+        <div class="ui-callout ui-callout-danger justify-center text-center">
+            <div>
+                <p class="ui-callout-title">No valid rows to import.</p>
+                <p class="mt-0.5">Fix the errors in your CSV and re-upload.</p>
+            </div>
         </div>
         {% endif %}
-    </div>
+    </section>
 </div>

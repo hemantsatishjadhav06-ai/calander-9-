@@ -188,7 +188,7 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
     {% if account.connection_status == "connected" %}
     <div class="border-t border-ink-100 mt-4 pt-4">
         <div class="mb-3">
-            <h4 class="text-xs font-semibold text-ink-700 uppercase tracking-wider">Posting Schedule</h4>
+            <h4 class="text-xs font-semibold text-ink-700 ">Posting Schedule</h4>
             <p class="text-xs text-ink-500 mt-0.5">Set recurring time slots for when queued posts are automatically published.</p>
         </div>
         {% include "social_accounts/partials/_posting_slots_grid.html" with account=account workspace_id=workspace_id %}

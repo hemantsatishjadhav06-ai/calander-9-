@@ -225,10 +225,10 @@ class ProposedPublishAtSaveTests(TestCase):
         resp = self.client.get(reverse("composer:drafts_list", kwargs={"workspace_id": self.ws.id}))
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode("utf-8")
-        # The proposed-time badge renders with its distinguishing title + accent
-        # and the "Proposed Publishing <datetime>" copy.
+        # The proposed-time line renders with its distinguishing title and the
+        # "Proposed for <datetime>" copy (a proposal, never worded as a schedule).
         self.assertIn('title="Proposed publishing time"', body)
-        self.assertIn("Proposed Publishing", body)
+        self.assertIn("Proposed for", body)
         # Rendered in the workspace timezone (Europe/Berlin, UTC+2 on this date),
         # not server/UTC time.
         self.assertIn("Sep 1, 9:00", body)

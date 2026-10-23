@@ -121,7 +121,7 @@
 
     <!-- Metadata -->
     <div class="px-5 py-4">
-      <h3 class="text-xs font-bold uppercase tracking-wider mb-3" style="color: var(--text-tertiary);">Details</h3>
+      <h3 class="text-xs font-bold mb-3" style="color: var(--text-tertiary);">Details</h3>
       <dl class="space-y-2.5">
         <div class="flex justify-between gap-3 min-w-0">
           <dt class="text-xs flex-shrink-0" style="color: var(--text-tertiary);">File size</dt>
@@ -158,7 +158,7 @@
 
     <!-- Tags -->
     <div class="px-5 py-4 border-t" style="border-color: var(--surface-2);">
-      <h3 class="text-xs font-bold uppercase tracking-wider mb-3" style="color: var(--text-tertiary);">Tags</h3>
+      <h3 class="text-xs font-bold mb-3" style="color: var(--text-tertiary);">Tags</h3>
       <div id="tag-editor-{{ asset.id }}">
         {% include "media_library/_tag_input.html" %}
       </div>
@@ -167,7 +167,7 @@
     <!-- Version History -->
     <div class="px-5 py-4 border-t" style="border-color: var(--surface-2);">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-xs font-bold uppercase tracking-wider" style="color: var(--text-tertiary);">Version History</h3>
+        <h3 class="text-xs font-bold " style="color: var(--text-tertiary);">Version History</h3>
         {% if versions %}
         <span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background: var(--surface-2); color: var(--text-tertiary);">{{ versions|length }}</span>
         {% endif %}

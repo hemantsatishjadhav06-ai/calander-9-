@@ -1,6 +1,6 @@
 <!-- Explore Feeds modal interior -->
 <div class="p-6">
-    <h2 class="text-lg font-semibold text-ink-800 text-center mb-5">Explore Feeds</h2>
+    <h2 class="ui-modal-title text-center mb-5">Explore feeds</h2>
 
     <!-- Category tabs -->
     <div class="flex items-center justify-center gap-2 flex-wrap mb-6">
@@ -8,12 +8,8 @@
         <button hx-get="{% url 'composer:feed_explore' workspace_id=workspace.id %}?category={{ cat.slug }}"
                 hx-target="#explore-feeds-content"
                 hx-swap="innerHTML"
-                class="px-3 py-1.5 text-xs font-semibold rounded-full border transition-all duration-150 cursor-pointer
-                       {% if cat.slug == active_category %}
-                       text-ink-800 bg-success-50 border-success-200
-                       {% else %}
-                       text-ink-500 bg-white border-ink-200 hover:bg-ink-25
-                       {% endif %}">
+                aria-pressed="{% if cat.slug == active_category %}true{% else %}false{% endif %}"
+                class="ui-filter-chip {% if cat.slug == active_category %}is-selected{% else %}bg-white ring-1 ring-inset ring-ink-200{% endif %}">
             {{ cat.label }}
         </button>
         {% endfor %}
@@ -22,7 +18,7 @@
     <!-- Feed grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto">
         {% for feed in curated_feeds %}
-        <div class="flex items-center gap-3 px-4 py-3 border border-ink-200 rounded-xl">
+        <div class="flex items-center gap-3 px-4 py-3 rounded-xl ring-1 ring-inset ring-ink-200">
             <!-- Feed icon -->
             <div class="w-10 h-10 rounded-full bg-ink-100 flex items-center justify-center flex-shrink-0">
                 {% if feed.favicon %}
@@ -59,8 +55,8 @@
                         hx-target="#explore-feeds-content"
                         hx-swap="innerHTML"
                         hx-include="closest form"
-                        class="flex items-center justify-center w-8 h-8 text-ink-500 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-all duration-150 cursor-pointer">
-                    <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                        class="ui-btn ui-btn-icon !rounded-full !bg-brand-100 !text-brand-700 hover:!bg-brand-200">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                 </button>
             </form>
             {% endif %}

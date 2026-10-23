@@ -18,7 +18,7 @@
     {% endif %}
     {% with extra=post.media_attachments.all|length %}
     {% if extra > 1 %}
-    <div class="absolute bottom-0 right-0 bg-ink-950/70 text-white text-[11px] leading-4 font-semibold tabular-nums px-1 rounded-tl-[5px]">+{{ extra|add:"-1" }}</div>
+    <div class="absolute bottom-0 right-0 bg-ink-950/70 text-white text-xs leading-4 font-semibold tabular-nums px-1 rounded-tl-[5px]">+{{ extra|add:"-1" }}</div>
     {% endif %}
     {% endwith %}
 </div>
