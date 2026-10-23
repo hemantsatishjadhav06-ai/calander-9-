@@ -11,6 +11,7 @@ contribute in [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 |---|---|
 | [PRODUCT_MAP.md](PRODUCT_MAP.md) | Every page a signed-in person can reach (who it is for, what it does, what happens next, where the code is), how work flows from an idea to receipts, and every task that runs on its own. |
 | [LIVE_OPERATIONS.md](LIVE_OPERATIONS.md) | Running production: the brand workspaces, how approval and publishing behave, the one canonical table of environment variables, verifying a deployment, rollback. |
+| [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) | How SM Bean looks ("Quiet graphite + Pine"): the palette and what each colour means, type, shape, motion, focus, the component recipes, the app shell, the conversation, Today, the live Team view, the portal, login and marketing site, and every checked contrast pair. Tokens live in `theme/static_src/src/styles.css`; `tools/recolor.py --check` guards the old palette. |
 | [TELEGRAM_CLIENT_HUB.md](TELEGRAM_CLIENT_HUB.md) | Telegram end to end: setting it up, the manager inbox, alerts and the morning briefing, everyday commands, weekly preparation, the boundaries that keep client and private chats separate. |
 | [TELEGRAM_CHANNELS.md](TELEGRAM_CHANNELS.md) | Status channels: a broadcast channel that receives fixed status messages for permitted posts and nothing else. |
 | [OPENDOTS_INTEGRATION.md](OPENDOTS_INTEGRATION.md) | The task controls (pause, resume, retry after review) adapted from OpenDots, what was deliberately not adopted, and how the adaptation is verified. |

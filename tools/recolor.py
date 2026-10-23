@@ -1,7 +1,7 @@
 """Move templates, JS and Python class strings to the "Quiet graphite + Pine" palette.
 
-This is the codemod behind the October 2026 redesign (the design system's migration map,
-sections 1-7). It rewrites, in place:
+This is the codemod behind the October 2026 redesign (the design round's migration map,
+sections 1-7; the system itself is docs/DESIGN_SYSTEM.md). It rewrites, in place:
 
 * Tailwind colour utilities from the default palettes (stone, gray, neutral, slate, zinc,
   orange, amber, yellow, red, rose, green, emerald, teal, lime, indigo, blue, sky, cyan,
@@ -82,7 +82,7 @@ SCALE_OF = {
     **dict.fromkeys(("indigo", "blue", "sky", "cyan"), "info"),
     **dict.fromkeys(("violet", "purple", "pink", "fuchsia"), "decorative"),
 }
-# Default step per scale (the migration map's role-correct tables; Layer 0 renders the same).
+# Default step per scale (the migration map's role-correct tables).
 STEPS = {
     "ink": {50: 50, 100: 100, 200: 200, 300: 300, 400: 500, 500: 500, 600: 600, 700: 700, 800: 800, 900: 900, 950: 950},
     "brand": {

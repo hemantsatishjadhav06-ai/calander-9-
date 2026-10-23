@@ -33,7 +33,8 @@ machine need different `DB_NAME`s.
 .venv/bin/mypy apps/ config/ providers/ tests/ --ignore-missing-imports
 .venv/bin/python manage.py makemigrations --check --dry-run    # a model change needs its migration
 npm ci --ignore-scripts && npm run test:ui                     # tests/js/*.test.cjs (the thread's state machine)
-(cd theme/static_src && npm ci && npm run build)               # static/css/dist/styles.css is committed; rebuild after changing classes
+(cd theme/static_src && npm ci && npm run build)               # compiles theme/static/css/dist/styles.css (built in Docker, never committed); rebuild after changing classes
+.venv/bin/python tools/recolor.py --check                       # no old palette class or mapped hex left (see Design system)
 .venv/bin/python manage.py runserver                            # the web app
 .venv/bin/python manage.py run_worker                           # the one worker: publishing, agency, Telegram
 ```
@@ -208,6 +209,35 @@ uncertain send or delivery is held for a person, never replayed.
   pairing message; cards that act carry the one footer (`actions.FOOTER`).
 - Times are shown in the workspace's timezone; dates in words.
 
+## Design system
+
+`docs/DESIGN_SYSTEM.md` is the spec ("Quiet graphite + Pine"): palette, type,
+components, screens and the checked contrast pairs. The tokens live in
+`theme/static_src/src/styles.css`: Layer 1 raw scales (the only place an app
+colour hex is written), Layer 2 semantic tokens (`--surface-*`, `--text-*`,
+`--primary*`, `--focus-ring`), Layer 3 component tokens, then the shared
+component classes. The public site repeats the same values as `--mk-*` in
+`static/css/marketing.css`.
+
+- Use the `ink-` (graphite) and `brand-` (Pine) scales, the status scales
+  `success-`, `warning-`, `danger-`, `info-`, or a semantic `var(--…)` token.
+  Tailwind's default palettes are switched off (`--color-*: initial`), so
+  `bg-stone-100` or `text-orange-700` compiles to nothing.
+- Pine (`brand-700`) means "yours to act on": one solid primary per view,
+  links, focus, checked controls, the Approvals count; repeated row actions are
+  tinted. Busy is `info`, waiting for a person `warning`, done `success`,
+  stopped `danger`. A status always has an icon and a word, through
+  `studio/partials/status_badge.html` or `approvals/partials/_status_badge.html`.
+- Words start at `ink-500`; `ink-300` and `ink-400` are for icons, borders and
+  control boundaries (`apps/common/tests/test_a11y_sweep.py` checks it).
+- Never write a raw hex in a template except in emails, which do not load the
+  stylesheet and use the palette's literal values (so do the standalone legal,
+  error and unsubscribe pages). Platform glyphs, previews and a client's own
+  colours are content and keep theirs.
+- `tools/recolor.py` is the codemod that moved everything off the old stone and
+  orange palette; `python tools/recolor.py --check` must say "nothing left to
+  do". Rebuild the CSS to see a class that no template used before.
+
 ## How to add things
 
 ### A job kind
@@ -287,6 +317,7 @@ Inbound — a new command or button:
 
 `docs/README.md` indexes the rest: `docs/PRODUCT_MAP.md` (pages, flows, what
 runs on its own), `docs/LIVE_OPERATIONS.md` (production, the canonical
-environment-variable table, verification, rollback), `docs/TELEGRAM_CLIENT_HUB.md`,
+environment-variable table, verification, rollback), `docs/DESIGN_SYSTEM.md`
+(the look: tokens, components, screens, contrast), `docs/TELEGRAM_CLIENT_HUB.md`,
 `docs/TELEGRAM_CHANNELS.md`, `docs/OPENDOTS_INTEGRATION.md`. Older status and
 audit documents are kept, unchanged, under `docs/archive/`.

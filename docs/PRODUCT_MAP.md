@@ -59,7 +59,10 @@ code is (views, templates, services).
   whether Telegram is listening and you are paired); the **Today** card, built
   from plain queries: *Waiting for you* (with Review and Approve buttons),
   *Going out today*, *Done since yesterday*, *Needs your review* (paused,
-  failed or interrupted tasks) and the next planned run; the **conversation**
+  failed or interrupted tasks) and the next planned run; under it the
+  **Right now** card (teammates working, stopped and idle, the busiest task's
+  steps, *Open Team*; it refreshes itself while the tab is visible); the
+  **conversation**
   with your team (the general internal thread, composer visible without
   scrolling); **In progress** (one row per idea: idea → brief → draft →
   approval, one state and one button each); **Routines** (the next three, for
@@ -120,8 +123,15 @@ code is (views, templates, services).
 ### Team — `studio:team` · `/studio/team/`; a job — `studio:job`
 
 - **Who:** every member.
-- **What:** the roster of agents by department with what each one does and who
-  is busy. A job page shows one piece of agency work other than a post (a
+- **What:** the team at work, live (refreshed every few seconds while the tab
+  is visible, changes announced to screen readers): four numbers (working now,
+  queued, done today, needs you); **Working now**, one row per running task
+  with its steps; **Last 24 hours** (turns per hour, with a table view) and
+  the **Latest post**'s receipt from draft to published; **Next 24 hours**
+  (scheduled posts, routines and plans, approvals due, queued work, under
+  "Nothing goes out without your approval"); **Recently finished**; and the
+  roster by department, each agent with its job, its state (Working, Stopped
+  or Idle, shown by shape and word) and what it did last. A job page shows one piece of agency work other than a post (a
   weekly plan, an article, a reply, a report, a learning pass) with its
   timeline and the task controls: Pause, Resume, Retry after review, Cancel.
   A job held by a switched-off autopilot says "Paused: autopilot is off" with
@@ -132,8 +142,11 @@ code is (views, templates, services).
   replayed on its own.
 - **Code:** `apps/studio/views_agency.py`, `apps/studio/team.py` (the one list
   of agents), `apps/studio/opendots.py` (`task_record`, `control_job`),
-  `apps/studio/opendots_views.py`. Templates `templates/studio/team.html`,
-  `job_detail.html`, `partials/job_progress.html`.
+  `apps/studio/opendots_views.py`, `apps/studio/live.py` (the live snapshot;
+  `studio:team_board` re-renders it). Templates `templates/studio/team.html`,
+  `partials/team_board.html` and the `partials/team_*.html` it includes,
+  `partials/live_strip.html` (Home's card), `job_detail.html`,
+  `partials/job_progress.html`; `static/js/live_board.js`.
 
 ### Settings hub — `studio:settings_hub` · `/studio/settings/`
 

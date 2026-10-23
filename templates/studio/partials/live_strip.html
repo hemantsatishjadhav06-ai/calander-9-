@@ -1,5 +1,5 @@
 {% comment %}
-Home's "Right now" card (final-home-1440.png, under Today): teammates working, stopped and idle, the busiest
+Home's "Right now" card (docs/DESIGN_SYSTEM.md 14.6, under Today): teammates working, stopped and idle, the busiest
 task's stage track, and a link to the Team tab. It refreshes itself every 15 s while the tab is visible
 (studio:team_board?part=strip); a refresh that changes nothing swaps nothing.
 To include it on Home: add "live": apps.studio.live.snapshot(workspace) to the context, then
