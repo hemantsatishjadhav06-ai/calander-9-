@@ -47,6 +47,7 @@
     .pr-foot__inner { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
     .pr-foot__links { display: flex; gap: 4px 20px; flex-wrap: wrap; }
     .pr-foot__links a { display: inline-flex; align-items: center; min-height: 32px; color: var(--mk-ink-2); }
+    @media (max-width: 1023px) { .pr-foot__links a { min-height: 44px; } }
     .pr-foot__links a:hover { color: var(--mk-ink); text-decoration: underline; text-underline-offset: 3px; }
     @media (max-width: 860px) { .pr-plans { grid-template-columns: minmax(0, 1fr); max-width: 460px; margin: 0 auto; gap: 28px; } .pr-tag { min-height: 0; } }
     @media (max-width: 640px) { .pr-head { padding-top: 48px; } .pr-faq { padding-top: 56px; padding-bottom: 72px; } }

@@ -697,6 +697,11 @@ main p a:not([class]):hover, main li a:not([class]):hover, main td a:not([class]
 .mk-footer .mk-logo { color: var(--mk-ink-strong); font-size: 1rem; }
 .mk-footer__bottom { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; align-items: center; margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--mk-line); font-size: 0.8125rem; color: var(--mk-ink-3); }
 .mk-footer__bottom a { font-size: 0.8125rem; color: var(--mk-ink-2); text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 1023px) {
+  /* 44px touch targets for standalone links on phones and tablets */
+  .mk-footer li a, .mk-link { min-height: 44px; }
+  .mk-footer li + li { margin-top: 0; }
+}
 @media (max-width: 860px) { .mk-footer__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .mk-footer__grid { grid-template-columns: minmax(0, 1fr); } }
 
