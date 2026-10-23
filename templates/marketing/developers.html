@@ -10,7 +10,7 @@
             <h1 class="mk-h1">A REST API and an MCP server, <em class="mk-accent">one permission model.</em></h1>
             <p class="mk-lead">Scripts, integrations and AI agents get the same pipeline your team uses: create and schedule posts, upload media, read analytics and work the inbox. Both protocols share keys, permissions, rate limits and the audit log.</p>
             <div class="mk-btn-row" style="margin-top: 28px;">
-                <a class="mk-btn mk-btn--dark" href="#endpoints">REST endpoints</a>
+                <a class="mk-btn mk-btn--ghost" href="#endpoints">REST endpoints</a>
                 <a class="mk-btn mk-btn--ghost" href="#mcp">MCP tools</a>
                 <a class="mk-btn mk-btn--ghost" href="/api/v1/docs" id="openapi">OpenAPI docs</a>
             </div>
@@ -78,7 +78,7 @@
         <div class="mk-section-head reveal">
             <span class="mk-eyebrow">REST</span>
             <h2 class="mk-h2">Endpoints</h2>
-            <p class="mk-lead">Base URL <code>{{ api_base_url }}/</code>. Interactive documentation, generated from the same code, lives at <a class="mk-link" href="/api/v1/docs">/api/v1/docs</a>.</p>
+            <p class="mk-lead">Base URL <code>{{ api_base_url }}/</code>. Interactive documentation, generated from the same code, lives at <a href="/api/v1/docs">/api/v1/docs</a>.</p>
         </div>
         <div class="mk-table-wrap reveal">
             <table class="mk-table">
@@ -131,19 +131,19 @@ The client discovers
 registers itself, and asks you to sign in.</pre></div>
             </div>
             <div class="reveal" data-delay="1">
-                <div class="mk-table-wrap" style="background: rgba(255,255,255,0.03); border-color: var(--mk-dark-line); box-shadow: none;">
-                    <table class="mk-table mk-table--dark" style="min-width: 0; color: var(--mk-dark-ink);">
-                        <thead><tr><th style="background: rgba(255,255,255,0.05); color: var(--mk-dark-ink-2);">Tools</th><th style="background: rgba(255,255,255,0.05); color: var(--mk-dark-ink-2);">Needs</th></tr></thead>
+                <div class="mk-table-wrap">
+                    <table class="mk-table mk-table--dark" style="min-width: 0;">
+                        <thead><tr><th>Tools</th><th>Needs</th></tr></thead>
                         <tbody>
-                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">list_accounts</code></td><td style="border-color: var(--mk-dark-line);" class="mk-dash">—</td></tr>
-                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">create_draft</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">cancel_post</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">create_posts</code></td></tr>
-                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">schedule_post</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">schedule_draft</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">create_posts</code> + <code style="background: rgba(255,255,255,0.08); color: #fff;">publish_directly</code></td></tr>
-                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">get_post</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">list_posts</code></td><td style="border-color: var(--mk-dark-line);" class="mk-dash">—</td></tr>
-                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">search_media</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">get_media</code></td><td style="border-color: var(--mk-dark-line);" class="mk-dash">—</td></tr>
-                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">upload_media</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">request_media_upload</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">finalize_media_upload</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">upload_media</code></td></tr>
-                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">get_account_analytics</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">get_post_analytics</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">view_analytics</code></td></tr>
-                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">list_inbox_messages</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">get_inbox_message</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">create_reply_draft</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">update_reply_draft</code> · <code style="background: rgba(255,255,255,0.08); color: #fff;">discard_reply_draft</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">use_inbox</code></td></tr>
-                            <tr><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">send_reply</code></td><td style="border-color: var(--mk-dark-line);"><code style="background: rgba(255,255,255,0.08); color: #fff;">reply_from_inbox</code></td></tr>
+                            <tr><td><code>list_accounts</code></td><td class="mk-dash">—</td></tr>
+                            <tr><td><code>create_draft</code> · <code>cancel_post</code></td><td><code>create_posts</code></td></tr>
+                            <tr><td><code>schedule_post</code> · <code>schedule_draft</code></td><td><code>create_posts</code> + <code>publish_directly</code></td></tr>
+                            <tr><td><code>get_post</code> · <code>list_posts</code></td><td class="mk-dash">—</td></tr>
+                            <tr><td><code>search_media</code> · <code>get_media</code></td><td class="mk-dash">—</td></tr>
+                            <tr><td><code>upload_media</code> · <code>request_media_upload</code> · <code>finalize_media_upload</code></td><td><code>upload_media</code></td></tr>
+                            <tr><td><code>get_account_analytics</code> · <code>get_post_analytics</code></td><td><code>view_analytics</code></td></tr>
+                            <tr><td><code>list_inbox_messages</code> · <code>get_inbox_message</code> · <code>create_reply_draft</code> · <code>update_reply_draft</code> · <code>discard_reply_draft</code></td><td><code>use_inbox</code></td></tr>
+                            <tr><td><code>send_reply</code></td><td><code>reply_from_inbox</code></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -170,7 +170,7 @@ registers itself, and asks you to sign in.</pre></div>
             <p class="mk-lead">Keys live under Organisation → API Keys once you have an account.</p>
             <div class="mk-btn-row">
                 <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
-                <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="/api/v1/docs">Open the API docs</a>
+                <a class="mk-btn mk-btn--ghost mk-btn--lg" href="/api/v1/docs">Open the API docs</a>
             </div>
         </div>
     </div>

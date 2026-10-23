@@ -40,7 +40,7 @@
                     <li>{% include "marketing/_icon.html" with name="check" %}<span>Local disk or S3-compatible storage for media</span></li>
                 </ul>
                 <div class="mk-btn-row">
-                    <a class="mk-btn mk-btn--dark" href="#docker">Docker Compose guide {% include "marketing/_icon.html" with name="arrow" %}</a>
+                    <a class="mk-btn mk-btn--ghost" href="#docker">Docker Compose guide {% include "marketing/_icon.html" with name="arrow" %}</a>
                     <a class="mk-btn mk-btn--ghost" href="{{ source_url }}" rel="noopener">Source code</a>
                 </div>
             </div>
@@ -150,7 +150,7 @@ python manage.py process_tasks</pre></div>
             <p class="mk-lead">The quickest way to judge it is to schedule one real post.</p>
             <div class="mk-btn-row">
                 <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
-                <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:developers' %}">Read the API docs</a>
+                <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:developers' %}">Read the API docs</a>
             </div>
         </div>
     </div>
