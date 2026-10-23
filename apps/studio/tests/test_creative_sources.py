@@ -95,7 +95,18 @@ def _meta(world, platform="instagram", **fields):
     )
 
 
-def test_collect_reads_website_fresh_each_time_and_extracts_only_visible_text(world, profile, offline_http):
+@pytest.fixture(autouse=True)
+def fresh_cache():
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
+
+
+def test_collect_shares_one_snapshot_per_quarter_hour_and_extracts_only_visible_text(world, profile, offline_http):
+    from django.core.cache import cache
+
     offline_http["website"] = httpx.Response(
         200,
         headers={"Content-Type": "text/html; charset=utf-8"},
@@ -110,7 +121,11 @@ def test_collect_reads_website_fresh_each_time_and_extracts_only_visible_text(wo
     assert first["website"]["status"] == "ready"
     assert first["website"]["title"] == "Brand & Homes"
     assert first["website"]["excerpt"] == "Premium homes Contact our team."
-    assert second["website"] == first["website"]
+    assert second == first
+    assert len(offline_http["requests"]) == 1  # the second call shares the snapshot
+    cache.clear()
+    third = creative_sources.collect(world.workspace, profile, [world.linkedin])
+    assert third["website"] == first["website"]
     assert len(offline_http["requests"]) == 2
     request = offline_http["requests"][0]
     assert request.url.host == "93.184.216.34"
@@ -160,7 +175,10 @@ def test_source_failures_are_bounded_generic_and_do_not_follow_redirects(world, 
 
 
 def test_total_read_deadline_is_enforced(world, profile, offline_http, monkeypatch):
-    clock = iter([0.0, creative_sources.FETCH_DEADLINE + 1])
+    from itertools import chain, repeat
+
+    # collect() and the website read each note their start; every later reading is past the deadline.
+    clock = chain([0.0, 0.0], repeat(creative_sources.FETCH_DEADLINE + 1))
     monkeypatch.setattr(creative_sources, "time", SimpleNamespace(monotonic=lambda: next(clock)))
     result = creative_sources.collect(world.workspace, profile, [])
     assert result["website"]["status"] == "unavailable"
@@ -312,3 +330,86 @@ def test_invalid_or_expired_meta_binding_does_not_make_channel_requests(world, p
     result = creative_sources.collect(world.workspace, profile, [account])
     assert result["channels"][0]["status"] == "unavailable"
     assert len(offline_http["requests"]) == 1  # website only
+
+
+def test_the_snapshot_is_shared_per_workspace_account_set_and_website(world, monkeypatch):
+    from django.core.cache import cache
+
+    from apps.studio.brand_defaults import ensure_profile
+
+    reads: list[str] = []
+    monkeypatch.setattr(
+        creative_sources,
+        "_website",
+        lambda url: (
+            reads.append("website") or {"url": url, "status": "not_configured", "title": "", "excerpt": "", "error": ""}
+        ),
+    )
+    monkeypatch.setattr(
+        creative_sources, "_channels", lambda ws, accounts, deadline=None: reads.append("channels") or []
+    )
+    profile = ensure_profile(world.workspace)
+    profile.website = ""
+
+    first = creative_sources.collect(world.workspace, profile, [world.linkedin])
+    second = creative_sources.collect(world.workspace, profile, [world.linkedin])
+    assert first == second and reads == ["website", "channels"]
+
+    creative_sources.collect(world.workspace, profile, [world.linkedin, world.x])
+    assert len(reads) == 4
+    creative_sources.collect(world.workspace, profile, [world.x, world.linkedin])  # the same set, any order
+    assert len(reads) == 4
+
+    profile.website = "https://brand.example/"  # a changed website is read afresh
+    creative_sources.collect(world.workspace, profile, [world.linkedin])
+    assert len(reads) == 6
+
+    cache.clear()
+    creative_sources.collect(world.workspace, profile, [world.linkedin])
+    assert len(reads) == 8
+
+
+def test_channel_reads_run_side_by_side_under_one_deadline(world, monkeypatch):
+    import time as clock
+
+    from django.core.cache import cache
+
+    from apps.social_accounts.models import SocialAccount
+    from apps.studio.brand_defaults import ensure_profile
+
+    pages = [
+        SocialAccount.objects.create(
+            workspace=world.workspace,
+            platform="facebook",
+            account_platform_id=str(100 + index),
+            account_name=f"Page {index}",
+            oauth_access_token="t",
+        )
+        for index in range(3)
+    ]
+    monkeypatch.setattr(
+        creative_sources,
+        "_website",
+        lambda url: {"url": "", "status": "not_configured", "title": "", "excerpt": "", "error": ""},
+    )
+    # Everything that touches the database is prepared first; only the network read runs in a thread.
+    monkeypatch.setattr(
+        creative_sources, "_meta_request", lambda account: (f"https://graph.example/{account.pk}", {}, True)
+    )
+
+    def slow_read(url, headers, facebook):
+        clock.sleep(0.3)
+        return [{"caption": url, "published_at": "2026-10-01T00:00:00+00:00", "platform_post_id": "1"}]
+
+    monkeypatch.setattr(creative_sources, "_meta_fetch", slow_read)
+    started = clock.monotonic()
+    result = creative_sources.collect(world.workspace, ensure_profile(world.workspace), pages)
+    assert clock.monotonic() - started < 0.8  # three 0.3 s reads, side by side
+    assert len(result["channels"]) == 3 and all(channel["source"] == "live_meta" for channel in result["channels"])
+
+    cache.clear()
+    monkeypatch.setattr(creative_sources, "CHANNEL_DEADLINE", 0.1)
+    started = clock.monotonic()
+    result = creative_sources.collect(world.workspace, ensure_profile(world.workspace), pages)
+    assert clock.monotonic() - started < 0.8
+    assert all(channel["source"] == "stored_history" for channel in result["channels"])

@@ -624,10 +624,12 @@ def test_bounded_retention_clears_transient_content_without_losing_unknown_recei
 
 
 def test_week_completion_mirrors_only_exact_internal_thread_and_deduplicates_per_user_notices(
-    hub, user, django_capture_on_commit_callbacks
+    hub, user, django_capture_on_commit_callbacks, monkeypatch
 ):
     from apps.accounts.models import User
+    from apps.telegram import inbox
 
+    monkeypatch.setattr(inbox, "is_quiet", lambda *a, **k: False)
     conn, chat = hub
     pair(conn, user)
     second = User.objects.create_user(email="weekly-approver@example.com", name="Approver", password="fake")
@@ -647,10 +649,17 @@ def test_week_completion_mirrors_only_exact_internal_thread_and_deduplicates_per
                 data={"week_id": str(week.pk), "workspace_id": str(conn.workspace_id)},
             )
     rows = list(TelegramDelivery.objects.all())
-    assert len(rows) == 1 and rows[0].chat_id == chat.pk
-    text = rows[0].payload["text"]
+    # One message in the requesting team thread, plus one inbox line per paired approver, each told once.
+    group_rows = [row for row in rows if row.chat_id == chat.pk]
+    inbox_rows = [row for row in rows if row.source_key.startswith("inbox:")]
+    assert len(rows) == 3 and len(group_rows) == 1 and len(inbox_rows) == 2
+    assert {row.chat.private_user_id for row in inbox_rows} == {user.pk, second.pk}
+    text = group_rows[0].payload["text"]
     assert "2026-10-19" in text and "human review: 1" in text and "/week" in text
-    assert "SECRET" not in text and "$100" not in text and "AI cost" not in text
+    for row in rows:
+        body = row.payload["text"]
+        assert "SECRET" not in body and "$100" not in body and "AI cost" not in body
+    assert all("Next week is planned" in row.payload["text"] for row in inbox_rows)
 
 
 @pytest.mark.parametrize(

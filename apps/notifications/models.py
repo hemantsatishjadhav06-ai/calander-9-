@@ -25,6 +25,8 @@ class EventType(models.TextChoices):
     CLIENT_CONNECTED_ACCOUNTS = "client_connected_accounts", "Client connected accounts"
     TEAM_MESSAGE = "team_message", "New message in the team thread"
     AUTOPILOT_PLANNED = "autopilot_planned", "Autopilot planned the week"
+    AGENCY_ALERT = "agency_alert", "The team needs you"
+    DAILY_BRIEFING = "daily_briefing", "Your morning briefing"
 
 
 class Channel(models.TextChoices):

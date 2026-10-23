@@ -29,6 +29,8 @@ from .permissions import fresh_member, internal_member
 PREFIX = "tg:a:"
 ACTION_TTL = timedelta(minutes=10)
 APPROVAL_KINDS = {"approve", "approve_schedule", "schedule"}
+#: The one caveat every card that acts carries.
+FOOTER = "Nothing publishes without your approval. Buttons work once and expire in 10 minutes."
 
 
 class TelegramActionError(ValueError):
@@ -241,7 +243,7 @@ def issue_post_review(chat, user_link, post, *, publish_at=None):
         f"Graphic {i + 1}: {item.media_asset.original_filename}; {trust.photo_status(item.media_asset)['label']}; alt text: {item.alt_text or '(none)'}"
         for i, item in enumerate(attachments)
     )
-    lines.append("Only the paired intended reviewer can use these buttons; they expire in 10 minutes.")
+    lines.append(FOOTER)
     text = "\n".join(lines)
     if (
         len(text) > 3900
@@ -312,26 +314,25 @@ def issue_brief_confirmation(chat, user_link, brief=None, *, confirmation_messag
     if message.job.requested_by_id != member.user_id:
         raise TelegramActionError("Ask for a fresh brief addressed to your paired account.")
     text = (
-        message.body + "\n\nConfirm these brief/source facts and prepare a draft. This does not approve or publish it."
+        message.body
+        + "\n\nGo ahead confirms the brief and its facts; the draft comes back for your approval. "
+        + FOOTER
     )
     if len(text) > 3900:
         raise TelegramActionError("Review and confirm this complete brief inside SM Bean.")
-    button = _issue(chat, user_link, "prepare", {"confirmation": snapshot}, label="Confirm facts & prepare draft")
+    # The same tap as the web card, with the same name.
+    button = _issue(chat, user_link, "prepare", {"confirmation": snapshot}, label="Go ahead")
     return {"text": text, "inline_keyboard": [[button]], "reply_markup": {"inline_keyboard": [[button]]}}
 
 
 def issue_week_confirmation(chat, user_link, preview):
-    from .weekly import analysis_text
+    """A short summary card with the confirm button; the complete evidence sits behind "Show evidence"."""
+    from .weekly import analysis_text, summary_card_text, week_role_ok
 
     forbid_in_agent_work("issue a Telegram weekly preparation button")
     member = fresh_member(user_link, "create_posts")
     chat = TelegramChat.objects.select_related("connection", "conversation").get(pk=chat.pk)
-    if (
-        not internal_member(member)
-        or chat.audience == "client"
-        or not member.effective_permissions.get("manage_workspace_settings")
-        or not member.effective_permissions.get("approve_posts")
-    ):
+    if not internal_member(member) or chat.audience == "client" or not week_role_ok(member):
         raise TelegramActionError("Review weekly preparation in a paired internal team or private chat.")
     _chat_access(chat, user_link, member)
     if not preview.get("needs_confirmation") or not preview.get("analysis_token"):
@@ -347,15 +348,25 @@ def issue_week_confirmation(chat, user_link, preview):
         raise TelegramActionError(
             "The weekly evidence or configuration is incomplete or blocked. Request a complete review first."
         )
-    text = analysis_text(preview)
-    button = _issue(
+    # The complete evidence must fit one card, or no confirmation is offered at all.
+    evidence = analysis_text(preview)
+    text = summary_card_text(preview) + "\n" + FOOTER
+    confirm = _issue(
         chat,
         user_link,
         "week_plan",
         {"week_start": preview["week_start"], "analysis_token": preview["analysis_token"]},
-        label="Confirm analysis & prepare week",
+        label="Prepare the week",
     )
-    return {"text": text, "inline_keyboard": [[button]], "reply_markup": {"inline_keyboard": [[button]]}}
+    show = _issue(
+        chat,
+        user_link,
+        "week_evidence",
+        {"week_start": preview["week_start"], "evidence": evidence},
+        label="Show evidence",
+    )
+    keyboard = [[confirm], [show]]
+    return {"text": text, "inline_keyboard": keyboard, "reply_markup": {"inline_keyboard": keyboard}}
 
 
 def _binding(action, connection, sender, chat_id, bot_id):
@@ -480,10 +491,13 @@ def handle_callback(connection, payload):
             _binding(action, current_connection, sender_id, chat_id, bot_id)
             if action.used_at or action.expires_at <= timezone.now():
                 raise TelegramActionError("This button was already used or expired. Request a fresh review card.")
-            if action.kind in {"prepare", "week_plan"}:
+            if action.kind in {"prepare", "week_plan", "week_evidence"}:
                 if not internal_member(member) or not member.effective_permissions.get("create_posts"):
                     raise TelegramActionError("A current paired team member must confirm preparation.")
-                if action.kind == "week_plan":
+                if action.kind == "week_evidence":
+                    # Reading the evidence changes nothing; the confirm button stays its own one-use step.
+                    outcome = {"ok": True, "text": str(action.snapshot.get("evidence") or "No evidence was saved.")}
+                elif action.kind == "week_plan":
                     from .weekly import queue_week_plan
 
                     result = queue_week_plan(
@@ -520,7 +534,7 @@ def handle_callback(connection, payload):
                         )
                     outcome = {
                         "ok": posted.job is not None,
-                        "text": "Draft preparation requested. Publishing still needs a separate exact post approval."
+                        "text": "The team started on the draft. You'll get it here to approve."
                         if posted.job
                         else (posted.note or "Preparation is blocked; check SM Bean."),
                     }
@@ -623,10 +637,10 @@ def _apply_post(action, member, nonce, sender_id, chat_id, bot_id):
             }
     text = {
         "client_signoff": "Client sign-off recorded. Your agency must still confirm scheduling.",
-        "changes": "Changes requested. Tell the account manager what should change, then review the new exact version.",
-        "reject": "This version was rejected. No publishing request was sent.",
-        "approve": "This exact version was approved; it was not scheduled. Confirm its future time before publication.",
-    }.get(action.kind, "Review decision recorded. No publishing request was sent.")
+        "changes": "Changes requested. Tell the team what should change and you'll get a new version to review.",
+        "reject": "This version was rejected. Nothing was sent.",
+        "approve": "Approved, not yet scheduled. Choose its time to publish.",
+    }.get(action.kind, "Review decision recorded. Nothing was sent.")
     return {
         "ok": True,
         "text": text,

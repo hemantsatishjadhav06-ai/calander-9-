@@ -4,7 +4,7 @@
 {% block title %}{{ brief.title|truncatechars:60 }} - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl">
+<div class="max-w-6xl {% if brief.status == 'ready' or brief.status == 'approved' %}pb-24 lg:pb-0{% endif %}">
     <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
         <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Agency</a>
         <span aria-hidden="true"> / </span><span>{% if brief.status == 'ready' %}Waiting for approval{% else %}Post{% endif %}</span>
@@ -17,7 +17,7 @@
                 <span class="text-xs text-stone-600">Revision {{ brief.revision }}{% if brief.author %} · by {{ brief.author.display_name }}{% endif %} · {{ brief.created_at|date:"j M Y, H:i" }}</span>
             </div>
             <h1 class="text-2xl sm:text-3xl text-stone-900 break-words" style="font-family: var(--font-display)">{{ brief.title }}</h1>
-            <p class="text-sm text-stone-600 mt-1 break-words"><span class="font-medium text-stone-700">From the idea:</span> {{ brief.idea }}{% if agents_used %} · made by {{ agents_used }} agents{% if elapsed_minutes %} in {{ elapsed_minutes }} min{% endif %}{% endif %}{% if cost is not None %} · about ${{ cost|floatformat:2 }}{% endif %}</p>
+            <p class="text-sm text-stone-600 mt-1 break-words"><span class="font-medium text-stone-700">From the idea:</span> {{ brief.idea }}</p>
             {% if brief.get_origin_display and brief.origin != 'manual' %}<p class="text-xs text-stone-600 mt-1">{{ brief.get_origin_display }}{% if brief.requested_by %} — asked for by {{ brief.requested_by.display_name }}{% endif %}</p>{% endif %}
             {% if brief.feedback and brief.revision > 1 %}<p class="text-sm text-stone-600 mt-1 break-words"><span class="font-medium text-stone-700">Latest notes to the team:</span> {{ brief.feedback }}</p>{% endif %}
         </div>
@@ -65,9 +65,24 @@
     <p class="text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-xl p-4 max-w-2xl">This brief was discarded.</p>
 
     {% else %}
+    {# ---- The decision comes first on a phone: a sticky bar with the one thing to do ---- #}
+    {% if can_approve and proposed_in_future %}
+    <div class="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur px-4 py-3" data-decision-bar>
+        <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true" class="flex items-center gap-3">
+            {% csrf_token %}<input type="hidden" name="mode" value="proposed">
+            <p class="flex-1 min-w-0 text-xs text-stone-700 truncate">Proposed {{ proposed_local|timezone:tzname|date:"D j M, H:i" }}</p>
+            <button type="submit" x-bind:disabled="busy" class="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Approve &amp; schedule</button>
+        </form>
+    </div>
+    {% elif next_step %}
+    <div class="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur px-4 py-3" data-decision-bar>
+        <p class="text-sm font-semibold text-green-800">{{ next_step }}</p>
+    </div>
+    {% endif %}
+
     <div class="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
-        <div class="space-y-6 min-w-0">
-            {# ---- The post, as LinkedIn will show it ---- #}
+        <div class="space-y-6 min-w-0 order-2 lg:order-1">
+            {# ---- The post, as the channel will show it ---- #}
             <section aria-labelledby="preview-heading" class="bg-white border border-stone-200 rounded-2xl overflow-hidden max-w-xl">
                 <h2 id="preview-heading" class="sr-only">Preview</h2>
                 <div class="flex items-start gap-2.5 px-4 pt-4 pb-3">
@@ -103,7 +118,7 @@
             {% endif %}{% endfor %}
             {% endif %}
 
-            {# ---- Brand reviewer ---- #}
+            {# ---- Brand reviewer: what to check before approving ---- #}
             {% if review %}
             <section aria-labelledby="review-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
                 <div class="flex items-center justify-between gap-3 mb-2">
@@ -130,36 +145,6 @@
                     </li>
                     {% endfor %}
                 </ul>
-                {% if qa.checks %}
-                <h3 class="text-sm font-semibold text-stone-900 mt-5 mb-2">QA inspector <span class="font-normal text-stone-600">· {{ qa.passed }} of {{ qa.total }} checks pass</span></h3>
-                <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-2">
-                    {% for check in qa.checks %}
-                    <li class="flex gap-2 text-sm">
-                        {% if check.passed %}
-                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                        {% else %}
-                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 {% if check.level == 'fail' %}text-red-700{% else %}text-amber-700{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" d="M12 8v5m0 3h.01"/></svg>
-                        {% endif %}
-                        <span><span class="font-medium text-stone-900">{{ check.name }}</span><span class="sr-only">{% if check.passed %} (passed){% else %} (needs attention){% endif %}</span>
-                            <span class="text-stone-600">— {{ check.note }}</span></span>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-            </section>
-            {% endif %}
-
-            {# ---- Art director ---- #}
-            {% if spec %}
-            <section aria-labelledby="art-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
-                <h2 id="art-heading" class="text-sm font-semibold text-stone-900 mb-2">Art director</h2>
-                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-                    <dt class="text-stone-600">Look</dt><dd class="text-stone-900">{{ spec.template|capfirst }} layout · {{ spec.format }} · {{ spec.grade|cut:"_" }}</dd>
-                    {% if reference.label %}<dt class="text-stone-600">Matched to</dt><dd class="text-stone-900">{{ reference.label|capfirst }}</dd>{% endif %}
-                    {% if spec.consistency_notes %}<dt class="text-stone-600">Kept</dt><dd class="text-stone-900">{{ spec.consistency_notes }}</dd>{% endif %}
-                    {% if spec.design_rationale %}<dt class="text-stone-600">Why</dt><dd class="text-stone-900">{{ spec.design_rationale }}</dd>{% endif %}
-                    {% if spec.picture_style %}<dt class="text-stone-600">Picture style</dt><dd class="text-stone-900">{{ spec.picture_style }}</dd>{% endif %}
-                </dl>
             </section>
             {% endif %}
 
@@ -203,12 +188,38 @@
             </section>
             {% endif %}
 
-            {# ---- Timeline ---- #}
-            <details class="bg-white border border-stone-200 rounded-2xl p-5" open>
-                <summary class="cursor-pointer text-sm font-semibold text-stone-900 rounded focus-visible:outline-2 focus-visible:outline-orange-700">
-                    How the team made it{% if cost is not None %} <span class="font-normal text-stone-600">· about ${{ cost|floatformat:2 }} in AI usage (estimate)</span>{% endif %}
-                </summary>
-                <ol class="mt-3 space-y-3">
+            {# ---- Details: how it was made, the art direction, the QA checks and what it cost ---- #}
+            <details class="bg-white border border-stone-200 rounded-2xl p-5" data-brief-details>
+                <summary class="cursor-pointer text-sm font-semibold text-stone-900 rounded focus-visible:outline-2 focus-visible:outline-orange-700">Details</summary>
+                <p class="mt-2 text-xs text-stone-600">{% if agents_used %}Made by {{ agents_used }} agent{{ agents_used|pluralize }}{% if elapsed_minutes %} in {{ elapsed_minutes }} min{% endif %}{% endif %}{% if cost is not None %} · about ${{ cost|floatformat:2 }} in AI usage (estimate){% endif %}</p>
+                {% if spec %}
+                <h3 class="text-sm font-semibold text-stone-900 mt-4 mb-2">Art director</h3>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+                    <dt class="text-stone-600">Look</dt><dd class="text-stone-900">{{ spec.template|capfirst }} layout · {{ spec.format }} · {{ spec.grade|cut:"_" }}</dd>
+                    {% if reference.label %}<dt class="text-stone-600">Matched to</dt><dd class="text-stone-900">{{ reference.label|capfirst }}</dd>{% endif %}
+                    {% if spec.consistency_notes %}<dt class="text-stone-600">Kept</dt><dd class="text-stone-900">{{ spec.consistency_notes }}</dd>{% endif %}
+                    {% if spec.design_rationale %}<dt class="text-stone-600">Why</dt><dd class="text-stone-900">{{ spec.design_rationale }}</dd>{% endif %}
+                    {% if spec.picture_style %}<dt class="text-stone-600">Picture style</dt><dd class="text-stone-900">{{ spec.picture_style }}</dd>{% endif %}
+                </dl>
+                {% endif %}
+                {% if qa.checks %}
+                <h3 class="text-sm font-semibold text-stone-900 mt-4 mb-2">QA inspector <span class="font-normal text-stone-600">· {{ qa.passed }} of {{ qa.total }} checks pass</span></h3>
+                <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+                    {% for check in qa.checks %}
+                    <li class="flex gap-2 text-sm">
+                        {% if check.passed %}
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        {% else %}
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 {% if check.level == 'fail' %}text-red-700{% else %}text-amber-700{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" d="M12 8v5m0 3h.01"/></svg>
+                        {% endif %}
+                        <span><span class="font-medium text-stone-900">{{ check.name }}</span><span class="sr-only">{% if check.passed %} (passed){% else %} (needs attention){% endif %}</span>
+                            <span class="text-stone-600">— {{ check.note }}</span></span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                <h3 class="text-sm font-semibold text-stone-900 mt-4 mb-2">How the team made it</h3>
+                <ol class="space-y-3">
                     {% for run in runs %}
                     <li class="flex items-start gap-3 text-sm">
                         {% include "components/agent_avatar.html" with agent=run.agent_spec size="sm" %}
@@ -221,13 +232,12 @@
                     </li>
                     {% endfor %}
                 </ol>
-                <p class="mt-3 text-xs text-stone-600">Agents run on {{ setup.model }}; pictures on fal.ai.</p>
             </details>
         </div>
 
-        <aside class="space-y-6">
-            {# ---- Approval ---- #}
-            <section aria-labelledby="approval-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+        <aside class="space-y-6 order-1 lg:order-2 min-w-0">
+            {# ---- Your decision: one primary action per state ---- #}
+            <section aria-labelledby="approval-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm" data-decision>
                 <h2 id="approval-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">Your decision</h2>
                 <p class="text-xs text-stone-600 mb-3">Nothing goes out until you approve.</p>
                 {% if brief.status == 'ready' and proposed_local %}
@@ -236,13 +246,14 @@
                     {% if scheduler_note %}<p class="text-xs text-stone-700 mt-0.5 break-words">{{ scheduler_note }}</p>{% endif %}
                 </div>
                 {% endif %}
+                {% if next_step %}<p class="text-sm font-semibold text-green-800 mb-3" data-next-step>{{ next_step }}</p>{% endif %}
                 {% if platform_posts %}
                 <ul class="space-y-1.5 mb-4">
                     {% for pp in platform_posts %}
                     <li class="text-sm">
                         <span class="font-medium text-stone-900">{{ pp.social_account.account_name|default:pp.social_account.account_handle }}</span>
                         <span class="text-stone-600">· {{ pp.social_account.get_platform_display }}</span><br>
-                        <span class="text-stone-700">{{ pp.get_status_display }}{% if pp.status == 'scheduled' and pp.scheduled_at %} for {{ pp.scheduled_at|date:"D j M, H:i" }}{% endif %}{% if pp.status == 'published' and pp.published_at %} {{ pp.published_at|date:"j M, H:i" }}{% endif %}</span>
+                        <span class="text-stone-700">{{ pp.get_status_display }}{% if pp.status == 'scheduled' and pp.scheduled_at %} for {{ pp.scheduled_at|timezone:tzname|date:"D j M, H:i" }}{% endif %}{% if pp.status == 'published' and pp.published_at %} {{ pp.published_at|timezone:tzname|date:"j M, H:i" }}{% endif %}</span>
                         {% if pp.platform_extra.permalink %} · <a class="underline" href="{{ pp.platform_extra.permalink }}" target="_blank" rel="noopener">View<span class="sr-only"> (opens in a new tab)</span></a>{% endif %}
                         {% if pp.status == 'failed' and pp.publish_error %}<p class="text-red-800 break-words">{{ pp.publish_error }}</p>{% endif %}
                     </li>
@@ -259,33 +270,49 @@
                             <span x-show="!busy">Approve &amp; schedule for {{ proposed_local|timezone:tzname|date:"D H:i" }}</span><span x-show="busy" x-cloak>Approving…</span>
                         </button>
                     </form>
-                    {% endif %}
-                    {% if can_publish_now %}
-                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
-                        {% csrf_token %}<input type="hidden" name="mode" value="now">
-                        <button type="submit" x-bind:disabled="busy" class="w-full px-5 py-2.5 text-sm font-semibold {% if proposed_in_future %}text-stone-800 bg-white border border-stone-300 hover:bg-stone-50{% else %}text-white bg-teal-700 hover:bg-teal-800{% endif %} rounded-full disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
-                            <span x-show="!busy">Approve &amp; publish now</span><span x-show="busy" x-cloak>Approving…</span>
-                        </button>
-                    </form>
-                    {% endif %}
+                    {% else %}
                     <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" class="rounded-xl border border-stone-200 p-3">
                         {% csrf_token %}<input type="hidden" name="mode" value="schedule">
-                        <p class="text-xs font-semibold text-stone-700 mb-2">{% if proposed_in_future %}Or pick another time{% else %}Approve and schedule{% endif %} ({{ workspace.effective_timezone|default:"UTC" }})</p>
+                        <p class="text-xs font-semibold text-stone-700 mb-2">Approve and schedule ({{ workspace.effective_timezone|default:"UTC" }})</p>
                         <div class="grid grid-cols-2 gap-2 mb-2">
                             <label class="sr-only" for="{{ schedule_form.date.id_for_label }}">Date</label>{{ schedule_form.date }}
                             <label class="sr-only" for="{{ schedule_form.time.id_for_label }}">Time</label>{{ schedule_form.time }}
                         </div>
-                        <button type="submit" class="w-full px-5 py-2 text-sm font-semibold text-teal-900 bg-teal-50 border border-teal-200 rounded-full hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-teal-700">Approve &amp; schedule</button>
-                        {% if brief.proposed_publish_at %}<p class="mt-1.5 text-xs text-stone-600">Filled in with the scheduler's proposal.</p>{% endif %}
+                        <button type="submit" class="w-full px-5 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Approve &amp; schedule</button>
                     </form>
-                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}">
-                        {% csrf_token %}<input type="hidden" name="mode" value="approve">
-                        <button type="submit" class="text-sm text-stone-800 underline hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-orange-700 rounded">Approve only — schedule it later</button>
-                    </form>
+                    {% endif %}
+                    <details class="rounded-xl border border-stone-200 p-3" data-decision-more>
+                        <summary class="cursor-pointer text-xs font-semibold text-stone-700 rounded focus-visible:outline-2 focus-visible:outline-orange-700">Other options</summary>
+                        <div class="mt-3 space-y-3">
+                            {% if proposed_in_future %}
+                            <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}">
+                                {% csrf_token %}<input type="hidden" name="mode" value="schedule">
+                                <p class="text-xs font-semibold text-stone-700 mb-2">Pick another time ({{ workspace.effective_timezone|default:"UTC" }})</p>
+                                <div class="grid grid-cols-2 gap-2 mb-2">
+                                    <label class="sr-only" for="{{ schedule_form.date.id_for_label }}">Date</label>{{ schedule_form.date }}
+                                    <label class="sr-only" for="{{ schedule_form.time.id_for_label }}">Time</label>{{ schedule_form.time }}
+                                </div>
+                                <button type="submit" class="w-full px-5 py-2 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Approve &amp; schedule for this time</button>
+                            </form>
+                            {% endif %}
+                            {% if can_publish_now %}
+                            <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                                {% csrf_token %}<input type="hidden" name="mode" value="now">
+                                <button type="submit" x-bind:disabled="busy" class="w-full px-5 py-2 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-full hover:bg-stone-50 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                                    <span x-show="!busy">Approve &amp; publish now</span><span x-show="busy" x-cloak>Approving…</span>
+                                </button>
+                            </form>
+                            {% endif %}
+                            <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}">
+                                {% csrf_token %}<input type="hidden" name="mode" value="approve">
+                                <button type="submit" class="text-sm text-stone-800 underline hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-orange-700 rounded">Approve only — schedule it later</button>
+                            </form>
+                        </div>
+                    </details>
                 </div>
                 {% elif brief.status == 'ready' %}
                 <p class="text-sm text-stone-700">Waiting for an approver (an owner or manager). It's also on the Approvals list.</p>
-                {% elif brief.status == 'approved' %}
+                {% elif brief.status == 'approved' and not next_step %}
                 <p class="text-sm text-green-800">Approved.</p>
                 {% endif %}
             </section>

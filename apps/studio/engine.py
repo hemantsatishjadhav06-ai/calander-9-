@@ -41,6 +41,13 @@ logger = logging.getLogger(__name__)
 #: django-background-tasks runs higher numbers first; publishing uses 0 and
 #: post briefs -10.
 PRIORITY_CHAT = -8
+#: What a job whose run died says (the task page, alerts, Home): plain words, no worker names.
+INTERRUPTED_ERROR = (
+    "The team stopped part-way — the work was interrupted before it could finish. "
+    "Press Retry to continue from where it stopped."
+)
+#: The words every interrupted error carries; ``opendots`` reads the task state from them.
+INTERRUPTED_MARKER = "stopped part-way"
 PRIORITY_DEFAULT = -15
 PRIORITY_BACKGROUND = -30
 
@@ -257,6 +264,9 @@ def _close_running(job: AgencyJob, message: str, *, status: str = AgentRun.Statu
 def _after_failure(job: AgencyJob, message: str) -> None:
     """Tell the person waiting in a thread that their request failed."""
     if job.kind != AgencyJob.Kind.CHAT or job.conversation_id is None:
+        from . import alerts
+
+        alerts.job_failed(job)  # the lead and backup hear about unprompted work; never raises
         return
     try:
         from .chat import post_failure_note
@@ -464,10 +474,6 @@ def sweep_stuck() -> int:
             "apps.studio.tasks.run_agency_step", str(job.pk), revision=job.revision, stage=job.stage
         ):
             continue
-        fail(
-            job,
-            "The team stopped part-way — the background worker restarted or isn't running. "
-            "Press Retry to continue from where it stopped.",
-        )
+        fail(job, INTERRUPTED_ERROR)
         failed += 1
     return failed

@@ -32,10 +32,10 @@ PREFIX = "workflow-prompt:"
 PROMPT_TTL = timedelta(days=7)
 _KEY = re.compile(r"^workflow-prompt:([0-9a-f-]{36}):part:0$")
 CONTROL_TEXT = {
-    "pause": "Your assistant task was paused. Open SM Bean to review its current state.",
-    "resume": "Your assistant task was resumed. Open SM Bean to review its current state.",
-    "retry": "A new attempt was requested for your assistant task. Open SM Bean to review its current state.",
-    "cancel": "Your assistant task was cancelled. Open SM Bean to review its current state.",
+    "pause": "Your task was paused. Open SM Bean to see where it stands.",
+    "resume": "Your task was resumed. Open SM Bean to see where it stands.",
+    "retry": "A new attempt was requested for your task. Open SM Bean to see where it stands.",
+    "cancel": "Your task was stopped. Open SM Bean to see where it stands.",
 }
 
 
@@ -275,21 +275,23 @@ def queue_workflow_message(message_id):
     result = job.result
     question = False
     if message.action == "new_post" and isinstance(result.get("creative_brief"), dict):
-        if result.get("awaiting_confirmation") is not True:
-            from apps.studio.forms import studio_accounts
-
-            accounts = studio_accounts(conversation.workspace)
-            choices = [
-                str(account.display_label or account.account_name or account.platform)[:100] for account in accounts[:5]
-            ]
-            text = creative_brief.questions(result["creative_brief"], choices)
-            question = True
-            if not creative_brief.missing(result["creative_brief"]):
-                text = "Please check the connected accounts and your chosen reference in SM Bean before continuing."
-        else:
+        # The author of a web-saved idea is a team member: only the topic is
+        # required, the rest is filled from the brand's defaults (A2).
+        if result.get("brief_id"):
+            text = (
+                "Your idea is queued; the team starts it as soon as a slot frees. The draft comes back to you for approval."
+                if result.get("queued")
+                else "The team started on your idea. The draft comes back to you for approval."
+            )
+        elif result.get("awaiting_confirmation") is True:
             text = "Your brief is ready for review. Check the brief and source facts in SM Bean before confirming draft preparation."
+        elif creative_brief.missing(result["creative_brief"], required=creative_brief.STAFF_REQUIRED):
+            text = "Before the team creates a draft: what should this post be about?"
+            question = True
+        else:
+            text = "Please check the connected accounts and your chosen reference in SM Bean before continuing."
     else:
-        text = "Your assistant added a workflow update. Open your saved idea in SM Bean for its current status."
+        text = "The team added an update to your idea. Open it in SM Bean for its current status."
     try:
         prefix = "question" if question else "message"
         return _queue(

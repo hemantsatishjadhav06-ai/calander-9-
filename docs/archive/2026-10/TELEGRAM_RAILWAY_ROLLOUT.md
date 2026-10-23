@@ -1,8 +1,8 @@
 # Controlled Railway release — SM Bean
 
 Updated 13 October 2026 for the reviewed cumulative release, including managed
-Telegram bot reservations. Use [the read-only inspector](../tools/telegram_release_inspect.py),
-[the immutable source-manifest generator](../tools/generate_release_source_manifest.py),
+Telegram bot reservations. Use [the read-only inspector](../../../tools/telegram_release_inspect.py),
+[the immutable source-manifest generator](../../../tools/generate_release_source_manifest.py),
 and [the Neopolis pilot worksheet](NEOPOLIS_LIVE_PILOT_WORKSHEET.md).
 The [12 October pending receipt](TELEGRAM_RAILWAY_RELEASE_RECEIPT.json) describes
 historical source `6cb392ff35494a0cb3172c95e654663cfe6dfce9`; preserve it as a

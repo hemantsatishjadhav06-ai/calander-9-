@@ -59,7 +59,7 @@ def test_signed_in_user_gets_the_dashboard_not_the_landing_page(client, user):
     response = client.get("/")
 
     assert response.status_code == 302
-    assert response["Location"] == reverse("studio:workflow", kwargs={"workspace_id": workspace.pk})
+    assert response["Location"] == reverse("studio:index", kwargs={"workspace_id": workspace.pk})
     assert "marketing/home.html" not in _template_names(response)
 
 

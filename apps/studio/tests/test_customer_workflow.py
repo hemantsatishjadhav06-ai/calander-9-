@@ -125,7 +125,7 @@ class TestCanonicalStart:
         conversation = saved(world)
         settings.ANTHROPIC_API_KEY = ""
         result = customer_workflow.start_idea(world.workspace, world.editor, conversation.pk)
-        assert result.job is None and "administrator setup" in result.note
+        assert result.job is None and "open Set up" in result.note and "administrator" not in result.note
         settings.ANTHROPIC_API_KEY = "fake-provider-key"
         monkeypatch.setattr(customer_workflow.budget, "can_spend", lambda ws: False)
         result = customer_workflow.start_idea(world.workspace, world.editor, conversation.pk)
@@ -173,15 +173,19 @@ class TestCanonicalStart:
         self, world, queued, guided_manager, source_collector, fake_team
     ):
         conversation = saved(world)
-        guided_manager.creative_brief["audience"] = ""
+        # The manager's one allowed question: the topic itself was unclear.
+        guided_manager.action = "answer"
+        guided_manager.creative_brief["topic"] = ""
         first = customer_workflow.start_idea(world.workspace, world.editor, conversation.pk)
+        assert first.job.input["kind"] == "create"
         drive(first.job)
         assert journey(world, conversation)["state"] == "needs_input"
         waiting = customer_workflow.context(world.workspace, world.editor)
         assert waiting["polling"] and not waiting["active"]
         assert not StudioBrief.objects.filter(workspace=world.workspace).exists()
-        guided_manager.creative_brief["audience"] = "First-time buyers"
-        answer = drive(chat.post_message(conversation, world.editor, "First-time buyers").job)
+        guided_manager.action = "new_post"
+        guided_manager.creative_brief["topic"] = "What first-time buyers should check before a site visit"
+        answer = drive(chat.post_message(conversation, world.editor, "A checklist before the site visit").job)
         assert journey(world, conversation)["state"] == "needs_confirmation"
         assert not StudioBrief.objects.filter(workspace=world.workspace).exists()
         confirmation = chat.post_message(
@@ -268,7 +272,18 @@ class TestHonestReadOnlyProgress:
         assert not first.json()["active"]
         assert "<script>alert" not in first.json()["html"]
         assert "&lt;script&gt;" in first.json()["html"]
+        # The compact In progress rows, the same partial Home renders.
+        assert 'id="workflow-journeys"' in first.json()["html"]
+        assert f'data-workflow-journey="{conversation.pk}"' in first.json()["html"]
         assert conversation.messages.count() == 1 and not queued
+
+    def test_the_guided_page_is_home_now(self, client, world):
+        client.force_login(world.editor)
+        response = client.get(url(world, "workflow"))
+        assert response.status_code == 302 and response["Location"] == url(world, "index")
+        # Viewers and clients never reach the staff entry points.
+        client.force_login(world.viewer)
+        assert client.get(url(world, "workflow")).status_code == 403
 
     def test_create_without_provider_keeps_an_actionable_saved_idea(self, client, world, queued, settings):
         settings.ANTHROPIC_API_KEY = ""

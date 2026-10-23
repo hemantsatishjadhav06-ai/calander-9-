@@ -38,6 +38,13 @@ def test_missing_provider_keeps_message_and_explains_next_action(world, settings
     assert "saved" in posted.note.lower()
     assert conversation.messages.filter(author_kind=Message.AuthorKind.SYSTEM, body=posted.note).exists()
     assert "OPENROUTER_API_KEY" not in posted.note and "budget" not in posted.note.lower()
+    # The one sentence Set up and readiness use for this state; a client only hears the agency is finishing set-up.
+    for banned in ("assistant", "administrator", "AI service"):
+        assert banned not in posted.note
+    if client_request:
+        assert "Set up" not in posted.note and "person will reply" in posted.note
+    else:
+        assert posted.note == chat.SETUP_REFUSAL and "open Set up" in posted.note
 
 
 @pytest.mark.django_db

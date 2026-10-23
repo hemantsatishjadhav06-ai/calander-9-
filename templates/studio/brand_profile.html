@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Brand profile - AI Studio - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
-{% block page_title %}AI Studio{% endblock %}
+{% block title %}Brand profile - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Agency{% endblock %}
 
 {% block content %}
 <div class="max-w-5xl">
     <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
-        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="underline hover:text-stone-900">AI Studio</a>
+        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Agency</a>
         <span aria-hidden="true"> / </span><span>Brand profile</span>
     </nav>
     <div class="mb-6 max-w-2xl">

@@ -1,7 +1,12 @@
 """Conversational intake data, separate from permission to create a draft.
 
-The model can propose these fields. Only a person's explicit confirmation of
-the stored summary can start work; a sentence or model flag is never consent.
+The model can propose these fields. For the agency's own people the code then
+fills whatever is still empty from the brand's defaults (:func:`defaults` and
+:func:`complete`), so the only thing a person must supply is the topic; the
+card shows which fields were defaulted so they can change them. Clients keep
+the full question round (:func:`questions`). Only a person's explicit
+confirmation of the stored summary — or the workspace's "go ahead" setting for
+its own staff — can start work; a sentence or model flag is never consent.
 """
 
 from __future__ import annotations
@@ -23,7 +28,16 @@ FIELDS = (
     "constraints",
 )
 REQUIRED = tuple(key for key in FIELDS if key != "constraints")
+#: What a team member must supply themselves; everything else has a default.
+STAFF_REQUIRED = ("topic",)
 GOALS = {"awareness", "education", "engagement", "leads", "announcement"}
+#: The defaults in words, for the model and the card.
+DEFAULT_AUDIENCE = "The brand's usual audience"
+DEFAULT_REFERENCES = "No uploaded reference; follow saved creative memory."
+VISUAL_DIRECTION = {
+    "brand": "Match the current brand series and its saved creative memory.",
+    "fresh": "Use a fresh layout within the brand's colours and typography.",
+}
 LABELS = {
     "topic": "Topic",
     "goal": "Goal",
@@ -93,9 +107,72 @@ def merge(previous, proposed) -> dict:
     return clean
 
 
-def missing(data) -> list[str]:
+def missing(data, *, required: tuple[str, ...] = REQUIRED) -> list[str]:
     clean = normalized(data)
-    return [key for key in REQUIRED if not clean[key]]
+    return [key for key in required if not clean[key]]
+
+
+def channel_label(account, accounts) -> str:
+    """How a connected account is named in ``channels``: its platform when that is unique, else name, else id."""
+    same_platform = [a for a in accounts if a.platform == account.platform]
+    if len(same_platform) == 1:
+        return account.platform
+    name = (account.account_name or account.account_handle or "").strip()
+    if name and sum(1 for a in accounts if (a.account_name or a.account_handle or "").strip() == name) == 1:
+        return name
+    return str(account.pk)
+
+
+def defaults(workspace, profile, accounts, *, style_mode: str = "", memory_house_style: str = "") -> dict:
+    """What the brief uses for every field the person did not mention.
+
+    ``accounts`` are the workspace's connected studio accounts the post may go
+    to. Channels default to the autopilot's accounts when it has some, else to
+    all of them. The goal stays empty: the strategist decides.
+    """
+    from .models import AgencySettings
+
+    accounts = list(accounts)
+    row = AgencySettings.objects.filter(workspace=workspace).first()
+    chosen = []
+    if row is not None:
+        usual = {a.pk for a in row.accounts.filter(workspace=workspace)}
+        chosen = [a for a in accounts if a.pk in usual]
+    chosen = chosen or accounts
+    visual = VISUAL_DIRECTION["fresh" if style_mode == "fresh" else "brand"]
+    house = " ".join(str(memory_house_style or "").split())[:200]
+    if house:
+        visual = f"{visual} House style: {house}"
+    audience = " ".join(str(getattr(profile, "audience", "") or "").split())[:1000]
+    return {
+        "goal": "",
+        "audience": audience or DEFAULT_AUDIENCE,
+        "call_to_action": " ".join(str(getattr(profile, "default_cta", "") or "").split())[:1000],
+        "channels": [channel_label(account, accounts) for account in chosen],
+        "visual_direction": visual[:1000],
+        "references": DEFAULT_REFERENCES,
+    }
+
+
+def complete(data, defaults_for: dict) -> tuple[dict, list[str]]:
+    """Fill the empty required fields from ``defaults_for``; the key message defaults to the topic.
+
+    Returns the completed brief and the keys that were filled, in field order,
+    so the card can say "defaults you can change".
+    """
+    clean = normalized(data)
+    filled = []
+    for key in REQUIRED:
+        if clean[key]:
+            continue
+        value = clean["topic"] if key == "key_message" else defaults_for.get(key)
+        if key == "channels":
+            value = [str(item) for item in value or [] if str(item).strip()]
+        if not value:
+            continue
+        clean[key] = value
+        filled.append(key)
+    return normalized(clean), filled
 
 
 def summary(data) -> str:

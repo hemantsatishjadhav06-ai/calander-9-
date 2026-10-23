@@ -13,7 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 from apps.studio import dashboard
 from apps.workspaces.models import Workspace
 
-from . import provisioning
+from . import provisioning, state
 from .forms import ChannelForm, ConnectForm, ManagedBotCreationForm, PairingForm
 from .models import (
     TelegramChannel,
@@ -34,6 +34,8 @@ def _bot_url(username):
 
 
 def _context(request, workspace_id):
+    from apps.studio.views_setup import is_owner
+
     workspace = get_object_or_404(Workspace, pk=workspace_id)
     member = current_member(workspace, request.user)
     connection = TelegramConnection.objects.filter(workspace=member.workspace).first()
@@ -78,6 +80,13 @@ def _context(request, workspace_id):
             pass
         else:
             channel_pairing_ready = True
+    # The same two facts the agency's Set up row and Home's status line read (apps.telegram.state).
+    deployment_ready = state.deployment_ready()
+    bot_state = state.bot_state(connection)
+    paired = own_link is not None
+    approvals_on = bool(connection and connection.approvals_enabled)
+    internal = internal_member(member)
+    steps_done = sum([deployment_ready, bot_state == "listening", paired, approvals_on])
     return {
         "workspace": member.workspace,
         "connection": connection,
@@ -85,9 +94,21 @@ def _context(request, workspace_id):
         "bot_url": _bot_url(connection.bot_username) if connection else "",
         "can_manage": manage,
         "can_pair_group": can_pair_group(member),
-        "internal": internal_member(member),
-        "telegram_client_view": not internal_member(member),
-        "tabs": dashboard.tabs(member.workspace, "telegram"),
+        "internal": internal,
+        "telegram_client_view": not internal,
+        "tabs": dashboard.tabs(member.workspace, "telegram", perms=member.effective_permissions),
+        # The exact names to set are for the people who can set them (the same rule as Set up).
+        "is_owner": is_owner(request.user, member.workspace),
+        "deployment_ready": deployment_ready,
+        "webhook_base": (getattr(settings, "TELEGRAM_WEBHOOK_BASE_URL", "") or "").strip(),
+        "webhook_flag": bool(getattr(settings, "TELEGRAM_WEBHOOK_READY", False)),
+        "bot_state": bot_state,
+        "paired": paired,
+        "approvals_on": approvals_on,
+        "approval_gate_on": bool(member.workspace.require_dashboard_approval),
+        "steps_done": steps_done,
+        "steps_total": 4,
+        "commands": provisioning.BOT_COMMANDS,
         "connect_form": ConnectForm(
             initial={"approvals_enabled": connection.approvals_enabled if connection else False}
         ),
@@ -157,10 +178,59 @@ def connect(request, workspace_id):
         except provisioning.ProvisioningError as exc:
             form.add_error(None, str(exc))
         else:
-            messages.success(request, "Bot configuration saved. Pair each person and group separately before using it.")
+            messages.success(request, "Bot connected. Next, pair your own account.")
             return redirect("telegram:settings", workspace_id=workspace_id)
     context["connect_form"] = form
     return _render(request, context, status=400)
+
+
+@login_required
+@require_POST
+def refresh_webhook(request, workspace_id):
+    context = _context(request, workspace_id)
+    if not context["can_manage"] or context["connection"] is None:
+        raise PermissionDenied("Only a current workspace settings owner can retry the webhook.")
+    try:
+        provisioning.refresh_webhook(context["connection"], request.user)
+    except provisioning.ProvisioningError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "The bot is listening again.")
+    return redirect("telegram:settings", workspace_id=workspace_id)
+
+
+@login_required
+@require_POST
+def toggle_approvals(request, workspace_id):
+    context = _context(request, workspace_id)
+    if not context["can_manage"] or context["connection"] is None:
+        raise PermissionDenied("Only a current workspace settings owner can change Telegram approvals.")
+    enabled = request.POST.get("enabled") == "on"
+    try:
+        provisioning.set_approvals(context["connection"], request.user, enabled)
+    except provisioning.ProvisioningError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(
+            request,
+            "Approving from Telegram is on." if enabled else "Approving from Telegram is off; cards still arrive.",
+        )
+    return redirect("telegram:settings", workspace_id=workspace_id)
+
+
+@login_required
+@require_POST
+def test_message(request, workspace_id):
+    context = _context(request, workspace_id)
+    if context["connection"] is None:
+        raise PermissionDenied("Connect a bot first.")
+    try:
+        provisioning.send_test_message(context["connection"], request.user)
+    except (provisioning.ProvisioningError, PermissionDenied) as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Sent. Check your Telegram chat.")
+    return redirect("telegram:settings", workspace_id=workspace_id)
 
 
 @login_required
@@ -183,6 +253,7 @@ def pair(request, workspace_id):
             context.update(
                 pairing_command=f"/start {nonce}" if ticket.purpose == "user" else f"/pair {nonce}",
                 expires_at=ticket.expires_at,
+                pairing_seconds=max(0, int((ticket.expires_at - timezone.now()).total_seconds())),
                 pairing_purpose=ticket.purpose,
                 pairing_audience=ticket.audience,
             )
@@ -228,9 +299,7 @@ def disconnect(request, workspace_id):
     context = _context(request, workspace_id)
     if context["connection"]:
         provisioning.disconnect(context["connection"], request.user)
-    messages.success(
-        request, "Telegram is disabled for this workspace. Its saved token and active pairings were cleared."
-    )
+    messages.success(request, "Telegram is off for this workspace. The saved token and every pairing were cleared.")
     return redirect("telegram:settings", workspace_id=workspace_id)
 
 
@@ -240,7 +309,7 @@ def unpair(request, workspace_id):
     context = _context(request, workspace_id)
     if context["connection"]:
         provisioning.unpair(context["connection"], request.user)
-    messages.success(request, "Your Telegram identity and private-chat access are disabled.")
+    messages.success(request, "Your Telegram account is unpaired.")
     return redirect("telegram:settings", workspace_id=workspace_id)
 
 
@@ -277,12 +346,10 @@ def connect_channel(request, workspace_id):
         except provisioning.ProvisioningError as exc:
             form.add_error(None, str(exc))
         else:
-            messages.success(
-                request, "Channel connected for shared status updates. Questions and approvals stay in linked chats."
-            )
+            messages.success(request, "Channel connected for status updates. Questions and approvals stay in chats.")
             return redirect("telegram:settings", workspace_id=workspace_id)
     elif not context["connection"]:
-        form.add_error(None, "Connect the workspace bot and link your own Telegram account first.")
+        form.add_error(None, "Connect the workspace bot and pair your own account first.")
     context["channel_form"] = form
     return _render(request, context, status=400)
 
@@ -298,5 +365,5 @@ def disconnect_channel(request, workspace_id, channel_id):
     except provisioning.ProvisioningError as exc:
         messages.error(request, str(exc))
     else:
-        messages.success(request, "Channel updates disabled. Its private chats and group conversations are unchanged.")
+        messages.success(request, "Channel updates are off. Chats and groups are unchanged.")
     return redirect("telegram:settings", workspace_id=workspace_id)

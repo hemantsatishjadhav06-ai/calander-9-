@@ -71,7 +71,7 @@ For a new company's bot, use the supported manager flow when Telegram gives
 the manager bot creation capability. Otherwise create it through BotFather's
 `/newbot` and enter its token securely in that company's settings. SM Bean's
 connect form validates an existing bot; a normal bot cannot silently create
-other bots or groups. See [Telegram setup details](TELEGRAM_CHANNELS.md).
+other bots or groups. See [Telegram setup details](../../TELEGRAM_CHANNELS.md).
 
 ## Pause or recover work
 
@@ -85,7 +85,7 @@ These persistent controls adapt the MIT-licensed
 [CopilotKit/OpenDots source](https://github.com/CopilotKit/OpenDots/tree/625452e06cde74cb25b0ce319e2c1be0488f5a5f)
 to SM Bean's existing jobs and worker. The integration does not start the full
 CopilotKit application or enable computer, browser, voice or MCP agents. See
-[the integration and license](OPENDOTS_INTEGRATION.md).
+[the integration and license](../../OPENDOTS_INTEGRATION.md).
 
 ## Complete the real pilot
 

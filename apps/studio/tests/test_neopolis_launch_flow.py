@@ -232,6 +232,10 @@ def launch(world, fake_team, photo, settings, tmp_path, monkeypatch):
                 creative_brief=CreativeBrief(**manager.fields) if manager.fields is not None else None,
                 needs_human=False,
                 reason="Confirm the human's brief before drafting.",
+                routine_instruction="",
+                routine_cadence="",
+                routine_weekday=-1,
+                routine_time="",
             )
         )
 
@@ -284,9 +288,12 @@ def _intake(launch):
         ).job
     )
     assert first.status == AgencyJob.Status.DONE, first.error
-    assert not first.result["awaiting_confirmation"]
+    # A team member's brief is complete at once: the audience and the call to action the
+    # manager did not hear are filled from the brand's defaults and shown as such on the card.
+    assert first.result["awaiting_confirmation"]
+    assert {"audience", "call_to_action"} <= set(first.result["creative_defaults"])
     first_reply = Message.objects.get(pk=first.result["message_id"])
-    assert 1 <= first_reply.body.count("?") <= 3
+    assert first_reply.body  # the manager's own words sit above the card
     assert not StudioBrief.objects.filter(workspace=world.workspace).exists()
     assert not Post.objects.filter(workspace=world.workspace).exists()
     launch.manager.fields = _brief_fields()

@@ -11,7 +11,7 @@ from apps.media_library.models import MediaAsset
 from . import dashboard, guards, trust
 from .forms_trust import BrandClaimForm
 from .models import BrandClaim
-from .views import _can_edit_brand, _workspace
+from .views import _can_edit_brand, _perms, _workspace
 
 
 @login_required
@@ -151,7 +151,7 @@ def verified_facts(request, workspace_id):
         "studio/trust.html",
         {
             "workspace": workspace,
-            "tabs": dashboard.tabs(workspace, "trust"),
+            "tabs": dashboard.tabs(workspace, "trust", perms=_perms(request)),
             "form": form,
             "claims": claims,
             "photos": photo_rows,

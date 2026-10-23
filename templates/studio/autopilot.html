@@ -4,45 +4,34 @@
 {% block title %}Autopilot - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl">
-    {# ---- Header ---- #}
+<div class="max-w-5xl min-w-0">
+    {# ---- Header: one sentence on what autopilot does right now ---- #}
     <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div class="max-w-2xl min-w-0">
             <h1 class="text-2xl sm:text-3xl text-stone-900" style="font-family: var(--font-display)">Autopilot</h1>
-            <p class="text-sm text-stone-600 mt-1">Once a week the planner fills your open slots. Every post and article still waits for your approval — autopilot never publishes.</p>
+            <p class="text-sm text-stone-700 mt-1" data-autopilot-summary>
+                {% if row.pk and row.autopilot_enabled %}
+                Autopilot is on: {{ row.posts_per_week }} post{{ row.posts_per_week|pluralize }} a week{% with names=row.accounts.all %}{% if names %} on {% for account in names %}{{ account.get_platform_display }}{% if not forloop.last %}{% if forloop.revcounter == 2 %} and {% else %}, {% endif %}{% endif %}{% endfor %}{% endif %}{% endwith %}, planned on {% for value, name in weekdays %}{% if value == row.plan_weekday %}{{ name }}s{% endif %}{% endfor %} at {{ row.plan_hour|stringformat:"02d" }}:00.
+                {% else %}
+                Autopilot is off: your team only works when someone asks it to. Switch it on and it plans a week of posts for you to approve.
+                {% endif %}
+            </p>
+            <p class="text-xs text-stone-600 mt-1" data-readiness-line>{% if operational.blockers or operational.warnings %}<a href="{{ operational.setup_url }}" class="font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">{{ operational.line }}</a>{% else %}{{ operational.line }}{% endif %}</p>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-            {% if can_plan %}
-            <form method="post" action="{% url 'studio:autopilot_plan' workspace_id=workspace.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
-                {% csrf_token %}
-                <button type="submit" x-bind:disabled="busy" {% if not claude_ready %}disabled aria-disabled="true"{% endif %}
-                        class="px-4 py-2 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-orange-700">Plan next week now</button>
-            </form>
-            {% endif %}
-            {% if can_save %}
-            <button type="submit" form="autopilot-form" class="px-4 py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Save</button>
-            {% endif %}
-        </div>
+        {% if can_plan %}
+        <form method="post" action="{% url 'studio:autopilot_plan' workspace_id=workspace.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+            {% csrf_token %}
+            <button type="submit" x-bind:disabled="busy" {% if not claude_ready %}disabled aria-disabled="true"{% endif %}
+                    class="px-4 py-2 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-orange-700">Plan next week now</button>
+        </form>
+        {% endif %}
     </div>
 
     {% include "components/agency_tabs.html" %}
-    <section class="mb-5 rounded-xl border border-stone-200 bg-white p-4" aria-label="Operational status">
-        <h2 class="font-semibold">{{ operational.title }}</h2>
-        {% for blocker in operational.blockers %}<p class="mt-1 text-sm text-red-800">{{ blocker }}</p>{% endfor %}
-        {% for warning in operational.warnings %}<p class="mt-1 text-sm text-amber-900">{{ warning }}</p>{% endfor %}
-        <p class="mt-2 text-xs text-stone-600">{{ operational.message }}</p>
-    </section>
 
-    {% if not claude_ready %}
-    <p class="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
-        <span class="font-semibold">The team can't plan yet.</span>
-        {{ configuration_error }}
-    </p>
-    {% endif %}
-
-    <div class="grid xl:grid-cols-[minmax(0,1fr)_24rem] gap-6 items-start">
-        {# ---- Settings ---- #}
-        <form id="autopilot-form" method="post" action="{% url 'studio:autopilot' workspace_id=workspace.id %}" class="bg-white border border-stone-200 rounded-xl px-5 py-2 shadow-sm min-w-0" novalidate>
+    <div class="grid xl:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
+        {# ---- The settings: the switch and the few things that matter, then Advanced ---- #}
+        <form id="autopilot-form" method="post" action="{% url 'studio:autopilot' workspace_id=workspace.id %}" class="bg-white border border-stone-200 rounded-2xl px-5 py-2 shadow-sm min-w-0" novalidate>
             {% csrf_token %}
             {% if form.non_field_errors %}<div class="my-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
             {% if not can_save %}<p class="my-3 text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">Only someone who manages this workspace's settings (usually the owner) can change autopilot.</p>{% endif %}
@@ -52,7 +41,7 @@
                 <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
                     <div>
                         <label for="{{ form.autopilot_enabled.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.autopilot_enabled.label }}</label>
-                        <p class="text-xs text-stone-600">Plan and prepare posts every week.</p>
+                        <p class="text-xs text-stone-600">Plan and prepare posts every week. Every post still waits for your approval.</p>
                     </div>
                     <span class="inline-flex items-center gap-2 text-sm text-stone-800">{{ form.autopilot_enabled }}<span>On</span></span>
                 </div>
@@ -82,21 +71,10 @@
                     </fieldset>
                 </div>
 
-                <div class="grid sm:grid-cols-[minmax(0,1fr)_16rem] gap-3 py-4">
-                    <div>
-                        <label for="{{ form.pillars.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.pillars.label }}</label>
-                        <p class="text-xs text-stone-600">What the planner rotates between. One per line, up to eight.</p>
-                    </div>
-                    <div>
-                        {{ form.pillars }}
-                        {% if form.pillars.errors %}<p class="mt-1 text-sm text-red-800">{{ form.pillars.errors|join:" " }}</p>{% endif %}
-                    </div>
-                </div>
-
                 <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
                     <div>
                         <label for="{{ form.plan_weekday.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.plan_weekday.label }}</label>
-                        <p class="text-xs text-stone-600">The team prepares next week's posts at this time (your timezone, {{ tzname }}).{% if plan_due_now %} Next week is due: the planner starts within 15 minutes.{% elif next_plan %} Next: {{ next_plan|timezone:tzname|date:"D j M, H:i" }}.{% endif %}</p>
+                        <p class="text-xs text-stone-600">Your team prepares next week's posts at this time ({{ tzname }}).{% if plan_due_now %} Next week is due: the planner starts within 15 minutes.{% elif next_plan %} Next: {{ next_plan|timezone:tzname|date:"D j M, H:i" }}.{% endif %}</p>
                     </div>
                     <div class="flex gap-2 w-full sm:w-auto">
                         <div class="flex-1 sm:w-36">{{ form.plan_weekday }}</div>
@@ -117,68 +95,97 @@
                     </div>
                 </div>
 
-                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
+                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4" data-creation-mode-field>
                     <div>
-                        <label for="{{ form.monthly_budget_usd.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.monthly_budget_usd.label }}</label>
-                        <p class="text-xs text-stone-600">Soft limit on estimated and reported AI charges. New work pauses after the recorded total reaches it; in-flight or unreported charges can exceed it. This month: ${{ spend|floatformat:2 }} recorded of ${{ budget|floatformat:2 }}.</p>
+                        <label for="{{ form.creation_mode.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.creation_mode.label }}</label>
+                        <p class="text-xs text-stone-600">{{ form.creation_mode.help_text }}</p>
                     </div>
-                    <div class="w-full sm:w-36">
-                        {{ form.monthly_budget_usd }}
-                        {% if form.monthly_budget_usd.errors %}<p class="mt-1 text-sm text-red-800">{{ form.monthly_budget_usd.errors|join:" " }}</p>{% endif %}
-                    </div>
-                </div>
-
-                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                    <div>
-                        <label for="{{ form.lead.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.lead.label }}</label>
-                        <p class="text-xs text-stone-600">An owner or manager; approval requests come from them.</p>
-                    </div>
-                    <div class="w-full sm:w-64">
-                        {{ form.lead }}
-                        {% if form.lead.errors %}<p class="mt-1 text-sm text-red-800">{{ form.lead.errors|join:" " }}</p>{% endif %}
-                    </div>
-                </div>
-
-                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                    <div><label for="{{ form.backup.id_for_label }}" class="text-sm font-semibold">{{ form.backup.label }}</label><p class="text-xs text-stone-600">Receives deadline alerts before a proposed post becomes overdue. A different current internal approver.</p></div>
-                    <div class="w-full sm:w-64">{{ form.backup }}{{ form.backup.errors }}</div>
-                </div>
-                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                    <div><label for="{{ form.delivery_delay_minutes.id_for_label }}" class="text-sm font-semibold">{{ form.delivery_delay_minutes.label }}</label><p class="text-xs text-stone-600">Late approved content is held for fresh review, a future time and human approval. Default: 1,440 minutes (24 hours).</p></div>
-                    <div class="w-full sm:w-44">{{ form.delivery_delay_minutes }}{{ form.delivery_delay_minutes.errors }}</div>
-                </div>
-                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                    <div>
-                        <label for="{{ form.learn_from_best.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.learn_from_best.label }}</label>
-                        <p class="text-xs text-stone-600">Let the art director start from your best creatives and references, not only the last post.</p>
-                    </div>
-                    <span class="inline-flex items-center gap-2 text-sm text-stone-800">{{ form.learn_from_best }}<span>On</span></span>
-                </div>
-
-                <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                    <div>
-                        <label for="{{ form.inbox_drafts_enabled.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.inbox_drafts_enabled.label }}</label>
-                        <p class="text-xs text-stone-600">Drafts only: a person reads and sends every reply.</p>
-                    </div>
-                    <span class="inline-flex items-center gap-2 text-sm text-stone-800">{{ form.inbox_drafts_enabled }}<span>On</span></span>
+                    <div class="w-full sm:w-64">{{ form.creation_mode }}{% if form.creation_mode.errors %}<p class="mt-1 text-sm text-red-800">{{ form.creation_mode.errors|join:" " }}</p>{% endif %}</div>
                 </div>
             </fieldset>
+
+            <details class="py-4 border-t border-stone-200" data-autopilot-advanced{% if advanced_open %} open{% endif %}>
+                <summary class="cursor-pointer text-sm font-semibold text-stone-900 rounded focus-visible:outline-2 focus-visible:outline-orange-700">Advanced <span class="font-normal text-stone-600">· approvers, budget, hold time, pillars, learning, inbox drafts</span></summary>
+                <fieldset {% if not can_save %}disabled{% endif %} class="divide-y divide-stone-200 mt-2">
+                    <legend class="sr-only">Advanced autopilot settings</legend>
+
+                    <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
+                        <div>
+                            <label for="{{ form.lead.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.lead.label }}</label>
+                            <p class="text-xs text-stone-600">An owner or manager; approval requests come from them.</p>
+                        </div>
+                        <div class="w-full sm:w-64">
+                            {{ form.lead }}
+                            {% if form.lead.errors %}<p class="mt-1 text-sm text-red-800">{{ form.lead.errors|join:" " }}</p>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
+                        <div><label for="{{ form.backup.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.backup.label }}</label><p class="text-xs text-stone-600">Gets the reminder before a proposed post becomes overdue. A different approver.</p></div>
+                        <div class="w-full sm:w-64">{{ form.backup }}{{ form.backup.errors }}</div>
+                    </div>
+
+                    <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
+                        <div>
+                            <label for="{{ form.monthly_budget_usd.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.monthly_budget_usd.label }}</label>
+                            <p class="text-xs text-stone-600">A soft limit. New work pauses once the month's recorded total reaches it. This month: ${{ spend|floatformat:2 }} of ${{ budget|floatformat:2 }}.</p>
+                        </div>
+                        <div class="w-full sm:w-36">
+                            {{ form.monthly_budget_usd }}
+                            {% if form.monthly_budget_usd.errors %}<p class="mt-1 text-sm text-red-800">{{ form.monthly_budget_usd.errors|join:" " }}</p>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
+                        <div><label for="{{ form.delivery_delay_minutes.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.delivery_delay_minutes.label }}</label><p class="text-xs text-stone-600">Late approved posts are held this long for a fresh look and a new time. Default: 1,440 minutes (24 hours).</p></div>
+                        <div class="w-full sm:w-44">{{ form.delivery_delay_minutes }}{{ form.delivery_delay_minutes.errors }}</div>
+                    </div>
+
+                    <div class="grid sm:grid-cols-[minmax(0,1fr)_16rem] gap-3 py-4">
+                        <div>
+                            <label for="{{ form.pillars.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.pillars.label }}</label>
+                            <p class="text-xs text-stone-600">What the planner rotates between. One per line, up to eight.</p>
+                        </div>
+                        <div>
+                            {{ form.pillars }}
+                            {% if form.pillars.errors %}<p class="mt-1 text-sm text-red-800">{{ form.pillars.errors|join:" " }}</p>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
+                        <div>
+                            <label for="{{ form.learn_from_best.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.learn_from_best.label }}</label>
+                            <p class="text-xs text-stone-600">Let the art director start from your best creatives and references, not only the last post.</p>
+                        </div>
+                        <span class="inline-flex items-center gap-2 text-sm text-stone-800">{{ form.learn_from_best }}<span>On</span></span>
+                    </div>
+
+                    <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
+                        <div>
+                            <label for="{{ form.inbox_drafts_enabled.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.inbox_drafts_enabled.label }}</label>
+                            <p class="text-xs text-stone-600">Drafts only: a person reads and sends every reply.</p>
+                        </div>
+                        <span class="inline-flex items-center gap-2 text-sm text-stone-800">{{ form.inbox_drafts_enabled }}<span>On</span></span>
+                    </div>
+                </fieldset>
+            </details>
+
             {% if can_save %}
             <div class="flex justify-end py-4 border-t border-stone-200">
-                <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Save autopilot settings</button>
+                <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Save</button>
             </div>
             {% endif %}
         </form>
 
         <aside class="space-y-6 min-w-0">
             {# ---- The promise ---- #}
-            <section aria-labelledby="promise-heading" class="bg-green-50 border border-green-700 rounded-xl p-5">
+            <section aria-labelledby="promise-heading" class="bg-green-50 border border-green-700 rounded-2xl p-5">
                 <h2 id="promise-heading" class="text-base font-semibold text-green-800">Nothing goes out without you</h2>
-                <p class="text-sm text-stone-800 mt-1">Autopilot prepares drafts and proposes times. A person with approval rights approves every post and article; only then is it scheduled for the proposed time.</p>
+                <p class="text-sm text-stone-800 mt-1">Autopilot prepares drafts and proposes times. A person with approval rights approves every post and article; only then is it scheduled.</p>
             </section>
 
             {# ---- Last run ---- #}
-            <section aria-labelledby="last-heading" class="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+            <section aria-labelledby="last-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
                 {% if last %}
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <h2 id="last-heading" class="text-sm font-semibold text-stone-900">Last run · week of {{ last.week.week_start|date:"D j M" }}</h2>
@@ -192,7 +199,6 @@
                     <li class="break-words">• {{ note.agent }}: {{ note.summary|truncatechars:140 }}</li>
                     {% endfor %}
                     {% if last.week.note %}<li class="break-words">• {{ last.week.note }}</li>{% endif %}
-                    {% if last.cost is not None and last.job %}<li>• Cost: ${{ last.cost|floatformat:2 }}</li>{% endif %}
                 </ul>
                 {% if last.job %}
                 <a href="{% url 'studio:job' workspace_id=workspace.id job_id=last.job.id %}" class="inline-block mt-3 text-sm font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">Open the plan</a>
@@ -204,7 +210,7 @@
             </section>
 
             {# ---- Weekly reports ---- #}
-            <section aria-labelledby="reports-heading" class="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+            <section aria-labelledby="reports-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
                 <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
                     <div>
                         <h2 id="reports-heading" class="text-sm font-semibold text-stone-900">Weekly client reports</h2>

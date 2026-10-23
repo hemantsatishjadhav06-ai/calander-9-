@@ -95,8 +95,9 @@ def _perms(request) -> dict:
 
 def _not_ready(workspace) -> str:
     """Why paid work can't start right now, or an empty string."""
-    if not llm.is_configured():
-        return "The SEO team isn't set up yet: the server has no Claude API key. Ask your admin to add one."
+    setup_error = llm.configuration_error()
+    if setup_error:
+        return f"The SEO team isn't set up yet. {setup_error}"
     if not budget.can_spend(workspace):
         return budget.over_budget_message(workspace)
     return ""
@@ -164,6 +165,7 @@ def write(request, workspace_id):
             "form": form,
             "error": error,
             "claude_ready": llm.is_configured(),
+            "setup_error": llm.configuration_error(),
             "pictures_ready": images.is_configured(),
             "article_team": [team.get(slug) for slug in ARTICLE_TEAM],
             "recent_jobs": _recent_jobs(workspace),

@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.composer.models import PlatformPost
-from apps.studio.models import AgencyJob, BrandProfile, Conversation, StudioBrief
+from apps.studio.models import AgencyJob, BrandProfile, Conversation, Message, StudioBrief
 from apps.studio.tests.conftest import make_brief, run_all
 
 
@@ -36,9 +36,10 @@ class TestPages:
 
         assert response.status_code == 200
         html = response.content.decode()
-        assert "Your agency team" in html and "Waiting for your approval" in html
+        assert "Good " in html and "Today" in html and "Recent work" in html
         # A viewer can look but not brief the team.
         assert response.context["can_create"] is False
+        assert response.context["journeys"] == []
         assert BrandProfile.objects.filter(workspace=world.workspace).exists()
 
     def test_outsiders_are_kept_out(self, client, world):
@@ -46,13 +47,16 @@ class TestPages:
 
         assert response.status_code in (403, 404)
 
-    def test_the_page_says_when_claude_is_not_set_up(self, client, world, settings):
+    def test_the_status_line_counts_the_set_up_steps_left(self, client, world, settings):
         settings.ANTHROPIC_API_KEY = ""
 
         response = _as(client, world.owner).get(_url("index", world))
 
-        assert response.context["setup"]["claude_ready"] is False
-        assert "AI service needs administrator setup" in response.content.decode()
+        html = response.content.decode()
+        assert response.context["setup_left"] >= 1
+        assert f"Set-up: {response.context['setup_left']} steps left" in html and "Open Set up" in html
+        # No service or setting is named on Home; that is the Set up page's job.
+        assert "ANTHROPIC_API_KEY" not in html and "administrator" not in html
 
 
 class TestBriefing:
@@ -68,7 +72,10 @@ class TestBriefing:
         assert response["Location"].startswith(_url("thread", world))
         assert job.requested_by == world.editor
         assert conversation.audience == Conversation.Audience.INTERNAL
-        assert str(world.linkedin.pk) in conversation.messages.get().body
+        # The idea is the person's own words; the form's choices travel as fields of the brief, not as sentences.
+        assert Message.objects.get(pk=job.input["message_id"]).body == "Why landlord shares cost less"
+        assert job.input["kind"] == "create" and job.input["create"]["accounts"] == [str(world.linkedin.pk)]
+        assert job.input["style_mode"] == "brand"
         assert not StudioBrief.objects.exists() and not fake_team.queued
 
     def test_an_empty_idea_is_sent_back(self, client, world, fake_team):
@@ -88,7 +95,7 @@ class TestBriefing:
             follow=True,
         )
 
-        assert "check Agency readiness" in _messages(response)
+        assert "Your team isn't connected yet" in _messages(response)
         assert not StudioBrief.objects.exists()
 
     def test_viewers_cannot_brief(self, client, world, fake_team):

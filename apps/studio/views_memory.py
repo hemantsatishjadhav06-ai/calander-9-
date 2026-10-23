@@ -106,7 +106,7 @@ def _context(request, workspace, *, house_form=None, upload_form=None) -> dict:
         "workspace": workspace,
         "profile": profile,
         "tzname": workspace.effective_timezone or "UTC",
-        "tabs": dashboard.tabs(workspace, "memory"),
+        "tabs": dashboard.tabs(workspace, "memory", perms=perms),
         "references": references,
         "reference_count": CreativeInsight.objects.filter(workspace=workspace, is_reference=True).count(),
         "best": best,

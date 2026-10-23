@@ -25,10 +25,11 @@ def test_the_home_shows_what_is_waiting_with_one_click_approval(client, world, f
 
     html = client.get(_url("studio:index", world)).content.decode()
 
-    assert "Waiting for your approval" in html and brief.title in html
+    # Home: the Today card first, with one-click approval, then the conversation and the rest.
+    assert "Waiting for you" in html and brief.title in html
     assert 'name="mode" value="proposed"' in html
-    assert "Team at work" in html and "The next seven days" in html
-    assert "Meet the team" in html
+    assert html.index("data-home-today") < html.index("data-home-thread") < html.index("data-home-recent")
+    assert "Set-up:" in html and "Autopilot off" in html
 
 
 def test_approve_at_the_proposed_time_schedules_it_there(client, world, fake_team):

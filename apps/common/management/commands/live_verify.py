@@ -65,6 +65,7 @@ class Command(BaseCommand):
             checks.append(self.check_accounts)
         checks.append(self.check_blog)
         checks.append(self.check_agency)
+        checks.append(self.check_telegram)
         if strict:
             checks.append(self.check_launch_evidence)
             if skip_accounts:
@@ -454,6 +455,30 @@ class Command(BaseCommand):
             self.record("PASS", "agency.agents_cannot_approve", "agency work is refused approve/schedule paths")
         else:
             self.record("FAIL", "agency.agents_cannot_approve", "the guard did not refuse agency work")
+
+    def check_telegram(self):
+        """Can this deployment receive Telegram messages, and which bots are listening? No Bot API call."""
+        from apps.telegram.models import TelegramConnection
+        from apps.telegram.provisioning import _webhook_url
+
+        url = _webhook_url(uuid.uuid4())
+        self.record(
+            "PASS" if url else "BLOCKED",
+            "telegram.webhook",
+            f"public webhook origin ready: {url.split('/webhooks', 1)[0]}"
+            if url
+            else "set TELEGRAM_WEBHOOK_BASE_URL to the public https origin and TELEGRAM_WEBHOOK_READY=true",
+        )
+        rows = list(TelegramConnection.objects.filter(is_active=True).select_related("workspace"))
+        detail = (
+            ", ".join(f"{row.workspace.name}: @{row.bot_username or '?'} {row.webhook_status}" for row in rows)
+            or "no active bot connection"
+        )
+        self.record(
+            "PASS" if rows and all(row.webhook_status == "active" for row in rows) else "INFO",
+            "telegram.connections",
+            detail,
+        )
 
     def check_blog(self):
         try:

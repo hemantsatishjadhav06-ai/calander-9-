@@ -64,12 +64,12 @@ The 12 October follow-up adds **six migration files**. Apply these with the comp
 
 | Migration | Purpose |
 |---|---|
-| [approvals 0005](../apps/approvals/migrations/0005_alter_approvalaction_action.py) | Human delivery reconciliation/account-check audit action choices. |
-| [common 0003](../apps/common/migrations/0003_taskheartbeat.py) | Durable task-specific start/success/failure evidence. |
-| [composer 0024](../apps/composer/migrations/0024_post_delivery_holds.py) | Parent-post durable delivery holds. |
-| [media_library 0006](../apps/media_library/migrations/0006_mediaasset_authenticity_mediaasset_verified_at_and_more.py) | Photo authenticity, named project and human attestation fields. |
-| [media_library 0007](../apps/media_library/migrations/0007_mediaasset_verified_asset_hash.py) | Attestation binding to current asset identity. |
-| [studio 0004](../apps/studio/migrations/0004_agencysettings_backup_studiobrief_trust_snapshot_and_more.py) | Backup approver, trust snapshot, structured verified claims and manual campaign outcomes. |
+| [approvals 0005](../../../apps/approvals/migrations/0005_alter_approvalaction_action.py) | Human delivery reconciliation/account-check audit action choices. |
+| [common 0003](../../../apps/common/migrations/0003_taskheartbeat.py) | Durable task-specific start/success/failure evidence. |
+| [composer 0024](../../../apps/composer/migrations/0024_post_delivery_holds.py) | Parent-post durable delivery holds. |
+| [media_library 0006](../../../apps/media_library/migrations/0006_mediaasset_authenticity_mediaasset_verified_at_and_more.py) | Photo authenticity, named project and human attestation fields. |
+| [media_library 0007](../../../apps/media_library/migrations/0007_mediaasset_verified_asset_hash.py) | Attestation binding to current asset identity. |
+| [studio 0004](../../../apps/studio/migrations/0004_agencysettings_backup_studiobrief_trust_snapshot_and_more.py) | Backup approver, trust snapshot, structured verified claims and manual campaign outcomes. |
 
 Legacy facts/assets do not become automatically verified. Do not bulk attest old claims or images, restamp queued approvals or clear unknown holds to make migration/activation appear complete.
 
@@ -80,7 +80,7 @@ Legacy facts/assets do not become automatically verified. Do not bulk attest old
 - **30 DOM state checks passed** for the thread script. These test controlled state transitions; they are separate from Chromium counts and the Python full-suite total. They do not certify a physical device or production accessibility journey.
 - The new **bounded real singleton-worker rehearsal** runs the actual command for one second through the lease proxy, processes publisher/agency/confirmation empty cycles once each, persists three completed tasks and healthy heartbeats, and preserves their next recurring schedules. Timing/poll observation is controlled, while the queue runner, task bodies, lease and database are real. No workspace, AgencyJob or Post exists, so it performs no paid work or publishing. This closes the earlier mock-only worker-loop evidence gap without claiming a Railway soak/load test.
 
-Browser JSON, verification notes and screenshots are under `agency-deliverables/user-flow-evidence/` in the final handoff. The worker rehearsal is [RealSingletonWorkerRehearsalTests](../apps/common/tests/test_delivery_worker_health.py). Local screenshots are not screenshots of deployed Railway.
+Browser JSON, verification notes and screenshots are under `agency-deliverables/user-flow-evidence/` in the final handoff. The worker rehearsal is [RealSingletonWorkerRehearsalTests](../../../apps/common/tests/test_delivery_worker_health.py). Local screenshots are not screenshots of deployed Railway.
 
 ## Production access evidence
 
@@ -101,7 +101,7 @@ The CTO and Neopolis owner must complete these checks on the deployed cumulative
 7. Rehearse recovery safely: unknown outcome remains held for account inspection; an existing-post record is a labeled human attestation, not independent provider confirmation. Checked-absent/expired recovery returns content for fresh review and future approval without sending. Editing or removing/readding a destination must not release the durable hold.
 8. Observe successful publisher, agency and confirmation tasks after restart, an actual automatic draft, and live lead/backup/failure notification receipt. Compare period reports/current old backlog with actual native receipts. Carry a consented test enquiry through the existing sales workflow and record the agreed campaign attribution manually. Agree operating fallback, acceptable delay, privacy settings and support coverage before selling stronger promises.
 
-`python manage.py live_verify --strict` or `python manage.py release --setup-brands --strict-verify` opts into critical verification. Default `--verify` remains best effort. Strict success requires selected recorded evidence but does not independently validate a human-attested receipt, premium graphics or a delivery SLA. See [live operations](LIVE_OPERATIONS.md) for rollout and rollback that pause/drain publishing while preserving approvals, source guards and unknown holds.
+`python manage.py live_verify --strict` or `python manage.py release --setup-brands --strict-verify` opts into critical verification. Default `--verify` remains best effort. Strict success requires selected recorded evidence but does not independently validate a human-attested receipt, premium graphics or a delivery SLA. See [live operations](../../LIVE_OPERATIONS.md) for rollout and rollback that pause/drain publishing while preserving approvals, source guards and unknown holds.
 
 ## Remaining operating limits
 

@@ -229,12 +229,10 @@ def sweep_stuck() -> int:
             )
         )
     ]
+    from .engine import INTERRUPTED_ERROR
+
     for brief in stuck:
-        _fail(
-            brief,
-            "The team stopped part-way — the background worker restarted or isn't running. "
-            "Press Retry to continue from where it stopped.",
-        )
+        _fail(brief, INTERRUPTED_ERROR)
     return len(stuck)
 
 

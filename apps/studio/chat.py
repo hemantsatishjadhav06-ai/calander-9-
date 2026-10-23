@@ -58,7 +58,9 @@ logger = logging.getLogger(__name__)
 #: Agent replies a workspace may ask for in 24 hours, whatever the budget says.
 DAILY_REPLY_CAP = 200
 #: Earlier messages the account manager reads before the one it answers.
-HISTORY_LIMIT = 20
+HISTORY_LIMIT = 12
+#: Characters of each earlier message the account manager reads.
+HISTORY_CHARS = 600
 #: Messages a thread panel shows.
 SHOWN_MESSAGES = 60
 MAX_BODY = 4000
@@ -67,8 +69,17 @@ STAFF_NOTIFY_EVERY = timedelta(minutes=30)
 #: A client is told about replies at most this often (the email cap is 6 an hour, shared with approvals).
 CLIENT_NOTIFY_EVERY = timedelta(hours=1)
 READ_KEY_PREFIX = "thread.read."
-#: How a client asked from a post card; the account manager reads it.
-REQUEST_KINDS = ("change", "question", "confirm_brief")
+#: How the message was asked: from a post card (``change``, ``question``), as a new idea
+#: (``create``: the person wants a post made from their words), the one-tap
+#: confirmation of a brief card (``confirm_brief``), or a routine's standing instruction
+#: running on its schedule (``routine``). The account manager reads it.
+REQUEST_KINDS = ("change", "question", "confirm_brief", "create", "routine")
+#: Source evidence behind a brief counts as current for this long; after that it is refreshed silently.
+SOURCE_MAX_AGE = timedelta(hours=24)
+#: A draft the thread keeps an eye on: something is going out, or went wrong going out.
+PENDING_DELIVERY = frozenset({"scheduled", "publishing", "failed"})
+#: Brief states a person can still stop from the thread (nothing was made yet).
+STOPPABLE = (StudioBrief.Status.PLANNED, StudioBrief.Status.QUEUED, StudioBrief.Status.WORKING)
 
 CLIENT_ROLE = "client"
 
@@ -483,14 +494,14 @@ def _source_warnings(sources):
         stale = (
             fetched is None
             or timezone.is_naive(fetched)
-            or timezone.now() - fetched > timedelta(minutes=30)
+            or timezone.now() - fetched > SOURCE_MAX_AGE
             or fetched > timezone.now()
         )
     except (ValueError, TypeError, OverflowError):
         stale = True
     if stale:
         warnings.append(
-            "Source evidence is stale or has no collection time. Confirmation will require a refreshed source check."
+            "This evidence is more than a day old. It is refreshed when you go ahead; you are asked again only if it changed."
         )
     channels = sources.get("channels") or []
     if isinstance(channels, list) and any(
@@ -601,10 +612,22 @@ def _publication_receipts(brief, viewer=None, *, can_reconcile=None):
     return receipts
 
 
-def _creative_message_context(conversation, messages, viewer):
-    """Attach staff-only brief confirmations and current draft previews."""
+def _delivery_pending(brief) -> bool:
+    """Whether the thread should keep an eye on this draft's delivery (statuses only, no receipt work)."""
+    if brief.post_id is None or brief.post.workspace_id != brief.workspace_id:
+        return False
+    return any(row.status in PENDING_DELIVERY for row in brief.post.platform_posts.all())
+
+
+def _creative_message_context(conversation, messages, viewer, *, selected_draft_id: str = "") -> list:
+    """Attach staff-only brief cards and draft previews to the messages; returns the thread's drafts.
+
+    Delivery receipts cost a lookup per channel, so they are worked out only
+    for the draft in view (``selected_draft_id``) and for drafts with something
+    going out or gone wrong; the others carry an empty list.
+    """
     if conversation is None or conversation.audience != Conversation.Audience.INTERNAL:
-        return
+        return []
     from . import creative_brief
 
     latest = creative_brief.latest_intake(conversation, viewer)
@@ -632,7 +655,11 @@ def _creative_message_context(conversation, messages, viewer):
     for brief in briefs:
         if brief.graphic_id and brief.graphic.workspace_id != conversation.workspace_id:
             brief.graphic = None
-        brief.publication_receipts = _publication_receipts(brief, can_reconcile=can_reconcile)
+        brief.publication_receipts = (
+            _publication_receipts(brief, can_reconcile=can_reconcile)
+            if str(brief.pk) == str(selected_draft_id or "") or _delivery_pending(brief)
+            else []
+        )
     by_id = {str(brief.pk): brief for brief in briefs}
     by_job = {brief.job_id: brief for brief in briefs}
     for message in messages:
@@ -663,15 +690,102 @@ def _creative_message_context(conversation, messages, viewer):
                 message.website_source_url = ""
             accounts = result.get("selected_accounts")
             message.creative_accounts = accounts if isinstance(accounts, list) else []
+            message.creative_defaults = [
+                creative_brief.LABELS[key]
+                for key in (result.get("creative_defaults") or [])
+                if isinstance(key, str) and key in creative_brief.LABELS
+            ]
+            message.creative_missing = [
+                creative_brief.LABELS[key]
+                for key in (result.get("creative_missing") or [])
+                if isinstance(key, str) and key in creative_brief.LABELS
+            ]
+            message.evidence_changed = str(result.get("evidence_changed") or "")
+            message.auto_started = result.get("auto_started") is True
+            message.queued = result.get("queued") is True
             message.can_confirm_brief = bool(
                 latest is not None
                 and message.job_id == latest.pk
                 and message.job.requested_by_id == viewer.pk
                 and result.get("awaiting_confirmation")
                 and not answering
-                and not creative_brief.missing(intake)
+                and not creative_brief.missing(intake, required=creative_brief.STAFF_REQUIRED)
             )
         message.created_brief = by_id.get(str(result.get("brief_id") or "")) or by_job.get(message.job_id)
+        created = message.created_brief
+        message.can_stop_brief = bool(
+            created is not None
+            and (result.get("auto_started") is True or result.get("queued") is True)
+            and created.status in STOPPABLE
+            and (message.job.requested_by_id == viewer.pk or can_reconcile)
+        )
+        message.stop_url = (
+            reverse(
+                "studio:thread_stop_brief",
+                kwargs={
+                    "workspace_id": conversation.workspace_id,
+                    "conversation_id": conversation.pk,
+                    "brief_id": created.pk,
+                },
+            )
+            if message.can_stop_brief
+            else ""
+        )
+    return briefs
+
+
+def _routine_message_context(conversation, messages, viewer, membership) -> None:
+    """Attach the "Routine proposed · Turn on" card to the manager replies that proposed one.
+
+    A reply whose chat job carries ``routine_id`` gets ``message.routine``: the
+    routine's words, its schedule, whether it is on, and whether this viewer
+    may turn it on (the person who asked for it, or a settings manager).
+    """
+    if conversation is None or conversation.audience != Conversation.Audience.INTERNAL:
+        return
+    from . import routines
+    from .models import Routine
+
+    wanted: dict[str, list] = {}
+    for message in messages:
+        message.routine = None
+        if message.author_kind != Message.AuthorKind.AGENT or message.job_id is None:
+            continue
+        if message.job.workspace_id != conversation.workspace_id or message.job.conversation_id != conversation.pk:
+            continue
+        result = message.job.result if isinstance(message.job.result, dict) else {}
+        routine_id = str(result.get("routine_id") or "")
+        if routine_id:
+            wanted.setdefault(routine_id, []).append(message)
+    if not wanted:
+        return
+    perms = membership.effective_permissions if membership is not None else {}
+    workspace_id = conversation.workspace_id
+    for routine in Routine.objects.filter(workspace_id=workspace_id, pk__in=list(wanted)).select_related(
+        "workspace", "created_by"
+    ):
+        card = {
+            "id": str(routine.pk),
+            "title": routine.display_title,
+            "instruction": routine.instruction,
+            "cadence_words": routines.cadence_words(routine),
+            "enabled": routine.enabled,
+            "can_change": routines.can_change(routine, viewer, perms),
+            "toggle_url": reverse(
+                "studio:routines_toggle", kwargs={"workspace_id": workspace_id, "routine_id": routine.pk}
+            ),
+            "url": reverse("studio:routines", kwargs={"workspace_id": workspace_id}),
+        }
+        for message in wanted[str(routine.pk)]:
+            message.routine = card
+
+
+def creation_mode(workspace) -> str:
+    """How the workspace starts a team member's ideas: ``confirm`` (a tap on the brief card) or ``auto``."""
+    from .models import AgencySettings
+
+    mode = AgencySettings.objects.filter(workspace=workspace).values_list("creation_mode", flat=True).first()
+    return mode if mode in dict(AgencySettings.CreationMode.choices) else AgencySettings.CreationMode.CONFIRM
 
 
 # ---------------------------------------------------------------------------
@@ -695,8 +809,14 @@ def replies_today(workspace) -> int:
     return AgencyJob.objects.filter(workspace=workspace, kind=AgencyJob.Kind.CHAT, created_at__gte=since).count()
 
 
+#: The same sentence as Set up and readiness use for this state; the thread shows no other instruction.
+SETUP_REFUSAL = (
+    "Your message is saved. Your team isn't connected yet — open Set up. You can still write or edit a draft."
+)
+
+
 def reply_refusal(workspace) -> str:
-    """Why the assistant cannot answer yet; never queue a doomed provider call."""
+    """Why the account manager cannot answer yet; never queue a doomed provider call."""
     from . import budget, llm
 
     if replies_today(workspace) >= DAILY_REPLY_CAP:
@@ -714,11 +834,8 @@ def refusal_text(workspace, reason: str, *, audience: str) -> str:
 
     if reason == "setup":
         if audience == Conversation.Audience.CLIENT:
-            return "Your message is saved. Your agency needs to enable its assistant before it can answer."
-        return (
-            "Your message is saved. An administrator needs to connect the AI service before your assistant can continue. "
-            "You can still write or edit a draft."
-        )
+            return "Your message is saved. Your agency is finishing its set-up; a person will reply here."
+        return SETUP_REFUSAL
     if audience == Conversation.Audience.CLIENT:
         return "Thanks — your message is with the team. A person will reply here as soon as they can."
     if reason == "budget":
@@ -749,6 +866,25 @@ def clean_body(body: str) -> str:
     return body
 
 
+def _create_extras(workspace, create) -> dict[str, Any]:
+    """The idea form's structured choices, checked against this workspace, as brief fields."""
+    from .creative_brief import GOALS
+    from .forms import studio_accounts
+
+    data = create if isinstance(create, dict) else {}
+    goal = str(data.get("goal") or "")
+    notes = str(data.get("notes") or "").strip()[:2000]
+    allowed = {str(account.pk) for account in studio_accounts(workspace)}
+    accounts: list[str] = []
+    for item in data.get("accounts") or []:
+        pk = str(getattr(item, "pk", item))
+        if pk not in allowed:
+            raise ChatError("Choose connected accounts of this workspace.")
+        if pk not in accounts:
+            accounts.append(pk)
+    return {"goal": goal if goal in GOALS else "", "notes": notes, "accounts": accounts}
+
+
 @transaction.atomic
 def post_message(
     conversation: Conversation,
@@ -764,11 +900,15 @@ def post_message(
     target_brief_id: str = "",
     explicit_assistant_request: bool = False,
     telegram_context: dict | None = None,
+    create: dict | None = None,
 ) -> Posted:
     """Store ``author``'s message and, when it wants one, ask the account manager to answer.
 
-    ``kind`` is how a client asked from a post card (``"change"`` or
-    ``"question"``); the account manager reads it. Raises :class:`ChatError`.
+    ``kind`` is one of :data:`REQUEST_KINDS`; the account manager reads it.
+    With ``kind="create"`` the body is the person's own idea in their own
+    words, and ``create`` may carry the structured choices of the idea form
+    (``goal``, ``notes``, ``accounts``), which reach the brief as fields, never
+    as sentences in the person's message. Raises :class:`ChatError`.
     """
     from . import engine
 
@@ -803,6 +943,10 @@ def post_message(
         except (TypeError, ValueError):
             raise ChatError("Choose a current brief confirmation in this thread.") from None
         extra_input.update(confirmation_message_id=str(confirmation_id), facts_confirmed=True)
+    if kind == "create":
+        if not guided or is_internal:
+            raise ChatError("Ideas for new posts go in the team's own conversation.")
+        extra_input["create"] = _create_extras(workspace, create)
     if target_brief_id:
         if not guided or is_internal:
             raise ChatError("Choose a draft in the agency team thread.")
@@ -1237,8 +1381,6 @@ def thread_context(
         return None
 
     messages = recent_messages(conversation, for_client=False) if conversation is not None else []
-    _creative_message_context(conversation, messages, request.user)
-    mark_read(request.user, conversation)
     workspace_id = workspace.pk
     messages_url = ""
     if conversation is not None:
@@ -1275,8 +1417,15 @@ def thread_context(
         placeholder = "e.g. Add an FAQ about stamp duty"
         internal_label = "Note for the team only — no reply from the account manager"
     else:
-        title, subtitle = "Create with the team", "Brief it here, answer a few questions, then confirm your draft."
-        placeholder = "e.g. Create an Instagram post for our site visits — ask me what you need…"
+        from .models import AgencySettings
+
+        title = "Create with the team"
+        # The header matches the workspace's creation mode: a tap, or the manager going ahead by itself.
+        if creation_mode(workspace) == AgencySettings.CreationMode.AUTO:
+            subtitle = "Say what you want to post. Your manager goes ahead with sensible defaults; you can stop it for a minute."
+        else:
+            subtitle = "Say what you want to post. Your manager proposes the brief; one tap starts it."
+        placeholder = "e.g. A LinkedIn post inviting families to Saturday's site visit"
         internal_label = "Note for the team only — no reply from the account manager"
     named = conversation.title if conversation is not None and conversation.title != title else ""
     if named and (is_client_thread or full_page) and not about_brief and not about_article:
@@ -1321,6 +1470,15 @@ def thread_context(
         about = brief or (conversation.brief if conversation is not None and conversation.brief_id else None)
         if about is not None and about.workspace_id == workspace.pk:
             selected_draft = about
+    # The cards and previews, with delivery receipts only for the draft in view and drafts still going out.
+    drafts = _creative_message_context(
+        conversation,
+        messages,
+        request.user,
+        selected_draft_id=str(selected_draft.pk) if selected_draft is not None else "",
+    )
+    _routine_message_context(conversation, messages, request.user, membership)
+    mark_read(request.user, conversation)
     selected_reference_id = (
         request.POST.get("reference_id")
         or latest_input.get("reference_id")
@@ -1355,15 +1513,19 @@ def thread_context(
         cast(Any, asset).provenance = trust.photo_status(asset)
     delivery_pending = any(
         receipt["row"].status in {"scheduled", "publishing"} or receipt["unknown"]
-        for draft in draft_choices
-        for receipt in _publication_receipts(draft)
+        for draft in drafts
+        for receipt in draft.publication_receipts
     )
-    if selected_draft is not None and selected_draft not in draft_choices:
+    if selected_draft is not None and all(draft.pk != selected_draft.pk for draft in drafts):
         delivery_pending = delivery_pending or any(
             receipt["row"].status in {"scheduled", "publishing"} or receipt["unknown"]
             for receipt in _publication_receipts(selected_draft)
         )
     working = has_active_job(conversation)
+    # The panel on Home polls with ``?home=1`` so a card's "Turn on" returns to Home, not the thread page.
+    home_panel = request.GET.get("home") == "1"
+    if home_panel and messages_url:
+        messages_url += "?home=1"
     return {
         "template": PANEL_TEMPLATE,
         "workspace": workspace,
@@ -1372,8 +1534,13 @@ def thread_context(
         "dom_id": dom_id(conversation, brief=brief, blog_post=blog_post),
         "send_url": send_url,
         "messages_url": messages_url,
+        "home_panel": home_panel,
+        "home_url": reverse("studio:index", kwargs={"workspace_id": workspace_id}),
         "polling": working or delivery_pending,
-        "poll_interval": "every 5s" if working else "every 30s",
+        "poll_interval": "every 3s" if working else "every 30s",
+        "creation_mode": creation_mode(workspace),
+        "can_set_creation_mode": bool(membership.effective_permissions.get("manage_workspace_settings")),
+        "creation_mode_url": reverse("studio:creation_mode", kwargs={"workspace_id": workspace_id}),
         "thread_key": f"{workspace.pk}:{dom_id(conversation, brief=brief, blog_post=blog_post)}",
         "can_post": True,
         "can_post_internal": True,
@@ -1400,8 +1567,13 @@ def thread_context(
 
 
 def home_thread_context(request, workspace) -> dict[str, Any] | None:
-    """The agency home's "Ask the team" panel: the workspace's general internal thread."""
-    return thread_context(request, find_general(workspace), workspace=workspace)
+    """The agency home's conversation panel: the workspace's general internal thread."""
+    context = thread_context(request, find_general(workspace), workspace=workspace)
+    if context is not None:
+        context["home_panel"] = True
+        if context["messages_url"] and "home=1" not in context["messages_url"]:
+            context["messages_url"] += "?home=1"
+    return context
 
 
 def brief_thread_context(request, brief: StudioBrief) -> dict[str, Any] | None:

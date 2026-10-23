@@ -45,7 +45,8 @@ REPORT_HOUR = 8
 AUTOPILOT_PAUSED = "Autopilot is paused. Re-enable it to continue."
 WORKSPACE_PAUSED = "This workspace is paused because it is archived or its organization is being deleted."
 PLAN_PAUSED = "The parent plan is not complete. Retry or finish the plan to continue."
-PAUSE_REASONS = (AUTOPILOT_PAUSED, WORKSPACE_PAUSED, PLAN_PAUSED)
+PROVIDER_PAUSED = "Your team isn't connected yet. Open Set up to connect it; the work carries on by itself after that."
+PAUSE_REASONS = (AUTOPILOT_PAUSED, WORKSPACE_PAUSED, PLAN_PAUSED, PROVIDER_PAUSED)
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +103,13 @@ def automatic_work_blocker(workspace, *, job=None, automatic: bool = False) -> s
         workspace=workspace, autopilot_enabled=True
     ).exists():
         return AUTOPILOT_PAUSED
+    if job is not None and (automatic or weekly_plan):
+        # Unprompted work that would call the model waits for the provider
+        # instead of failing; it resumes on its own once Set up is complete.
+        from . import llm
+
+        if not llm.is_configured():
+            return PROVIDER_PAUSED
     return ""
 
 
@@ -125,7 +133,7 @@ def plan_is_due(settings_row, now: datetime | None = None) -> bool:
 
 def plan_blocker(settings_row) -> str:
     """Why a plan can't start for this workspace now, for people; "" when it can."""
-    from . import budget
+    from . import budget, llm
     from .jobtypes.plan import plan_accounts, valid_lead
 
     workspace = settings_row.workspace
@@ -137,6 +145,8 @@ def plan_blocker(settings_row) -> str:
             "None of the autopilot accounts is connected right now. Reconnect one, or choose others under "
             "Agency → Autopilot."
         )
+    if not llm.is_configured():
+        return PROVIDER_PAUSED
     if not budget.can_spend(workspace):
         return budget.over_budget_message(workspace)
     return ""
@@ -538,6 +548,7 @@ def announce_planned_weeks() -> int:
     not two). A plan that failed or was cancelled marks the week FAILED; a
     person retrying the plan puts it back to PLANNING.
     """
+    from . import alerts
     from .models import AgencyJob, AutopilotWeek, StudioBrief
 
     announced = 0
@@ -561,6 +572,7 @@ def announce_planned_weeks() -> int:
             AutopilotWeek.objects.filter(pk=week.pk, status=AutopilotWeek.Status.PLANNING).update(
                 status=AutopilotWeek.Status.FAILED, note=(note or "The plan failed.")[:500], updated_at=timezone.now()
             )
+            alerts.week_failed(week)  # once per week and reason; never raises
             continue
         if job.status != AgencyJob.Status.DONE:
             continue
@@ -593,6 +605,7 @@ def announce_planned_weeks() -> int:
                 note=f"{ready} of {requested} posts are ready; {'; '.join(details)}. {' '.join(guidance)}",
                 updated_at=timezone.now(),
             )
+            alerts.week_failed(week)
             continue
         if not ready:
             AutopilotWeek.objects.filter(pk=week.pk, status=AutopilotWeek.Status.PLANNING).update(
@@ -600,6 +613,7 @@ def announce_planned_weeks() -> int:
                 note="The team couldn't finish any of the week's posts. Open the plan to see why.",
                 updated_at=timezone.now(),
             )
+            alerts.week_failed(week)
             continue
         moved = AutopilotWeek.objects.filter(pk=week.pk, status=week.status).update(
             status=AutopilotWeek.Status.PLANNED, note="", updated_at=timezone.now()

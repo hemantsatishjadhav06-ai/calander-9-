@@ -119,7 +119,9 @@ def _context(request, workspace, form=None) -> dict:
         "row": row,
         "form": form,
         "tzname": workspace.effective_timezone or "UTC",
-        "tabs": dashboard.tabs(workspace, "autopilot"),
+        "tabs": dashboard.tabs(workspace, "autopilot", perms=perms),
+        # Links from Set up, the Settings hub and the Telegram page land on the approvers and the budget.
+        "advanced_open": bool(form.errors) or request.GET.get("open") == "advanced",
         "can_save": perms.get("manage_workspace_settings", False),
         "can_plan": _can_plan(request, workspace),
         "can_report": perms.get("create_posts", False),

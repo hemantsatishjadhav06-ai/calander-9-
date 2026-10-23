@@ -90,23 +90,6 @@ jobs:
     name: Test (pytest)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    services:
-      postgres:
-        # Pulled via AWS's public mirror of Docker Hub official images —
-        # avoids anonymous Docker Hub pulls, whose timeouts/rate limits
-        # broke main CI on 2026-06-10 (run 27262568530).
-        image: public.ecr.aws/docker/library/postgres:16-alpine
-        env:
-          POSTGRES_DB: brightbean_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
       DJANGO_SETTINGS_MODULE: config.settings.test
       SECRET_KEY: test-secret-key-not-for-production
@@ -119,6 +102,20 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
+
+      # The runner image ships PostgreSQL 16 (service stopped). Using it
+      # instead of a service container removes the image pull that the
+      # public registries throttle: anonymous Docker Hub pulls broke main CI
+      # on 2026-06-10 (run 27262568530) and the AWS public mirror answered
+      # "toomanyrequests: Data limit exceeded" before any test ran on
+      # 2026-10-20 and 2026-10-23 (runs 39365798270, 39368366023, 39935766258).
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+          sudo -u postgres createdb brightbean_test
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0

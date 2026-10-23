@@ -188,8 +188,14 @@ class StartedIdea:
 
 
 @transaction.atomic
-def start_idea(workspace, user, conversation_id):
-    """Dispatch once, under fresh scope/role locks. Paused and failed jobs keep their review path."""
+def start_idea(workspace, user, conversation_id, *, create=None, reference_id="", style_mode=""):
+    """Dispatch once, under fresh scope/role locks. Paused and failed jobs keep their review path.
+
+    The saved idea goes to the manager as the person's own words (``kind="create"``);
+    ``create`` carries the idea form's structured choices (goal, direction,
+    accounts) and ``reference_id`` / ``style_mode`` the photo and look, as
+    fields of the brief.
+    """
     current, person, _member = current_staff(workspace, user, locked=True)
     conversation = (
         Conversation.objects.select_for_update()
@@ -219,26 +225,25 @@ def start_idea(workspace, user, conversation_id):
             conversation, previous, "This idea already has saved work. Open its conversation to continue.", True
         )
     if not llm.is_configured():
-        return StartedIdea(
-            conversation,
-            None,
-            "Your idea is saved. The AI service needs administrator setup before guided drafting can start.",
-        )
+        return StartedIdea(conversation, None, "Your idea is saved. Your team isn't connected yet — open Set up.")
     refusal = chat.reply_refusal(current)
     if refusal:
         return StartedIdea(conversation, None, chat.refusal_text(current, refusal, audience=conversation.audience))
     posted = chat.post_message(
         conversation,
         person,
-        "Help me turn this saved idea into a post. Ask only for missing details and references, "
-        "then show me the brief to confirm before creating a draft.\n\n" + original.body,
+        original.body,
+        kind="create",
+        create=create,
+        reference_id=reference_id,
+        style_mode=style_mode,
     )
     if posted.job is not None:
         original.action_status = Message.ActionStatus.STARTED
         original.job = posted.job
         original.save(update_fields=["action_status", "job"])
     return StartedIdea(
-        conversation, posted.job, posted.note or "The team will ask for the details it needs in this conversation."
+        conversation, posted.job, posted.note or "Your manager is on it. The brief appears here in a moment."
     )
 
 
@@ -278,9 +283,9 @@ def _journey(workspace, user, conversation, *, configured, spend_allowed):
     can_resume = bool(original and original.author_id == user.pk and not jobs and configured and spend_allowed)
     task = None
     if latest is not None:
-        from .opendots import task_record
+        from .opendots import task_status
 
-        task = task_record(latest)
+        task = task_status(latest)  # the row reads the state only; the task page carries the controls
         events.append({"label": "Guided brief requested", "created_at": latest.created_at, "kind": "brief"})
         if task["status"] == "paused":
             state, label = "paused", "Work paused"
@@ -288,7 +293,7 @@ def _journey(workspace, user, conversation, *, configured, spend_allowed):
             action_url = reverse("studio:job", kwargs={"workspace_id": workspace.pk, "job_id": latest.pk})
         elif latest.status in AgencyJob.ACTIVE_STATUSES:
             state = "working" if latest.status == AgencyJob.Status.WORKING else "queued"
-            label = "Preparing your brief" if state == "working" else "Waiting for the worker"
+            label = "Preparing your brief" if state == "working" else "Waiting to start"
             action = "Open the conversation"
             if (latest.input or {}).get("kind") == "confirm_brief":
                 step, label = 2, "Confirmed brief waiting for creation"
@@ -431,9 +436,7 @@ def _journey(workspace, user, conversation, *, configured, spend_allowed):
 
 def context(workspace, user, *, form=None):
     """Read-only status for the launchpad and its polling fragment; no prompt or job is created."""
-    from apps.telegram.models import TelegramConnection, TelegramUserLink
-
-    from .readiness import operational_readiness
+    from .readiness import operational_readiness, telegram_state
 
     current, person, member = current_staff(workspace, user)
     configured, spend_allowed = llm.is_configured(), budget.can_spend(current)
@@ -443,16 +446,13 @@ def context(workspace, user, *, form=None):
         .select_related("workspace")
         .order_by("-last_message_at", "-created_at")[:30]
     ]
-    connection = (
-        TelegramConnection.objects.filter(workspace=current, is_active=True).only("id", "webhook_status").first()
-    )
-    paired = bool(
-        connection and TelegramUserLink.objects.filter(connection=connection, user=person, is_active=True).exists()
-    )
-    telegram_ready = bool(connection and connection.webhook_status == "active" and paired)
+    # Updates reach a paired person through a listening bot; the webhook's public address is the Set up page's concern.
+    telegram = telegram_state(current, person)
+    telegram_ready = telegram["connected"] and telegram["paired"]
     return {
         "workspace": current,
-        "workflow_form": form or IdeaForm(),
+        # A paired author gets Telegram updates by default; the box stays visible to switch off.
+        "workflow_form": form or IdeaForm(initial={"telegram_updates": telegram_ready}),
         "journeys": journeys,
         "active": any(row["state"] in {"queued", "working", "delivering"} for row in journeys),
         # Waiting on a person is still a saved workflow. Read-only polling
@@ -462,16 +462,16 @@ def context(workspace, user, *, form=None):
         "readiness": operational_readiness(current),
         "can_create": bool(member.effective_permissions.get("create_posts")),
         "telegram_url": reverse("telegram:settings", kwargs={"workspace_id": current.pk}),
-        "telegram_state": "ready" if telegram_ready else "pairing_needed" if connection else "setup_needed",
+        "telegram_state": "ready" if telegram_ready else "pairing_needed" if telegram["connected"] else "setup_needed",
         "telegram_label": "Your Telegram account is paired"
         if telegram_ready
         else "Pair your Telegram account"
-        if connection
+        if telegram["connected"]
         else "Connect your Telegram bot",
         "telegram_description": "Requests and review updates can use your paired Telegram conversation. Channel delivery needs its own verified destination."
         if telegram_ready
         else "Connect the workspace bot, then pair your own account to receive updates and answer questions.",
-        "tabs": dashboard.tabs(current, "workflow"),
+        "tabs": dashboard.tabs(current, "workflow", perms=member.effective_permissions),
         "tzname": current.effective_timezone or "UTC",
         "checked_at": timezone.now(),
     }

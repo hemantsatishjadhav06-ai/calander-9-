@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import zoneinfo
 from datetime import date, datetime, timedelta
 
@@ -153,7 +154,9 @@ def test_the_client_safe_report_has_only_the_reports_own_words(world, agency):
         "current_backlog",
     }
     assert [s["kind"] for s in report["sections"]] == ["went_out", "best", "next"]
-    assert "4.2" not in str(report) and "secret" not in str(report)
+    # The report's own words only (its timestamp may well contain "4.2"): no cost, no internal section, no state.
+    words = json.dumps({key: value for key, value in report.items() if key not in {"id", "created_at"}})
+    assert "4.2" not in words and "secret" not in words and "Costs" not in words
     assert reports.latest_report(other_ws)["title"] == "Other brand's week"
     assert [r["id"] for r in reports.recent_reports(world.workspace)] == [str(job.pk)]
 

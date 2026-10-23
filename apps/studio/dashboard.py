@@ -46,24 +46,57 @@ def _maybe_url(name: str, **kwargs) -> str | None:
         return None
 
 
-def tabs(workspace, active: str) -> list[dict[str, Any]]:
-    """The agency's tabs (pages that are not available simply don't show)."""
+#: Pages that live behind the Settings tab: their views keep their own
+#: ``active`` key, and the tab bar lights up Settings for all of them.
+SETTINGS_PAGES = frozenset({"settings", "brand", "trust", "memory", "outcomes", "autopilot", "telegram", "budget"})
+#: Appended to the Autopilot page's URL by links whose target (approvers, budget) sits in its Advanced section.
+ADVANCED_OPEN = "?open=advanced"
+
+
+def tabs(workspace, active: str, perms: dict | None = None) -> list[dict[str, Any]]:
+    """The agency's four tabs (a page that is not available simply doesn't show).
+
+    With the viewer's ``perms``, Routines is left out for people who may not
+    write one (its page needs ``create_posts``), so no tab leads to a refusal.
+    """
     items = [
-        ("overview", "Overview", "studio:index"),
+        ("overview", "Home", "studio:index"),
+        ("routines", "Routines", "studio:routines"),
         ("team", "Team", "studio:team"),
-        ("memory", "Creative memory", "studio:memory"),
-        ("autopilot", "Autopilot", "studio:autopilot"),
-        ("thread", "Ask the team", "studio:thread"),
-        ("telegram", "Telegram", "telegram:settings"),
-        ("brand", "Brand", "studio:brand"),
-        ("trust", "Verified facts", "studio:trust"),
-        ("outcomes", "Outcomes", "studio:outcomes"),
+        ("settings", "Settings", "studio:settings_hub"),
     ]
+    if perms is not None and not perms.get("create_posts"):
+        items = [item for item in items if item[0] != "routines"]
+    if active in SETTINGS_PAGES:
+        active = "settings"
+    elif active in ("workflow", "thread"):
+        active = "overview"
     out = []
     for key, label, name in items:
         url = _maybe_url(name, workspace_id=workspace.id)
         if url:
             out.append({"key": key, "label": label, "url": url, "active": key == active})
+    return out
+
+
+def settings_cards(workspace) -> list[dict[str, Any]]:
+    """The Settings hub: one card per page the agency's settings are spread over."""
+    items = [
+        ("brand", "Brand", "Name, colours, voice and the facts the team may use.", "studio:brand"),
+        ("trust", "Verified facts", "Prices, availability and dates a person has checked.", "studio:trust"),
+        ("memory", "Creative memory", "The looks that worked, and the house style the team keeps.", "studio:memory"),
+        ("outcomes", "Outcomes", "What each campaign is for, and how it is measured.", "studio:outcomes"),
+        ("autopilot", "Autopilot", "How many posts a week, where, and who approves.", "studio:autopilot"),
+        ("telegram", "Telegram", "Your bot, your pairing and your team's groups.", "telegram:settings"),
+        ("budget", "Budget", "This month's AI spend against the soft limit.", "studio:autopilot"),
+    ]
+    out = []
+    for key, label, blurb, name in items:
+        url = _maybe_url(name, workspace_id=workspace.id)
+        if url and key == "budget":
+            url += ADVANCED_OPEN  # the budget lives in the Autopilot page's Advanced section
+        if url:
+            out.append({"key": key, "label": label, "blurb": blurb, "url": url})
     return out
 
 
@@ -292,6 +325,128 @@ def overview(workspace) -> dict[str, Any]:
         "agency_settings": settings_for(workspace),
         "agent_count": len(team.AGENTS),
         "inbox_drafts": _inbox_drafts(workspace),
+    }
+
+
+def _job_title(job: AgencyJob) -> str:
+    return job.title or job.get_kind_display()
+
+
+def needs_review(workspace, limit: int = 5) -> list[dict[str, Any]]:
+    """Paused, failed or interrupted tasks a person has to look at, newest first."""
+    from .opendots import task_status
+
+    rows: list[dict[str, Any]] = []
+    jobs = chat.web_jobs(
+        AgencyJob.objects.filter(workspace=workspace, status__in=(AgencyJob.Status.FAILED, AgencyJob.Status.CANCELLED))
+    ).order_by("-updated_at")[: limit * 3]
+    for job in jobs:
+        record = task_status(job)  # a list reads the label only, never the signed effect review
+        if record["status"] not in ("paused", "failed", "interrupted"):
+            continue
+        rows.append(
+            {
+                "title": _job_title(job),
+                "label": record["label"],
+                "url": _maybe_url("studio:job", workspace_id=workspace.id, job_id=job.pk),
+            }
+        )
+        if len(rows) >= limit:
+            return rows
+    for brief in StudioBrief.objects.filter(workspace=workspace, status=StudioBrief.Status.FAILED).order_by(
+        "-updated_at"
+    )[: limit - len(rows)]:
+        rows.append(
+            {
+                "title": brief.title,
+                "label": "Needs your attention",
+                "url": reverse("studio:detail", kwargs={"workspace_id": workspace.id, "brief_id": brief.pk}),
+            }
+        )
+    return rows
+
+
+def today(workspace, user=None) -> dict[str, Any]:
+    """The Today card: what waits for a person, what goes out, what got done, what runs next.
+
+    Code-built from this workspace's rows; no model call. ``user`` is only
+    used to say whether this person may approve.
+    """
+    from apps.composer.models import PlatformPost
+
+    zone = _zone(workspace)
+    now = timezone.now()
+    local = now.astimezone(zone)
+    day_start = datetime.combine(local.date(), datetime.min.time(), tzinfo=zone)
+    day_end = day_start + timedelta(days=1)
+    yesterday = now - timedelta(days=1)
+
+    waiting_rows = waiting(workspace)
+    going_out = [
+        {
+            "time": pp.scheduled_at.astimezone(zone),
+            "label": (pp.post.title or pp.post.caption or "Post")[:80],
+            "where": pp.social_account.get_platform_display(),
+            "state": pp.get_status_display(),
+        }
+        for pp in PlatformPost.objects.filter(
+            post__workspace=workspace,
+            status__in=("scheduled", "publishing"),
+            scheduled_at__gte=day_start,
+            scheduled_at__lt=day_end,
+        )
+        .select_related("post", "social_account")
+        .order_by("scheduled_at")[:6]
+        if pp.scheduled_at is not None
+    ]
+    done: list[dict[str, Any]] = []
+    for brief in (
+        StudioBrief.objects.filter(
+            workspace=workspace,
+            finished_at__gte=yesterday,
+            status__in=(StudioBrief.Status.READY, StudioBrief.Status.APPROVED),
+        )
+        .only("idea", "design_spec", "post_copy", "chosen_concept", "finished_at", "status")
+        .order_by("-finished_at")[:4]
+    ):
+        done.append(
+            {
+                "label": f"Draft ready: {brief.title}",
+                "when": brief.finished_at.astimezone(zone) if brief.finished_at else None,
+                "url": reverse("studio:detail", kwargs={"workspace_id": workspace.id, "brief_id": brief.pk}),
+            }
+        )
+    for job in (
+        chat.web_jobs(
+            AgencyJob.objects.filter(workspace=workspace, status=AgencyJob.Status.DONE, finished_at__gte=yesterday)
+        )
+        .exclude(kind=AgencyJob.Kind.CHAT)
+        .order_by("-finished_at")[: max(0, 4 - len(done))]
+    ):
+        done.append(
+            {
+                "label": _job_title(job),
+                "when": job.finished_at.astimezone(zone) if job.finished_at else None,
+                "url": _maybe_url("studio:job", workspace_id=workspace.id, job_id=job.pk),
+            }
+        )
+    done.sort(key=lambda row: row["when"] or now, reverse=True)
+
+    row = settings_for(workspace)
+    next_run = None
+    if row is not None and row.autopilot_enabled:
+        from .views_autopilot import next_plan_at
+
+        next_run = next_plan_at(row)
+    review = needs_review(workspace)
+    return {
+        "waiting": waiting_rows[:3],
+        "waiting_count": len(waiting_rows),
+        "going_out": going_out,
+        "done": done,
+        "next_run": next_run,
+        "needs_review": review,
+        "quiet": not (waiting_rows or going_out or done or review or next_run),
     }
 
 

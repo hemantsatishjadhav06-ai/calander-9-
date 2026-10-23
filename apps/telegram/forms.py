@@ -36,9 +36,7 @@ class ConnectForm(forms.Form):
             attrs={"autocomplete": "new-password", "class": "w-full rounded-lg border border-stone-300 p-3"},
         ),
     )
-    approvals_enabled = forms.BooleanField(
-        required=False, label="Allow paired internal approvers to approve exact review cards in Telegram"
-    )
+    approvals_enabled = forms.BooleanField(required=False, label="Allow approving from Telegram review cards")
 
     def clean_token(self):
         token = self.cleaned_data["token"].strip()

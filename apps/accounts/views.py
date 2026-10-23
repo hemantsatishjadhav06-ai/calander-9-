@@ -109,6 +109,7 @@ def dashboard(request):
 
 
 def _workspace_landing(membership):
+    """Staff land on Home (the conversation with their team); clients and viewers on the calendar."""
     from apps.telegram.permissions import current_member, internal_member
 
     try:
@@ -116,7 +117,7 @@ def _workspace_landing(membership):
     except PermissionDenied:
         return None
     can_start = bool(internal_member(current) and current.effective_permissions.get("create_posts", False))
-    route = "studio:workflow" if can_start else "calendar:calendar"
+    route = "studio:index" if can_start else "calendar:calendar"
     return redirect(route, workspace_id=membership.workspace_id)
 
 

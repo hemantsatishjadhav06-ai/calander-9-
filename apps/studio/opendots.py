@@ -44,7 +44,7 @@ def _notify_control(job_id, revision, action):
 
         job_control_event(job_id, revision, action)
     except Exception:
-        logger.warning("The assistant control update could not be queued for Telegram.")
+        logger.warning("The task control update could not be queued for Telegram.")
 
 
 class CoworkerControlError(ValueError):
@@ -77,7 +77,7 @@ def _status(job: AgencyJob) -> str:
     """Port OpenDots' task states without adding competing persistence."""
     if job.status == AgencyJob.Status.CANCELLED and _control(job).get("paused") is True:
         return "paused"
-    if job.status == AgencyJob.Status.FAILED and "background worker restarted" in job.error:
+    if job.status == AgencyJob.Status.FAILED and engine.INTERRUPTED_MARKER in job.error:
         return "interrupted"
     states: dict[str, str] = {
         AgencyJob.Status.QUEUED: "queued",
@@ -137,28 +137,78 @@ def _review_payload(job: AgencyJob) -> dict:
     return {"job": str(job.pk), "workspace": str(job.workspace_id), "effects": _effect_digest(job)}
 
 
+def _waiting_on_policy(job: AgencyJob) -> bool:
+    """A queued job the worker keeps skipping because autopilot (or the workspace) is paused, or the team isn't connected."""
+    from .autopilot import PAUSE_REASONS
+
+    return job.status == AgencyJob.Status.QUEUED and job.error in PAUSE_REASONS
+
+
+LABELS = {
+    "queued": "Waiting to start",
+    "waiting_policy": "Paused: autopilot is off",
+    "waiting_setup": "Waiting for Set up",
+    "running": "Your team is working",
+    "paused": "Paused by you",
+    "completed": "Finished",
+    "failed": "Needs your attention",
+    "interrupted": "Interrupted — review before retrying",
+    "cancelled": "Stopped",
+}
+
+
+def task_status(job: AgencyJob) -> dict[str, Any]:
+    """The cheap part of :func:`task_record`: status, label and where to fix a policy pause. No extra queries.
+
+    Lists (Home's rows, the briefing's counts) read only this; the signed
+    effect review belongs to the task page and its controls.
+    """
+    from django.urls import NoReverseMatch, reverse
+
+    from .autopilot import PROVIDER_PAUSED
+
+    status = _status(job)
+    shown = status
+    policy_url = policy_note = policy_link = ""
+    if status == "queued" and _waiting_on_policy(job):
+        # The reason says what to do: the team isn't connected (Set up), or autopilot is off (Autopilot).
+        setup = job.error == PROVIDER_PAUSED
+        shown = "waiting_setup" if setup else "waiting_policy"
+        page = "studio:setup" if setup else "studio:autopilot"
+        policy_note = (
+            "This task continues on its own once your team is connected"
+            if setup
+            else "This task continues on its own once autopilot is on"
+        )
+        policy_link = "open Set up" if setup else "open Autopilot"
+        try:
+            policy_url = reverse(page, kwargs={"workspace_id": job.workspace_id})
+        except NoReverseMatch:
+            policy_url = ""
+    return {
+        "id": str(job.pk),
+        "status": shown,
+        "label": LABELS[shown],
+        "policy_url": policy_url,
+        "policy_note": policy_note,
+        "policy_link": policy_link,
+    }
+
+
 def task_record(job: AgencyJob) -> dict[str, Any]:
     """Read-only status/control projection for an already-authorized job.
 
     Callers must scope with chat.web_jobs and their authenticated workspace;
     the mutation service independently repeats that check under row locks.
+    ``waiting_policy`` and ``waiting_setup`` are display states only: the
+    control rules are those of the underlying queued job, so it can still be
+    paused or stopped.
     """
     status = _status(job)
     active = status in ("queued", "running")  # OpenDots TaskActions.active
     needs_review = _needs_review(job)
-    labels = {
-        "queued": "Waiting to start",
-        "running": "Your assistant is working",
-        "paused": "Paused by you",
-        "completed": "Finished",
-        "failed": "Needs your attention",
-        "interrupted": "Interrupted — review before retrying",
-        "cancelled": "Stopped",
-    }
     return {
-        "id": str(job.pk),
-        "status": status,
-        "label": labels[status],
+        **task_status(job),
         "revision": job.revision,
         "stage": job.stage,
         "needs_effect_review": needs_review,
@@ -207,14 +257,14 @@ def control_job(
     with transaction.atomic():
         member = current_member(workspace, user, locked=True)
         if not internal_member(member) or member.effective_permissions.get("create_posts") is not True:
-            raise PermissionDenied("Your current workspace role cannot control assistant tasks.")
+            raise PermissionDenied("Your current workspace role cannot control the team's tasks.")
         job = (
             chat.web_jobs(AgencyJob.objects.select_for_update(of=("self",)))
             .filter(pk=job_id, workspace_id=member.workspace_id)
             .first()
         )
         if job is None:
-            raise PermissionDenied("This assistant task is unavailable in your workspace.")
+            raise PermissionDenied("This task is unavailable in your workspace.")
         job.workspace = member.workspace
         if job.revision != expected_revision:
             raise CoworkerControlError("This task changed in another tab. Reload before continuing.")

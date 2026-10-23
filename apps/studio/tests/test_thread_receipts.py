@@ -68,14 +68,17 @@ def _html(client, world, conversation):
     return client.get(_url("thread", world) + f"?c={conversation.pk}").content.decode()
 
 
-def test_primary_entry_starts_the_existing_guided_conversation_without_graphic_work(client, world, jobs):
-    conversation = chat.general_conversation(world.workspace)
+def test_primary_entry_starts_its_own_guided_conversation_without_graphic_work(client, world, jobs):
+    general = chat.general_conversation(world.workspace)
     client.force_login(world.editor)
     response = client.post(_url("create", world), {"idea": "Invite families for a site visit"})
-    assert response.status_code == 302 and response["Location"] == chat.staff_thread_url(conversation)
     job = AgencyJob.objects.get()
-    assert job.kind == AgencyJob.Kind.CHAT and job.conversation_id == conversation.pk
-    assert "Invite families for a site visit" in conversation.messages.get().body
+    conversation = job.conversation
+    assert response.status_code == 302 and response["Location"] == chat.staff_thread_url(conversation)
+    assert conversation.pk != general.pk and conversation.created_by == world.editor
+    assert job.kind == AgencyJob.Kind.CHAT and job.input["kind"] == "create"
+    trigger = Message.objects.get(pk=job.input["message_id"])
+    assert trigger.body == "Invite families for a site visit"  # the person's own words, nothing spliced in
     assert jobs == [(job.pk, "answer")]
     assert not StudioBrief.objects.exists() and not Post.objects.exists()
 
@@ -96,8 +99,13 @@ def test_legacy_entry_choices_are_kept_as_human_brief_inputs_not_immediate_pipel
     )
     assert response.status_code == 302
     job = AgencyJob.objects.get()
-    text = Message.objects.get().body
-    assert "leads" in text and "Saturday only, no invented prices" in text and str(world.linkedin.pk) in text
+    text = Message.objects.get(pk=job.input["message_id"]).body
+    assert text == "A site visit campaign"  # the choices travel as fields, never as sentences
+    assert job.input["create"] == {
+        "goal": "leads",
+        "notes": "Saturday only, no invented prices",
+        "accounts": [str(world.linkedin.pk)],
+    }
     assert job.input["reference_id"] == str(reference.pk) and job.input["style_mode"] == "brand"
     assert not StudioBrief.objects.exists()
 
@@ -280,7 +288,7 @@ def test_unavailable_stale_and_stored_sources_warn_before_the_collapsed_evidence
         "creative_brief": _complete_intake(),
         "awaiting_confirmation": True,
         "sources": {
-            "fetched_at": (timezone.now() - timedelta(hours=1)).isoformat(),
+            "fetched_at": (timezone.now() - timedelta(hours=25)).isoformat(),
             "website": {"status": "unavailable"},
             "channels": [{"source": "stored_history", "posts": []}],
         },
@@ -288,7 +296,7 @@ def test_unavailable_stale_and_stored_sources_warn_before_the_collapsed_evidence
     job.save(update_fields=["result"])
     client.force_login(world.editor)
     html = _html(client, world, conversation)
-    assert "Website evidence is unavailable" in html and "Source evidence is stale" in html
+    assert "Website evidence is unavailable" in html and "This evidence is more than a day old" in html
     assert "not a fresh account read" in html
     assert html.index("data-source-warnings") < html.index(
         f'data-thread-details-key="sources-{conversation.messages.get().pk}"'
