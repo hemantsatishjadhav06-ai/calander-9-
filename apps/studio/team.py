@@ -21,7 +21,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 #: ink-700: the one avatar fill (white on it reads 9.97:1).
 _NEUTRAL = "#3E434A"
 
