@@ -8,50 +8,46 @@ forever; we explicitly do NOT persist plaintext anywhere.
 {% endcomment %}
 <template x-teleport="body">
     <div x-show="showRevealModal" x-transition.opacity
-         class="fixed inset-0 z-50 flex items-center justify-center"
-         style="background: rgba(14, 17, 20,0.55);">
+         class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+         style="background: var(--overlay);">
         <div x-show="showRevealModal" x-transition
              x-trap.noscroll="showRevealModal" role="dialog" aria-modal="true" aria-labelledby="token-reveal-title" aria-describedby="token-reveal-desc"
-             class="w-full max-w-lg mx-4 rounded-xl p-6"
-             style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(14, 17, 20,0.25);">
-            <div class="flex items-start gap-3 mb-4">
-                <svg aria-hidden="true" class="flex-shrink-0 mt-0.5" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                     stroke="var(--warning-700)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 9v3.75m0-9.75A10 10 0 1 1 2 12 10 10 0 0 1 12 3zm0 13.5h.008v.008H12v-.008z"/>
-                </svg>
-                <div>
-                    <h3 id="token-reveal-title" class="text-base font-semibold" style="color: var(--text-primary);">
-                        Save this token now.
-                    </h3>
-                    <p id="token-reveal-desc" class="text-xs mt-1" style="color: var(--text-secondary);">
-                        {{ SITE_NAME }} does not store the plaintext token. Once you close this modal it cannot be retrieved.
-                        Paste it into your agent or secret manager before continuing.
-                    </p>
+             class="ui-modal max-sm:rounded-b-none">
+            <div class="ui-modal-header">
+                <div class="flex items-start gap-3">
+                    <svg aria-hidden="true" class="mt-1 size-5 shrink-0 text-warning-500" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/>
+                    </svg>
+                    <div>
+                        <h2 id="token-reveal-title" class="ui-modal-title">Save this token now.</h2>
+                        <p id="token-reveal-desc" class="mt-1 text-small text-ink-600">
+                            {{ SITE_NAME }} doesn't keep a copy. Once you close this, it can't be shown again.
+                            Paste it into your tool or password manager first.
+                        </p>
+                    </div>
                 </div>
             </div>
 
-            <div class="text-xs mb-2" style="color: var(--text-tertiary);">
-                Key name: <strong style="color: var(--text-secondary);">{{ key_name }}</strong>
+            <div class="ui-modal-body">
+                <p class="mb-2 text-small text-ink-600">
+                    Key: <span class="font-semibold text-ink-900">{{ key_name }}</span>
+                </p>
+                <div class="flex items-center gap-2 rounded-xl bg-ink-50 p-2 pl-3 ring-1 ring-inset ring-ink-200">
+                    <code id="reveal-token" class="min-w-0 flex-1 break-all font-mono text-[13px] text-ink-900">{{ token }}</code>
+                    <button type="button"
+                            x-data="{ label: 'Copy' }"
+                            @click="navigator.clipboard.writeText(document.getElementById('reveal-token').innerText); label = 'Copied'; setTimeout(() => label = 'Copy', 1500)"
+                            x-text="label"
+                            aria-live="polite"
+                            class="ui-btn ui-btn-secondary ui-btn-sm shrink-0">
+                        Copy
+                    </button>
+                </div>
             </div>
 
-            <div class="flex items-center gap-2 rounded-lg px-3 py-2 mb-4"
-                 style="background: var(--surface-1); border: 1px solid var(--border);">
-                <code id="reveal-token" class="text-xs break-all flex-1 font-mono"
-                      style="color: var(--text-primary);">{{ token }}</code>
-                <button type="button"
-                        x-data="{ label: 'Copy' }"
-                        @click="navigator.clipboard.writeText(document.getElementById('reveal-token').innerText); label = 'Copied'; setTimeout(() => label = 'Copy', 1500)"
-                        x-text="label"
-                        class="px-2.5 py-1 text-xs font-medium rounded cursor-pointer whitespace-nowrap"
-                        style="background: var(--neutral-900); color: white;">
-                    Copy
-                </button>
-            </div>
-
-            <div class="flex justify-end">
-                <button type="button" @click="showRevealModal = false"
-                        class="btn-neutral px-5 py-2 text-sm font-medium rounded-full cursor-pointer"
-                        style="background: var(--neutral-100); color: var(--text-primary);">
+            <div class="ui-modal-footer">
+                <button type="button" @click="showRevealModal = false" class="ui-btn ui-btn-primary">
                     I've saved it
                 </button>
             </div>

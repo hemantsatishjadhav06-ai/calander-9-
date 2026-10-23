@@ -1,49 +1,36 @@
-<div class="px-6 py-4 group" id="member-{{ member.membership.id }}"
-     style="border-bottom: 1px solid var(--border);"
+<div class="group px-4 py-3.5 sm:px-5" id="member-{{ member.membership.id }}"
      x-data="{ showActions: false, showWorkspaces: false, menuStyle: {} }">
-    <!-- Row 1: Member info -->
-    <div class="flex items-center gap-4">
-        <!-- Avatar / Initials -->
-        <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold"
-             style="background: var(--neutral-200); color: var(--text-secondary);">
+    <!-- Member -->
+    <div class="flex items-center gap-3">
+        <div class="grid size-9 shrink-0 place-items-center rounded-full bg-ink-100 text-[13px] font-semibold text-ink-700" aria-hidden="true">
             {{ member.user.display_name|first|upper }}
         </div>
 
-        <!-- Name & Email -->
-        <div class="flex-1 min-w-0">
+        <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
-                <span class="text-sm font-medium truncate" style="color: var(--text-primary);">
-                    {{ member.user.display_name }}
-                </span>
+                <span class="truncate text-sm font-semibold text-ink-900">{{ member.user.display_name }}</span>
                 {% if member.user.id == current_user.id %}
-                <span class="text-xs px-1.5 py-0.5 rounded" style="background: var(--neutral-100); color: var(--text-tertiary);">you</span>
+                <span class="ui-chip">You</span>
                 {% endif %}
             </div>
-            <div class="text-xs truncate" style="color: var(--text-tertiary);">{{ member.user.email }}</div>
+            <div class="truncate text-small text-ink-600">{{ member.user.email }}</div>
         </div>
 
-        <!-- Org Role Badge -->
-        <div class="flex-shrink-0">
-            {% if member.membership.org_role == "owner" %}
-            <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: var(--warning-100); color: var(--warning-700);">Owner</span>
-            {% elif member.membership.org_role == "admin" %}
-            <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: var(--info-100); color: var(--info-700);">Admin</span>
-            {% else %}
-            <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: var(--neutral-100); color: var(--text-secondary);">Member</span>
-            {% endif %}
-        </div>
+        <!-- Organization role -->
+        <span class="shrink-0 text-small font-medium text-ink-700">
+            {% if member.membership.org_role == "owner" %}Owner{% elif member.membership.org_role == "admin" %}Admin{% else %}Member{% endif %}
+        </span>
 
         <!-- Actions -->
         {% if is_admin and member.user.id != current_user.id %}
-        <div class="flex-shrink-0 relative">
+        <div class="relative shrink-0">
             <button type="button" aria-label="Actions for {{ member.user.display_name }}" aria-haspopup="true" :aria-expanded="showActions"
-                    @click="showActions = !showActions; if (showActions) { const r = $el.getBoundingClientRect(); menuStyle = { position: 'fixed', top: (r.bottom + 4) + 'px', left: (r.right - 208) + 'px', zIndex: 9999 } }"
-                    class="btn-neutral-100 p-1.5 rounded-lg transition-colors cursor-pointer"
-                    style="color: var(--text-tertiary);">
-                <svg aria-hidden="true" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                    @click="showActions = !showActions; if (showActions) { const r = $el.getBoundingClientRect(); menuStyle = { position: 'fixed', top: (r.bottom + 4) + 'px', left: Math.max(8, r.right - 240) + 'px', zIndex: 9999 } }"
+                    class="ui-btn ui-btn-icon">
+                <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="19" cy="12" r="1.75"/></svg>
             </button>
 
-            <!-- Dropdown (teleported to body so it escapes the card's overflow:hidden) -->
+            <!-- Menu (teleported to body so it escapes the card's overflow) -->
             <template x-teleport="body">
             <div x-show="showActions" @click.outside="showActions = false"
                  @keydown.escape.window="showActions = false"
@@ -51,51 +38,45 @@
                  x-transition
                  x-init="window.htmx && htmx.process($el)"
                  :style="menuStyle"
-                 class="w-52 py-1 rounded-lg shadow-lg"
-                 style="background: var(--surface-0); border: 1px solid var(--border);">
+                 class="ui-menu w-60">
 
-                <!-- Change Role -->
+                <!-- Change role -->
                 <form hx-post="{% url 'members:update_role' membership_id=member.membership.id %}"
                       hx-target="#member-{{ member.membership.id }}"
                       hx-swap="outerHTML"
-                      class="px-3 py-2" style="border-bottom: 1px solid var(--border);">
+                      class="px-2.5 pb-2.5 pt-2">
                     {% csrf_token %}
-                    <label for="org-role-{{ member.membership.id }}" class="text-xs font-medium block mb-1" style="color: var(--text-secondary);">Organization Role</label>
+                    <label for="org-role-{{ member.membership.id }}" class="mb-1.5 block text-caption font-semibold text-ink-600">Organization role</label>
                     <div class="flex gap-2">
-                        <select id="org-role-{{ member.membership.id }}" name="org_role" class="text-xs flex-1 px-2 py-1 rounded border outline-none"
-                                style="border-color: var(--border); background: var(--surface-0); color: var(--text-primary);">
+                        <select id="org-role-{{ member.membership.id }}" name="org_role" class="ui-input min-w-0 flex-1 lg:h-8 lg:text-[13px]">
                             {% for value, label in org_role_choices %}
                             <option value="{{ value }}" {% if value == member.membership.org_role %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
-                        <button type="submit"
-                                class="text-xs px-2 py-1 rounded font-medium cursor-pointer"
-                                style="background: var(--neutral-100); color: var(--text-primary);">
-                            Save
-                        </button>
+                        <button type="submit" class="ui-btn ui-btn-secondary ui-btn-sm">Save</button>
                     </div>
                 </form>
+                <div class="ui-menu-separator" role="separator"></div>
 
-                <!-- Manage Workspaces -->
-                <button @click="showWorkspaces = true; showActions = false"
+                <!-- Manage workspaces -->
+                <button type="button" @click="showWorkspaces = true; showActions = false"
                         hx-get="{% url 'members:manage_workspaces' membership_id=member.membership.id %}"
                         hx-target="#ws-modal-content-{{ member.membership.id }}"
                         hx-swap="innerHTML"
-                        class="btn-neutral-surface w-full text-left px-3 py-2 text-sm cursor-pointer transition-colors"
-                        style="color: var(--text-primary);">
-                    Manage Workspaces
+                        class="ui-menu-item">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    Manage workspaces
                 </button>
 
-                <!-- Remove Member -->
+                <!-- Remove member -->
                 <form hx-post="{% url 'members:remove' membership_id=member.membership.id %}"
                       hx-target="#member-{{ member.membership.id }}"
                       hx-swap="delete"
                       hx-confirm="Remove {{ member.user.display_name }} from the organization? This will also remove them from all workspaces.">
                     {% csrf_token %}
-                    <button type="submit"
-                            class="btn-danger-soft-bg w-full text-left px-3 py-2 text-sm cursor-pointer transition-colors"
-                            style="color: var(--danger-500);">
-                        Remove from Organization
+                    <button type="submit" class="ui-menu-item is-danger">
+                        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
+                        Remove from organization
                     </button>
                 </form>
             </div>
@@ -104,44 +85,43 @@
         {% endif %}
     </div>
 
-    <!-- Row 2: Workspace Badges -->
+    <!-- Workspaces -->
     {% if member.workspace_memberships %}
-    <div class="flex items-center justify-start flex-wrap gap-2 mt-2">
+    <ul class="mt-2.5 flex flex-wrap items-center gap-1.5 pl-12" role="list" aria-label="Workspaces">
         {% for wm in member.workspace_memberships %}
-        <span class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full" style="background: var(--neutral-100); color: var(--text-secondary);"
-              title="{{ wm.workspace.name }} ({{ wm.workspace_role }})">
+        <li class="ui-chip !gap-1.5 !pl-0.5" title="{{ wm.workspace.name }} ({{ wm.workspace_role }})">
             {% if wm.workspace.icon %}
-            <img src="{{ wm.workspace.icon.url }}" alt="" class="w-4 h-4 rounded-full object-cover">
+            <img src="{{ wm.workspace.icon.url }}" alt="" class="size-5 rounded-full object-cover">
             {% else %}
-            <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-semibold" style="background: var(--neutral-200); color: var(--text-tertiary);">{{ wm.workspace.name|first|upper }}</span>
+            <span class="grid size-5 place-items-center rounded-full bg-white text-[11px] font-semibold text-ink-700" aria-hidden="true">{{ wm.workspace.name|first|upper }}</span>
             {% endif %}
             {{ wm.workspace.name }}
-        </span>
+        </li>
         {% endfor %}
-    </div>
+    </ul>
     {% endif %}
 
-    <!-- Workspace Assignment Modal (per member) -->
+    <!-- Workspace assignment modal (per member) -->
     {% if is_admin and member.user.id != current_user.id %}
     <template x-teleport="body">
         <div x-show="showWorkspaces" x-transition.opacity
-             class="fixed inset-0 z-50 flex items-center justify-center"
-             style="background: rgba(14, 17, 20,0.4);">
+             class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+             style="background: var(--overlay);">
             <div @click.outside="showWorkspaces = false"
                  @keydown.escape.window="showWorkspaces = false"
                  x-trap.noscroll="showWorkspaces" role="dialog" aria-modal="true" aria-labelledby="ws-modal-title-{{ member.membership.id }}"
-                 class="w-full max-w-md rounded-xl shadow-xl p-6"
-                 style="background: var(--surface-0);">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 id="ws-modal-title-{{ member.membership.id }}" class="text-base font-semibold" style="color: var(--text-primary);">
-                        Workspaces - {{ member.user.display_name }}
-                    </h3>
-                    <button type="button" @click="showWorkspaces = false" class="cursor-pointer" style="color: var(--text-tertiary);" aria-label="Close">
-                        <svg aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                 class="ui-modal max-w-[480px] max-sm:max-h-[92vh] max-sm:overflow-y-auto max-sm:rounded-b-none">
+                <div class="ui-modal-header">
+                    <div class="min-w-0">
+                        <h2 id="ws-modal-title-{{ member.membership.id }}" class="ui-modal-title">Workspaces</h2>
+                        <p class="mt-0.5 truncate text-small text-ink-600">{{ member.user.display_name }}</p>
+                    </div>
+                    <button type="button" @click="showWorkspaces = false" class="ui-btn ui-btn-icon -mr-2 -mt-1" aria-label="Close">
+                        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
-                <div id="ws-modal-content-{{ member.membership.id }}">
-                    <p class="text-sm" style="color: var(--text-tertiary);">Loading...</p>
+                <div id="ws-modal-content-{{ member.membership.id }}" class="ui-modal-body">
+                    <p class="flex items-center gap-2 text-sm text-ink-600"><span class="ui-spinner" aria-hidden="true"></span>Loading…</p>
                 </div>
             </div>
         </div>

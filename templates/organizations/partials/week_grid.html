@@ -3,51 +3,53 @@ Org calendar week view - 7 columns, hourly rows. Posts link to their workspace's
 Context: week_days, week_slots, today, default_workspace.
 {% endcomment %}
 
-<div class="bg-white overflow-auto" style="animation: slideUp 200ms cubic-bezier(0.16,1,0.3,1) both; max-height: calc(100vh - 260px);">
-    <!-- Day headers -->
-    <div class="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-ink-200 sticky top-0 bg-white z-10">
-        <div class="border-r border-ink-200"></div>
-        {% for day in week_days %}
-        <div class="px-2 py-2 text-center border-r border-ink-200 last:border-r-0 {% if day == today %}bg-brand-50{% endif %}">
-            <div class="text-[10px] font-semibold text-ink-500 uppercase">{{ day|date:"D" }}</div>
-            <div class="text-sm font-semibold {% if day == today %}text-brand-700{% else %}text-ink-700{% endif %}">{{ day.day }}</div>
+<div class="overflow-auto" style="max-height: calc(100vh - 260px);">
+    <div class="min-w-[760px]">
+        <!-- Day headers -->
+        <div class="sticky top-0 z-10 grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-ink-200 bg-white">
+            <div class="border-r border-ink-200"></div>
+            {% for day in week_days %}
+            <div class="border-r border-ink-200 px-2 py-2 text-center last:border-r-0 {% if day == today %}bg-ink-25{% endif %}">
+                <div class="text-caption font-semibold text-ink-500">{{ day|date:"D" }}</div>
+                <div class="mx-auto mt-0.5 grid size-7 place-items-center rounded-full text-sm font-semibold tabular-nums {% if day == today %}bg-ink-900 text-white{% else %}text-ink-900{% endif %}" {% if day == today %}aria-current="date"{% endif %}>{{ day.day }}</div>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
 
-    <!-- Hour rows -->
-    {% for hour, day_slots in week_slots %}
-    <div class="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-ink-100 min-h-[56px]">
-        <div class="border-r border-ink-200 px-2 py-1 text-right">
-            <span class="text-[11px] font-medium text-ink-500 tabular-nums">{% if hour < 10 %}0{% endif %}{{ hour }}:00</span>
-        </div>
-        {% for day, slot_posts in day_slots %}
-        <div class="border-r border-ink-100 last:border-r-0 p-1 cal-add-cell {% if day == today %}bg-brand-50{% endif %}" style="position: relative;">
-            {% if default_workspace and day > today or default_workspace and day == today and hour >= current_hour %}
-            <a aria-label="Create post" href="{% url 'composer:compose' workspace_id=default_workspace.id %}?scheduled_date={{ day|date:'Y-m-d' }}&scheduled_time={{ hour }}:00" class="cal-add-btn" title="Create post">
-                <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-            </a>
-            {% endif %}
-            {% for pp in slot_posts %}
-            <a href="{% url 'composer:compose_edit' workspace_id=pp.post.workspace_id post_id=pp.post_id %}"
-               class="cross-post-chip status-{{ pp.status }}"
-               title="{{ pp.post.workspace.name }}: {{ pp.post.caption_snippet }}">
-                <span class="ws-dot" style="background: {{ pp.post.workspace.primary_color|default:'var(--primary)' }};"></span>
-                <span class="w-4 h-4 rounded flex items-center justify-center pi-{{ pp.social_account.platform }} flex-shrink-0 text-white">
-                    {% include "social_accounts/partials/_platform_icon.html" with platform=pp.social_account.platform size="3" %}
-                </span>
-                {% with first_media=pp.post.media_attachments.all.0 %}
-                {% if first_media and first_media.media_asset.thumbnail %}
-                <img src="{{ first_media.media_asset.thumbnail.url }}" alt="" class="w-5 h-5 rounded object-cover flex-shrink-0">
-                {% elif first_media and not first_media.media_asset.is_video %}
-                <img src="{{ first_media.media_asset.file.url }}" alt="" class="w-5 h-5 rounded object-cover flex-shrink-0">
+        <!-- Hour rows -->
+        {% for hour, day_slots in week_slots %}
+        <div class="grid min-h-[56px] grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-ink-200 last:border-b-0">
+            <div class="border-r border-ink-200 px-2 py-1 text-right">
+                <span class="text-caption tabular-nums text-ink-500">{% if hour < 10 %}0{% endif %}{{ hour }}:00</span>
+            </div>
+            {% for day, slot_posts in day_slots %}
+            <div class="cal-add-cell relative border-r border-ink-200 p-1 last:border-r-0 {% if day == today %}bg-ink-25{% endif %}">
+                {% if default_workspace and day > today or default_workspace and day == today and hour >= current_hour %}
+                <a aria-label="Create post on {{ day|date:'j F' }} at {% if hour < 10 %}0{% endif %}{{ hour }}:00" href="{% url 'composer:compose' workspace_id=default_workspace.id %}?scheduled_date={{ day|date:'Y-m-d' }}&scheduled_time={{ hour }}:00" class="cal-add-btn" title="Create post">
+                    <svg aria-hidden="true" class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                </a>
                 {% endif %}
-                {% endwith %}
-                <span class="truncate">{{ pp.post.caption_snippet|truncatechars:28 }}</span>
-            </a>
+                {% for pp in slot_posts %}
+                <a href="{% url 'composer:compose_edit' workspace_id=pp.post.workspace_id post_id=pp.post_id %}"
+                   class="cross-post-chip status-{{ pp.status }}"
+                   title="{{ pp.post.workspace.name }}: {{ pp.post.caption_snippet }}">
+                    <span class="ws-dot" style="background: {{ pp.post.workspace.primary_color|default:'var(--ink-400)' }};" aria-hidden="true"></span>
+                    <span class="flex size-4 shrink-0 items-center justify-center rounded pi-{{ pp.social_account.platform }} text-white">
+                        {% include "social_accounts/partials/_platform_icon.html" with platform=pp.social_account.platform size="3" %}
+                    </span>
+                    {% with first_media=pp.post.media_attachments.all.0 %}
+                    {% if first_media and first_media.media_asset.thumbnail %}
+                    <img src="{{ first_media.media_asset.thumbnail.url }}" alt="" class="size-5 shrink-0 rounded object-cover">
+                    {% elif first_media and not first_media.media_asset.is_video %}
+                    <img src="{{ first_media.media_asset.file.url }}" alt="" class="size-5 shrink-0 rounded object-cover">
+                    {% endif %}
+                    {% endwith %}
+                    <span class="truncate">{{ pp.post.caption_snippet|truncatechars:28 }}</span>
+                </a>
+                {% endfor %}
+            </div>
             {% endfor %}
         </div>
         {% endfor %}
     </div>
-    {% endfor %}
 </div>
