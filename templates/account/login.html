@@ -8,21 +8,21 @@
   .auth-card .btn-brand {
     /* The brand's primary action colour, same as the landing page (WCAG AA with white text). */
     background-color: var(--primary-strong);
-    box-shadow: 0 4px 14px rgba(194, 65, 12, 0.25);
+    box-shadow: 0 4px 14px rgba(17, 86, 65, 0.25);
   }
   .auth-card .btn-brand:hover {
-    background-color: var(--brand-800, #9A3412);
-    box-shadow: 0 6px 20px rgba(194, 65, 12, 0.35);
+    background-color: var(--brand-800);
+    box-shadow: 0 6px 20px rgba(17, 86, 65, 0.35);
   }
   .auth-card .btn-brand:focus {
-    box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.35);
+    box-shadow: 0 0 0 3px rgba(17, 86, 65, 0.35);
   }
 </style>
 <div class="w-full max-w-md px-4">
     <!-- Logo & Header -->
     <div class="text-center mb-8">
         <div class="inline-flex items-center justify-center w-12 h-12 mb-4">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold tracking-tight" style="background: #C2410C;" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</div>
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold tracking-tight" style="background: var(--primary);" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</div>
         </div>
         <span class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: var(--primary-strong);">{{ SITE_NAME }}</span>
         <h1 class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">

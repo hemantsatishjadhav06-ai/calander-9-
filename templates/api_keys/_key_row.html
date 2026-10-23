@@ -6,13 +6,13 @@
             {# Status chip. #}
             {% if row.status == "active" %}
             <span class="px-2 py-0.5 text-xs rounded-full"
-                  style="background: var(--success-soft, #D1FAE5); color: var(--success-700, #047857);">Active</span>
+                  style="background: var(--success-soft); color: var(--success-700);">Active</span>
             {% elif row.status == "revoked" %}
             <span class="px-2 py-0.5 text-xs rounded-full"
                   style="background: var(--neutral-100); color: var(--text-tertiary);">Revoked</span>
             {% else %}
             <span class="px-2 py-0.5 text-xs rounded-full"
-                  style="background: var(--warning-soft, #FEF3C7); color: var(--warning-700, #B45309);">Expired</span>
+                  style="background: var(--warning-soft); color: var(--warning-700);">Expired</span>
             {% endif %}
         </div>
         <div class="text-xs flex flex-wrap items-center gap-x-3 gap-y-1" style="color: var(--text-tertiary);">
@@ -30,7 +30,7 @@
         <div class="mt-2 flex flex-wrap gap-1.5">
             {% for sa in row.accounts %}
             <span class="px-2 py-0.5 text-xs rounded-md"
-                  style="background: var(--surface-1, #F3F4F6); color: var(--text-secondary); border: 1px solid var(--border);">
+                  style="background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border);">
                 {{ sa.platform }} · {{ sa.account_name }}
             </span>
             {% endfor %}
@@ -60,7 +60,7 @@
         <button type="button"
                 @click="showEditModal = true"
                 class="btn-neutral px-4 py-1.5 text-xs font-medium rounded-full cursor-pointer whitespace-nowrap"
-                style="background: var(--surface-1, #F3F4F6); color: var(--text-secondary); border: 1px solid var(--border);">
+                style="background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border);">
             Edit
         </button>
 
@@ -68,12 +68,12 @@
             <div x-show="showEditModal" x-transition.opacity
                  @keydown.escape.window="showEditModal = false"
                  class="fixed inset-0 z-50 flex items-center justify-center"
-                 style="background: rgba(0,0,0,0.4);">
+                 style="background: rgba(14, 17, 20,0.4);">
                 <div @click.outside="showEditModal = false"
                      x-show="showEditModal" x-transition
                      x-trap.noscroll="showEditModal" role="dialog" aria-modal="true" aria-labelledby="edit-key-title-{{ row.id }}"
                      class="w-full max-w-xl mx-4 rounded-xl flex flex-col"
-                     style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.18); max-height: 90vh;">
+                     style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(14, 17, 20,0.18); max-height: 90vh;">
                     <form method="POST" action="{% url 'api_keys:edit' row.id %}" class="flex flex-col min-h-0">
                         {% csrf_token %}
                         <div class="flex items-start justify-between px-6 pt-6 pb-4 flex-shrink-0">
@@ -97,7 +97,7 @@
                                 <div class="space-y-1.5">
                                     {% for perm_key, label, checked in row.editable_permissions %}
                                     <label class="flex items-start gap-2 text-sm px-2 py-1.5 rounded cursor-pointer"
-                                           style="background: var(--surface-1, #F9FAFB); border: 1px solid var(--border);">
+                                           style="background: var(--surface-1); border: 1px solid var(--border);">
                                         <input type="checkbox" name="permissions" value="{{ perm_key }}"
                                                class="w-4 h-4 mt-0.5"{% if checked %} checked{% endif %}>
                                         <span>
@@ -109,7 +109,7 @@
                                 </div>
                                 {% else %}
                                 <p class="text-xs px-3 py-2 rounded-lg"
-                                   style="background: var(--warning-soft, #FEF3C7); color: var(--warning-700, #B45309);">
+                                   style="background: var(--warning-soft); color: var(--warning-700);">
                                     You don't hold any grantable permissions in this workspace.
                                 </p>
                                 {% endif %}
@@ -122,7 +122,7 @@
                                     <div class="space-y-1.5">
                                         {% for perm in row.locked_permissions %}
                                         <label class="flex items-start gap-2 text-sm px-2 py-1.5 rounded opacity-60 cursor-not-allowed"
-                                               style="background: var(--surface-1, #F9FAFB); border: 1px solid var(--border);">
+                                               style="background: var(--surface-1); border: 1px solid var(--border);">
                                             <input type="checkbox" checked disabled class="w-4 h-4 mt-0.5">
                                             <span class="font-mono text-xs" style="color: var(--text-tertiary);">{{ perm }}</span>
                                         </label>
@@ -139,7 +139,7 @@
                                 <div class="space-y-1.5">
                                     {% for sa, checked in row.editable_accounts %}
                                     <label class="flex items-center gap-2 text-sm px-2 py-1.5 rounded cursor-pointer"
-                                           style="background: var(--surface-1, #F9FAFB); border: 1px solid var(--border);">
+                                           style="background: var(--surface-1); border: 1px solid var(--border);">
                                         <input type="checkbox" name="social_account_ids" value="{{ sa.id }}"
                                                class="w-4 h-4"{% if checked %} checked{% endif %}>
                                         <span class="font-mono text-xs" style="color: var(--text-tertiary);">{{ sa.platform }}</span>
@@ -152,7 +152,7 @@
                                 </p>
                                 {% else %}
                                 <p class="text-xs px-3 py-2 rounded-lg"
-                                   style="background: var(--warning-soft, #FEF3C7); color: var(--warning-700, #B45309);">
+                                   style="background: var(--warning-soft); color: var(--warning-700);">
                                     No connected accounts in this workspace.
                                 </p>
                                 {% endif %}
@@ -203,7 +203,7 @@
         <button type="button"
                 @click="showRevokeModal = true"
                 class="btn-neutral px-4 py-1.5 text-xs font-medium rounded-full cursor-pointer whitespace-nowrap"
-                style="background: var(--error-soft, #FEE2E2); color: var(--error-700, #B91C1C);">
+                style="background: var(--error-soft); color: var(--error-700);">
             Revoke
         </button>
 
@@ -211,12 +211,12 @@
             <div x-show="showRevokeModal" x-transition.opacity
                  @keydown.escape.window="showRevokeModal = false"
                  class="fixed inset-0 z-50 flex items-center justify-center"
-                 style="background: rgba(0,0,0,0.4);">
+                 style="background: rgba(14, 17, 20,0.4);">
                 <div @click.outside="showRevokeModal = false"
                      x-show="showRevokeModal" x-transition
                      x-trap.noscroll="showRevokeModal" role="dialog" aria-modal="true" aria-labelledby="revoke-key-title-{{ row.id }}"
                      class="w-full max-w-md mx-4 rounded-xl flex flex-col"
-                     style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.18);">
+                     style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(14, 17, 20,0.18);">
                     <div class="flex items-start justify-between px-6 pt-6 pb-4">
                         <div>
                             <h3 id="revoke-key-title-{{ row.id }}" class="text-lg font-semibold" style="color: var(--text-primary);">Revoke API key</h3>
@@ -242,7 +242,7 @@
                         </button>
                         <button type="submit"
                                 class="px-5 py-2 text-sm font-medium rounded-full cursor-pointer"
-                                style="background: var(--error-700, #B91C1C); color: white;">
+                                style="background: var(--error-700); color: white;">
                             Revoke key
                         </button>
                     </form>

@@ -9,14 +9,14 @@ forever; we explicitly do NOT persist plaintext anywhere.
 <template x-teleport="body">
     <div x-show="showRevealModal" x-transition.opacity
          class="fixed inset-0 z-50 flex items-center justify-center"
-         style="background: rgba(0,0,0,0.55);">
+         style="background: rgba(14, 17, 20,0.55);">
         <div x-show="showRevealModal" x-transition
              x-trap.noscroll="showRevealModal" role="dialog" aria-modal="true" aria-labelledby="token-reveal-title" aria-describedby="token-reveal-desc"
              class="w-full max-w-lg mx-4 rounded-xl p-6"
-             style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.25);">
+             style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(14, 17, 20,0.25);">
             <div class="flex items-start gap-3 mb-4">
                 <svg aria-hidden="true" class="flex-shrink-0 mt-0.5" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                     stroke="var(--warning-700, #B45309)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                     stroke="var(--warning-700)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 9v3.75m0-9.75A10 10 0 1 1 2 12 10 10 0 0 1 12 3zm0 13.5h.008v.008H12v-.008z"/>
                 </svg>
                 <div>
@@ -35,7 +35,7 @@ forever; we explicitly do NOT persist plaintext anywhere.
             </div>
 
             <div class="flex items-center gap-2 rounded-lg px-3 py-2 mb-4"
-                 style="background: var(--surface-1, #F3F4F6); border: 1px solid var(--border);">
+                 style="background: var(--surface-1); border: 1px solid var(--border);">
                 <code id="reveal-token" class="text-xs break-all flex-1 font-mono"
                       style="color: var(--text-primary);">{{ token }}</code>
                 <button type="button"
@@ -43,7 +43,7 @@ forever; we explicitly do NOT persist plaintext anywhere.
                         @click="navigator.clipboard.writeText(document.getElementById('reveal-token').innerText); label = 'Copied'; setTimeout(() => label = 'Copy', 1500)"
                         x-text="label"
                         class="px-2.5 py-1 text-xs font-medium rounded cursor-pointer whitespace-nowrap"
-                        style="background: var(--neutral-900, #111827); color: white;">
+                        style="background: var(--neutral-900); color: white;">
                     Copy
                 </button>
             </div>

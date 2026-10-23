@@ -17,7 +17,7 @@
     <!-- Portal Link Status -->
     <div class="flex-shrink-0">
         {% if client.token %}
-        <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: #DCFCE7; color: #166534;">
+        <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: var(--success-100); color: var(--success-700);">
             Link active
         </span>
         {% else %}
@@ -64,7 +64,7 @@
             {% csrf_token %}
             <button type="submit"
                     class="btn-danger-soft-bg text-xs px-3 py-1.5 rounded-full font-medium cursor-pointer transition-colors"
-                    style="color: #DC2626; background: transparent;">
+                    style="color: var(--danger-500); background: transparent;">
                 Remove
             </button>
         </form>

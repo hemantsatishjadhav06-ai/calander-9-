@@ -9,40 +9,40 @@
 {% endif %}
 <style>
   .ml-edit-canvas {
-    background: var(--surface-1, #FAFAF9);
-    border: 1px solid var(--border, #E7E5E4);
-    border-radius: var(--radius-xl, 0.75rem);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
     overflow: hidden;
   }
   .ml-edit-toolbar {
-    background: var(--surface-0, #FFF);
-    border: 1px solid var(--border, #E7E5E4);
-    border-radius: var(--radius-xl, 0.75rem);
+    background: var(--surface-0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
   }
   .ml-tool-btn {
     display: flex; flex-direction: column; align-items: center; gap: 4px;
     padding: 10px 14px;
-    border-radius: var(--radius-lg, 0.5rem);
+    border-radius: var(--radius-lg);
     font-size: 10px; font-weight: 600;
-    color: var(--text-secondary, #57534E);
+    color: var(--text-secondary);
     cursor: pointer;
-    transition: all var(--dur-fast, 150ms) ease;
+    transition: all var(--dur-fast) ease;
   }
-  .ml-tool-btn:hover { background: var(--surface-1, #FAFAF9); color: var(--text-primary, #1C1917); }
-  .ml-tool-btn.active { background: var(--primary-soft, #FFF7ED); color: var(--brand-700, #C2410C); }
+  .ml-tool-btn:hover { background: var(--surface-1); color: var(--text-primary); }
+  .ml-tool-btn.active { background: var(--primary-soft); color: var(--brand-700); }
   .ml-trim-track {
     height: 48px;
-    background: var(--surface-2, #F5F5F4);
-    border-radius: var(--radius-lg, 0.5rem);
+    background: var(--surface-2);
+    border-radius: var(--radius-lg);
     position: relative;
     overflow: hidden;
   }
   .ml-trim-selection {
     position: absolute; top: 0; bottom: 0;
-    background: rgba(249, 115, 22, 0.15);
-    border-left: 3px solid var(--primary, #F97316);
-    border-right: 3px solid var(--primary, #F97316);
+    background: rgba(17, 86, 65, 0.15);
+    border-left: 3px solid var(--primary);
+    border-right: 3px solid var(--primary);
   }
 </style>
 {% endblock %}
@@ -51,13 +51,13 @@
 <div class="flex items-center gap-3">
   <a aria-label="Back" href="{% if is_shared_library %}{% url 'media_library_org:shared_asset_detail' asset_id=asset.id %}{% else %}{% url 'media_library:index' workspace_id=workspace.id %}{% endif %}"
      class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors btn-surface-2"
-     style="color: var(--text-tertiary, #78716C);">
+     style="color: var(--text-tertiary);">
     <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
   </a>
-  <h1 class="text-lg font-semibold" style="color: var(--text-primary, #1C1917);">Edit - {{ asset.original_filename }}</h1>
+  <h1 class="text-lg font-semibold" style="color: var(--text-primary);">Edit - {{ asset.original_filename }}</h1>
   {% if is_shared_library %}
   <span class="text-xs font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider"
-        style="background: rgba(20,184,166,0.15); color: #0F766E;">Shared</span>
+        style="background: rgba(66, 158, 74,0.15); color: var(--success-600);">Shared</span>
   {% endif %}
 </div>
 {% endblock %}
@@ -106,7 +106,7 @@
         Cancel
       </a>
       <button @click="save()" class="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-full transition-all btn-primary-hover"
-              style="background: var(--primary, #F97316); box-shadow: var(--shadow-primary);">
+              style="background: var(--primary); box-shadow: var(--shadow-primary);">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
         Save as new version
       </button>

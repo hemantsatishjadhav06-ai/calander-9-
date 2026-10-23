@@ -5,36 +5,36 @@
 
 {% block content %}
 <div class="max-w-5xl">
-    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
-        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Agency</a>
+    <nav aria-label="Breadcrumb" class="text-sm text-ink-600 mb-3">
+        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="underline hover:text-ink-900">Agency</a>
         <span aria-hidden="true"> / </span><span>Brand profile</span>
     </nav>
     <div class="mb-6 max-w-2xl">
-        <h1 class="text-lg font-semibold text-stone-900">Brand profile</h1>
-        <p class="text-sm text-stone-600 mt-0.5">How {{ profile.brand_name }} sounds and looks. Saved background notes are unverified. Record source-backed commercial claims and project photos in <a href="{% url 'studio:trust' workspace_id=workspace.pk %}" class="underline">Verified facts</a>; each claim needs a verifier and review expiry.</p>
+        <h1 class="text-lg font-semibold text-ink-900">Brand profile</h1>
+        <p class="text-sm text-ink-600 mt-0.5">How {{ profile.brand_name }} sounds and looks. Saved background notes are unverified. Record source-backed commercial claims and project photos in <a href="{% url 'studio:trust' workspace_id=workspace.pk %}" class="underline">Verified facts</a>; each claim needs a verifier and review expiry.</p>
     </div>
 
     <section aria-labelledby="samples-heading" class="mb-8">
-        <h2 id="samples-heading" class="text-sm font-semibold text-stone-900 mb-3">Your layouts, in your look</h2>
+        <h2 id="samples-heading" class="text-sm font-semibold text-ink-900 mb-3">Your layouts, in your look</h2>
         <ul class="grid grid-cols-2 md:grid-cols-4 gap-3">
             {% for template in templates %}
             <li>
                 <img src="{% url 'studio:brand_sample' workspace_id=workspace.id template=template %}?v={{ profile.updated_at|date:'U' }}"
-                     alt="Sample {{ template }} graphic" class="w-full h-auto rounded-xl border border-stone-200 bg-stone-100" loading="lazy">
-                <p class="mt-1 text-xs text-stone-600 capitalize">{{ template }}{% if template == profile.default_template %} · default{% endif %}</p>
+                     alt="Sample {{ template }} graphic" class="w-full h-auto rounded-xl border border-ink-200 bg-ink-100" loading="lazy">
+                <p class="mt-1 text-xs text-ink-600 capitalize">{{ template }}{% if template == profile.default_template %} · default{% endif %}</p>
             </li>
             {% endfor %}
         </ul>
-        <p class="mt-2 text-xs text-stone-600">Samples use the brand background; real posts carry a picture. Once the team has made a post, the next ones follow its look.</p>
+        <p class="mt-2 text-xs text-ink-600">Samples use the brand background; real posts carry a picture. Once the team has made a post, the next ones follow its look.</p>
     </section>
 
     <form method="post" novalidate>
         {% csrf_token %}
         <fieldset {% if not can_edit %}disabled{% endif %} class="space-y-8">
-            {% if form.non_field_errors %}<div class="text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+            {% if form.non_field_errors %}<div class="text-sm text-danger-600 bg-danger-50 border border-danger-200 rounded-lg px-3 py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
 
-            <section aria-labelledby="voice-heading" class="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6">
-                <h2 id="voice-heading" class="text-sm font-semibold text-stone-900 mb-4">How it sounds</h2>
+            <section aria-labelledby="voice-heading" class="bg-white border border-ink-200 rounded-2xl p-5 sm:p-6">
+                <h2 id="voice-heading" class="text-sm font-semibold text-ink-900 mb-4">How it sounds</h2>
                 <div class="grid md:grid-cols-2 gap-4">
                     {% include "blog/partials/field.html" with field=form.brand_name %}
                     {% include "blog/partials/field.html" with field=form.website %}
@@ -46,8 +46,8 @@
                 </div>
             </section>
 
-            <section aria-labelledby="facts-heading" class="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6">
-                <h2 id="facts-heading" class="text-sm font-semibold text-stone-900 mb-4">Background notes and rules</h2>
+            <section aria-labelledby="facts-heading" class="bg-white border border-ink-200 rounded-2xl p-5 sm:p-6">
+                <h2 id="facts-heading" class="text-sm font-semibold text-ink-900 mb-4">Background notes and rules</h2>
                 <div class="grid md:grid-cols-2 gap-4">
                     <div class="md:col-span-2">{% include "blog/partials/field.html" with field=form.facts %}</div>
                     {% include "blog/partials/field.html" with field=form.dos %}
@@ -56,8 +56,8 @@
                 </div>
             </section>
 
-            <section aria-labelledby="look-heading" class="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6">
-                <h2 id="look-heading" class="text-sm font-semibold text-stone-900 mb-4">How it looks</h2>
+            <section aria-labelledby="look-heading" class="bg-white border border-ink-200 rounded-2xl p-5 sm:p-6">
+                <h2 id="look-heading" class="text-sm font-semibold text-ink-900 mb-4">How it looks</h2>
                 <div class="grid md:grid-cols-2 gap-4">
                     <div class="flex gap-6">
                         {% include "blog/partials/field.html" with field=form.primary_color %}
@@ -76,12 +76,12 @@
 
             {% if can_edit %}
             <div class="flex items-center gap-3">
-                <button type="submit" class="px-6 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Save brand profile</button>
-                <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="text-sm text-stone-700 underline">Cancel</a>
+                <button type="submit" class="px-6 py-2.5 text-sm font-semibold text-white bg-brand-700 rounded-full hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">Save brand profile</button>
+                <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="text-sm text-ink-700 underline">Cancel</a>
             </div>
             {% endif %}
         </fieldset>
-        {% if not can_edit %}<p class="mt-4 text-sm text-stone-600">Only an owner or manager can change the brand profile.</p>{% endif %}
+        {% if not can_edit %}<p class="mt-4 text-sm text-ink-600">Only an owner or manager can change the brand profile.</p>{% endif %}
     </form>
 </div>
 {% endblock %}

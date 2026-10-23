@@ -8,12 +8,12 @@ reveal modal on top of the freshly-rendered list page.
     <div x-show="showIssueModal" x-transition.opacity
          @keydown.escape.window="showIssueModal = false"
          class="fixed inset-0 z-50 flex items-center justify-center"
-         style="background: rgba(0,0,0,0.4);">
+         style="background: rgba(14, 17, 20,0.4);">
         <div @click.outside="showIssueModal = false"
              x-show="showIssueModal" x-transition
              x-trap.noscroll="showIssueModal" role="dialog" aria-modal="true" aria-labelledby="issue-key-title"
              class="w-full max-w-xl mx-4 rounded-xl flex flex-col"
-             style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.18); max-height: 90vh;">
+             style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(14, 17, 20,0.18); max-height: 90vh;">
             <form method="POST" action="{% url 'api_keys:issue' %}" class="flex flex-col min-h-0">
                 {% csrf_token %}
                 <div class="flex items-start justify-between px-6 pt-6 pb-5 flex-shrink-0">

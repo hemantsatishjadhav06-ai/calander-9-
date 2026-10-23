@@ -17,7 +17,7 @@
         <div class="mb-8">
             <div class="flex items-center gap-2 mb-3">
                 <h2 class="text-[0.75rem] font-bold uppercase tracking-wider" style="color: var(--text-tertiary);">Needs your approval</h2>
-                <span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[0.6875rem] font-bold">{{ pending_posts|length }}</span>
+                <span class="px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 text-[0.6875rem] font-bold">{{ pending_posts|length }}</span>
             </div>
             <div class="space-y-4">
                 {% for post in pending_posts %}{% include "client_portal/_client_card.html" %}{% endfor %}
@@ -36,7 +36,7 @@
 
         {% if not pending_posts and not decided_posts %}
         <div class="text-center py-20">
-            <div class="mx-auto w-12 h-12 mb-3" style="color: var(--neutral-300, #D6D3D1);">
+            <div class="mx-auto w-12 h-12 mb-3" style="color: var(--neutral-300);">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
             </div>
             <p class="font-medium" style="color: var(--text-secondary);">All caught up</p>

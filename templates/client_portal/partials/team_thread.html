@@ -10,18 +10,18 @@ the form swaps the container's content. Context: pt (apps.client_portal.views_te
     {% if not pt.post and pt.conversation %}<input type="hidden" name="c" value="{{ pt.conversation.pk }}">{% endif %}
     {% if pt.post %}<input type="hidden" name="d" value="{{ pt.dom_id }}">{% endif %}
     {% if pt.error %}
-    <p class="mb-2 text-[0.8125rem] rounded-lg px-3 py-2 bg-red-50 text-red-800 border border-red-200" role="alert">{{ pt.error }}</p>
+    <p class="mb-2 text-[0.8125rem] rounded-lg px-3 py-2 bg-danger-50 text-danger-600 border border-danger-200" role="alert">{{ pt.error }}</p>
     {% endif %}
     <label for="{{ pt.dom_id }}-body" class="sr-only">{% if pt.post %}Write to the team about this post{% else %}Write to the team{% endif %}</label>
     <div class="flex flex-wrap sm:flex-nowrap items-end gap-2">
         <textarea id="{{ pt.dom_id }}-body" name="body" rows="2" maxlength="4000" required
                   placeholder="Write to the team…"
-                  class="w-full sm:flex-1 min-w-0 px-3 py-2 text-[0.875rem] rounded-xl resize-y border-[1.5px] border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                  class="w-full sm:flex-1 min-w-0 px-3 py-2 text-[0.875rem] rounded-xl resize-y border-[1.5px] border-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                   style="background: var(--surface-0); color: var(--text-primary);">{{ pt.body }}</textarea>
         <div class="flex gap-2 flex-shrink-0">
             {% if pt.post and pt.show_change_button %}
             <button type="submit" name="kind" value="change"
-                    class="px-4 py-2 text-[0.8125rem] font-semibold rounded-xl border border-stone-300 hover:bg-stone-50"
+                    class="px-4 py-2 text-[0.8125rem] font-semibold rounded-xl border border-ink-300 hover:bg-ink-25"
                     style="background: var(--surface-0); color: var(--text-primary);">Request a change</button>
             {% endif %}
             <button type="submit" name="kind" value="question"

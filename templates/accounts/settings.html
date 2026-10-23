@@ -147,7 +147,7 @@
 
             <button type="button" @click="showDeleteModal = true"
                     class="btn-danger-soft px-5 py-2 text-sm font-medium rounded-full transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                    style="background: var(--error-soft, #FEE2E2); color: var(--error-500, #EF4444);">
+                    style="background: var(--error-soft); color: var(--error-500);">
                 Delete Account
             </button>
         </div>
@@ -157,7 +157,7 @@
             <div x-show="showDeleteModal" x-transition.opacity
                  @keydown.escape.window="showDeleteModal = false"
                  class="fixed inset-0 z-50 flex items-center justify-center"
-                 style="background: rgba(0,0,0,0.4);">
+                 style="background: rgba(14, 17, 20,0.4);">
                 <div @click.outside="showDeleteModal = false"
                      x-show="showDeleteModal"
                      x-transition
@@ -192,7 +192,7 @@
                             <input type="hidden" name="action" value="delete_account">
                             <button type="submit"
                                     class="btn-opacity px-5 py-2 text-sm font-semibold rounded-full cursor-pointer transition-colors whitespace-nowrap"
-                                    style="background: var(--error-500, #EF4444); color: white;">
+                                    style="background: var(--error-500); color: white;">
                                 Yes, delete my account
                             </button>
                         </form>

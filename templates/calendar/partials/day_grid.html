@@ -5,10 +5,10 @@ Context: day_slots, target_date, workspace.
 
 <div class="bg-white mx-auto" style="animation: slideUp 200ms cubic-bezier(0.16,1,0.3,1) both; max-height: calc(100vh - 200px); overflow-y: auto;">
 {% for cell in day_slots %}
-    <div class="flex border-b border-stone-100 min-h-[64px] cal-add-cell {% if cell.posts or cell.slots %}has-posts{% endif %} {% if is_today and cell.hour == current_hour %}bg-orange-50/50{% endif %}">
+    <div class="flex border-b border-ink-100 min-h-[64px] cal-add-cell {% if cell.posts or cell.slots %}has-posts{% endif %} {% if is_today and cell.hour == current_hour %}bg-brand-50{% endif %}">
         <!-- Time label -->
-        <div class="w-20 flex-shrink-0 border-r border-stone-200 px-3 py-2 text-right">
-            <span class="text-xs font-medium tabular-nums {% if is_today and cell.hour == current_hour %}text-orange-700 font-semibold{% else %}text-stone-500{% endif %}">
+        <div class="w-20 flex-shrink-0 border-r border-ink-200 px-3 py-2 text-right">
+            <span class="text-xs font-medium tabular-nums {% if is_today and cell.hour == current_hour %}text-brand-700 font-semibold{% else %}text-ink-500{% endif %}">
                 {% if cell.hour < 10 %}0{% endif %}{{ cell.hour }}:00
             </span>
         </div>
@@ -29,7 +29,7 @@ Context: day_slots, target_date, workspace.
                         {% include "social_accounts/partials/_platform_icon.html" with platform=slot.account.platform size="3" %}
                     </span>
                     <span class="truncate">{{ slot.account.account_name|default:slot.account.account_handle }}</span>
-                    <span class="tabular-nums text-stone-500">{{ slot.time_label }}</span>
+                    <span class="tabular-nums text-ink-500">{{ slot.time_label }}</span>
                     {% if not slot.is_past %}
                     <a aria-label="Schedule post for {{ slot.account.account_name|default:slot.account.account_handle }} at {{ slot.time_label }}" href="{% url 'composer:compose' workspace_id=workspace.id %}?account={{ slot.account.id }}&scheduled_date={{ slot.compose_date }}&scheduled_time={{ slot.compose_time }}"
                        class="calendar-slot-add"

@@ -9,7 +9,7 @@ class ChannelForm(forms.Form):
         label="Channel @username or numeric ID",
         max_length=40,
         widget=forms.TextInput(
-            attrs={"placeholder": "@your_channel or -100…", "class": "w-full rounded-lg border border-stone-300 p-3"}
+            attrs={"placeholder": "@your_channel or -100…", "class": "w-full rounded-lg border border-ink-400 p-3"}
         ),
         help_text="Copy @username from Channel info for a public channel, or use its numeric ID for a private channel.",
     )
@@ -33,7 +33,7 @@ class ConnectForm(forms.Form):
         max_length=200,
         widget=forms.PasswordInput(
             render_value=False,
-            attrs={"autocomplete": "new-password", "class": "w-full rounded-lg border border-stone-300 p-3"},
+            attrs={"autocomplete": "new-password", "class": "w-full rounded-lg border border-ink-400 p-3"},
         ),
     )
     approvals_enabled = forms.BooleanField(required=False, label="Allow approving from Telegram review cards")
@@ -57,7 +57,7 @@ class PairingForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["purpose"].widget = forms.HiddenInput()
         self.initial["purpose"] = "chat" if group else "user"
-        self.fields["audience"].widget.attrs.update({"class": "w-full rounded-lg border border-stone-300 bg-white p-3"})
+        self.fields["audience"].widget.attrs.update({"class": "w-full rounded-lg border border-ink-400 bg-white p-3"})
         if group:
             self.fields["audience"].choices = [
                 choice for choice in TelegramChat.Audience.choices if choice[0] != TelegramChat.Audience.PRIVATE
@@ -82,7 +82,7 @@ class ManagedBotCreationForm(forms.Form):
     manager_connection = forms.ChoiceField(
         label="Your personally linked manager bot",
         choices=[],
-        widget=forms.Select(attrs={"class": "w-full rounded-lg border border-stone-300 bg-white p-3"}),
+        widget=forms.Select(attrs={"class": "w-full rounded-lg border border-ink-400 bg-white p-3"}),
     )
 
     def __init__(self, *args, managers=(), **kwargs):

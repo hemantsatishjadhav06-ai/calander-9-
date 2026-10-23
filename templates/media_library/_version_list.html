@@ -2,7 +2,7 @@
 {% load tz media_library_tz %}{% media_display_timezone as tz_name %}
 
 <style>
-  .ml-version-restore { transition: background var(--dur-fast, 150ms) ease; }
+  .ml-version-restore { transition: background var(--dur-fast) ease; }
   .ml-version-restore:hover { background: var(--primary-soft) !important; }
 </style>
 
@@ -10,9 +10,9 @@
 <div class="space-y-2">
   {% for version in versions %}
   <div class="flex items-start gap-3 p-2.5 rounded-lg transition-colors"
-       style="background: var(--surface-1, #FAFAF9);">
+       style="background: var(--surface-1);">
     <!-- Version thumbnail -->
-    <div class="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0" style="background: var(--surface-2, #F5F5F4);">
+    <div class="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0" style="background: var(--surface-2);">
       {% if version.thumbnail %}
         <img src="{{ version.thumbnail.url }}" alt="v{{ version.version_number }}" class="w-full h-full object-cover">
       {% else %}
@@ -24,21 +24,21 @@
 
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
-        <span class="text-xs font-bold" style="color: var(--text-primary, #1C1917);">Version {{ version.version_number }}</span>
+        <span class="text-xs font-bold" style="color: var(--text-primary);">Version {{ version.version_number }}</span>
         {% if asset.current_version_id == version.id %}
         <span class="text-xs px-1.5 py-0.5 rounded-full font-semibold"
-              style="background: var(--success-50, #F0FDF4); color: var(--success-700, #15803D);">Current</span>
+              style="background: var(--success-50); color: var(--success-700);">Current</span>
         {% endif %}
       </div>
       {% if version.change_description %}
-      <p class="text-xs mt-0.5 truncate" style="color: var(--text-secondary, #57534E);">{{ version.change_description }}</p>
+      <p class="text-xs mt-0.5 truncate" style="color: var(--text-secondary);">{{ version.change_description }}</p>
       {% endif %}
-      <p class="text-xs mt-0.5" style="color: var(--text-ghost, #766F6A);">{% timezone tz_name %}{{ version.created_at|date:"M j, Y g:i A" }}{% endtimezone %}</p>
+      <p class="text-xs mt-0.5" style="color: var(--text-ghost);">{% timezone tz_name %}{{ version.created_at|date:"M j, Y g:i A" }}{% endtimezone %}</p>
     </div>
 
     {% if asset.current_version_id != version.id and not asset.is_shared %}
     <button class="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ml-version-restore"
-            style="color: var(--primary, #F97316);"
+            style="color: var(--primary);"
             hx-post="{% url 'media_library:version_restore' workspace_id=workspace.id asset_id=asset.id version_id=version.id %}"
             hx-target="#version-list-{{ asset.id }}"
             hx-confirm="Restore version {{ version.version_number }}? This will create a new version.">
@@ -49,5 +49,5 @@
   {% endfor %}
 </div>
 {% else %}
-<p class="text-xs py-3 text-center" style="color: var(--text-ghost, #766F6A);">No version history yet. Edits will appear here.</p>
+<p class="text-xs py-3 text-center" style="color: var(--text-ghost);">No version history yet. Edits will appear here.</p>
 {% endif %}

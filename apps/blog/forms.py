@@ -8,8 +8,8 @@ from .models import BlogPost, BlogSite
 RECENT_IMAGE_LIMIT = 30
 
 _INPUT = (
-    "w-full px-3 py-2 text-sm rounded-lg border border-stone-300 bg-white text-stone-900 "
-    "focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+    "w-full px-3 py-2 text-sm rounded-lg border border-ink-400 bg-white text-ink-900 "
+    "focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600"
 )
 
 

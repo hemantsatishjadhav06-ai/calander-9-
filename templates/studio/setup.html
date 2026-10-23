@@ -6,27 +6,27 @@
 {% block content %}
 <div class="max-w-3xl min-w-0">
     <header class="mb-5">
-        <p class="text-xs font-semibold uppercase tracking-wide text-stone-600">Agency</p>
-        <h1 class="text-2xl sm:text-3xl text-stone-900" style="font-family: var(--font-display)">Set up</h1>
-        <p class="text-sm text-stone-600 mt-1">{% if left %}Finish these steps and your team works on its own, asking you only when it needs you.{% else %}Everything is set up. Your team works on its own and asks you only when it needs you.{% endif %}</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-600">Agency</p>
+        <h1 class="text-2xl sm:text-3xl text-ink-900" style="font-family: var(--font-display)">Set up</h1>
+        <p class="text-sm text-ink-600 mt-1">{% if left %}Finish these steps and your team works on its own, asking you only when it needs you.{% else %}Everything is set up. Your team works on its own and asks you only when it needs you.{% endif %}</p>
         <div class="mt-3 flex items-center gap-3" aria-label="{{ done }} of {{ total }} steps done">
-            <div class="flex-1 h-1.5 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true"><div class="h-full rounded-full bg-orange-700" style="width: {% widthratio done total 100 %}%"></div></div>
-            <p class="text-sm font-semibold text-stone-800 whitespace-nowrap" data-setup-progress>{{ done }} of {{ total }} steps done</p>
+            <div class="flex-1 h-1.5 rounded-full bg-ink-100 overflow-hidden" aria-hidden="true"><div class="h-full rounded-full bg-brand-700" style="width: {% widthratio done total 100 %}%"></div></div>
+            <p class="text-sm font-semibold text-ink-800 whitespace-nowrap" data-setup-progress>{{ done }} of {{ total }} steps done</p>
         </div>
     </header>
 
-    <ol class="bg-white border border-stone-200 rounded-2xl shadow-sm divide-y divide-stone-100" data-setup-rows>
+    <ol class="bg-white border border-ink-200 rounded-2xl shadow-sm divide-y divide-ink-100" data-setup-rows>
         {% for row in rows %}
         <li class="flex flex-wrap sm:flex-nowrap items-start gap-x-4 gap-y-2 px-4 sm:px-5 py-4" data-setup-row="{{ row.key }}" data-setup-state="{{ row.state }}">
             <span class="mt-0.5 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center
-                {% if row.state == 'done' %}bg-green-700 text-white{% elif row.state == 'attention' %}bg-amber-500 text-white{% else %}bg-stone-100 text-stone-600 ring-1 ring-inset ring-stone-300{% endif %}" aria-hidden="true">
+                {% if row.state == 'done' %}bg-success-600 text-white{% elif row.state == 'attention' %}bg-warning-500 text-white{% else %}bg-ink-100 text-ink-600 ring-1 ring-inset ring-ink-300{% endif %}" aria-hidden="true">
                 {% if row.state == 'done' %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>{% elif row.state == 'attention' %}<span class="text-xs font-bold">!</span>{% else %}<span class="text-[10px] font-semibold">{{ forloop.counter }}</span>{% endif %}
             </span>
             <div class="flex-1 min-w-0">
-                <h2 class="text-sm font-semibold text-stone-900">{{ row.title }}<span class="sr-only"> — {% if row.state == 'done' %}done{% elif row.state == 'attention' %}needs attention{% else %}to do{% endif %}</span></h2>
-                <p class="text-sm text-stone-700 break-words">{{ row.status }}</p>
-                {% if row.note %}<p class="text-xs text-stone-600 mt-0.5 break-words">{{ row.note }}</p>{% endif %}
-                {% if row.detail %}<p class="text-xs text-stone-700 mt-1 break-words rounded-lg bg-stone-50 border border-stone-200 px-2.5 py-1.5"><span class="font-semibold">For the owner:</span> {{ row.detail }}</p>{% endif %}
+                <h2 class="text-sm font-semibold text-ink-900">{{ row.title }}<span class="sr-only"> — {% if row.state == 'done' %}done{% elif row.state == 'attention' %}needs attention{% else %}to do{% endif %}</span></h2>
+                <p class="text-sm text-ink-700 break-words">{{ row.status }}</p>
+                {% if row.note %}<p class="text-xs text-ink-600 mt-0.5 break-words">{{ row.note }}</p>{% endif %}
+                {% if row.detail %}<p class="text-xs text-ink-700 mt-1 break-words rounded-lg bg-ink-50 border border-ink-200 px-2.5 py-1.5"><span class="font-semibold">For the owner:</span> {{ row.detail }}</p>{% endif %}
             </div>
             {% if row.action %}
             <div class="flex-shrink-0 w-full sm:w-auto">
@@ -34,10 +34,10 @@
                 <form method="post" action="{{ row.action.url }}" x-data="{ busy: false }" x-on:submit="busy = true">
                     {% csrf_token %}
                     {% for name, value in row.action.fields.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
-                    <button type="submit" x-bind:disabled="busy" class="w-full sm:w-auto px-3.5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></button>
+                    <button type="submit" x-bind:disabled="busy" class="w-full sm:w-auto px-3.5 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></button>
                 </form>
                 {% else %}
-                <a href="{{ row.action.url }}" class="inline-block w-full sm:w-auto text-center px-3.5 py-2 text-sm font-semibold {% if row.state == 'done' %}text-stone-800 bg-white border border-stone-300 hover:bg-stone-50{% else %}text-white bg-orange-700 hover:bg-orange-800{% endif %} rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></a>
+                <a href="{{ row.action.url }}" class="inline-block w-full sm:w-auto text-center px-3.5 py-2 text-sm font-semibold {% if row.state == 'done' %}text-ink-800 bg-white border border-ink-300 hover:bg-ink-25{% else %}text-white bg-brand-700 hover:bg-brand-800{% endif %} rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></a>
                 {% endif %}
             </div>
             {% endif %}
@@ -45,6 +45,6 @@
         {% endfor %}
     </ol>
 
-    <p class="mt-4 text-xs text-stone-600">Checked {{ checked_at|timezone:tzname|date:"j M, H:i" }} ({{ tzname }}). Nothing here approves, schedules or publishes a post: that always waits for a person.</p>
+    <p class="mt-4 text-xs text-ink-600">Checked {{ checked_at|timezone:tzname|date:"j M, H:i" }} ({{ tzname }}). Nothing here approves, schedules or publishes a post: that always waits for a person.</p>
 </div>
 {% endblock %}

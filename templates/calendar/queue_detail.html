@@ -5,15 +5,15 @@
 {% block page_header %}
 <div class="flex items-center justify-between mb-6">
     <div class="flex items-center gap-3">
-        <a aria-label="Back to queues" href="{% url 'calendar:queue_list' workspace_id=workspace.id %}" class="text-stone-400 hover:text-stone-600 transition-colors">
+        <a aria-label="Back to queues" href="{% url 'calendar:queue_list' workspace_id=workspace.id %}" class="text-ink-500 hover:text-ink-600 transition-colors">
             <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </a>
         <div>
-            <h1 class="text-base font-semibold text-stone-900" style="letter-spacing: -0.01em;">{{ queue.name }}</h1>
+            <h1 class="text-base font-semibold text-ink-900" style="letter-spacing: -0.01em;">{{ queue.name }}</h1>
             <div class="flex items-center gap-2 mt-0.5">
-                <span class="text-xs text-stone-500">{{ queue.social_account.account_name|default:queue.social_account.account_handle }} · {{ queue.social_account.get_platform_display }}</span>
+                <span class="text-xs text-ink-500">{{ queue.social_account.account_name|default:queue.social_account.account_handle }} · {{ queue.social_account.get_platform_display }}</span>
                 {% if queue.category %}
-                <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-stone-200">
+                <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-ink-200">
                     <span class="w-2 h-2 rounded-full" style="background: {{ queue.category.color }};"></span>
                     {{ queue.category.name }}
                 </span>
@@ -52,7 +52,7 @@
 
     <div id="entries-list" class="space-y-2">
         {% for entry in entries %}
-        <div class="group flex items-center gap-3 p-3 bg-white rounded-lg border border-stone-200 hover:border-stone-300 transition-colors cursor-grab active:cursor-grabbing"
+        <div class="group flex items-center gap-3 p-3 bg-white rounded-lg border border-ink-200 hover:border-ink-300 transition-colors cursor-grab active:cursor-grabbing"
              draggable="true"
              data-entry-id="{{ entry.id }}"
              @dragstart="onDragStart($event, '{{ entry.id }}')"
@@ -60,31 +60,31 @@
              @drop="onDrop($event, '{{ entry.id }}')">
 
             <!-- Drag handle -->
-            <div class="text-stone-300 flex-shrink-0">
+            <div class="text-ink-500 flex-shrink-0">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
             </div>
 
             <!-- Slot order -->
-            <div class="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center text-[10px] font-bold text-stone-500 flex-shrink-0">
+            <div class="w-6 h-6 rounded-full bg-ink-100 flex items-center justify-center text-[10px] font-bold text-ink-500 flex-shrink-0">
                 {{ forloop.counter }}
             </div>
 
             <!-- Post info -->
             <div class="flex-1 min-w-0">
                 <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=entry.post.id %}"
-                   class="text-sm font-medium text-stone-800 hover:text-stone-900 line-clamp-1">
+                   class="text-sm font-medium text-ink-800 hover:text-ink-900 line-clamp-1">
                     {{ entry.post.caption_snippet|default:"(no caption)" }}
                 </a>
                 <div class="flex items-center gap-2 mt-0.5">
                     <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full
-                        {% if entry.post.status == 'draft' %}bg-stone-100 text-stone-600
-                        {% elif entry.post.status == 'scheduled' %}bg-blue-50 text-blue-700
-                        {% elif entry.post.status == 'published' %}bg-green-50 text-green-700
-                        {% else %}bg-stone-100 text-stone-600{% endif %}">
+                        {% if entry.post.status == 'draft' %}bg-ink-100 text-ink-600
+                        {% elif entry.post.status == 'scheduled' %}bg-info-50 text-info-600
+                        {% elif entry.post.status == 'published' %}bg-success-50 text-success-600
+                        {% else %}bg-ink-100 text-ink-600{% endif %}">
                         {{ entry.post.get_status_display }}
                     </span>
                     {% if entry.post.author %}
-                    <span class="text-[10px] text-stone-500">{{ entry.post.author.name|default:entry.post.author.email }}</span>
+                    <span class="text-[10px] text-ink-500">{{ entry.post.author.name|default:entry.post.author.email }}</span>
                     {% endif %}
                 </div>
             </div>
@@ -92,16 +92,16 @@
             <!-- Assigned slot -->
             <div class="text-right flex-shrink-0">
                 {% if entry.assigned_slot_datetime %}
-                <span class="text-xs font-medium text-stone-700">{{ entry.assigned_slot_datetime|date:"M d" }}</span>
-                <span class="text-[10px] text-stone-500 block">{{ entry.assigned_slot_datetime|time:"H:i" }}</span>
+                <span class="text-xs font-medium text-ink-700">{{ entry.assigned_slot_datetime|date:"M d" }}</span>
+                <span class="text-[10px] text-ink-500 block">{{ entry.assigned_slot_datetime|time:"H:i" }}</span>
                 {% else %}
-                <span class="text-xs text-stone-500">No slot</span>
+                <span class="text-xs text-ink-500">No slot</span>
                 {% endif %}
             </div>
 
             <!-- Remove from queue (leaves a gap; the slot frees up) -->
             <button aria-label="Remove from queue" type="button"
-                    class="text-stone-300 hover:text-red-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                    class="text-ink-500 hover:text-danger-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
                     hx-post="{% url 'calendar:queue_entry_remove' workspace_id=workspace.id queue_id=queue.id entry_id=entry.id %}"
                     hx-confirm="Remove this post from the queue? Its slot will free up."
                     @click.stop
@@ -112,11 +112,11 @@
         </div>
         {% empty %}
         <div class="text-center py-16">
-            <div class="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mx-auto mb-3">
-                <svg class="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            <div class="w-12 h-12 rounded-full bg-ink-100 flex items-center justify-center mx-auto mb-3">
+                <svg class="w-6 h-6 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
             </div>
-            <p class="text-sm font-medium text-stone-700">Queue is empty</p>
-            <p class="text-xs text-stone-500 mt-1">Add posts to this queue from the composer using "Add to Queue".</p>
+            <p class="text-sm font-medium text-ink-700">Queue is empty</p>
+            <p class="text-xs text-ink-500 mt-1">Add posts to this queue from the composer using "Add to Queue".</p>
         </div>
         {% endfor %}
     </div>

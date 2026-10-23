@@ -6,7 +6,7 @@
   <div class="flex flex-wrap gap-1.5">
     <template x-for="(tag, i) in tags" :key="i">
       <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full"
-            style="background: var(--primary-soft, #FFF7ED); color: var(--brand-700, #C2410C);">
+            style="background: var(--primary-soft); color: var(--brand-700);">
         <span x-text="tag"></span>
         {% if is_shared_library and is_admin or not is_shared_library and not asset.is_shared %}
         <button :aria-label="'Remove tag ' + tag" @click="removeTag(i)" type="button" class="hover:opacity-70 transition-opacity">
@@ -34,7 +34,7 @@
     <!-- Autocomplete dropdown -->
     <div x-show="suggestions.length > 0" x-cloak
          class="absolute z-10 left-0 right-0 mt-1 rounded-lg border overflow-hidden"
-         style="background: var(--surface-0, #FFF); border-color: var(--border, #E7E5E4); box-shadow: var(--shadow-lg);">
+         style="background: var(--surface-0); border-color: var(--border); box-shadow: var(--shadow-lg);">
       <template x-for="(s, i) in suggestions" :key="i">
         <button @click="addTag(s); suggestions = []"
                 class="w-full text-left px-3 py-1.5 text-xs transition-colors btn-surface-1"

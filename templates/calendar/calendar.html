@@ -5,11 +5,11 @@
 
 {% block page_header %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4 lg:mb-[25px]">
-    <h1 class="text-xl sm:text-2xl font-semibold text-stone-900" style="letter-spacing: -0.01em;">Publish</h1>
+    <h1 class="text-xl sm:text-2xl font-semibold text-ink-900" style="letter-spacing: -0.01em;">Publish</h1>
 
     <div class="flex items-center gap-3">
         <!-- List / Calendar toggle -->
-        <div class="flex items-center bg-stone-50 rounded-full p-0.5" x-data="{ activeMode: '{{ mode|default:'calendar' }}' }">
+        <div class="flex items-center bg-ink-50 rounded-full p-0.5" x-data="{ activeMode: '{{ mode|default:'calendar' }}' }">
             <button class="view-btn{% if mode == 'list' %} active{% endif %}" :class="{ active: activeMode === 'list' }"
                     @click="activeMode = 'list'"
                     hx-get="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&tab={{ active_tab|default:'queue' }}&_switch_mode=1"
@@ -42,8 +42,8 @@
     /* Calendar-specific styles */
     .cal-day {
         min-height: 80px;
-        border-right: 1px solid #E7E5E4;
-        border-bottom: 1px solid #E7E5E4;
+        border-right: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
         padding: 6px;
         transition: background 150ms ease;
         background: white;
@@ -51,21 +51,21 @@
     @media (min-width: 768px) {
         .cal-day { min-height: 130px; padding: 8px; }
     }
-    .cal-day:hover { background: #FAFAF9; }
-    .cal-day.past { background: #F5F5F4; }
+    .cal-day:hover { background: var(--surface-1); }
+    .cal-day.past { background: var(--surface-2); }
     .cal-day.past:hover { background: #EEEEEC; }
-    .cal-day.today { background: #FFF7ED; }
+    .cal-day.today { background: var(--primary-soft); }
     .cal-day.other-month { opacity: 0.4; }
     .cal-day .day-num {
         font-size: 13px; font-weight: 600;
         width: 28px; height: 28px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         margin-bottom: 4px;
-        color: #44403C;
+        color: var(--ink-700);
     }
-    .cal-day.past .day-num { color: #78716C; }
+    .cal-day.past .day-num { color: var(--text-tertiary); }
     .cal-day.today .day-num {
-        background: #F97316; color: white;
+        background: var(--primary); color: white;
     }
 
     .post-chip {
@@ -81,68 +81,68 @@
     .post-chip .chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
 
     /* Status colors */
-    .status-draft      { background: #F5F5F4; color: #57534E; border: 1px solid #E7E5E4; }
-    .status-draft .chip-dot { background: #A8A29E; }
-    .status-pending_review, .status-pending_client { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
-    .status-pending_review .chip-dot, .status-pending_client .chip-dot { background: #F97316; }
-    .status-scheduled  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
-    .status-scheduled .chip-dot { background: #3B82F6; }
-    .status-published  { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }
-    .status-published .chip-dot { background: #22C55E; }
-    .status-approved   { background: #F0FDFA; color: #0F766E; border: 1px solid #99F6E4; }
-    .status-approved .chip-dot { background: #14B8A6; }
-    .status-changes_requested { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
-    .status-changes_requested .chip-dot { background: #F97316; }
-    .status-rejected   { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
-    .status-rejected .chip-dot { background: #EF4444; }
-    .status-publishing { background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; }
-    .status-publishing .chip-dot { background: #6366F1; }
-    .status-partially_published { background: #FEFCE8; color: #A16207; border: 1px solid #FEF08A; }
-    .status-partially_published .chip-dot { background: #EAB308; }
-    .status-failed     { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
-    .status-failed .chip-dot { background: #EF4444; }
-    .status-on_hold    { background: #F5F3FF; color: #6D28D9; border: 1px solid #DDD6FE; }
-    .status-on_hold .chip-dot { background: #7C3AED; }
+    .status-draft      { background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border); }
+    .status-draft .chip-dot { background: var(--ink-400); }
+    .status-pending_review, .status-pending_client { background: var(--primary-soft); color: var(--primary); border: 1px solid var(--brand-200); }
+    .status-pending_review .chip-dot, .status-pending_client .chip-dot { background: var(--primary); }
+    .status-scheduled  { background: var(--info-50); color: var(--info-600); border: 1px solid var(--info-200); }
+    .status-scheduled .chip-dot { background: var(--info-500); }
+    .status-published  { background: var(--success-50); color: var(--success-600); border: 1px solid var(--success-200); }
+    .status-published .chip-dot { background: var(--success-500); }
+    .status-approved   { background: var(--success-50); color: var(--success-600); border: 1px solid var(--success-200); }
+    .status-approved .chip-dot { background: var(--success-500); }
+    .status-changes_requested { background: var(--primary-soft); color: var(--primary); border: 1px solid var(--brand-200); }
+    .status-changes_requested .chip-dot { background: var(--primary); }
+    .status-rejected   { background: var(--error-50); color: var(--error-700); border: 1px solid var(--danger-200); }
+    .status-rejected .chip-dot { background: var(--error-500); }
+    .status-publishing { background: var(--info-50); color: var(--info-600); border: 1px solid var(--info-200); }
+    .status-publishing .chip-dot { background: var(--info-500); }
+    .status-partially_published { background: var(--warning-50); color: var(--warning-600); border: 1px solid var(--warning-200); }
+    .status-partially_published .chip-dot { background: var(--warning-500); }
+    .status-failed     { background: var(--error-50); color: var(--error-700); border: 1px solid var(--danger-200); }
+    .status-failed .chip-dot { background: var(--error-500); }
+    .status-on_hold    { background: var(--ink-100); color: var(--ink-700); border: 1px solid var(--ink-200); }
+    .status-on_hold .chip-dot { background: var(--ink-500); }
 
     /* View switcher */
     .view-btn {
         padding: 6px 14px; border-radius: 9999px;
         font-size: 12px; font-weight: 600;
-        color: #78716C; border: none; background: transparent;
+        color: var(--text-tertiary); border: none; background: transparent;
         cursor: pointer; transition: all 150ms ease;
     }
-    .view-btn:hover { color: #1C1917; background: #F5F5F4; }
-    .view-btn.active { color: #C2410C; background: #FFF7ED; border: 1px solid #FDBA74; box-shadow: 0 1px 2px rgba(194, 65, 12, 0.08); }
+    .view-btn:hover { color: var(--text-primary); background: var(--surface-2); }
+    .view-btn.active { color: var(--primary); background: var(--primary-soft); border: 1px solid var(--brand-300); box-shadow: 0 1px 2px rgba(17, 86, 65, 0.08); }
 
     /* Filter chips */
     .filter-chip {
         display: inline-flex; align-items: center; gap: 4px;
         padding: 4px 10px; border-radius: 9999px;
         font-size: 11px; font-weight: 600;
-        background: #FFF7ED; color: #C2410C;
-        border: 1px solid #FED7AA;
+        background: var(--primary-soft); color: var(--primary);
+        border: 1px solid var(--brand-200);
     }
     .filter-chip button {
         width: 14px; height: 14px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         background: transparent; border: none; cursor: pointer;
-        color: #EA580C; font-size: 10px;
+        color: var(--brand-600); font-size: 10px;
     }
-    .filter-chip button:hover { background: #FFEDD5; }
+    .filter-chip button:hover { background: var(--brand-100); }
 
     /* Publish tab styles */
     .publish-tab {
         padding: 10px 16px; border-radius: 0;
         font-size: 13px; font-weight: 600;
-        color: #78716C; background: transparent;
+        color: var(--text-tertiary); background: transparent;
         border: none; cursor: pointer;
         transition: all 150ms ease;
         position: relative;
         border-bottom: 2px solid transparent;
         margin-bottom: -1px;
     }
-    .publish-tab:hover { color: #1C1917; border-bottom-color: #D6D3D1; }
-    .publish-tab.active { color: #C2410C; border-bottom-color: #F97316; }
+    .publish-tab:hover { color: var(--text-primary); border-bottom-color: var(--ink-300); }
+    .publish-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
     .publish-tab-strip { scrollbar-width: none; }
     .publish-tab-strip::-webkit-scrollbar { display: none; }
 
@@ -154,26 +154,26 @@
     .cal-filter-select {
         padding: 6px 28px 6px 10px; border-radius: 8px;
         font-size: 12px; font-weight: 600;
-        color: #57534E; background: white;
-        border: 1px solid #E7E5E4;
+        color: var(--text-secondary); background: white;
+        border: 1px solid var(--border);
         cursor: pointer; transition: all 150ms ease;
         appearance: none;
         white-space: nowrap;
         flex-shrink: 0;
-        background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2378716C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23656B73' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-position: right 8px center;
     }
     .publish-filter-select.has-icon,
     .cal-filter-select.has-icon { padding-left: 28px; }
     .publish-filter-select:hover,
-    .cal-filter-select:hover { border-color: #D6D3D1; }
+    .cal-filter-select:hover { border-color: var(--ink-300); }
     .publish-filter-select:focus,
-    .cal-filter-select:focus { outline: none; border-color: #F97316; box-shadow: 0 0 0 2px rgba(249,115,22,0.15); }
+    .cal-filter-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(17, 86, 65,0.15); }
     .publish-filter-icon,
     .cal-filter-icon {
         position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
-        width: 14px; height: 14px; color: #78716C; pointer-events: none;
+        width: 14px; height: 14px; color: var(--text-tertiary); pointer-events: none;
     }
 
     /* Platform icon badges */
@@ -196,14 +196,14 @@
         display: none;
         position: absolute; top: 6px; right: 6px;
         width: 22px; height: 22px; border-radius: 50%;
-        background: #F97316; color: white; border: none;
+        background: var(--primary); color: white; border: none;
         align-items: center; justify-content: center;
         cursor: pointer; font-size: 14px; line-height: 1;
-        box-shadow: 0 2px 6px rgba(249,115,22,0.35);
+        box-shadow: 0 2px 6px rgba(17, 86, 65,0.35);
         transition: transform 100ms ease, background 100ms ease;
         z-index: 5;
     }
-    .cal-add-btn:hover { background: #EA580C; transform: scale(1.1); }
+    .cal-add-btn:hover { background: var(--brand-600); transform: scale(1.1); }
     .cal-add-cell { position: relative; }
     .cal-add-cell.has-posts:hover .cal-add-btn { display: flex; }
 
@@ -212,8 +212,8 @@
         top: 50%; left: 50%; right: auto;
         transform: translate(-50%, -50%);
         width: 32px; height: 32px;
-        background: #F97316; color: white;
-        box-shadow: 0 2px 6px rgba(249,115,22,0.35);
+        background: var(--primary); color: white;
+        box-shadow: 0 2px 6px rgba(17, 86, 65,0.35);
         border: none;
     }
     .cal-add-cell:not(.has-posts) .cal-add-btn svg { width: 16px; height: 16px; }
@@ -221,9 +221,9 @@
         display: flex;
     }
     .cal-add-cell:not(.has-posts) .cal-add-btn:hover {
-        background: #EA580C;
+        background: var(--brand-600);
         transform: translate(-50%, -50%) scale(1.1);
-        box-shadow: 0 6px 20px rgba(249,115,22,0.35);
+        box-shadow: 0 6px 20px rgba(17, 86, 65,0.35);
     }
 
     /* Day/week grids (non-month cells): hide add button entirely when cell has posts */
@@ -250,9 +250,9 @@
         border-radius: 6px;
         font-size: 11px;
         font-weight: 600;
-        border: 1px dashed #E7E5E4;
+        border: 1px dashed var(--border);
         background: #FFFFFF;
-        color: #78716C;
+        color: var(--text-tertiary);
     }
     .calendar-channel-slot--week {
         width: 100%;
@@ -261,7 +261,7 @@
     }
     .calendar-channel-slot.is-past-open {
         opacity: 0.45;
-        background: #FAFAF9;
+        background: var(--surface-1);
     }
     .calendar-slot-platform-icon {
         flex-shrink: 0;
@@ -271,8 +271,8 @@
         width: 16px;
         height: 16px;
         border-radius: 9999px;
-        background: #F5F5F4;
-        color: #78716C;
+        background: var(--surface-2);
+        color: var(--text-tertiary);
     }
     .calendar-slot-add {
         flex-shrink: 0;
@@ -282,11 +282,11 @@
         width: 18px;
         height: 18px;
         border-radius: 9999px;
-        background: #FFEDD5;
-        color: #C2410C;
+        background: var(--brand-100);
+        color: var(--primary);
     }
     .calendar-slot-add:hover {
-        background: #FED7AA;
+        background: var(--brand-200);
         transform: scale(1.05);
     }
     .calendar-post-slot-check {
@@ -298,7 +298,7 @@
         height: 16px;
         border-radius: 9999px;
         background: rgba(255,255,255,0.72);
-        color: #15803D;
+        color: var(--success-600);
         margin-left: auto;
     }
 
@@ -311,7 +311,7 @@
        the cursor-following drag clone stays visible. */
     .chip-ghost { display: none !important; }
     /* Highlight the day cell currently under the drag (toggled in onMove). */
-    .cal-drop.cal-drop-active { background: #FFF7ED; box-shadow: inset 0 0 0 2px #F97316; }
+    .cal-drop.cal-drop-active { background: var(--primary-soft); box-shadow: inset 0 0 0 2px var(--primary); }
     /* While dragging, suppress the per-cell "+" add buttons that would otherwise
        flicker under the cursor as it crosses cells. */
     body.cal-dragging .cal-add-btn { display: none !important; }
@@ -319,7 +319,7 @@
     /* Bulk-selection checkbox (chips + list rows). Hover-reveal on chips; always
        shown once checked or when a selection is active. */
     .cal-select-box {
-        width: 15px; height: 15px; flex-shrink: 0; border: 1.5px solid #A8A29E;
+        width: 15px; height: 15px; flex-shrink: 0; border: 1.5px solid var(--ink-400);
         border-radius: 4px; background: #fff; cursor: pointer; color: #fff;
         display: inline-flex; align-items: center; justify-content: center;
         opacity: 0; transition: opacity 120ms ease, background 120ms ease;
@@ -327,12 +327,12 @@
     .post-chip:hover .cal-select-box,
     .cal-select-box.is-checked,
     body.has-selection .cal-select-box { opacity: 1; }
-    .cal-select-box.is-checked { background: #F97316; border-color: #F97316; }
-    .cal-select-box:hover { border-color: #F97316; }
+    .cal-select-box.is-checked { background: var(--primary); border-color: var(--primary); }
+    .cal-select-box:hover { border-color: var(--primary); }
     /* Keyboard access: reveal + outline the checkbox when focused (it's
        otherwise opacity:0 until hover, unreachable by keyboard). */
     .post-chip:focus-within .cal-select-box { opacity: 1; }
-    .cal-select-box:focus-visible { opacity: 1; outline: 2px solid #F97316; outline-offset: 2px; }
+    .cal-select-box:focus-visible { opacity: 1; outline: 2px solid var(--primary); outline-offset: 2px; }
     /* In list rows the checkbox is always visible (there's room). */
     .row-select-box { opacity: 1; }
     /* The shared toast host and the selection bar both sit bottom-centre. Lift
@@ -368,12 +368,12 @@ ticked (see the `sel` Alpine store).{% endcomment %}
     {# Floating action bar #}
     <div x-cloak x-show="$store.sel.count > 0"
          x-effect="document.body.classList.toggle('has-selection', $store.sel.count > 0)"
-         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 bg-stone-900 text-white rounded-full shadow-2xl pl-4 pr-2 py-2">
+         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 bg-ink-900 text-white rounded-full shadow-2xl pl-4 pr-2 py-2">
         <span class="text-sm font-medium whitespace-nowrap" x-text="$store.sel.count + ' selected'"></span>
         <span class="w-px h-5 bg-white/20 mx-1.5"></span>
         <button @click="ask('draft')" :disabled="busy" class="px-3 py-1.5 text-xs font-semibold rounded-full hover:bg-white/10 transition-colors disabled:opacity-50">Draft</button>
-        <button @click="ask('publish')" :disabled="busy" class="px-3 py-1.5 text-xs font-semibold rounded-full bg-emerald-500 hover:bg-emerald-600 transition-colors disabled:opacity-50">Publish</button>
-        <button @click="ask('delete')" :disabled="busy" class="px-3 py-1.5 text-xs font-semibold rounded-full text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50">Delete</button>
+        <button @click="ask('publish')" :disabled="busy" class="px-3 py-1.5 text-xs font-semibold rounded-full bg-success-500 hover:bg-success-500 transition-colors disabled:opacity-50">Publish</button>
+        <button @click="ask('delete')" :disabled="busy" class="px-3 py-1.5 text-xs font-semibold rounded-full text-danger-300 hover:bg-danger-500/20 transition-colors disabled:opacity-50">Delete</button>
         <button aria-label="Clear selection" @click="$store.sel.clear()" class="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors" title="Clear selection">
             <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
@@ -382,23 +382,23 @@ ticked (see the `sel` Alpine store).{% endcomment %}
     {% comment %}Confirmation dialog for impactful actions (publish / delete).
     Draft is reversible so it runs without a prompt.{% endcomment %}
     <div x-cloak x-show="confirmAction" @keydown.escape.window="confirmAction = null"
-         class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4" @click.self="confirmAction = null">
+         class="fixed inset-0 z-[70] flex items-center justify-center bg-ink-950/35 px-4" @click.self="confirmAction = null">
         <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xs text-center"
              x-trap.noscroll="confirmAction" role="dialog" aria-modal="true" aria-labelledby="bulk-confirm-title">
             <div class="w-11 h-11 mx-auto rounded-full flex items-center justify-center mb-3"
-                 :class="confirmAction === 'delete' ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600'">
+                 :class="confirmAction === 'delete' ? 'bg-danger-50 text-danger-500' : 'bg-success-50 text-success-600'">
                 <svg x-show="confirmAction === 'delete'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 <svg x-show="confirmAction === 'publish'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
             </div>
-            <h3 id="bulk-confirm-title" class="text-base font-bold text-stone-900" x-text="confirmAction === 'delete' ? 'Delete posts?' : 'Publish now?'"></h3>
-            <p class="text-sm text-stone-500 mt-1 leading-relaxed"
+            <h3 id="bulk-confirm-title" class="text-base font-bold text-ink-900" x-text="confirmAction === 'delete' ? 'Delete posts?' : 'Publish now?'"></h3>
+            <p class="text-sm text-ink-500 mt-1 leading-relaxed"
                x-text="confirmAction === 'delete'
                    ? ('Permanently delete ' + $store.sel.count + ' selected post' + ($store.sel.count === 1 ? '' : 's') + '. This can\'t be undone.')
                    : ('Publish ' + $store.sel.count + ' selected post' + ($store.sel.count === 1 ? '' : 's') + ' now — they go out on their platforms shortly.')"></p>
             <div class="flex gap-2 mt-5">
-                <button @click="confirmAction = null" class="flex-1 px-4 py-2 text-sm font-semibold rounded-full border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors">Cancel</button>
+                <button @click="confirmAction = null" class="flex-1 px-4 py-2 text-sm font-semibold rounded-full border border-ink-200 text-ink-600 hover:bg-ink-25 transition-colors">Cancel</button>
                 <button @click="exec(confirmAction)" :disabled="busy"
-                        :class="confirmAction === 'delete' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600'"
+                        :class="confirmAction === 'delete' ? 'bg-danger-500 hover:bg-danger-500' : 'bg-success-500 hover:bg-success-500'"
                         class="flex-1 px-4 py-2 text-sm font-semibold rounded-full text-white transition-colors disabled:opacity-50"
                         x-text="confirmAction === 'delete' ? 'Delete' : 'Publish'"></button>
             </div>

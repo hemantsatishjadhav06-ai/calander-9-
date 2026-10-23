@@ -39,7 +39,7 @@
     {% if error %}
     <div role="alert" style="
         background: var(--error-50);
-        border: 1px solid rgba(239,68,68,0.15);
+        border: 1px solid rgba(153, 22, 24,0.15);
         border-radius: var(--radius-lg);
         padding: 12px 16px;
         margin-bottom: 20px;
@@ -73,18 +73,18 @@
                 border-radius: var(--radius-lg);
                 display: flex; align-items: center; justify-content: center;
             " class="
-                {% if value == 'facebook' %}bg-blue-50 text-blue-600
-                {% elif value == 'instagram' %}bg-gradient-to-br from-purple-50 to-pink-50 text-pink-600
-                {% elif value == 'linkedin_personal' %}bg-blue-50 text-blue-700
-                {% elif value == 'linkedin_company' %}bg-blue-50 text-blue-700
-                {% elif value == 'tiktok' %}bg-stone-900 text-white
-                {% elif value == 'youtube' %}bg-red-50 text-red-600
-                {% elif value == 'pinterest' %}bg-red-50 text-red-500
-                {% elif value == 'threads' %}bg-stone-100 text-stone-800
-                {% elif value == 'bluesky' %}bg-sky-50 text-sky-500
-                {% elif value == 'google_business' %}bg-blue-50 text-blue-500
-                {% elif value == 'mastodon' %}bg-indigo-50 text-indigo-600
-                {% elif value == 'x' %}bg-stone-900 text-white
+                {% if value == 'facebook' %}bg-info-50 text-info-600
+                {% elif value == 'instagram' %}bg-gradient-to-br from-ink-50 to-ink-50 text-ink-700
+                {% elif value == 'linkedin_personal' %}bg-info-50 text-info-600
+                {% elif value == 'linkedin_company' %}bg-info-50 text-info-600
+                {% elif value == 'tiktok' %}bg-ink-900 text-white
+                {% elif value == 'youtube' %}bg-danger-50 text-danger-600
+                {% elif value == 'pinterest' %}bg-danger-50 text-danger-500
+                {% elif value == 'threads' %}bg-ink-100 text-ink-800
+                {% elif value == 'bluesky' %}bg-info-50 text-info-600
+                {% elif value == 'google_business' %}bg-info-50 text-info-600
+                {% elif value == 'mastodon' %}bg-info-50 text-info-600
+                {% elif value == 'x' %}bg-ink-900 text-white
                 {% endif %}
             ">
                 {% include "social_accounts/partials/_platform_icon.html" with platform=value size="5" %}
@@ -150,7 +150,7 @@
                 <div x-show="showForm" x-cloak style="
                     position: fixed; inset: 0; z-index: 50;
                     display: flex; align-items: center; justify-content: center;
-                    background: rgba(0,0,0,0.4); padding: 16px;
+                    background: rgba(14, 17, 20,0.4); padding: 16px;
                 " @click.self="showForm = false">
                     <form id="connection-bluesky-form" role="dialog" aria-modal="true" aria-labelledby="connection-bluesky-title" x-trap.noscroll="showForm" method="post" action="{% url 'onboarding:connection_bluesky' token=link.token %}" style="
                         background: var(--surface-0);
@@ -224,7 +224,7 @@
                 <div x-show="showForm" x-cloak style="
                     position: fixed; inset: 0; z-index: 50;
                     display: flex; align-items: center; justify-content: center;
-                    background: rgba(0,0,0,0.4); padding: 16px;
+                    background: rgba(14, 17, 20,0.4); padding: 16px;
                 " @click.self="showForm = false">
                     <form id="connection-mastodon-form" role="dialog" aria-modal="true" aria-labelledby="connection-mastodon-title" x-trap.noscroll="showForm" method="post" action="{% url 'onboarding:connection_mastodon' token=link.token %}" style="
                         background: var(--surface-0);
@@ -298,7 +298,7 @@
     {% if connected_accounts %}
     <div style="
         background: var(--success-50);
-        border: 1px solid rgba(34,197,94,0.15);
+        border: 1px solid rgba(66, 158, 74,0.15);
         border-radius: var(--radius-lg);
         padding: 14px 18px;
         margin-bottom: 20px;

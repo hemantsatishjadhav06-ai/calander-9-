@@ -11,7 +11,7 @@
                :checked="isSelected('{{ message.id }}')"
                @change="toggleSelect('{{ message.id }}')"
                aria-label="Select message"
-               class="w-3.5 h-3.5 rounded border-stone-300 text-orange-700 focus:ring-orange-200 cursor-pointer">
+               class="w-3.5 h-3.5 rounded border-ink-400 text-brand-700 focus:ring-brand-600/20 cursor-pointer">
     </div>
 
     <!-- Platform icon -->
@@ -24,7 +24,7 @@
         {% if message.sender_avatar_url %}
         <img src="{{ message.sender_avatar_url }}" alt="" class="w-8 h-8 rounded-full object-cover">
         {% else %}
-        <div class="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-stone-500" style="background: var(--surface-2);">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-ink-500" style="background: var(--surface-2);">
             {{ message.sender_name|make_list|first|upper }}
         </div>
         {% endif %}
@@ -33,13 +33,13 @@
     <!-- Content -->
     <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 mb-0.5">
-            <span class="inbox-row-sender text-[13px] font-semibold text-stone-700 truncate">{{ message.sender_name }}</span>
+            <span class="inbox-row-sender text-[13px] font-semibold text-ink-700 truncate">{{ message.sender_name }}</span>
             {% if message.sender_handle %}
-            <span class="text-[11px] text-stone-500 truncate">@{{ message.sender_handle }}</span>
+            <span class="text-[11px] text-ink-500 truncate">@{{ message.sender_handle }}</span>
             {% endif %}
-            <span class="text-[11px] text-stone-500 ml-auto flex-shrink-0" title="{{ message.received_at|date:'N j, Y g:i A' }}">{{ message.received_at|timesince }} ago</span>
+            <span class="text-[11px] text-ink-500 ml-auto flex-shrink-0" title="{{ message.received_at|date:'N j, Y g:i A' }}">{{ message.received_at|timesince }} ago</span>
         </div>
-        <p class="inbox-row-preview text-[12px] text-stone-500 truncate leading-snug">{{ message.body|truncatewords:20 }}</p>
+        <p class="inbox-row-preview text-[12px] text-ink-500 truncate leading-snug">{{ message.body|truncatewords:20 }}</p>
         <div class="flex items-center gap-1.5 mt-1.5">
             <!-- Type badge -->
             <span class="badge-pill badge-type">{{ message.get_message_type_display }}</span>

@@ -1,11 +1,11 @@
 <div id="intel-panel-content-gaps" class="intel-panel mt-6 grid-cols-1 gap-6 lg:grid-cols-2">
-    <div class="rounded-xl border border-stone-200 bg-white shadow-sm">
-        <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
-            <h2 class="text-sm font-semibold text-stone-900">Research content gaps</h2>
-            <span class="inline-flex items-center rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-mono text-stone-600">5 credits</span>
+    <div class="rounded-xl border border-ink-200 bg-white shadow-sm">
+        <div class="flex items-center justify-between border-b border-ink-100 px-5 py-3.5">
+            <h2 class="text-sm font-semibold text-ink-900">Research content gaps</h2>
+            <span class="inline-flex items-center rounded-md bg-ink-100 px-2 py-0.5 text-[11px] font-mono text-ink-600">5 credits</span>
         </div>
         <div class="p-5">
-            <p class="text-xs text-stone-500 mb-5 leading-relaxed">
+            <p class="text-xs text-ink-500 mb-5 leading-relaxed">
                 Find ranked content opportunities in a niche. Returns gaps that are <em>underserved</em> (no quality coverage) or <em>stale</em> (existing top videos are over a year old).
             </p>
 
@@ -39,29 +39,29 @@
                                 class="intel-input w-full text-left cursor-pointer"
                                 style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
                             {% if is_preview %}
-                            <span class="cg-niche-label truncate text-stone-900">{{ preview_inputs.research_content_gaps.niche_name }} ({{ preview_inputs.research_content_gaps.niche_slug }})</span>
+                            <span class="cg-niche-label truncate text-ink-900">{{ preview_inputs.research_content_gaps.niche_name }} ({{ preview_inputs.research_content_gaps.niche_slug }})</span>
                             {% else %}
-                            <span class="cg-niche-label truncate text-stone-500">Choose a niche…</span>
+                            <span class="cg-niche-label truncate text-ink-500">Choose a niche…</span>
                             {% endif %}
-                            <svg class="cg-niche-chevron h-4 w-4 flex-shrink-0 text-stone-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <svg class="cg-niche-chevron h-4 w-4 flex-shrink-0 text-ink-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
                             </svg>
                         </button>
                         <div id="cg-niche-panel"
-                             class="absolute left-0 right-0 top-full z-50 mt-1.5 hidden overflow-hidden rounded-lg border border-stone-200 bg-white shadow-lg">
-                            <div class="border-b border-stone-100 p-2">
+                             class="absolute left-0 right-0 top-full z-50 mt-1.5 hidden overflow-hidden rounded-lg border border-ink-200 bg-white shadow-lg">
+                            <div class="border-b border-ink-100 p-2">
                                 <div class="relative">
-                                    <svg class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <svg class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
                                     </svg>
                                     <input type="text" id="cg-niche-search" placeholder="Search niches…" aria-label="Search niches" autocomplete="off"
-                                           class="block w-full rounded-md border-0 bg-stone-50 py-1.5 pl-8 pr-2.5 text-sm text-stone-900 placeholder:text-stone-500 focus:bg-white focus:outline-none focus:ring-2"
-                                           style="--tw-ring-color: var(--primary-ring, rgba(249,115,22,0.30));">
+                                           class="block w-full rounded-md border-0 bg-ink-50 py-1.5 pl-8 pr-2.5 text-sm text-ink-900 placeholder:text-ink-500 focus:bg-white focus:outline-none focus:ring-2"
+                                           style="--tw-ring-color: var(--primary-ring);">
                                 </div>
                             </div>
                             <ul id="cg-niche-listbox" role="listbox" aria-label="Niches" class="max-h-72 overflow-y-auto py-1"></ul>
-                            <div id="cg-niche-empty" class="hidden px-4 py-6 text-center text-sm text-stone-500">No niches match.</div>
-                            <div id="cg-niche-status" class="border-t border-stone-100 bg-stone-50 px-3 py-1.5 text-[11px] text-stone-500"></div>
+                            <div id="cg-niche-empty" class="hidden px-4 py-6 text-center text-sm text-ink-500">No niches match.</div>
+                            <div id="cg-niche-status" class="border-t border-ink-100 bg-ink-50 px-3 py-1.5 text-[11px] text-ink-500"></div>
                         </div>
                     </div>
                     <p class="intel-helper">
@@ -143,9 +143,9 @@
         </div>
     </div>
 
-    <div class="rounded-xl border border-stone-200 bg-white shadow-sm">
-        <div class="border-b border-stone-100 px-5 py-3.5">
-            <h2 class="text-sm font-semibold text-stone-900">Result</h2>
+    <div class="rounded-xl border border-ink-200 bg-white shadow-sm">
+        <div class="border-b border-ink-100 px-5 py-3.5">
+            <h2 class="text-sm font-semibold text-ink-900">Result</h2>
         </div>
         <div id="content-gaps-result" class="p-5 min-h-[220px]">
             {% if is_preview %}
@@ -163,23 +163,23 @@
     /* Gap-type pill: hand-CSS so we don't depend on Tailwind's
        ``peer-checked:`` variants being in the pre-built bundle. */
     .cg-gap-pill {
-        border-color: #e7e5e4;
-        color: #57534e;
+        border-color: var(--border);
+        color: var(--text-secondary);
     }
     .cg-gap-pill:hover {
-        border-color: #d6d3d1;
-        background: #fafaf9;
+        border-color: var(--ink-300);
+        background: var(--surface-1);
     }
     label > input[type="checkbox"]:checked + .cg-gap-pill {
         border-color: var(--primary);
-        background: var(--primary-soft, #fff7ed);
+        background: var(--primary-soft);
         color: var(--primary);
     }
     label > input[type="checkbox"]:checked + .cg-gap-pill .cg-gap-pill-check {
         opacity: 1;
     }
     label > input[type="checkbox"]:focus + .cg-gap-pill {
-        box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+        box-shadow: 0 0 0 3px rgba(17, 86, 65, 0.15);
     }
     /* Combobox row hover/selection. */
     .cg-niche-row {
@@ -193,7 +193,7 @@
     }
     .cg-niche-row:hover,
     .cg-niche-row.cg-niche-row-active {
-        background: var(--primary-soft, #fff7ed);
+        background: var(--primary-soft);
     }
 </style>
 <script nonce="{{ request.csp_nonce }}">
@@ -238,10 +238,10 @@
                     + ' aria-selected="' + (selected === n.slug ? "true" : "false") + '"'
                     + ' class="cg-niche-row">'
                     +   '<span class="min-w-0 flex-1">'
-                    +     '<span class="block truncate font-medium text-stone-900">' + esc(n.name) + '</span>'
-                    +     '<span class="block truncate font-mono text-[11px] text-stone-500">' + esc(n.slug) + '</span>'
+                    +     '<span class="block truncate font-medium text-ink-900">' + esc(n.name) + '</span>'
+                    +     '<span class="block truncate font-mono text-[11px] text-ink-500">' + esc(n.slug) + '</span>'
                     +   '</span>'
-                    +   '<span class="ml-2 inline-flex flex-shrink-0 items-center rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">' + esc(n.gap_count) + ' gaps</span>'
+                    +   '<span class="ml-2 inline-flex flex-shrink-0 items-center rounded-md bg-ink-100 px-1.5 py-0.5 text-[11px] font-medium text-ink-600">' + esc(n.gap_count) + ' gaps</span>'
                     + '</li>';
             }).join("");
         }
@@ -288,8 +288,8 @@
         if (!niche) return;
         hidden.value = niche.slug;
         labelEl.textContent = niche.name + " (" + niche.slug + ")";
-        labelEl.classList.remove("text-stone-500");
-        labelEl.classList.add("text-stone-900");
+        labelEl.classList.remove("text-ink-500");
+        labelEl.classList.add("text-ink-900");
         closePanel(true);
     }
     function applyFilter() {

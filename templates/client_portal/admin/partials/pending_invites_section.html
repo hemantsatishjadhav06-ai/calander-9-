@@ -23,7 +23,7 @@
 
             <!-- Role Badge -->
             <div class="flex-shrink-0">
-                <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: #FEF3C7; color: #92400E;">Client</span>
+                <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: var(--warning-100); color: var(--warning-700);">Client</span>
             </div>
 
             <!-- Actions -->
@@ -45,7 +45,7 @@
                     {% csrf_token %}
                     <button type="submit"
                             class="btn-danger-soft-bg text-xs px-3 py-1.5 rounded-full font-medium cursor-pointer transition-colors"
-                            style="color: #DC2626; background: transparent;">
+                            style="color: var(--danger-500); background: transparent;">
                         Revoke
                     </button>
                 </form>

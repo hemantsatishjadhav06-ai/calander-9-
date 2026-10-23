@@ -4,10 +4,10 @@
 
 {% block content %}
 <div class="max-w-2xl">
-    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
-        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Blog</a>
+    <nav aria-label="Breadcrumb" class="text-sm text-ink-600 mb-3">
+        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-ink-900">Blog</a>
     </nav>
-    <h1 class="text-lg font-semibold text-stone-900 mb-2">No website to publish to</h1>
-    <p class="text-sm text-stone-700">This workspace isn't connected to a website, so there is nowhere to publish an article yet. <a href="{% url 'studio:setup' workspace_id=workspace.id %}" class="font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">Open Set up</a> to see how your owner connects one.</p>
+    <h1 class="text-lg font-semibold text-ink-900 mb-2">No website to publish to</h1>
+    <p class="text-sm text-ink-700">This workspace isn't connected to a website, so there is nowhere to publish an article yet. <a href="{% url 'studio:setup' workspace_id=workspace.id %}" class="font-semibold text-brand-800 underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">Open Set up</a> to see how your owner connects one.</p>
 </div>
 {% endblock %}

@@ -25,9 +25,9 @@
         <!-- Org Role Badge -->
         <div class="flex-shrink-0">
             {% if member.membership.org_role == "owner" %}
-            <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: #FEF3C7; color: #92400E;">Owner</span>
+            <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: var(--warning-100); color: var(--warning-700);">Owner</span>
             {% elif member.membership.org_role == "admin" %}
-            <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: #DBEAFE; color: #1E40AF;">Admin</span>
+            <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: var(--info-100); color: var(--info-700);">Admin</span>
             {% else %}
             <span class="text-xs font-medium px-2.5 py-1 rounded-full" style="background: var(--neutral-100); color: var(--text-secondary);">Member</span>
             {% endif %}
@@ -94,7 +94,7 @@
                     {% csrf_token %}
                     <button type="submit"
                             class="btn-danger-soft-bg w-full text-left px-3 py-2 text-sm cursor-pointer transition-colors"
-                            style="color: #DC2626;">
+                            style="color: var(--danger-500);">
                         Remove from Organization
                     </button>
                 </form>
@@ -126,7 +126,7 @@
     <template x-teleport="body">
         <div x-show="showWorkspaces" x-transition.opacity
              class="fixed inset-0 z-50 flex items-center justify-center"
-             style="background: rgba(0,0,0,0.4);">
+             style="background: rgba(14, 17, 20,0.4);">
             <div @click.outside="showWorkspaces = false"
                  @keydown.escape.window="showWorkspaces = false"
                  x-trap.noscroll="showWorkspaces" role="dialog" aria-modal="true" aria-labelledby="ws-modal-title-{{ member.membership.id }}"

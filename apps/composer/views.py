@@ -1603,7 +1603,7 @@ def autosave(request, workspace_id, post_id=None):
         # indicator markup on purpose — the response swaps into #autosave-status,
         # so a 4xx here would fire the global error toast on every tick.
         if _is_readonly_write(request, post):
-            return HttpResponse('<span class="text-xs text-gray-400">Read-only — not saved</span>')
+            return HttpResponse('<span class="text-xs text-ink-500">Read-only — not saved</span>')
         orig_content = _base_content_snapshot(post)
     else:
         post = Post(workspace=workspace, author=request.user)
@@ -1638,7 +1638,7 @@ def autosave(request, workspace_id, post_id=None):
         _revert_approved_to_review(post)
 
     return HttpResponse(
-        f'<span class="text-xs text-gray-400">Saved {timezone.now().strftime("%H:%M")}</span>',
+        f'<span class="text-xs text-ink-500">Saved {timezone.now().strftime("%H:%M")}</span>',
         headers={"HX-Trigger": json.dumps({"autosaved": {"postId": str(post.id), "isNew": is_new}})},
     )
 

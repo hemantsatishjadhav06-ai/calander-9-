@@ -86,7 +86,7 @@
         border-radius: var(--radius-md); padding: 4px 24px 4px 8px;
         transition: all var(--dur-fast) ease; cursor: pointer;
         appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2378716C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23656B73' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-position: right 8px center;
     }
@@ -126,10 +126,10 @@
 <div class="inbox-shell" x-data="inboxController()">
 
     <!-- Header -->
-    <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-3 border-b border-stone-200 flex-shrink-0">
+    <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-3 border-b border-ink-200 flex-shrink-0">
         <div class="flex items-center gap-3 sm:gap-4">
-            <h1 class="text-base font-semibold text-stone-900" style="letter-spacing: -0.01em;">Inbox</h1>
-            <div class="flex items-center gap-1 bg-stone-50 rounded-full p-0.5">
+            <h1 class="text-base font-semibold text-ink-900" style="letter-spacing: -0.01em;">Inbox</h1>
+            <div class="flex items-center gap-1 bg-ink-50 rounded-full p-0.5">
                 <a href="{% url 'inbox:feed' workspace_id=workspace.id %}"
                    class="inbox-tab {% if current_view == 'all' %}active{% endif %}"
                    hx-get="{% url 'inbox:feed' workspace_id=workspace.id %}?view=all"
@@ -157,7 +157,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="message_ids" x-bind:value="Array.from(selected).join(',')">
                 <button type="submit" x-bind:disabled="busy"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-white rounded-full disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-white rounded-full disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
                         style="background: var(--primary-strong);">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
                     <span x-text="selectedCount > 0 ? 'Draft replies to ' + selectedCount + ' selected' : 'Draft replies with the team'">Draft replies with the team</span>
@@ -165,14 +165,14 @@
             </form>
             {% endif %}
             <a href="{% url 'inbox:saved_replies' workspace_id=workspace.id %}"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-stone-600 bg-white border border-stone-200 rounded-full hover:border-stone-300 hover:bg-stone-50 transition-all duration-150"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-ink-600 bg-white border border-ink-200 rounded-full hover:border-ink-300 hover:bg-ink-25 transition-all duration-150"
                title="Saved Replies">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
                 <span class="hidden sm:inline">Saved Replies</span>
             </a>
             {% if sla_config %}
             <a href="{% url 'inbox:sla_config' workspace_id=workspace.id %}"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-stone-600 bg-white border border-stone-200 rounded-full hover:border-stone-300 hover:bg-stone-50 transition-all duration-150"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-ink-600 bg-white border border-ink-200 rounded-full hover:border-ink-300 hover:bg-ink-25 transition-all duration-150"
                title="SLA Settings">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span class="hidden sm:inline">SLA</span>
@@ -211,9 +211,9 @@
         <div class="inbox-detail-pane" id="inbox-detail-panel"
              :data-mobile-visible="activePanel === 'detail' ? '' : undefined">
             <!-- Mobile back button -->
-            <div class="flex md:hidden items-center gap-2 px-3 py-2.5 border-b border-stone-200 flex-shrink-0">
+            <div class="flex md:hidden items-center gap-2 px-3 py-2.5 border-b border-ink-200 flex-shrink-0">
                 <button @click="activePanel = 'list'"
-                        class="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors cursor-pointer">
+                        class="flex items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                     Back
                 </button>

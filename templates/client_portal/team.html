@@ -34,7 +34,7 @@
                             <span class="block truncate">{{ row.title }}</span>
                             <span class="block text-[0.75rem] font-normal" style="color: var(--text-secondary);">{% if row.is_post %}About a post{% else %}Your account{% endif %} · {{ row.conversation.last_message_at|timezone:tzname|date:"j M, H:i" }}</span>
                         </span>
-                        {% if row.unread %}<span class="flex-shrink-0 px-1.5 py-px rounded-full text-[0.6875rem] font-bold bg-orange-100 text-orange-800">{{ row.unread }}<span class="sr-only"> unread</span></span>{% endif %}
+                        {% if row.unread %}<span class="flex-shrink-0 px-1.5 py-px rounded-full text-[0.6875rem] font-bold bg-brand-100 text-brand-800">{{ row.unread }}<span class="sr-only"> unread</span></span>{% endif %}
                     </a>
                 </li>
                 {% endfor %}

@@ -29,7 +29,7 @@ WEEKDAYS = (
 MAX_PILLARS = 8
 #: Reference pictures one upload may carry.
 MAX_REFERENCE_FILES = 6
-_CHECK = "w-4 h-4 rounded accent-orange-700"
+_CHECK = "w-4 h-4 rounded accent-brand-700"
 
 
 def eligible_leads(workspace) -> list:

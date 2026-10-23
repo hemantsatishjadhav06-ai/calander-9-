@@ -14,7 +14,7 @@
 <div>
     <div>
         <div class="flex items-center">
-            <div class="text-xs uppercase tracking-wide text-stone-500">Percentile</div>
+            <div class="text-xs uppercase tracking-wide text-ink-500">Percentile</div>
             <span class="intel-tooltip-trigger" tabindex="0" aria-describedby="pkg-percentile-tooltip">
                 <span class="intel-tooltip-icon" aria-hidden="true">?</span>
                 <span id="pkg-percentile-tooltip" role="tooltip" class="intel-tooltip" data-align="left">
@@ -37,16 +37,16 @@
       meaningful) is visually flagged. Each pill carries a "?" trigger
       with its own tooltip explaining the metric.
     {% endcomment %}
-    <div class="mt-5 pt-4 border-t border-stone-100">
+    <div class="mt-5 pt-4 border-t border-ink-100">
         <div class="flex items-center justify-between gap-3">
-            <div class="text-xs uppercase tracking-wide text-stone-500">Niche match</div>
+            <div class="text-xs uppercase tracking-wide text-ink-500">Niche match</div>
             {% with conf=result.niche_confidence %}
             {% if conf is not None %}
             <div class="flex items-center gap-1">
                 <span class="text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded
-                             {% if conf >= 0.75 %}bg-green-50 text-green-700
-                             {% elif conf >= 0.5 %}bg-amber-50 text-amber-700
-                             {% else %}bg-stone-100 text-stone-600{% endif %}">
+                             {% if conf >= 0.75 %}bg-success-50 text-success-600
+                             {% elif conf >= 0.5 %}bg-warning-50 text-warning-600
+                             {% else %}bg-ink-100 text-ink-600{% endif %}">
                     {% widthratio conf 1 100 %}% confidence
                 </span>
                 <span class="intel-tooltip-trigger" tabindex="0" aria-describedby="pkg-confidence-tooltip">
@@ -63,8 +63,8 @@
             {% endwith %}
         </div>
         <div class="mt-2 flex items-center justify-between gap-2 flex-wrap">
-            <span class="text-sm font-medium text-stone-900">{{ result.niche_label }}</span>
-            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-stone-100 text-stone-500">{{ result.niche_slug }}</span>
+            <span class="text-sm font-medium text-ink-900">{{ result.niche_label }}</span>
+            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-ink-100 text-ink-500">{{ result.niche_slug }}</span>
         </div>
     </div>
 </div>

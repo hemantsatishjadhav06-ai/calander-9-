@@ -31,11 +31,11 @@ tear down the toast.
         {% include "approvals/partials/_approval_row.html" %}
         {% empty %}
         <div class="text-center py-16">
-            <div class="mx-auto w-14 h-14 rounded-full border-2 border-stone-200 flex items-center justify-center text-stone-300 mb-3">
+            <div class="mx-auto w-14 h-14 rounded-full border-2 border-ink-200 flex items-center justify-center text-ink-500 mb-3">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5"/></svg>
             </div>
-            <p class="text-stone-500 font-medium">No posts pending approval</p>
-            <p class="text-sm text-stone-500 mt-1">Posts submitted for review will appear here</p>
+            <p class="text-ink-500 font-medium">No posts pending approval</p>
+            <p class="text-sm text-ink-500 mt-1">Posts submitted for review will appear here</p>
         </div>
         {% endfor %}
     </div>
@@ -49,15 +49,15 @@ tear down the toast.
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="translate-y-full opacity-0" x-transition:enter-end="translate-y-0 opacity-100"
          class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-        <div class="flex items-center gap-3 px-5 py-3 bg-stone-900 text-white rounded-2xl shadow-2xl">
+        <div class="flex items-center gap-3 px-5 py-3 bg-ink-900 text-white rounded-2xl shadow-2xl">
             <span class="text-[0.8125rem] font-medium" x-text="selectedPosts.length + ' selected'"></span>
-            <div class="w-px h-5 bg-stone-700"></div>
+            <div class="w-px h-5 bg-ink-700"></div>
             <button hx-post="{% url 'approvals:bulk_action' workspace_id=workspace.id %}"
                     hx-include="[name='post_ids']" hx-vals='{"action": "approve"}' hx-swap="none"
-                    class="px-3.5 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-emerald-500 hover:bg-emerald-600 text-white">Approve all</button>
+                    class="px-3.5 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-success-500 hover:bg-success-500 text-white">Approve all</button>
             <button @click="rejectOpen = true"
-                    class="px-3.5 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-red-500 hover:bg-red-600 text-white">Reject all</button>
-            <button aria-label="Clear selection" @click="selectedPosts = []" class="ml-1 text-stone-400 hover:text-white">
+                    class="px-3.5 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-danger-500 hover:bg-danger-500 text-white">Reject all</button>
+            <button aria-label="Clear selection" @click="selectedPosts = []" class="ml-1 text-ink-300 hover:text-white focus-visible:outline-white">
                 <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
@@ -65,21 +65,21 @@ tear down the toast.
 
     {# bulk reject modal #}
     <div x-show="rejectOpen" x-cloak class="fixed inset-0 z-[150] flex items-center justify-center p-4" @click="rejectOpen = false" @keydown.escape.window="rejectOpen = false">
-        <div class="absolute inset-0" style="background: rgba(28,25,23,.42); backdrop-filter: blur(3px);"></div>
+        <div class="absolute inset-0" style="background: rgba(28, 31, 36,.42); backdrop-filter: blur(3px);"></div>
         <div class="relative bg-white rounded-2xl shadow-2xl w-full modal-pop" style="max-width: 440px;" @click.stop
              x-trap.noscroll="rejectOpen" role="dialog" aria-modal="true" aria-labelledby="bulk-reject-title">
             <div class="p-6">
-                <h3 id="bulk-reject-title" class="text-[1.0625rem] font-bold text-stone-900 mb-1" x-text="'Reject ' + selectedPosts.length + (selectedPosts.length > 1 ? ' posts' : ' post')"></h3>
-                <p class="text-[0.8125rem] text-stone-500 mb-4">Tell the creator why. This comment is shared with them.</p>
+                <h3 id="bulk-reject-title" class="text-[1.0625rem] font-bold text-ink-900 mb-1" x-text="'Reject ' + selectedPosts.length + (selectedPosts.length > 1 ? ' posts' : ' post')"></h3>
+                <p class="text-[0.8125rem] text-ink-500 mb-4">Tell the creator why. This comment is shared with them.</p>
                 <textarea id="bulk-reject-comment" name="comment" x-model="bulkReason" rows="3" placeholder="Reason for rejection…" aria-label="Reason for rejection"
-                          class="w-full px-3 py-2 text-[0.875rem] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-transparent resize-none"></textarea>
+                          class="w-full px-3 py-2 text-[0.875rem] border border-ink-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-danger-200 focus:border-transparent resize-none"></textarea>
                 <div class="flex justify-end gap-2 mt-4">
-                    <button @click="rejectOpen = false" class="px-4 py-2 text-[0.8125rem] font-medium text-stone-600 hover:bg-stone-100 rounded-full">Cancel</button>
+                    <button @click="rejectOpen = false" class="px-4 py-2 text-[0.8125rem] font-medium text-ink-600 hover:bg-ink-100 rounded-full">Cancel</button>
                     <button hx-post="{% url 'approvals:bulk_action' workspace_id=workspace.id %}"
                             hx-include="[name='post_ids'], #bulk-reject-comment" hx-vals='{"action": "reject"}' hx-swap="none"
                             :disabled="!bulkReason.trim()"
                             class="px-4 py-2 text-[0.8125rem] font-semibold text-white rounded-full"
-                            :class="bulkReason.trim() ? 'bg-red-500 hover:bg-red-600' : 'bg-stone-300 cursor-not-allowed'">Reject all</button>
+                            :class="bulkReason.trim() ? 'bg-danger-500 hover:bg-danger-500' : 'bg-ink-300 cursor-not-allowed'">Reject all</button>
                 </div>
             </div>
         </div>
@@ -88,17 +88,17 @@ tear down the toast.
 
     {# version-diff modal (loaded via hx-get on the row's "View changes" button) #}
     <div x-show="diffOpen" x-cloak class="fixed inset-0 z-[150] flex items-center justify-center p-4" @click="diffOpen = false" @keydown.escape.window="diffOpen = false">
-        <div class="absolute inset-0" style="background: rgba(28,25,23,.42); backdrop-filter: blur(3px);"></div>
+        <div class="absolute inset-0" style="background: rgba(28, 31, 36,.42); backdrop-filter: blur(3px);"></div>
         <div class="relative bg-white rounded-2xl shadow-2xl w-full modal-pop max-h-[80vh] overflow-y-auto" style="max-width: 620px;" @click.stop
              x-trap.noscroll="diffOpen" role="dialog" aria-modal="true" aria-labelledby="version-diff-title">
             <div class="p-6">
                 <div class="flex items-start justify-between mb-3">
-                    <h3 id="version-diff-title" class="text-[1.0625rem] font-bold text-stone-900">Version changes</h3>
-                    <button @click="diffOpen = false" class="text-stone-500 hover:text-stone-600" aria-label="Close">
+                    <h3 id="version-diff-title" class="text-[1.0625rem] font-bold text-ink-900">Version changes</h3>
+                    <button @click="diffOpen = false" class="text-ink-500 hover:text-ink-600" aria-label="Close">
                         <svg aria-hidden="true" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
-                <div id="diff-modal-body"><p class="text-sm text-stone-500">Loading…</p></div>
+                <div id="diff-modal-body"><p class="text-sm text-ink-500">Loading…</p></div>
             </div>
         </div>
     </div>

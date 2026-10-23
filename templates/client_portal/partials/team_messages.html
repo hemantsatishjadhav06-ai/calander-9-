@@ -22,9 +22,9 @@ the account manager is answering, then stops.
             <span class="font-normal" style="color: var(--text-secondary);">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:pt.tzname|date:"j M, H:i" }}</time></span></p>
         <p class="text-[0.875rem] mt-0.5 whitespace-pre-line break-words" style="color: var(--text-primary);">{{ m.body }}</p>
         {% if m.action_status == 'started' %}
-        <p class="mt-1.5"><span class="inline-flex px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold bg-indigo-50 text-indigo-800">The team is on it</span></p>
+        <p class="mt-1.5"><span class="inline-flex px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold bg-info-50 text-info-600">The team is on it</span></p>
         {% elif m.action_status == 'needs_human' %}
-        <p class="mt-1.5"><span class="inline-flex px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold bg-amber-50 text-amber-800">Waiting for an agency team member</span></p>
+        <p class="mt-1.5"><span class="inline-flex px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold bg-warning-50 text-warning-600">Waiting for an agency team member</span></p>
         {% endif %}
     </div>
     {% endif %}

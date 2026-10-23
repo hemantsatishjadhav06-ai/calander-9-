@@ -14,7 +14,7 @@
             {% for value, label in approval_modes.choices %}
             <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer transition-colors"
                    :style="mode === '{{ value }}'
-                        ? 'border: 1px solid var(--primary); background: var(--primary-soft, var(--surface-0)); box-shadow: 0 0 0 3px var(--primary-ring);'
+                        ? 'border: 1px solid var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 3px var(--primary-ring);'
                         : 'border: 1px solid var(--border); background: var(--surface-0);'"
                    {% if not is_owner_or_manager %}style="cursor: not-allowed; opacity: 0.7;"{% endif %}>
                 <input type="radio"

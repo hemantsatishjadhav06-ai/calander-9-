@@ -1,11 +1,11 @@
 <div id="intel-panel-video-hook" class="intel-panel mt-6 grid-cols-1 gap-6 lg:grid-cols-2">
-    <div class="rounded-xl border border-stone-200 bg-white shadow-sm">
-        <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
-            <h2 class="text-sm font-semibold text-stone-900">Score video hook</h2>
-            <span class="inline-flex items-center rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-mono text-stone-600">10 credits</span>
+    <div class="rounded-xl border border-ink-200 bg-white shadow-sm">
+        <div class="flex items-center justify-between border-b border-ink-100 px-5 py-3.5">
+            <h2 class="text-sm font-semibold text-ink-900">Score video hook</h2>
+            <span class="inline-flex items-center rounded-md bg-ink-100 px-2 py-0.5 text-[11px] font-mono text-ink-600">10 credits</span>
         </div>
         <div class="p-5">
-            <p class="text-xs text-stone-500 mb-5 leading-relaxed">
+            <p class="text-xs text-ink-500 mb-5 leading-relaxed">
                 Analyze the first ~6 seconds of a YouTube video for hook quality, archetype, and improvement suggestions.
             </p>
 
@@ -34,16 +34,16 @@
                         {% if can_manage_billing %}<a href="{% url 'intelligence:subscribe' org_id=organization.id %}">Activate Intelligence</a> to analyze your own video hooks.{% else %}Ask an admin to activate Intelligence to analyze your own video hooks.{% endif %}
                     </p>
                     {% else %}
-                    <p class="mt-2 text-[11px] text-stone-500">First call on a video can take 25–29 s. Cache hits return instantly.</p>
+                    <p class="mt-2 text-[11px] text-ink-500">First call on a video can take 25–29 s. Cache hits return instantly.</p>
                     {% endif %}
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="rounded-xl border border-stone-200 bg-white shadow-sm">
-        <div class="border-b border-stone-100 px-5 py-3.5">
-            <h2 class="text-sm font-semibold text-stone-900">Result</h2>
+    <div class="rounded-xl border border-ink-200 bg-white shadow-sm">
+        <div class="border-b border-ink-100 px-5 py-3.5">
+            <h2 class="text-sm font-semibold text-ink-900">Result</h2>
         </div>
         <div id="video-hook-result" class="p-5 min-h-[220px]">
             {% if is_preview %}

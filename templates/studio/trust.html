@@ -3,7 +3,7 @@
 {% block content %}
 <div class="max-w-5xl">
   <h1 class="text-2xl font-semibold mb-2">Verified facts and project photos</h1>
-  <p class="text-sm text-stone-700 mb-5">Record who checked each claim, its source and review expiry. These are human attestations; collecting a website does not independently verify a commercial claim. Saved brand background notes remain unverified.</p>
+  <p class="text-sm text-ink-700 mb-5">Record who checked each claim, its source and review expiry. These are human attestations; collecting a website does not independently verify a commercial claim. Saved brand background notes remain unverified.</p>
   {% include "components/agency_tabs.html" %}
   {% if can_verify %}
   <form method="post" class="bg-white border rounded-xl p-5 space-y-3 mb-6">
@@ -12,7 +12,7 @@
     <h2 class="font-semibold">Verify a claim</h2>
     {{ form.non_field_errors }}
     {% for field in form %}<div><label for="{{ field.id_for_label }}" class="text-sm font-medium">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
-    <button class="bg-orange-700 text-white rounded-lg px-4 py-2" type="submit">Record verification</button>
+    <button class="bg-brand-700 text-white rounded-lg px-4 py-2" type="submit">Record verification</button>
   </form>
   {% endif %}
   <section class="space-y-3 mb-7" aria-label="Claim records">

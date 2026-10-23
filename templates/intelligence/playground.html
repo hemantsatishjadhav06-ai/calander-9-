@@ -5,27 +5,27 @@
 {% block page_header %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4 lg:mb-[25px]">
     <div>
-        <h1 class="text-xl sm:text-2xl font-semibold text-stone-900" style="letter-spacing: -0.01em;">Intelligence</h1>
-        <p class="text-sm text-stone-500 mt-1">
+        <h1 class="text-xl sm:text-2xl font-semibold text-ink-900" style="letter-spacing: -0.01em;">Intelligence</h1>
+        <p class="text-sm text-ink-500 mt-1">
             YouTube packaging scoring, channel benchmarks, content-gap research.
         </p>
     </div>
 
     {% if subscription and subscription.status == "active" %}
-    <div class="flex items-center gap-4 px-4 py-2 bg-stone-50 rounded-full border border-stone-200">
+    <div class="flex items-center gap-4 px-4 py-2 bg-ink-50 rounded-full border border-ink-200">
         <div class="text-xs">
-            <div class="text-stone-500">Plan</div>
-            <div class="font-semibold text-stone-900 capitalize">{{ subscription.plan_slug|default:"," }}</div>
+            <div class="text-ink-500">Plan</div>
+            <div class="font-semibold text-ink-900 capitalize">{{ subscription.plan_slug|default:"," }}</div>
         </div>
         {% if me %}
-        <div class="h-7 w-px bg-stone-200"></div>
+        <div class="h-7 w-px bg-ink-200"></div>
         <div class="text-xs">
-            <div class="text-stone-500">Credits</div>
-            <div class="font-semibold text-stone-900">{{ me.credits_remaining|default:"," }}</div>
+            <div class="text-ink-500">Credits</div>
+            <div class="font-semibold text-ink-900">{{ me.credits_remaining|default:"," }}</div>
         </div>
         {% endif %}
         {% if can_manage_billing %}
-        <div class="h-7 w-px bg-stone-200"></div>
+        <div class="h-7 w-px bg-ink-200"></div>
         <a href="{% url 'intelligence:billing-settings' org_id=organization.id %}"
            class="text-xs font-medium hover:underline" style="color: var(--primary);">
             Billing →
@@ -68,7 +68,7 @@
     <div class="intel-tools">
 
         {# Tab bar #}
-        <div class="overflow-x-auto border-b border-stone-200">
+        <div class="overflow-x-auto border-b border-ink-200">
             <div class="flex gap-1" role="tablist">
                 <button type="button" data-tab="packaging" id="intel-tab-packaging"
                         class="intel-tab intel-tab-active -mb-px inline-flex flex-shrink-0 items-center gap-2 px-3 py-2.5 text-sm font-semibold border-b-2 cursor-pointer transition">
@@ -139,11 +139,11 @@
 <style>
     /* Tab styling using Studio's brand color tokens. */
     .intel-tab {
-        color: var(--text-secondary, #57534e);
+        color: var(--text-secondary);
         border-color: transparent;
     }
     .intel-tab:hover {
-        color: var(--text-primary, #1c1917);
+        color: var(--text-primary);
     }
     .intel-tab.intel-tab-active {
         color: var(--primary);
@@ -161,42 +161,42 @@
         width: 100%;
         padding: 0.625rem 0.875rem;
         font-size: 0.875rem;
-        color: var(--text-primary, #1c1917);
+        color: var(--text-primary);
         /* Grey input fill gives the input field enough contrast against
            the white card body that the input boundary is obvious without
            the user having to focus it first. */
-        background: var(--surface-1, #fafaf9);
-        border: 1px solid var(--border, #e7e5e4);
+        background: var(--surface-1);
+        border: 1px solid var(--border);
         border-radius: 0.5rem;
-        box-shadow: inset 0 1px 1px 0 rgba(0,0,0,0.02);
+        box-shadow: inset 0 1px 1px 0 rgba(14, 17, 20,0.02);
         transition: all 150ms ease;
         outline: none;
     }
-    .intel-input::placeholder { color: var(--text-ghost, #766F6A); }
+    .intel-input::placeholder { color: var(--text-ghost); }
     .intel-input:hover {
-        border-color: var(--border-hover, #d6d3d1);
-        background: var(--surface-2, #f5f5f4);
+        border-color: var(--border-hover);
+        background: var(--surface-2);
     }
     .intel-input:focus {
         background: white;
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+        box-shadow: 0 0 0 3px rgba(17, 86, 65, 0.15);
     }
     .intel-label {
         display: block;
         font-size: 0.875rem;
         font-weight: 500;
-        color: var(--text-primary, #1c1917);
+        color: var(--text-primary);
         margin-bottom: 0.5rem;
     }
     .intel-label-hint {
         font-weight: 400;
-        color: var(--text-ghost, #766F6A);
+        color: var(--text-ghost);
     }
     .intel-helper {
         margin-top: 0.375rem;
         font-size: 0.75rem;
-        color: var(--text-ghost, #766F6A);
+        color: var(--text-ghost);
     }
     .intel-submit {
         display: inline-flex;
@@ -209,7 +209,7 @@
         background: var(--primary-strong);
         border: none;
         border-radius: 0.5rem;
-        box-shadow: 0 1px 2px 0 rgba(0,0,0,0.06);
+        box-shadow: 0 1px 2px 0 rgba(14, 17, 20,0.06);
         cursor: pointer;
         transition: background 150ms ease, transform 150ms ease;
     }
@@ -218,13 +218,13 @@
         transform: translateY(-1px);
     }
     .intel-submit:disabled {
-        background: var(--primary-muted, #fed7aa);
+        background: var(--primary-muted);
         cursor: not-allowed;
         transform: none;
         box-shadow: none;
     }
     .intel-submit:disabled:hover {
-        background: var(--primary-muted, #fed7aa);
+        background: var(--primary-muted);
         transform: none;
     }
     /* Helper note rendered under the disabled CTA when the org is in
@@ -239,14 +239,14 @@
            hugged gap inside the wrapper. */
         margin-top: 0.5rem;
         font-size: 0.75rem;
-        color: var(--text-ghost, #766F6A);
+        color: var(--text-ghost);
         line-height: 1.5;
     }
     .intel-activate-note a {
         color: var(--primary);
         font-weight: 600;
         text-decoration: none;
-        border-bottom: 1px solid var(--primary-muted, #fed7aa);
+        border-bottom: 1px solid var(--primary-muted);
         transition: border-color 150ms ease;
     }
     .intel-activate-note a:hover {
@@ -274,9 +274,9 @@
         font-size: 0.75rem;
         line-height: 1.5;
         color: white;
-        background: #1c1917; /* stone-900 */
+        background: var(--ink-900); /* stone-900 */
         border-radius: 0.5rem;
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 15px -3px rgba(14, 17, 20,0.1);
         z-index: 20;
         pointer-events: none;
         visibility: hidden;
@@ -296,7 +296,7 @@
         position: absolute;
         top: 100%;
         border: 4px solid transparent;
-        border-top-color: #1c1917;
+        border-top-color: var(--ink-900);
     }
     .intel-tooltip[data-align="left"]::after  { left: 0.75rem; }
     .intel-tooltip[data-align="right"]::after { right: 0.75rem; }
@@ -307,8 +307,8 @@
         align-items: center;
         justify-content: center;
         border-radius: 9999px;
-        background: var(--neutral-200, #e7e5e4);
-        color: var(--text-secondary, #57534e);
+        background: var(--neutral-200);
+        color: var(--text-secondary);
         font-size: 0.625rem;
         font-weight: 700;
         margin-left: 0.25rem;

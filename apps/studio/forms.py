@@ -25,8 +25,8 @@ STUDIO_PLATFORMS = (
 )
 
 _FIELD = (
-    "w-full text-sm px-3 py-2.5 rounded-xl border border-stone-300 bg-white outline-none "
-    "focus:border-orange-500 focus:ring-2 focus:ring-orange-100 transition-all"
+    "w-full text-sm px-3 py-2.5 rounded-xl border border-ink-400 bg-white outline-none "
+    "focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all"
 )
 
 
@@ -71,13 +71,13 @@ class BriefForm(forms.Form):
     accounts = forms.MultipleChoiceField(
         label="Post to",
         required=True,
-        widget=forms.CheckboxSelectMultiple(attrs={"class": "w-4 h-4 rounded accent-orange-700"}),
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "w-4 h-4 rounded accent-brand-700"}),
     )
     style_lock = forms.BooleanField(
         label="Match the look of the last post",
         required=False,
         initial=True,
-        widget=forms.CheckboxInput(attrs={"class": "mt-0.5 w-4 h-4 rounded accent-orange-700"}),
+        widget=forms.CheckboxInput(attrs={"class": "mt-0.5 w-4 h-4 rounded accent-brand-700"}),
     )
     source_picture = forms.ChoiceField(label="Picture", required=False)
 
@@ -131,7 +131,7 @@ class FeedbackForm(forms.Form):
     new_picture = forms.BooleanField(
         label="Paint a new picture too",
         required=False,
-        widget=forms.CheckboxInput(attrs={"class": "w-4 h-4 rounded accent-orange-700"}),
+        widget=forms.CheckboxInput(attrs={"class": "w-4 h-4 rounded accent-brand-700"}),
     )
 
 
@@ -233,7 +233,7 @@ class BrandProfileForm(forms.ModelForm):
         self.initial["logo"] = str(self.instance.logo_id or "")
         for name, field in self.fields.items():
             if name in ("primary_color", "accent_color"):
-                field.widget.attrs["class"] = "h-10 w-16 rounded-lg border border-stone-300 bg-white p-1 cursor-pointer"
+                field.widget.attrs["class"] = "h-10 w-16 rounded-lg border border-ink-400 bg-white p-1 cursor-pointer"
             else:
                 field.widget.attrs.setdefault("class", _FIELD)
 
