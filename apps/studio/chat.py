@@ -695,7 +695,12 @@ def _creative_message_context(conversation, messages, viewer, *, selected_draft_
             # "linkedin_company"). The stored brief keeps the machine labels it matches on.
             platform_names = dict(PlatformCredential.Platform.choices)
             message.creative_accounts = [
-                {**account, "platform_label": platform_names.get(account.get("platform"), account.get("platform", ""))}
+                {
+                    **account,
+                    "platform_label": platform_names.get(
+                        str(account.get("platform") or ""), account.get("platform", "")
+                    ),
+                }
                 for account in (accounts if isinstance(accounts, list) else [])
                 if isinstance(account, dict)
             ]
