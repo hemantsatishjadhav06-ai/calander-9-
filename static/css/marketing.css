@@ -42,18 +42,6 @@
   --mk-danger-50: #FFF3F1;  --mk-danger-200: #FFCDC6;  --mk-danger-500: #991618;  --mk-danger-600: #7C1213;
   --mk-info-50: #EFF8FD;    --mk-info-200: #BEE3F8;    --mk-info-500: #035A7B;    --mk-info-600: #044E6B;
 
-  /* Legacy names kept so nothing that still reads them breaks */
-  --mk-orange: var(--mk-brand);
-  --mk-orange-600: var(--mk-brand-focus);
-  --mk-orange-700: var(--mk-brand);
-  --mk-orange-soft: var(--mk-brand-soft);
-  --mk-orange-100: var(--mk-brand-100);
-  --mk-green: var(--mk-success-500);
-  --mk-green-600: var(--mk-success-600);
-  --mk-green-700: var(--mk-success-600);
-  --mk-green-soft: var(--mk-success-50);
-  --mk-green-100: var(--mk-success-200);
-
   /* The one dark band */
   --mk-dark: #0E1114;        /* ink-950 */
   --mk-dark-2: #1C1F24;      /* ink-900: code blocks */

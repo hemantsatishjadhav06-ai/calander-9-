@@ -3,6 +3,7 @@ Compact routine rows with their controls. Context:
   routines  — list of dicts from apps.studio.routines.rows(workspace, limit, viewer=..., perms=...)
   workspace — the workspace
   can_manage — True when the viewer manages the workspace's settings (may pause or delete any routine)
+  team_url  — optional: the Team tab's address; a running row then links to it ("See it on Team")
 Each row's own `can_change` (the viewer wrote it) also unlocks Pause and Delete.
 The rows pad themselves; put them in a card with no padding. Run now is secondary (a repeated
 row action never takes the page's one solid button); Delete is a quiet danger action.
@@ -16,6 +17,7 @@ row action never takes the page's one solid button); Delete is a quiet danger ac
                 <p class="text-sm font-semibold text-ink-900 break-words">{{ row.title }}</p>
                 {% if row.running %}
                 {% include "studio/partials/pill.html" with tone="info" icon="spinner" label="Running" data_state="" %}
+                {% if team_url %}<a href="{{ team_url }}" class="ui-link inline-flex items-center text-[13px] max-lg:min-h-11" data-routine-team-link>See it on Team<span class="sr-only">: {{ row.title }}</span></a>{% endif %}
                 {% elif row.needs_attention %}
                 {% include "studio/partials/pill.html" with tone="warning" icon="triangle" label="Needs you" data_state="" %}
                 {% elif not row.enabled %}

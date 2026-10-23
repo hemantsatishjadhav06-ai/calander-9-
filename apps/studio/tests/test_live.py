@@ -530,3 +530,136 @@ def test_the_refresh_stays_within_its_query_budget(client, world):
     # The snapshot plus the request's own session, user and membership lookups; no sidebar queries.
     assert len(fresh) <= 30
     assert len(cached) <= len(fresh) - 15
+
+
+# ---------------------------------------------------------------------------
+# Home's "Right now" card, and the links into the Team tab
+# ---------------------------------------------------------------------------
+
+
+def test_home_shows_the_right_now_card_under_today_to_staff(client, world):
+    brief = _brief(world.workspace, status=StudioBrief.Status.WORKING, stage=StudioBrief.Stage.COPY)
+    _run("copywriter", brief=brief, status=AgentRun.Status.RUNNING)
+
+    for user in (world.owner, world.editor):
+        cache.clear()
+        client.force_login(user)
+        response = client.get(_url("studio:index", world))
+        html = response.content.decode()
+
+        assert response.status_code == 200
+        assert html.count("data-live-strip") == 1 and "Right now" in html and "Open Team" in html
+        assert f'href="{_url("studio:team", world)}"' in html
+        assert f"{_url('studio:team_board', world)}?part=strip" in html and "js/live_board.js" in html
+        assert "Saturday site visit, free parking" in html and 'aria-current="step"' in html
+        # Under Today, in the same column, before the first-steps card and the conversation.
+        assert html.index("data-home-today") < html.index("data-live-strip") < html.index("data-home-thread")
+
+
+def test_home_leaves_the_card_out_for_viewers_without_the_permission(client, world):
+    client.force_login(world.viewer)
+    response = client.get(_url("studio:index", world))
+    html = response.content.decode()
+
+    assert response.status_code == 200
+    assert "data-live-strip" not in html and "Right now" not in html
+    # The Team tab itself stays open to them.
+    assert client.get(_url("studio:team", world)).status_code == 200
+
+
+def test_the_home_card_follows_create_or_approve(world, rf):
+    from apps.studio import views
+
+    membership = WorkspaceMembership.objects.get(user=world.editor, workspace=world.workspace)
+    request = rf.get("/")
+    request.workspace_membership = membership
+
+    assert views._live_strip(request, world.workspace, {"create_posts": True})["team_url"]
+    assert views._live_strip(request, world.workspace, {"create_posts": False, "approve_posts": True}) is not None
+    assert views._live_strip(request, world.workspace, {"create_posts": False, "approve_posts": False}) is None
+
+    client_user = world.viewer.__class__.objects.create_user(
+        email="client-home@example.com", password="pw-12345678", name="Client", tos_accepted_at=timezone.now()
+    )
+    request.workspace_membership = WorkspaceMembership.objects.create(
+        user=client_user, workspace=world.workspace, workspace_role="client"
+    )
+    assert views._live_strip(request, world.workspace, {"approve_posts": True}) is None
+
+
+def test_a_failing_snapshot_never_breaks_home(client, world, monkeypatch):
+    def boom(workspace, **kwargs):
+        raise RuntimeError("snapshot failed")
+
+    monkeypatch.setattr(live, "snapshot", boom)
+    client.force_login(world.owner)
+    response = client.get(_url("studio:index", world))
+
+    assert response.status_code == 200 and "data-live-strip" not in response.content.decode()
+
+
+def test_the_home_card_adds_no_queries_once_the_snapshot_is_cached(client, world, monkeypatch):
+    from apps.studio import views
+
+    _busy(world, 3)
+    monkeypatch.setattr(live, "CACHE_SECONDS", 300)  # the test must not race the real 3 s lifetime
+    client.force_login(world.owner)
+    url = _url("studio:index", world)
+    client.get(url)  # warm the session, the middleware and the snapshot caches
+    client.get(url)
+
+    with CaptureQueriesContext(connection) as cached:
+        assert "data-live-strip" in client.get(url).content.decode()
+    cache.delete(f"{live.CACHE_PREFIX}{world.workspace.pk}")
+    with CaptureQueriesContext(connection) as cold:
+        assert "data-live-strip" in client.get(url).content.decode()
+    original = views._live_strip
+    monkeypatch.setattr(views, "_live_strip", lambda *args: None)
+    with CaptureQueriesContext(connection) as without:
+        assert "data-live-strip" not in client.get(url).content.decode()
+    monkeypatch.setattr(views, "_live_strip", original)
+
+    assert len(cached) <= len(without) + 2, "a cached snapshot should cost Home next to nothing"
+    assert len(cold) <= len(without) + 22, "an uncached snapshot stays within its fixed budget"
+
+
+def test_the_routines_page_links_a_running_routine_to_the_team_tab(client, world):
+    Routine.objects.create(
+        workspace=world.workspace,
+        title="Morning plan",
+        instruction="Plan the day.",
+        created_by=world.owner,
+        status=Routine.Status.RUNNING,
+        next_run_at=timezone.now() + timedelta(hours=2),
+    )
+    Routine.objects.create(
+        workspace=world.workspace,
+        title="Evening check",
+        instruction="Check the day.",
+        created_by=world.owner,
+        next_run_at=timezone.now() + timedelta(hours=8),
+    )
+    client.force_login(world.owner)
+
+    html = client.get(_url("studio:routines", world)).content.decode()
+
+    assert html.count("data-routine-team-link") == 1
+    assert f'href="{_url("studio:team", world)}" class="ui-link' in html and "See it on Team" in html
+
+
+def test_set_up_links_autopilot_to_the_team_tab_once_it_is_on(client, world):
+    client.force_login(world.owner)
+    html = client.get(_url("studio:setup", world)).content.decode()
+    assert 'data-setup-link="autopilot"' not in html
+
+    AgencySettings.objects.create(workspace=world.workspace, autopilot_enabled=True, lead=world.owner)
+    html = client.get(_url("studio:setup", world)).content.decode()
+    assert 'data-setup-link="autopilot"' in html and "See your team at work" in html
+    assert f'href="{_url("studio:team", world)}"' in html
+
+
+def test_the_roster_names_no_vendor():
+    for agent in team.AGENTS:
+        lowered = agent.does.lower()
+        for banned in ("fal.ai", "fal ", "anthropic", "openrouter", "claude", "openai"):
+            assert banned not in lowered, (agent.slug, banned)

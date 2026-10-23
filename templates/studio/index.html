@@ -16,7 +16,7 @@
 
     {% include "components/agency_tabs.html" %}
 
-    {% comment %}Order at every width: Today, first steps, the conversation, In progress, Routines, Recent work.
+    {% comment %}Order at every width: Today, Right now, first steps, the conversation, In progress, Routines, Recent work.
     On a wide screen the conversation is the main column and Today sits beside it.{% endcomment %}
     <div class="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_372px] lg:items-start">
         <aside class="lg:col-start-2 lg:row-start-1 min-w-0 flex flex-col gap-6">
@@ -131,6 +131,9 @@
                 {% endif %}
             </section>
 
+            {# ---- Right now: the live team at a glance (apps.studio.live.snapshot; refreshes itself) ---- #}
+            {% if live %}{% include "studio/partials/live_strip.html" %}{% endif %}
+
             {% include "onboarding/partials/_checklist.html" %}
         </aside>
 
@@ -167,7 +170,7 @@
                 </div>
                 {% if routine_rows %}
                 <div class="ui-card p-0 overflow-hidden">
-                    {% include "studio/partials/routine_rows.html" with routines=routine_rows can_manage=can_manage_settings %}
+                    {% include "studio/partials/routine_rows.html" with routines=routine_rows can_manage=can_manage_settings team_url=team_url %}
                 </div>
                 {% else %}
                 {# The example is a task the manager carries out itself; the briefing is code-built, so it is one tap here. #}

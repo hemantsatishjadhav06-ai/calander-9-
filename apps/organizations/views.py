@@ -285,7 +285,7 @@ def cross_workspace_calendar(request):
     # Workspace colors for legend
     workspace_colors = {}
     for ws in workspaces:
-        workspace_colors[str(ws.id)] = ws.primary_color or "#F97316"
+        workspace_colors[str(ws.id)] = ws.primary_color or "#83888F"  # ink-400, as the templates fall back
 
     today = date.today()
 

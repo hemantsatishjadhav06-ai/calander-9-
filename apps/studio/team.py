@@ -159,7 +159,12 @@ AGENTS: tuple[AgentSpec, ...] = (
         jobs=("post", "blog"),
     ),
     AgentSpec(
-        "illustrator", "Illustrator", "creative", "Paints the picture (fal.ai).", kind="image", jobs=("post", "blog")
+        "illustrator",
+        "Illustrator",
+        "creative",
+        "Paints the picture for the post.",
+        kind="image",
+        jobs=("post", "blog"),
     ),
     AgentSpec(
         "designer",

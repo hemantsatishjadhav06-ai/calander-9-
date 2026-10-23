@@ -22,7 +22,8 @@
             <section aria-labelledby="routines-heading" class="ui-card p-0 overflow-hidden">
                 <h2 id="routines-heading" class="sr-only">Your routines</h2>
                 {% if routines %}
-                {% include "studio/partials/routine_rows.html" with routines=routines workspace=workspace can_manage=can_manage %}
+                {% url 'studio:team' workspace_id=workspace.id as team_url %}
+                {% include "studio/partials/routine_rows.html" with routines=routines workspace=workspace can_manage=can_manage team_url=team_url %}
                 {% else %}
                 <div class="ui-empty">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>

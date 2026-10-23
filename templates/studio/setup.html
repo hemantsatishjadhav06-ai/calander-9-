@@ -27,6 +27,7 @@
                 <p class="mt-0.5 text-sm text-ink-700 break-words">{{ row.status }}</p>
                 {% if row.note %}<p class="text-[13px]/[18px] text-ink-600 mt-1 break-words">{{ row.note }}</p>{% endif %}
                 {% if row.detail %}<p class="ui-owner-box mt-2 break-words"><span class="font-semibold text-ink-900">For the owner:</span> {{ row.detail }}</p>{% endif %}
+                {% if row.link %}<p class="mt-1"><a href="{{ row.link.url }}" class="ui-link inline-flex items-center max-lg:min-h-11" data-setup-link="{{ row.key }}">{{ row.link.label }}</a></p>{% endif %}
             </div>
             {% if row.action %}
             {% if row.state != 'done' %}{% cycle 'ui-btn-primary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' as setup_tone silent %}{% endif %}
