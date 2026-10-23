@@ -2,59 +2,57 @@
 <div id="msg-{{ message.id }}"
      class="inbox-row {% if message.status == 'unread' %}is-unread{% endif %}"
      @click="selectMessage('{{ message.id }}', '{% url 'inbox:message_detail' workspace_id=workspace.id message_id=message.id %}')"
+     @keydown.enter.self.prevent="selectMessage('{{ message.id }}', '{% url 'inbox:message_detail' workspace_id=workspace.id message_id=message.id %}')"
      role="button"
-     tabindex="0">
+     tabindex="0"
+     aria-label="{% if message.status == 'unread' %}Unread. {% endif %}{{ message.get_message_type_display }} from {{ message.sender_name }}">
 
     <!-- Checkbox -->
-    <div class="flex-shrink-0 pt-0.5" @click.stop>
+    <label class="-m-1 grid size-6 flex-shrink-0 cursor-pointer place-items-center self-start rounded" @click.stop>
         <input type="checkbox"
                :checked="isSelected('{{ message.id }}')"
                @change="toggleSelect('{{ message.id }}')"
-               aria-label="Select message"
-               class="w-3.5 h-3.5 rounded border-ink-400 text-brand-700 focus:ring-brand-600/20 cursor-pointer">
-    </div>
+               aria-label="Select message from {{ message.sender_name }}"
+               class="ui-checkbox cursor-pointer">
+    </label>
 
-    <!-- Platform icon -->
-    <div class="flex-shrink-0 pt-0.5">
-        {% include "partials/_platform_icon.html" with platform=message.social_account.platform size="sm" %}
-    </div>
-
-    <!-- Avatar -->
-    <div class="flex-shrink-0">
+    <!-- Avatar with the platform's glyph -->
+    <div class="relative flex-shrink-0 self-start">
         {% if message.sender_avatar_url %}
-        <img src="{{ message.sender_avatar_url }}" alt="" class="w-8 h-8 rounded-full object-cover">
+        <img src="{{ message.sender_avatar_url }}" alt="" class="size-9 rounded-full object-cover">
         {% else %}
-        <div class="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-ink-500" style="background: var(--surface-2);">
+        <div class="grid size-9 place-items-center rounded-full bg-ink-100 text-[13px] font-semibold text-ink-700" aria-hidden="true">
             {{ message.sender_name|make_list|first|upper }}
         </div>
         {% endif %}
+        <span class="absolute -bottom-1 -right-1 grid size-[18px] place-items-center rounded-full bg-white ring-1 ring-ink-200 [&>svg]:size-3" title="{{ message.social_account.get_platform_display }}">
+            {% include "partials/_platform_icon.html" with platform=message.social_account.platform size="sm" %}
+        </span>
     </div>
 
     <!-- Content -->
-    <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 mb-0.5">
-            <span class="inbox-row-sender text-[13px] font-semibold text-ink-700 truncate">{{ message.sender_name }}</span>
+    <div class="min-w-0 flex-1">
+        <div class="flex items-baseline gap-2">
+            <span class="inbox-row-sender truncate text-sm font-semibold text-ink-900">{{ message.sender_name }}</span>
             {% if message.sender_handle %}
-            <span class="text-[11px] text-ink-500 truncate">@{{ message.sender_handle }}</span>
+            <span class="hidden truncate text-caption text-ink-500 sm:inline">@{{ message.sender_handle }}</span>
             {% endif %}
-            <span class="text-[11px] text-ink-500 ml-auto flex-shrink-0" title="{{ message.received_at|date:'N j, Y g:i A' }}">{{ message.received_at|timesince }} ago</span>
+            <span class="ml-auto flex-shrink-0 text-caption tabular-nums text-ink-500" title="{{ message.received_at|date:'j F Y, H:i' }}">{{ message.received_at|timesince }} ago</span>
         </div>
-        <p class="inbox-row-preview text-[12px] text-ink-500 truncate leading-snug">{{ message.body|truncatewords:20 }}</p>
-        <div class="flex items-center gap-1.5 mt-1.5">
-            <!-- Type badge -->
+        <p class="inbox-row-preview mt-0.5 truncate text-small text-ink-600">{{ message.body|truncatewords:20 }}</p>
+        <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span class="badge-pill badge-type">{{ message.get_message_type_display }}</span>
-            <!-- Status badge -->
-            <span class="badge-pill badge-status-{{ message.status }}">{{ message.get_status_display }}</span>
-            <!-- Sentiment badge -->
+            {% include "inbox/partials/_status_badge.html" %}
+            {% if message.sentiment != 'neutral' %}
             {% include "inbox/partials/_sentiment_badge.html" %}
-            <!-- Assignment -->
+            {% endif %}
             {% if message.assigned_to %}
-            <span class="badge-pill" style="background: var(--accent-indigo-soft); color: var(--accent-indigo);">
-                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                {{ message.assigned_to.get_short_name|default:message.assigned_to.email|truncatechars:10 }}
+            <span class="inline-flex items-center gap-1 text-caption text-ink-600">
+                <svg class="size-3 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <span class="sr-only">Assigned to</span>
+                {{ message.assigned_to.get_short_name|default:message.assigned_to.email|truncatechars:14 }}
             </span>
             {% endif %}
-            <!-- SLA -->
             {% if sla_config and sla_config.is_active and message.status != 'resolved' and message.status != 'archived' %}
             <span class="sla-countdown ml-auto"
                   :class="getSlaClass('{{ message.received_at|date:'c' }}')"

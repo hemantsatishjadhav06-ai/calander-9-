@@ -1,37 +1,44 @@
 {% load humanize %}
 {# One pending reply: a draft awaiting review, or a failed send awaiting retry. #}
-<div class="rounded-lg border px-3 py-2.5 {% if draft.status == 'failed' %}border-danger-200 bg-danger-50{% else %}border-ink-200 bg-ink-50{% endif %}">
-    <div class="flex items-center gap-2 mb-1">
+<div class="rounded-xl px-3.5 py-3 ring-1 ring-inset {% if draft.status == 'failed' %}bg-danger-50 ring-danger-200{% else %}bg-white ring-ink-200{% endif %}">
+    <div class="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
         {% if draft.status == 'failed' %}
-        <span class="badge-pill" style="background: var(--danger-100); color: var(--error-700);">Failed</span>
+        <span class="ui-pill ui-pill-danger">
+            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+            Not sent
+        </span>
         {% else %}
-        <span class="badge-pill" style="background: var(--surface-2); color: var(--ink-600);">Draft</span>
+        <span class="ui-pill">
+            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg>
+            Draft
+        </span>
         {% endif %}
         {% if draft.drafted_by %}
-        <span class="text-[11px] font-semibold text-brand-800">{% if draft.drafted_by == 'reputation_manager' %}Drafted by the reviews manager{% else %}Drafted by the community manager{% endif %} · check it before you send</span>
+        <span class="text-caption font-medium text-ink-700">{% if draft.drafted_by == 'reputation_manager' %}Drafted by the reviews manager{% else %}Drafted by the community manager{% endif %} · check it before you send</span>
         {% else %}
-        <span class="text-[11px] text-ink-500">{{ draft.author.get_short_name|default:draft.author.email|default:"—" }}</span>
+        <span class="text-caption text-ink-600">{{ draft.author.get_short_name|default:draft.author.email|default:"—" }}</span>
         {% endif %}
-        <span class="text-[11px] text-ink-500 ml-auto">{{ draft.created_at|timesince }} ago</span>
+        <span class="ml-auto text-caption text-ink-500">{{ draft.created_at|timesince }} ago</span>
     </div>
-    <p class="text-[13px] text-ink-700 leading-relaxed whitespace-pre-wrap">{{ draft.body }}</p>
+    <p class="whitespace-pre-wrap text-sm text-ink-900">{{ draft.body }}</p>
     {% if draft.status == 'failed' and draft.send_error %}
-    <p class="text-[11px] text-danger-600 mt-1">Last attempt failed: {{ draft.send_error }}</p>
+    <p class="mt-1.5 text-small text-danger-600">Last attempt failed: {{ draft.send_error }}</p>
     {% endif %}
-    <div class="flex items-center gap-2 mt-2">
-        <button hx-post="{% url 'inbox:send_reply_draft' workspace_id=workspace.id reply_id=draft.id %}"
+    <div class="mt-2.5 flex items-center gap-2">
+        <button type="button"
+                hx-post="{% url 'inbox:send_reply_draft' workspace_id=workspace.id reply_id=draft.id %}"
                 hx-target="#inbox-detail-panel"
                 hx-swap="innerHTML"
                 hx-disabled-elt="this"
-                class="inline-flex items-center gap-1 px-3 py-1 text-[11px] font-semibold text-white rounded-full transition-all"
-                style="background: var(--primary-strong); box-shadow: var(--shadow-primary);">
+                class="ui-btn ui-btn-tinted ui-btn-sm">
             {% if draft.status == 'failed' %}Retry send{% else %}Send{% endif %}
         </button>
-        <button hx-post="{% url 'inbox:discard_reply_draft' workspace_id=workspace.id reply_id=draft.id %}"
+        <button type="button"
+                hx-post="{% url 'inbox:discard_reply_draft' workspace_id=workspace.id reply_id=draft.id %}"
                 hx-target="#inbox-detail-panel"
                 hx-swap="innerHTML"
                 hx-confirm="Discard this draft reply?"
-                class="inline-flex items-center gap-1 px-3 py-1 text-[11px] font-medium text-ink-500 hover:text-ink-700 rounded-full border border-ink-200 hover:bg-ink-25 transition-all">
+                class="ui-btn ui-btn-ghost ui-btn-sm">
             Discard
         </button>
     </div>
