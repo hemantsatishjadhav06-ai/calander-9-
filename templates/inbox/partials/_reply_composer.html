@@ -67,6 +67,7 @@
                             hx-post="{% url 'inbox:save_reply_draft' workspace_id=workspace.id message_id=message.id %}"
                             hx-target="#inbox-detail-panel"
                             hx-swap="innerHTML"
+                            hx-disabled-elt="this"
                             :disabled="!replyText.trim()"
                             class="ui-btn ui-btn-secondary ui-btn-sm">
                         Save as draft
