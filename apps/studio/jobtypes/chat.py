@@ -74,6 +74,8 @@ TOO_MANY_WAITING = (
 STARTED_REPLY = "The team is on it. The draft comes back here for your approval."
 GO_AHEAD_REPLY = "Here's the brief I'd run with. Change anything, or go ahead."
 ROUTINE_PROPOSED = "Here's the routine. Turn it on and it runs by itself; the results land in this thread."
+#: A private Telegram chat has no card and is not where the routine runs: say where to turn it on and where it lands.
+ROUTINE_PROPOSED_ELSEWHERE = "Here's the routine. Turn it on from Routines and it runs by itself; the results land in the team thread on the web."
 #: Telegram has no brief card in the reply itself; the mirror removes this line when it attaches the button.
 TELEGRAM_BRIEF_HINT = "Send /brief to open the confirmation card."
 ROUTINE_NOT_MADE = "I couldn't set that routine up:"
@@ -1196,7 +1198,9 @@ def _auto_eligible(job, conversation, trigger, speaker: str) -> bool:
 
     The team's own threads are the internal web threads and a team member's
     private Telegram chat. Clients, client threads and Telegram groups always
-    confirm.
+    confirm. A routine's instruction (``kind="routine"``) goes ahead whatever
+    the workspace's creation mode: nobody is there to tap, and the finished
+    post still waits for a person's approval.
     """
     if speaker != "staff" or trigger.author_kind != Message.AuthorKind.STAFF:
         return False
@@ -1204,6 +1208,8 @@ def _auto_eligible(job, conversation, trigger, speaker: str) -> bool:
         return False
     if (job.input or {}).get("telegram_context") is not None and not chat.is_private_conversation(conversation):
         return False
+    if (job.input or {}).get("kind") == "routine":
+        return True
     return chat.creation_mode(conversation.workspace) == AgencySettings.CreationMode.AUTO
 
 
@@ -1663,7 +1669,8 @@ def _set_routine(conversation, requester, membership, out, trigger, reply: str) 
     Nothing runs here: the routine starts the same work a person could start
     by typing, on its schedule, once a person has turned it on. A private
     Telegram chat's routine runs in the workspace's general team thread, as
-    every routine does when its own thread is not a shared one.
+    every routine does when its own thread is not a shared one; its reply
+    says so, and the Telegram mirror adds the link to turn it on.
     """
     from .. import routines
 
@@ -1671,6 +1678,7 @@ def _set_routine(conversation, requester, membership, out, trigger, reply: str) 
         return Outcome(NOT_ALLOWED, "set_routine", Message.ActionStatus.NEEDS_HUMAN, notify_staff=True)
     instruction = (out.routine_instruction or "").strip() or (out.instructions or "").strip() or trigger.body
     weekday = out.routine_weekday if out.routine_cadence == "weekly" and 0 <= out.routine_weekday <= 6 else None
+    private = chat.is_private_conversation(conversation)
     try:
         routine = routines.propose(
             conversation.workspace,
@@ -1679,12 +1687,12 @@ def _set_routine(conversation, requester, membership, out, trigger, reply: str) 
             cadence=out.routine_cadence or "",
             weekday=weekday,
             time=_routine_time(out.routine_time),
-            conversation=None if chat.is_private_conversation(conversation) else conversation,
+            conversation=None if private else conversation,
         )
     except routines.RoutineError as exc:
         return Outcome(f"{ROUTINE_NOT_MADE} {exc}", "set_routine", Message.ActionStatus.DECLINED)
     return Outcome(
-        _sentences(reply) or ROUTINE_PROPOSED,
+        ROUTINE_PROPOSED_ELSEWHERE if private else (_sentences(reply) or ROUTINE_PROPOSED),
         "set_routine",
         result={"routine_id": str(routine.pk), "routine_cadence": routines.cadence_words(routine)},
     )

@@ -80,6 +80,51 @@ def test_routines_is_for_the_team_not_clients(hub):  # noqa: F811
 
 
 # ---------------------------------------------------------------------------
+# A routine proposed from the phone can be turned on, and says where it runs
+# ---------------------------------------------------------------------------
+
+
+def test_a_routine_proposed_in_a_private_chat_arrives_with_the_way_to_turn_it_on(hub, monkeypatch):  # noqa: F811
+    from apps.studio import engine
+    from apps.studio.jobtypes import chat as chat_job
+    from apps.studio.models import AgencyJob, Message
+    from apps.studio.roles import client as client_roles
+    from apps.studio.tests.test_chat import FakeAccountManager
+
+    manager = FakeAccountManager(
+        action="set_routine",
+        reply="Every weekday at 08:30 I'll draft a market update. The results land in this thread.",
+        routine_instruction="Draft a market update.",
+        routine_cadence="weekdays",
+        routine_time="08:30",
+    )
+    monkeypatch.setattr(client_roles, "account_manager", manager)
+    monkeypatch.setattr(timezone, "now", lambda: dt.datetime.now(dt.UTC))  # a real clock: the job's run is timed
+    monkeypatch.setattr(chat_job, "_collect_sources", lambda *args, **kwargs: {})
+    bound = provisioning.private_chat(hub.connection, hub.links["owner"])
+
+    result = send(hub, "Every weekday at 8:30 draft a market update", role="owner", bound=bound)
+    job = AgencyJob.objects.get(pk=result["job_id"])
+    engine.run_step(str(job.pk), job.revision, job.stage)
+
+    routine = Routine.objects.get(workspace=hub.ws)
+    assert not routine.enabled and routine.conversation_id is None  # runs in the team thread on the web
+    reply = Message.objects.get(job=job, author_kind="agent")
+    assert reply.body == chat_job.ROUTINE_PROPOSED_ELSEWHERE and "this thread" not in reply.body
+    TelegramDelivery.objects.all().delete()
+    assert notifications.mirror_message(reply.pk) == 1
+    row = TelegramDelivery.objects.get(chat=bound)
+    assert reply.body in row.payload["text"]
+    assert [button["text"] for button in _buttons(row)] == ["Open Routines to turn it on"]
+    assert _buttons(row)[0]["url"].endswith(f"/workspace/{hub.ws.pk}/studio/routines/")
+    # Another person's private chat gets no button; a client group never would; the team group does.
+    other = provisioning.private_chat(hub.connection, hub.links["editor"])
+    assert notifications._routine_markup(reply, other) is None
+    assert notifications._routine_markup(reply, hub.client_chat) is None
+    assert notifications._routine_markup(reply, hub.team_chat) is not None
+
+
+# ---------------------------------------------------------------------------
 # A routine that needs a person reaches the manager inbox
 # ---------------------------------------------------------------------------
 

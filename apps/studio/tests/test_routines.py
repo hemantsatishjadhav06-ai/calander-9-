@@ -24,8 +24,18 @@ from apps.members.models import WorkspaceMembership
 from apps.notifications.models import EventType, Notification
 from apps.studio import autopilot, chat, engine, routines, tasks
 from apps.studio.jobtypes import chat as chat_job
-from apps.studio.models import AgencyJob, AgencySettings, AutopilotWeek, Conversation, Message, Routine, RoutineRun
+from apps.studio.models import (
+    AgencyJob,
+    AgencySettings,
+    AutopilotWeek,
+    Conversation,
+    Message,
+    Routine,
+    RoutineRun,
+    StudioBrief,
+)
 from apps.studio.roles import client as client_roles
+from apps.studio.tests.conftest import run_all
 from apps.studio.tests.test_chat import FakeAccountManager, assert_nothing_approved, drive
 from apps.studio.tests.test_insights import agency_settings, install_fake_agency, overspend
 
@@ -429,7 +439,7 @@ class TestLease:
         job.refresh_from_db()
         assert job.is_active  # the job is left for a person to look at
         notice = _notices(world.editor).get()
-        assert "stopped during this run" in notice.body
+        assert "stopped part-way" in notice.body and "worker" not in notice.body
         row = routines.rows(world.workspace)[0]
         assert row["last_result"] == routines.INTERRUPTED and row["next_run_words"] == "" and row["needs_attention"]
 
@@ -450,6 +460,56 @@ class TestLease:
         assert routines.settle_running(now=late) == 1
         running.refresh_from_db()
         assert running.status == Routine.Status.IDLE and running.runs.get().status == RoutineRun.Status.FINISHED
+
+    def test_a_job_still_queued_behind_other_work_keeps_its_lease(self, world, running, jobs, monkeypatch):
+        """A busy day is not a dead run: the queue still holds the job, so the routine waits with it."""
+        job = the_job(running)
+        monkeypatch.setattr(engine, "_has_pending_task", lambda *args, **kwargs: True)
+        late = WEDNESDAY + routines.LEASE + dt.timedelta(minutes=1)
+
+        assert routines.settle_running(now=late) == 0
+
+        running.refresh_from_db()
+        assert running.status == Routine.Status.RUNNING and running.lease_until == late + routines.LEASE
+        assert running.runs.get().status == RoutineRun.Status.RUNNING and not _notices(world.editor).exists()
+        # A job the engine holds for a pause reason it resumes by itself is waiting too.
+        monkeypatch.setattr(engine, "_has_pending_task", lambda *args, **kwargs: False)
+        AgencyJob.objects.filter(pk=job.pk).update(error=autopilot.PROVIDER_PAUSED)
+        later = late + routines.LEASE + dt.timedelta(minutes=1)
+        assert routines.settle_running(now=later) == 0
+        running.refresh_from_db()
+        assert running.status == Routine.Status.RUNNING and running.lease_until == later + routines.LEASE
+        # Once nothing holds the job any more, the lease really expires.
+        AgencyJob.objects.filter(pk=job.pk).update(error="")
+        last = later + routines.LEASE + dt.timedelta(minutes=1)
+        assert routines.settle_running(now=last) == 1
+        running.refresh_from_db()
+        assert running.status == Routine.Status.INTERRUPTED
+
+    def test_resume_after_an_interruption_puts_it_back_on_its_schedule(self, client, world, running, jobs):
+        late = WEDNESDAY + routines.LEASE + dt.timedelta(minutes=1)
+        assert routines.settle_running(now=late) == 1
+        running.refresh_from_db()
+        assert running.status == Routine.Status.INTERRUPTED
+
+        routines.set_enabled(running, False, now=late)
+        running.refresh_from_db()
+        assert running.status == Routine.Status.INTERRUPTED and not running.enabled  # pausing changes nothing else
+        routines.set_enabled(running, True, now=late)
+
+        running.refresh_from_db()
+        assert running.enabled and running.status == Routine.Status.IDLE and running.last_error == ""
+        row = routines.rows(world.workspace)[0]
+        assert row["next_run_words"] and not row["needs_attention"]
+        # The next run the page announced is one the tick really takes.
+        assert routines.run_due(now=running.next_run_at) == 1
+        assert len(jobs) == 2
+        # From the page: Resume says the next run, and that run is on the schedule.
+        client.force_login(world.editor)
+        Routine.objects.filter(pk=running.pk).update(status=Routine.Status.INTERRUPTED, enabled=False)
+        response = client.post(_url("studio:routines_toggle", world, routine_id=running.pk), follow=True)
+        assert "On. Next run" in response.content.decode()
+        assert Routine.objects.get(pk=running.pk).status == Routine.Status.IDLE
 
 
 # ---------------------------------------------------------------------------
@@ -610,6 +670,94 @@ def test_the_tick_settles_then_starts(world, running, manager_agent, jobs):
     running.refresh_from_db()
     other.refresh_from_db()
     assert running.status == Routine.Status.IDLE and other.status == Routine.Status.RUNNING
+
+
+# ---------------------------------------------------------------------------
+# A routine's instruction goes ahead on its own
+# ---------------------------------------------------------------------------
+
+
+class TestRoutinePosts:
+    """Nobody is typing when a routine runs: a post it proposes starts without a tap, in every creation mode."""
+
+    @pytest.fixture
+    def post_manager(self, monkeypatch):
+        from apps.studio.tests.test_conversation_manager import topic_only
+        from apps.studio.tests.test_guided_chat import GuidedManager
+
+        manager = GuidedManager(creative_brief=topic_only())
+        monkeypatch.setattr(client_roles, "account_manager", manager)
+        monkeypatch.setattr(chat_job, "_collect_sources", lambda *args, **kwargs: {})
+        return manager
+
+    def test_a_due_instruction_that_proposes_a_post_starts_the_brief_in_confirm_mode(
+        self, world, jobs, fake_team, post_manager
+    ):
+        assert chat.creation_mode(world.workspace) == AgencySettings.CreationMode.CONFIRM
+        routine = due(make_routine(world, user=world.editor, instruction="Draft a market update for LinkedIn."))
+
+        assert routines.run_due(now=WEDNESDAY) == 1
+        job = drive(the_job(routine))
+
+        assert job.status == AgencyJob.Status.DONE and post_manager.calls[-1]["request_kind"] == "routine"
+        assert job.result["auto_started"] is True and job.result["awaiting_confirmation"] is False
+        brief = StudioBrief.objects.get(workspace=world.workspace)
+        assert brief.status == StudioBrief.Status.QUEUED and brief.origin == StudioBrief.Origin.CHAT
+        assert brief.requested_by == world.editor and brief.author == world.editor and brief.job_id == job.pk
+        assert job.result["brief_id"] == str(brief.pk) and fake_team.queued == [(brief.pk, 1, "strategy")]
+        reply = Message.objects.get(job=job, author_kind=Message.AuthorKind.AGENT)
+        assert reply.action_status == Message.ActionStatus.STARTED and reply.body.startswith("On it")
+        assert routines.settle_running(now=WEDNESDAY + dt.timedelta(minutes=5)) == 1
+        routine.refresh_from_db()
+        assert routine.status == Routine.Status.IDLE and routine.runs.get().status == RoutineRun.Status.FINISHED
+
+        run_all(brief)
+
+        # The finished post waits for a person, exactly as a typed idea's would.
+        assert brief.status == StudioBrief.Status.READY
+        assert set(PlatformPost.objects.filter(post=brief.post).values_list("status", flat=True)) == {"pending_review"}
+        assert_nothing_approved(world.workspace)
+
+    def test_a_person_typing_the_same_words_still_waits_for_the_tap(self, world, jobs, fake_team, post_manager):
+        conversation = chat.general_conversation(world.workspace, created_by=world.editor)
+
+        job = drive(chat.post_message(conversation, world.editor, "Draft a market update for LinkedIn.").job)
+
+        assert job.result["awaiting_confirmation"] is True and not job.result.get("auto_started")
+        assert not StudioBrief.objects.exists() and fake_team.queued == []
+
+    def test_a_routine_in_a_telegram_team_group_still_waits_for_the_tap(self, world, jobs, fake_team, post_manager):
+        """The team's own threads only: a group chat is never started without a tap, routine or not."""
+        from apps.telegram.models import TelegramChat, TelegramConnection
+
+        connection = TelegramConnection.objects.create(
+            workspace=world.workspace, token="t", webhook_secret="s", bot_id=1, bot_username="b", is_active=True
+        )
+        group = Conversation.objects.create(workspace=world.workspace, audience=Conversation.Audience.INTERNAL)
+        TelegramChat.objects.create(
+            connection=connection, chat_id=-5, chat_type="group", audience="team", conversation=group
+        )
+        job = engine.create(
+            world.workspace,
+            AgencyJob.Kind.CHAT,
+            input={"kind": "routine", "telegram_context": {}},
+            requested_by=world.editor,
+            conversation=group,
+        )
+        trigger = Message(conversation=group, author=world.editor, author_kind=Message.AuthorKind.STAFF, body="x")
+
+        assert not chat_job._auto_eligible(job, group, trigger, "staff")
+        general = chat.general_conversation(world.workspace, created_by=world.editor)
+        web_job = engine.create(
+            world.workspace,
+            AgencyJob.Kind.CHAT,
+            input={"kind": "routine"},
+            requested_by=world.editor,
+            conversation=general,
+        )
+        assert chat_job._auto_eligible(web_job, general, trigger, "staff")
+        assert not chat_job._auto_eligible(web_job, general, trigger, "client")
+        assert not StudioBrief.objects.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -1123,9 +1271,24 @@ class TestHomeRows:
         assert "All routines" in html and "Run now" in html
 
     def test_without_routines_home_says_how_to_start_one(self, client, world):
+        """The example is a task the manager carries out itself; the morning briefing is its own one tap."""
+        from html import unescape
+
         client.force_login(world.editor)
-        html = client.get(_url("studio:index", world)).content.decode()
+        html = unescape(client.get(_url("studio:index", world)).content.decode())
         assert "data-home-routines-empty" in html and _url("studio:routines", world) in html
+        assert "every Monday at 9 draft a market update" in html and "tell me what's waiting" not in html
+        assert "data-home-morning-briefing" in html and 'name="suggestion" value="morning"' in html
+
+        response = client.post(
+            _url("studio:routines_create", world), {"suggestion": "morning", "next": _url("studio:index", world)}
+        )
+
+        assert response.status_code == 302 and response["Location"] == _url("studio:index", world)
+        routine = Routine.objects.get()
+        assert routine.kind == Routine.Kind.BRIEFING and routine.enabled and routine.time == dt.time(8, 30)
+        home = client.get(_url("studio:index", world)).content.decode()
+        assert "data-home-morning-briefing" not in home and "Morning briefing" in home
 
     def test_a_viewer_gets_no_routines_section(self, client, world):
         make_routine(world, user=world.editor, title="Mornings")

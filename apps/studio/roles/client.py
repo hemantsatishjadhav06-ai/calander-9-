@@ -73,8 +73,8 @@ ACCOUNT_MANAGER = (
     "- revise_copy, revise_design, new_picture and new_angles change the post in <item>; use them only when the "
     "person asks for that change to that post.\n"
     "- new_post when they ask for a new post. edit_blog when they ask for changes to the article in <item>.\n"
-    "- set_routine when they want something done on a schedule (\"every weekday at 8:30 tell me what's "
-    'waiting", "every Monday at 9 draft a market update"). Fill routine_instruction with what to do each time, '
+    '- set_routine when they want something done on a schedule ("every Monday at 9 draft a market update", '
+    '"every weekday at 17:00 draft replies to new comments"). Fill routine_instruction with what to do each time, '
     "in their words; routine_cadence with daily, weekdays or weekly; routine_weekday with 0 (Monday) to 6 "
     "(Sunday) for weekly, else -1; routine_time with the time of day as HH:MM (24-hour, their local time; 09:00 "
     "when they name none). It only proposes: the person turns the routine on with one tap, so never say it is "

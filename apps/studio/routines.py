@@ -8,7 +8,8 @@ market update" becomes a :class:`~apps.studio.models.Routine`. A worker tick
    (idle, with the reply as the run's summary), failed or cancelled (failed),
    or its 45-minute lease ran out while the job is still active (interrupted,
    not started again, not even at its next time, until a person checks what it
-   did and runs it again);
+   did and runs it again or resumes it); a job that is only queued behind
+   other work keeps its lease;
 2. :func:`run_due` starts routines whose time has come, under a row lock that
    a second tick skips, after the same gates every other automatic action
    passes (eligible workspace, provider configured, budget, the author still
@@ -49,7 +50,7 @@ SUMMARY_CHARS = 200
 MAX_INSTRUCTION = 2000
 MAX_TITLE = 120
 
-INTERRUPTED = "The worker stopped during this run. Check what it did, then run it again."
+INTERRUPTED = "This run stopped part-way. Check what it did, then run it again."
 BRIEFING_UNAVAILABLE = "Briefing is not available yet"
 BRIEFING_FAILED = "The briefing could not be sent. Run it again."
 AUTHOR_GONE = "The person who wrote this routine is no longer on your team. Delete it, or write it again."
@@ -270,12 +271,21 @@ def suggestion(workspace, user, key: str) -> Routine:
 
 
 def set_enabled(routine: Routine, enabled: bool, now: dt.datetime | None = None) -> Routine:
-    """Pause or resume. Resuming schedules the next run from now; nothing runs early."""
+    """Pause or resume. Resuming schedules the next run from now; nothing runs early.
+
+    Resuming an interrupted routine is the person's "run it again": it goes
+    back on its schedule (idle), so the next run the page announces is one the
+    tick will take.
+    """
     routine.enabled = enabled
     fields = ["enabled", "updated_at"]
     if enabled:
         routine.next_run_at = next_run(routine, now)
         fields.append("next_run_at")
+        if routine.status == Routine.Status.INTERRUPTED:
+            routine.status = Routine.Status.IDLE
+            routine.last_error = ""
+            fields += ["status", "last_error"]
     routine.save(update_fields=fields)
     return routine
 
@@ -419,7 +429,12 @@ def _settle_one(routine: Routine, now: dt.datetime) -> bool:
         _notify_creator(routine, run, error)
         return True
     if expired:
-        # The job is still queued or working past the lease: the worker most
+        if _still_waiting_its_turn(job):
+            # The job is healthy, only queued behind other work or held by a
+            # pause reason the engine resumes by itself: give it another lease.
+            _set(routine, now, lease_until=now + LEASE)
+            return False
+        # The job is still queued or working past the lease: the run most
         # likely died with it. Leave the job as it is for a person to look at;
         # the routine is not started again until someone says so.
         _set(routine, now, status=Routine.Status.INTERRUPTED, lease_until=None, last_error=INTERRUPTED)
@@ -427,6 +442,23 @@ def _settle_one(routine: Routine, now: dt.datetime) -> bool:
         _notify_creator(routine, run, INTERRUPTED)
         return True
     return False
+
+
+def _still_waiting_its_turn(job: AgencyJob) -> bool:
+    """A queued job the background queue still holds, or one paused by policy: waiting, not lost.
+
+    The same two signs ``engine.sweep_stuck`` spares, so a long queue on a
+    busy day never turns a healthy routine into an interrupted one.
+    """
+    from . import autopilot, engine
+
+    if job.status != AgencyJob.Status.QUEUED:
+        return False
+    if job.error in autopilot.PAUSE_REASONS:
+        return True
+    return engine._has_pending_task(
+        "apps.studio.tasks.run_agency_step", str(job.pk), revision=job.revision, stage=job.stage
+    )
 
 
 def settle_running(now: dt.datetime | None = None) -> int:

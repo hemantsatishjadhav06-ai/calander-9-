@@ -8,8 +8,9 @@
     {# ---- Greeting and one status line ---- #}
     <header class="mb-4">
         <h1 class="text-2xl sm:text-3xl text-stone-900" style="font-family: var(--font-display)">{{ greeting }}</h1>
-        <p class="text-sm text-stone-600 mt-1" data-home-status>
-            {% for part in status_parts %}{% if not forloop.first %}<span aria-hidden="true"> · </span>{% endif %}<span class="whitespace-nowrap">{{ part.text }}{% if part.url %} · <a href="{{ part.url }}" class="font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">{{ part.link }}</a>{% endif %}</span>{% endfor %}
+        {# Each part may wrap (a bot name can be long); only a part's link stays on one line. #}
+        <p class="text-sm text-stone-600 mt-1 break-words" data-home-status>
+            {% for part in status_parts %}{% if not forloop.first %}<span aria-hidden="true"> · </span>{% endif %}<span>{{ part.text }}{% if part.url %} · <a href="{{ part.url }}" class="whitespace-nowrap font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">{{ part.link }}</a>{% endif %}</span>{% endfor %}
         </p>
     </header>
 
@@ -149,7 +150,16 @@
                     {% include "studio/partials/routine_rows.html" with routines=routine_rows can_manage=can_manage_settings %}
                 </div>
                 {% else %}
-                <p class="text-sm text-stone-600" data-home-routines-empty>Nothing runs on its own yet. Tell your manager “every weekday at 8:30 tell me what's waiting”, or <a href="{% url 'studio:routines' workspace_id=workspace.id %}" class="underline font-semibold text-orange-800 rounded focus-visible:outline-2 focus-visible:outline-orange-700">pick a routine</a>.</p>
+                {# The example is a task the manager carries out itself; the briefing is code-built, so it is one tap here. #}
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3" data-home-routines-empty>
+                    <p class="text-sm text-stone-600 sm:flex-1">Nothing runs on its own yet. Tell your manager “every Monday at 9 draft a market update”, or <a href="{% url 'studio:routines' workspace_id=workspace.id %}" class="underline font-semibold text-orange-800 rounded focus-visible:outline-2 focus-visible:outline-orange-700">pick a routine</a>.</p>
+                    <form method="post" action="{% url 'studio:routines_create' workspace_id=workspace.id %}" data-home-morning-briefing>
+                        {% csrf_token %}
+                        <input type="hidden" name="suggestion" value="morning">
+                        <input type="hidden" name="next" value="{% url 'studio:index' workspace_id=workspace.id %}">
+                        <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Morning briefing in Telegram, weekdays 08:30</button>
+                    </form>
+                </div>
                 {% endif %}
             </section>
             {% endif %}

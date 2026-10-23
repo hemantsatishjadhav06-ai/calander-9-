@@ -64,6 +64,27 @@ def _progress_markup(message, chat):
     return link_keyboard(link_button("Open progress", path))
 
 
+def _routine_markup(message, chat):
+    """A routine the manager proposed: Telegram has no card, so the reply carries the way to turn it on.
+
+    The button is a plain link to the Routines page (its own permissions
+    apply there); it goes to the team's chats only: the requester's private
+    chat and the internal team group, never a client group.
+    """
+    job = _agent_result(message)
+    if job is None or chat.audience == "client" or job.result.get("message_id") != str(message.pk):
+        return None
+    if chat.audience == "private" and chat.private_user_id != job.requested_by_id:
+        return None
+    if not job.result.get("routine_id"):
+        return None
+    return link_keyboard(
+        link_button(
+            "Open Routines to turn it on", reverse("studio:routines", kwargs={"workspace_id": job.workspace_id})
+        )
+    )
+
+
 def brief_card(message_id, chat_id):
     """Attach the one-use confirm button to the manager's brief in the requester's private chat.
 
@@ -141,6 +162,8 @@ def mirror_message(message_id):
         markup = _progress_markup(message, chat)
         if markup is not None:
             text += "\n\nThe team started."
+        else:
+            markup = _routine_markup(message, chat)
         if queue_message(
             chat, text, source_key=f"conversation:{message.conversation_id}:message:{message.pk}", reply_markup=markup
         ):
