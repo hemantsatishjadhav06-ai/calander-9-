@@ -325,20 +325,33 @@ def account_analytics_bundle(account: SocialAccount, days: int) -> dict[str, Any
     # metrics can refresh hourly; without this freshness check the main graph
     # can lag behind the post drawer/table even though newer post snapshots are
     # already stored.
+    #
+    # Only the days the account sync may not have finished can lag: its latest
+    # day and anything after it. Earlier days already hold the account's full
+    # total, which a sum over the posts we know about can only under-count, so
+    # they keep the account value. On the days that can lag both numbers are
+    # lower bounds of the real total, so the larger one wins.
     for m in platform_metrics:
         if not _supports_post_fallback(m):
             continue
         daily, fallback_captured = _post_summed_series_for_metric(account, m, start, end)
         if not daily:
             continue
-        account_captured = captured_by_metric.get(m)
-        should_use_fallback = m not in metrics_with_account_data or (
-            fallback_captured is not None and account_captured is not None and fallback_captured > account_captured
-        )
-        if should_use_fallback:
+        if m not in metrics_with_account_data:
             by_metric[m].update(daily)
-            if fallback_captured is not None and (max_captured is None or fallback_captured > max_captured):
-                max_captured = fallback_captured
+        else:
+            account_captured = captured_by_metric.get(m)
+            fresher = (
+                fallback_captured is not None and account_captured is not None and fallback_captured > account_captured
+            )
+            if not fresher:
+                continue
+            latest_account_day = max(by_metric[m])
+            for day, value in daily.items():
+                if day >= latest_account_day:
+                    by_metric[m][day] = max(by_metric[m].get(day, 0.0), value)
+        if fallback_captured is not None and (max_captured is None or fallback_captured > max_captured):
+            max_captured = fallback_captured
 
     series_map = {
         m: [by_metric[m].get(start + timedelta(days=i), 0.0) for i in range(2 * days)] for m in platform_metrics
