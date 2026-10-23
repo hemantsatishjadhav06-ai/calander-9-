@@ -1,5 +1,5 @@
-<div class="text-sm text-danger-600">
+<div class="text-sm text-danger-600" role="alert">
   Setup couldn't complete after several attempts.
-  Please contact <a href="mailto:{{ SUPPORT_EMAIL }}" class="text-brand-700 hover:text-brand-800">{{ SUPPORT_EMAIL }}</a>.
-  {% if last_error %}<div class="text-xs text-ink-500 font-mono mt-2">{{ last_error }}</div>{% endif %}
+  Please contact <a href="mailto:{{ SUPPORT_EMAIL }}" class="link-inline">{{ SUPPORT_EMAIL }}</a>.
+  {% if last_error %}<div class="mt-2 break-words font-mono text-caption text-ink-600">{{ last_error }}</div>{% endif %}
 </div>
