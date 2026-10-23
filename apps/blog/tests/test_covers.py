@@ -216,6 +216,22 @@ def test_preview_and_detail_show_the_designed_cover(client, world):
     assert f"{cover_url}?v=1" in detail and "Designed (title over the picture)" in detail
 
 
+def test_preview_survives_a_featured_image_whose_file_is_gone(client, world, image_asset):
+    """The designed cover is drawn inside the preview view, so a featured image that can no longer be
+    read (a redeployed MEDIA_ROOT, a media sweep, a storage error) must leave the hero out, not turn
+    the whole preview into a 500."""
+    asset = image_asset()
+    post = make_post(world, cover_style="designed")
+    BlogPost.objects.filter(pk=post.pk).update(featured_image=asset)
+    asset.file.storage.delete(asset.file.name)
+    client.force_login(world.owner)
+
+    response = client.get(_url("preview", world, post))
+
+    assert response.status_code == 200
+    assert "data:image/jpeg;base64," not in response.content.decode()
+
+
 def test_editor_offers_the_cover_choice_and_shows_the_preview(client, world):
     post = make_post(world, cover_style="designed")
     client.force_login(world.editor)
