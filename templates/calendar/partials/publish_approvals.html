@@ -17,12 +17,12 @@ tear down the toast.
     {# filter chips: selected is ink, never the accent #}
     <div class="flex items-center gap-1 mb-5 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap" role="group" aria-label="Filter by status" style="scrollbar-width: none;">
         {% include "calendar/partials/_approval_pill.html" with pid="all" label="All" count=all_count %}
-        {% include "calendar/partials/_approval_pill.html" with pid="pending_review" label="Pending review" count=pending_review_count %}
-        {% include "calendar/partials/_approval_pill.html" with pid="pending_client" label="Pending client" count=pending_client_count %}
+        {% include "calendar/partials/_approval_pill.html" with pid="pending_review" label="Ready for approval" count=pending_review_count %}
+        {% include "calendar/partials/_approval_pill.html" with pid="pending_client" label="Waiting for client" count=pending_client_count %}
         {% include "calendar/partials/_approval_pill.html" with pid="approved" label="Approved" count=approved_count %}
         {% include "calendar/partials/_approval_pill.html" with pid="rejected" label="Rejected" count=rejected_count %}
         {% include "calendar/partials/_approval_pill.html" with pid="changes_requested" label="Changes requested" count=changes_requested_count %}
-        {% include "calendar/partials/_approval_pill.html" with pid="on_hold" label="Hold requested" count=on_hold_count %}
+        {% include "calendar/partials/_approval_pill.html" with pid="on_hold" label="On hold" count=on_hold_count %}
     </div>
 
     {# post list #}

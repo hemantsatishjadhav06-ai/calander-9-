@@ -139,7 +139,7 @@
         {% endif %}
         <div class="flex justify-between gap-3 min-w-0">
           <dt class="flex-shrink-0 text-ink-600">Uploaded</dt>
-          <dd class="font-medium truncate min-w-0 text-ink-900">{% media_display_timezone as tz_name %}{% timezone tz_name %}{{ asset.created_at|date:"M j, Y g:i A" }}{% endtimezone %}</dd>
+          <dd class="font-medium truncate min-w-0 text-ink-900">{% media_display_timezone as tz_name %}{% timezone tz_name %}{{ asset.created_at|date:"j M Y, H:i" }}{% endtimezone %}</dd>
         </div>
         {% if asset.uploaded_by %}
         <div class="flex justify-between gap-3 min-w-0">

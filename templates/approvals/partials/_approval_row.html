@@ -46,8 +46,8 @@ schedules the exact proposed time, and only a person can press either.
                 {% if post.scheduled_at or post.proposed_publish_at %}
                 <span class="text-xs text-ink-600 inline-flex items-center gap-1 tabular-nums">
                     <svg class="w-3 h-3 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                    {% if post.scheduled_at %}{% timezone display_timezone %}{{ post.scheduled_at|date:"D j M, g:i A" }}{% endtimezone %}
-                    {% else %}Proposed {% timezone display_timezone %}{{ post.proposed_publish_at|date:"D j M, g:i A" }}{% endtimezone %}{% endif %}
+                    {% if post.scheduled_at %}{% timezone display_timezone %}{{ post.scheduled_at|date:"D j M, H:i" }}{% endtimezone %}
+                    {% else %}Proposed {% timezone display_timezone %}{{ post.proposed_publish_at|date:"D j M, H:i" }}{% endtimezone %}{% endif %}
                 </span>
                 {% endif %}
             </div>
@@ -96,7 +96,7 @@ schedules the exact proposed time, and only a person can press either.
                         {% if pp.effective_first_comment and pp.social_account.supports_first_comment %}<p class="text-xs text-ink-600 mt-1.5">First comment: {{ pp.effective_first_comment }}</p>{% endif %}
                         {% with n=post.media_attachments.all|length %}<p class="text-xs text-ink-500 mt-1.5">{% if n %}{{ n }} media file{{ n|pluralize }} attached{% else %}No media{% if pp.social_account.platform == "instagram" or pp.social_account.platform == "instagram_login" %} — Instagram cannot publish without an image or video{% endif %}{% endif %}</p>{% endwith %}
                         {% if pp.approved_at %}
-                        <p class="text-xs text-success-600 mt-1.5">Approved by {{ pp.approved_by.display_name|default:"an approver" }} · {% timezone display_timezone %}{{ pp.approved_at|date:"M j, g:i A" }}{% endtimezone %}{% if pp.approved_revision %} · version {{ pp.approved_revision }}{% endif %}{% if pp.approved_publish_at %} · to publish {% timezone display_timezone %}{{ pp.approved_publish_at|date:"M j, g:i A" }}{% endtimezone %}{% endif %}</p>
+                        <p class="text-xs text-success-600 mt-1.5">Approved by {{ pp.approved_by.display_name|default:"an approver" }} · {% timezone display_timezone %}{{ pp.approved_at|date:"D j M, H:i" }}{% endtimezone %}{% if pp.approved_revision %} · version {{ pp.approved_revision }}{% endif %}{% if pp.approved_publish_at %} · to publish {% timezone display_timezone %}{{ pp.approved_publish_at|date:"D j M, H:i" }}{% endtimezone %}{% endif %}</p>
                         {% endif %}
                         {% if pp.status == "failed" and pp.publish_error %}<p role="alert" class="text-xs text-danger-500 mt-1.5">{{ pp.publish_error }}</p>{% endif %}
                     </div>

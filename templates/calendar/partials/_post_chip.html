@@ -5,13 +5,14 @@ the words stay ink so every chip reads at 15:1. The status is also spoken (sr-on
 shape and colour are never the only cue. `.post-chip.is-draggable` and data-platform-post-id
 are the drag-and-drop hooks in calendarApp().
 {% endcomment %}
+{% load approval_extras %}
 <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=pp.post_id %}?account={{ pp.social_account_id }}"
    class="post-chip status-{{ pp.status }}{% if pp.is_reschedulable %} is-draggable{% endif %}"
-   title="{{ pp.get_status_display }} · {% if pp.is_reschedulable %}Move or open{% else %}Open{% endif %}"
+   title="{{ pp.status|status_label }} · {% if pp.is_reschedulable %}Move or open{% else %}Open{% endif %}"
    {% if pp.is_reschedulable %}draggable="true" data-platform-post-id="{{ pp.id }}"{% else %}draggable="false"{% endif %}>
     {% if pp.is_bulk_selectable %}{% include "calendar/partials/_select_checkbox.html" with pp_id=pp.id %}{% endif %}
     <span class="chip-dot" aria-hidden="true"></span>
-    <span class="sr-only">{{ pp.get_status_display }}:</span>
+    <span class="sr-only">{{ pp.status|status_label }}:</span>
     <span class="chip-glyph" aria-hidden="true">{% include "partials/_platform_icon.html" with platform=pp.social_account.platform size="sm" %}</span>
     {% with first_media=pp.post.media_attachments.all.0 %}
     {% if first_media and first_media.media_asset.thumbnail %}

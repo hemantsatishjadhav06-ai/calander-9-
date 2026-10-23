@@ -17,23 +17,39 @@ _SUCCESS = {"tone": "success", "dot": "#429E4A", "bg": "#EDFCED", "fg": "#317F38
 _INFO = {"tone": "info", "dot": "#035A7B", "bg": "#EFF8FD", "fg": "#044E6B", "bd": "#BEE3F8"}
 _DANGER = {"tone": "danger", "dot": "#991618", "bg": "#FFF3F1", "fg": "#7C1213", "bd": "#FFCDC6"}
 
+# The words are the design system's fixed status list (DESIGN_SYSTEM.md 10.5), the same the Agency
+# side uses ("Ready for approval"), so one post reads the same on Team, Approvals and its brief page.
 STATUS_META = {
     "draft": {"label": "Draft", "icon": "dash", **_NEUTRAL},
-    "pending_review": {"label": "Pending review", "icon": "clock", **_WARNING},
-    "pending_client": {"label": "Pending client", "icon": "clock", **_WARNING},
+    "pending_review": {"label": "Ready for approval", "icon": "clock", **_WARNING},
+    "pending_client": {"label": "Waiting for client", "icon": "clock", **_WARNING},
     "approved": {"label": "Approved", "icon": "check", **_SUCCESS},
     "changes_requested": {"label": "Changes requested", "icon": "return", **_WARNING},
     "rejected": {"label": "Rejected", "icon": "x-octagon", **_DANGER},
     "scheduled": {"label": "Scheduled", "icon": "calendar", **_INFO},
     "publishing": {"label": "Publishing", "icon": "spinner", **_INFO},
     "published": {"label": "Published", "icon": "check", **_SUCCESS},
-    "partially_published": {"label": "Partially published", "icon": "alert-triangle", **_WARNING},
+    "partially_published": {"label": "Partly published", "icon": "alert-triangle", **_WARNING},
     "failed": {"label": "Failed", "icon": "x-octagon", **_DANGER},
-    "on_hold": {"label": "Hold requested", "icon": "pause", **_NEUTRAL},
+    "on_hold": {"label": "On hold", "icon": "pause", **_NEUTRAL},
 }
 
 
 @register.inclusion_tag("approvals/partials/_status_badge.html")
-def status_badge(status):
-    """Render the editorial-status pill (icon + word) for *status*."""
-    return {"meta": STATUS_META.get(status, STATUS_META["draft"])}
+def status_badge(status, label=""):
+    """Render the editorial-status pill (icon + word) for *status*.
+
+    ``label`` replaces the word only where the reader changes it (the client's own portal says
+    "Waiting for you" for pending_client); tone and icon always follow the status.
+    """
+    meta = STATUS_META.get(status, STATUS_META["draft"])
+    if label:
+        meta = {**meta, "label": label}
+    return {"meta": meta}
+
+
+@register.filter
+def status_label(status):
+    """The status word alone (sentence case, from the fixed list), for text that is not a pill."""
+    meta = STATUS_META.get(status)
+    return meta["label"] if meta else str(status or "").replace("_", " ").capitalize()

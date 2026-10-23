@@ -27,7 +27,8 @@
 
         {% if decided_posts %}
         <section aria-labelledby="portal-decided-heading">
-            <h2 id="portal-decided-heading" class="mb-3 text-xs font-semibold text-ink-500">Approved and scheduled</h2>
+            {# Approved, on hold and scheduled posts: "Decided" claims nothing about a schedule; each card says which. #}
+            <h2 id="portal-decided-heading" class="mb-3 text-xs font-semibold text-ink-500">Decided</h2>
             <div class="space-y-4">
                 {% for post in decided_posts %}{% include "client_portal/_client_card.html" %}{% endfor %}
             </div>

@@ -26,12 +26,12 @@
                    class="flex items-center justify-between gap-3 min-h-10 px-3 rounded-lg text-sm transition-colors {% if version_new and v.version_number == version_new.version_number %}bg-ink-100 font-semibold text-ink-950{% else %}text-ink-700 hover:bg-ink-50{% endif %}"
                    {% if version_new and v.version_number == version_new.version_number %}aria-current="page"{% endif %}>
                     <span class="tabular-nums">v{{ v.version_number }}</span>
-                    <span class="text-xs font-normal text-ink-500 tabular-nums">{{ v.created_at|date:"j M, g:i A" }}</span>
+                    <span class="text-xs font-normal text-ink-500 tabular-nums">{{ v.created_at|date:"j M, H:i" }}</span>
                 </a>
                 {% else %}
                 <div class="flex items-center justify-between gap-3 min-h-10 px-3 rounded-lg text-sm {% if version_new and v.version_number == version_new.version_number %}bg-ink-100 font-semibold text-ink-950{% else %}text-ink-700{% endif %}">
                     <span>v1 <span class="text-xs font-normal text-ink-500">(first)</span></span>
-                    <span class="text-xs font-normal text-ink-500 tabular-nums">{{ v.created_at|date:"j M, g:i A" }}</span>
+                    <span class="text-xs font-normal text-ink-500 tabular-nums">{{ v.created_at|date:"j M, H:i" }}</span>
                 </div>
                 {% endif %}
                 </li>

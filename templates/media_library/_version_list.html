@@ -29,7 +29,7 @@
       {% if version.change_description %}
       <p class="text-xs mt-0.5 truncate text-ink-700">{{ version.change_description }}</p>
       {% endif %}
-      <p class="text-xs mt-0.5 text-ink-600">{% timezone tz_name %}{{ version.created_at|date:"M j, Y g:i A" }}{% endtimezone %}</p>
+      <p class="text-xs mt-0.5 text-ink-600">{% timezone tz_name %}{{ version.created_at|date:"j M Y, H:i" }}{% endtimezone %}</p>
     </div>
 
     {% if asset.current_version_id != version.id and not asset.is_shared %}

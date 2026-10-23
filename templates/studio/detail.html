@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load tz %}
+{% load tz approval_extras %}
 
 {% block title %}{{ brief.title|truncatechars:60 }} - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
@@ -260,7 +260,7 @@
                     <li class="px-3.5 py-2.5 text-sm">
                         <span class="font-semibold text-ink-900">{{ pp.social_account.account_name|default:pp.social_account.account_handle }}</span>
                         <span class="text-ink-500">· {{ pp.social_account.get_platform_display }}</span><br>
-                        <span class="text-[13px] text-ink-700">{{ pp.get_status_display }}{% if pp.status == 'scheduled' and pp.scheduled_at %} for <span class="tabular-nums">{{ pp.scheduled_at|timezone:tzname|date:"D j M, H:i" }}</span>{% endif %}{% if pp.status == 'published' and pp.published_at %} <span class="tabular-nums">{{ pp.published_at|timezone:tzname|date:"j M, H:i" }}</span>{% endif %}</span>
+                        <span class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-700">{% status_badge pp.status %}{% if pp.status == 'scheduled' and pp.scheduled_at %}<span class="tabular-nums">for {{ pp.scheduled_at|timezone:tzname|date:"D j M, H:i" }}</span>{% endif %}{% if pp.status == 'published' and pp.published_at %}<span class="tabular-nums">{{ pp.published_at|timezone:tzname|date:"j M, H:i" }}</span>{% endif %}</span>
                         {% if pp.platform_extra.permalink %} · <a class="text-[13px] link-inline" href="{{ pp.platform_extra.permalink }}" target="_blank" rel="noopener">View<span class="sr-only"> (opens in a new tab)</span></a>{% endif %}
                         {% if pp.status == 'failed' and pp.publish_error %}<p class="text-[13px] text-danger-600 break-words">{{ pp.publish_error }}</p>{% endif %}
                     </li>

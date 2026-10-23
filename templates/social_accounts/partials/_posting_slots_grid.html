@@ -54,7 +54,7 @@ Context: account (with prefetched posting_slots), workspace_id.
                                     <button type="button" @click="editing = true"
                                             class="h-7 max-lg:h-11 px-1.5 rounded-md text-[13px] tabular-nums whitespace-nowrap cursor-pointer hover:bg-ink-100 transition-colors {% if not day.is_active %}text-ink-500 line-through{% else %}text-ink-900 font-medium{% endif %}"
                                             title="Change this time">
-                                        {{ slot.time|time:"g:i A" }}
+                                        {{ slot.time|time:"H:i" }}
                                     </button>
                                     <form hx-post="{% url 'calendar:delete_posting_slot' workspace_id=workspace_id slot_id=slot.id %}"
                                           hx-swap="none" class="inline">
