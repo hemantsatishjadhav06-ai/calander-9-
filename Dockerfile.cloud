@@ -11,8 +11,10 @@ COPY theme/static_src/package*.json theme/static_src/
 RUN --mount=type=secret,id=build_ca_bundle \
     if [ -f /run/secrets/build_ca_bundle ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca_bundle; fi; \
     cd theme/static_src && npm ci
+# Tailwind scans templates, the Python strings that carry classes and the app's own JS.
 COPY templates/ templates/
 COPY apps/ apps/
+COPY static/js/ static/js/
 COPY theme/ theme/
 RUN cd theme/static_src && npm run build
 

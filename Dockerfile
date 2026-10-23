@@ -7,8 +7,10 @@ COPY theme/static_src/package*.json theme/static_src/
 # Keep the canonical recipe compatible with Railway's Dockerfile parser.
 # A generated Dockerfile.cloud adds optional CA-secret mounts for BuildKit.
 RUN cd theme/static_src && npm ci
+# Tailwind scans templates, the Python strings that carry classes and the app's own JS.
 COPY templates/ templates/
 COPY apps/ apps/
+COPY static/js/ static/js/
 COPY theme/ theme/
 RUN cd theme/static_src && npm run build
 
