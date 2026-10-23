@@ -356,3 +356,24 @@ class ReadonlyWriteGuardTests(ReadonlyComposerTestsBase):
         self.assertEqual(resp.status_code, 200)
         post.refresh_from_db()
         self.assertEqual(post.caption, "original caption")
+
+
+class ComposerKeyboardAccessTests(ReadonlyComposerTestsBase):
+    """The preview scrolls on its own; with nothing focusable inside (a scheduled post's
+    preview), keyboard users could not scroll it. It is a named, focusable region, and
+    every icon-only control in the action bar has a name on a phone."""
+
+    def test_preview_is_a_named_focusable_region(self):
+        html = self._compose(self._make_post("scheduled")).content.decode()
+
+        panel = re.search(r'<div id="preview-panel"[^>]*>', html, flags=re.S)
+        assert panel
+        assert 'tabindex="0"' in panel.group(0)
+        assert 'role="region"' in panel.group(0) and 'aria-label="Post preview"' in panel.group(0)
+
+    def test_the_phone_delete_button_has_a_name(self):
+        html = self._compose(self._make_post("draft")).content.decode()
+
+        button = re.search(r"<button[^>]*open-delete-modal.*?</button>", html, flags=re.S)
+        assert button
+        assert '<span class="sr-only sm:hidden">Delete post</span>' in button.group(0)

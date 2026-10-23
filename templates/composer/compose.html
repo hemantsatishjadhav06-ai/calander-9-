@@ -1688,13 +1688,14 @@
                       x-text="selectedAccounts.length + (selectedAccounts.length === 1 ? ' platform' : ' platforms')">
                 </span>
                 <button aria-label="Close preview" type="button" @click="showPreviewPanel = false"
-                        class="lg:hidden w-7 h-7 rounded-md text-ink-500 hover:text-ink-600 hover:bg-ink-100 flex items-center justify-center transition-colors cursor-pointer">
+                        class="lg:hidden size-11 -my-2 -mr-2 rounded-lg text-ink-500 hover:text-ink-600 hover:bg-ink-100 flex items-center justify-center transition-colors cursor-pointer">
                     <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
         </div>
 
         <div id="preview-panel" class="flex-1 overflow-y-auto p-4 space-y-4 panel-scroll"
+             tabindex="0" role="region" aria-label="Post preview"
              hx-post="{% url 'composer:preview' workspace_id=workspace.id %}"
              hx-trigger="previewUpdate from:body"
              hx-include="#composer-form"
