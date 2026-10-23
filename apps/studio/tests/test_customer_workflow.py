@@ -125,7 +125,7 @@ class TestCanonicalStart:
         conversation = saved(world)
         settings.ANTHROPIC_API_KEY = ""
         result = customer_workflow.start_idea(world.workspace, world.editor, conversation.pk)
-        assert result.job is None and "administrator setup" in result.note
+        assert result.job is None and "open Set up" in result.note and "administrator" not in result.note
         settings.ANTHROPIC_API_KEY = "fake-provider-key"
         monkeypatch.setattr(customer_workflow.budget, "can_spend", lambda ws: False)
         result = customer_workflow.start_idea(world.workspace, world.editor, conversation.pk)

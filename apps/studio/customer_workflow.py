@@ -225,11 +225,7 @@ def start_idea(workspace, user, conversation_id, *, create=None, reference_id=""
             conversation, previous, "This idea already has saved work. Open its conversation to continue.", True
         )
     if not llm.is_configured():
-        return StartedIdea(
-            conversation,
-            None,
-            "Your idea is saved. The AI service needs administrator setup before guided drafting can start.",
-        )
+        return StartedIdea(conversation, None, "Your idea is saved. Your team isn't connected yet — open Set up.")
     refusal = chat.reply_refusal(current)
     if refusal:
         return StartedIdea(conversation, None, chat.refusal_text(current, refusal, audience=conversation.audience))
@@ -287,9 +283,9 @@ def _journey(workspace, user, conversation, *, configured, spend_allowed):
     can_resume = bool(original and original.author_id == user.pk and not jobs and configured and spend_allowed)
     task = None
     if latest is not None:
-        from .opendots import task_record
+        from .opendots import task_status
 
-        task = task_record(latest)
+        task = task_status(latest)  # the row reads the state only; the task page carries the controls
         events.append({"label": "Guided brief requested", "created_at": latest.created_at, "kind": "brief"})
         if task["status"] == "paused":
             state, label = "paused", "Work paused"
@@ -297,7 +293,7 @@ def _journey(workspace, user, conversation, *, configured, spend_allowed):
             action_url = reverse("studio:job", kwargs={"workspace_id": workspace.pk, "job_id": latest.pk})
         elif latest.status in AgencyJob.ACTIVE_STATUSES:
             state = "working" if latest.status == AgencyJob.Status.WORKING else "queued"
-            label = "Preparing your brief" if state == "working" else "Waiting for the worker"
+            label = "Preparing your brief" if state == "working" else "Waiting to start"
             action = "Open the conversation"
             if (latest.input or {}).get("kind") == "confirm_brief":
                 step, label = 2, "Confirmed brief waiting for creation"
@@ -475,7 +471,7 @@ def context(workspace, user, *, form=None):
         "telegram_description": "Requests and review updates can use your paired Telegram conversation. Channel delivery needs its own verified destination."
         if telegram_ready
         else "Connect the workspace bot, then pair your own account to receive updates and answer questions.",
-        "tabs": dashboard.tabs(current, "workflow"),
+        "tabs": dashboard.tabs(current, "workflow", perms=member.effective_permissions),
         "tzname": current.effective_timezone or "UTC",
         "checked_at": timezone.now(),
     }

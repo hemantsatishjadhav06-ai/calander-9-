@@ -77,7 +77,7 @@ def _status(job: AgencyJob) -> str:
     """Port OpenDots' task states without adding competing persistence."""
     if job.status == AgencyJob.Status.CANCELLED and _control(job).get("paused") is True:
         return "paused"
-    if job.status == AgencyJob.Status.FAILED and "background worker restarted" in job.error:
+    if job.status == AgencyJob.Status.FAILED and engine.INTERRUPTED_MARKER in job.error:
         return "interrupted"
     states: dict[str, str] = {
         AgencyJob.Status.QUEUED: "queued",
@@ -138,10 +138,61 @@ def _review_payload(job: AgencyJob) -> dict:
 
 
 def _waiting_on_policy(job: AgencyJob) -> bool:
-    """A queued job the worker keeps skipping because autopilot (or the workspace) is paused."""
+    """A queued job the worker keeps skipping because autopilot (or the workspace) is paused, or the team isn't connected."""
     from .autopilot import PAUSE_REASONS
 
     return job.status == AgencyJob.Status.QUEUED and job.error in PAUSE_REASONS
+
+
+LABELS = {
+    "queued": "Waiting to start",
+    "waiting_policy": "Paused: autopilot is off",
+    "waiting_setup": "Waiting for Set up",
+    "running": "Your team is working",
+    "paused": "Paused by you",
+    "completed": "Finished",
+    "failed": "Needs your attention",
+    "interrupted": "Interrupted — review before retrying",
+    "cancelled": "Stopped",
+}
+
+
+def task_status(job: AgencyJob) -> dict[str, Any]:
+    """The cheap part of :func:`task_record`: status, label and where to fix a policy pause. No extra queries.
+
+    Lists (Home's rows, the briefing's counts) read only this; the signed
+    effect review belongs to the task page and its controls.
+    """
+    from django.urls import NoReverseMatch, reverse
+
+    from .autopilot import PROVIDER_PAUSED
+
+    status = _status(job)
+    shown = status
+    policy_url = policy_note = policy_link = ""
+    if status == "queued" and _waiting_on_policy(job):
+        # The reason says what to do: the team isn't connected (Set up), or autopilot is off (Autopilot).
+        setup = job.error == PROVIDER_PAUSED
+        shown = "waiting_setup" if setup else "waiting_policy"
+        page = "studio:setup" if setup else "studio:autopilot"
+        policy_note = (
+            "This task continues on its own once your team is connected"
+            if setup
+            else "This task continues on its own once autopilot is on"
+        )
+        policy_link = "open Set up" if setup else "open Autopilot"
+        try:
+            policy_url = reverse(page, kwargs={"workspace_id": job.workspace_id})
+        except NoReverseMatch:
+            policy_url = ""
+    return {
+        "id": str(job.pk),
+        "status": shown,
+        "label": LABELS[shown],
+        "policy_url": policy_url,
+        "policy_note": policy_note,
+        "policy_link": policy_link,
+    }
 
 
 def task_record(job: AgencyJob) -> dict[str, Any]:
@@ -149,36 +200,15 @@ def task_record(job: AgencyJob) -> dict[str, Any]:
 
     Callers must scope with chat.web_jobs and their authenticated workspace;
     the mutation service independently repeats that check under row locks.
-    ``waiting_policy`` is a display state only: the control rules are those
-    of the underlying queued job, so it can still be paused or stopped.
+    ``waiting_policy`` and ``waiting_setup`` are display states only: the
+    control rules are those of the underlying queued job, so it can still be
+    paused or stopped.
     """
     status = _status(job)
     active = status in ("queued", "running")  # OpenDots TaskActions.active
     needs_review = _needs_review(job)
-    labels = {
-        "queued": "Waiting to start",
-        "waiting_policy": "Paused: autopilot is off",
-        "running": "Your team is working",
-        "paused": "Paused by you",
-        "completed": "Finished",
-        "failed": "Needs your attention",
-        "interrupted": "Interrupted — review before retrying",
-        "cancelled": "Stopped",
-    }
-    shown = "waiting_policy" if status == "queued" and _waiting_on_policy(job) else status
-    policy_url = ""
-    if shown == "waiting_policy":
-        from django.urls import NoReverseMatch, reverse
-
-        try:
-            policy_url = reverse("studio:autopilot", kwargs={"workspace_id": job.workspace_id})
-        except NoReverseMatch:
-            policy_url = ""
     return {
-        "id": str(job.pk),
-        "status": shown,
-        "label": labels[shown],
-        "policy_url": policy_url,
+        **task_status(job),
         "revision": job.revision,
         "stage": job.stage,
         "needs_effect_review": needs_review,

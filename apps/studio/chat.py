@@ -809,8 +809,14 @@ def replies_today(workspace) -> int:
     return AgencyJob.objects.filter(workspace=workspace, kind=AgencyJob.Kind.CHAT, created_at__gte=since).count()
 
 
+#: The same sentence as Set up and readiness use for this state; the thread shows no other instruction.
+SETUP_REFUSAL = (
+    "Your message is saved. Your team isn't connected yet — open Set up. You can still write or edit a draft."
+)
+
+
 def reply_refusal(workspace) -> str:
-    """Why the assistant cannot answer yet; never queue a doomed provider call."""
+    """Why the account manager cannot answer yet; never queue a doomed provider call."""
     from . import budget, llm
 
     if replies_today(workspace) >= DAILY_REPLY_CAP:
@@ -828,11 +834,8 @@ def refusal_text(workspace, reason: str, *, audience: str) -> str:
 
     if reason == "setup":
         if audience == Conversation.Audience.CLIENT:
-            return "Your message is saved. Your agency needs to enable its assistant before it can answer."
-        return (
-            "Your message is saved. An administrator needs to connect the AI service before your assistant can continue. "
-            "You can still write or edit a draft."
-        )
+            return "Your message is saved. Your agency is finishing its set-up; a person will reply here."
+        return SETUP_REFUSAL
     if audience == Conversation.Audience.CLIENT:
         return "Thanks — your message is with the team. A person will reply here as soon as they can."
     if reason == "budget":
@@ -1414,10 +1417,14 @@ def thread_context(
         placeholder = "e.g. Add an FAQ about stamp duty"
         internal_label = "Note for the team only — no reply from the account manager"
     else:
-        title, subtitle = (
-            "Create with the team",
-            "Say what you want to post. Your manager proposes the brief; one tap starts it.",
-        )
+        from .models import AgencySettings
+
+        title = "Create with the team"
+        # The header matches the workspace's creation mode: a tap, or the manager going ahead by itself.
+        if creation_mode(workspace) == AgencySettings.CreationMode.AUTO:
+            subtitle = "Say what you want to post. Your manager goes ahead with sensible defaults; you can stop it for a minute."
+        else:
+            subtitle = "Say what you want to post. Your manager proposes the brief; one tap starts it."
         placeholder = "e.g. A LinkedIn post inviting families to Saturday's site visit"
         internal_label = "Note for the team only — no reply from the account manager"
     named = conversation.title if conversation is not None and conversation.title != title else ""

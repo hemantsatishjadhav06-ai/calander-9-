@@ -64,9 +64,9 @@
     <div role="status" class="mb-6 text-sm text-amber-950 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
         This task is paused. Review its saved work, then choose Resume task when you are ready. Other tasks and weekly planning keep their own settings.
     </div>
-    {% elif assistant_task.status == 'waiting_policy' %}
+    {% elif assistant_task.status == 'waiting_policy' or assistant_task.status == 'waiting_setup' %}
     <div role="status" data-task-waiting-policy class="mb-6 text-sm text-amber-950 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-        {{ assistant_task.label }}. This task continues on its own once autopilot is on{% if assistant_task.policy_url %} — <a href="{{ assistant_task.policy_url }}" class="font-semibold underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">open Autopilot</a>{% endif %}.
+        {{ assistant_task.label }}. {{ assistant_task.policy_note }}{% if assistant_task.policy_url %} — <a href="{{ assistant_task.policy_url }}" class="font-semibold underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">{{ assistant_task.policy_link }}</a>{% endif %}.
     </div>
     {% endif %}
 

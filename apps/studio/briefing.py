@@ -27,7 +27,7 @@ def _plural(count: int, word: str) -> str:
 
 
 def _task_counts(workspace) -> dict[str, int]:
-    from .opendots import task_record
+    from .opendots import task_status
 
     counts = {"paused": 0, "failed": 0, "interrupted": 0}
     rows = chat.web_jobs(
@@ -38,7 +38,7 @@ def _task_counts(workspace) -> dict[str, int]:
         )
     ).order_by("-updated_at")[:200]
     for job in rows:
-        status = task_record(job)["status"]
+        status = task_status(job)["status"]
         if status in counts:
             counts[status] += 1
     return counts

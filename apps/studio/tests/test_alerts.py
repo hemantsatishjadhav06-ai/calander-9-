@@ -36,6 +36,18 @@ def test_failed_unprompted_job_alerts_lead_and_backup_once(world, quiet_queue):
     assert_nothing_approved(world.workspace)
 
 
+def test_an_interrupted_job_is_described_in_plain_words(world, quiet_queue):
+    agency_settings(world, backup=world.manager)
+    job = engine.create(world.workspace, "plan", title="Plan the week", requested_by=world.owner)
+    engine.fail(job, engine.INTERRUPTED_ERROR)
+    note = _alerts(user=world.owner).get()
+    assert "stopped part-way" in note.body and "worker" not in note.body
+    from apps.studio import opendots
+
+    job.refresh_from_db()
+    assert opendots.task_record(job)["status"] == "interrupted"
+
+
 def test_without_a_lead_every_internal_approver_is_told(world, quiet_queue):
     job = engine.create(world.workspace, "report", requested_by=world.owner)
     engine.fail(job, "x")
