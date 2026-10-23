@@ -3,39 +3,37 @@
 {% block content %}
 <div x-data="{ showInviteModal: false }">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h2 class="text-xl font-semibold" style="color: var(--text-primary);">Client Portal</h2>
-            <p class="text-sm mt-1" style="color: var(--text-tertiary);">
+    <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+            <h2 class="text-h2 text-ink-950">Client portal</h2>
+            <p class="mt-1 text-sm text-ink-600">
                 Invite external clients to review and approve posts.
             </p>
         </div>
-        <button @click="showInviteModal = true"
-                class="btn-opacity px-5 py-2 text-sm font-medium rounded-full cursor-pointer transition-colors"
-                style="background: var(--primary-strong); color: white;">
-            Invite Client
+        <button type="button" @click="showInviteModal = true" class="ui-btn ui-btn-primary max-sm:w-full">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Invite client
         </button>
     </div>
 
     <!-- Active Clients -->
-    <div style="background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden;" class="mb-8">
-        <div class="px-6 py-4" style="border-bottom: 1px solid var(--border);">
-            <h3 class="text-sm font-semibold" style="color: var(--text-primary);">Clients ({{ clients_data|length }})</h3>
+    <section class="mb-8 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" aria-labelledby="portal-clients-heading">
+        <div class="flex items-center gap-2 border-b border-ink-200 px-5 py-4">
+            <h3 id="portal-clients-heading" class="text-h3 text-ink-950">Clients</h3>
+            <span class="ui-badge">{{ clients_data|length }}</span>
         </div>
         <div id="clients-list">
             {% for client in clients_data %}
                 {% include "client_portal/admin/partials/client_row.html" %}
             {% empty %}
-            <div class="px-6 py-12 text-center" id="no-clients-placeholder">
-                <div class="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style="background: var(--neutral-100);">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-tertiary);"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-                </div>
-                <p class="text-sm font-medium" style="color: var(--text-secondary);">No clients yet</p>
-                <p class="text-xs mt-1" style="color: var(--text-tertiary);">Invite a client to give them portal access for reviewing and approving posts.</p>
+            <div class="ui-empty" id="no-clients-placeholder">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                <p class="ui-empty-title">No clients yet</p>
+                <p class="ui-empty-body">Invite a client to give them portal access for reviewing and approving posts.</p>
             </div>
             {% endfor %}
         </div>
-    </div>
+    </section>
 
     <!-- Pending Invitations -->
     <div id="pending-invites-section">

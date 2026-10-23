@@ -1,14 +1,17 @@
 # Fonts
 
-Self-hosted web fonts for the public marketing pages (`templates/marketing/`).
-They are served from this app's own origin so the site works under the
-`font-src 'self'` Content Security Policy without loading anything from a CDN.
+The app and the public pages use the system font (SF Pro on Apple devices,
+Segoe UI on Windows, Roboto on Android), so no web font loads on any page and
+nothing is fetched from a CDN under the `font-src 'self'` Content Security
+Policy.
+
+One file is kept as a documented fallback, in case uniform rendering across
+platforms is ever preferred over the native font. Nothing references it today.
 
 | Family | Files | License |
 |---|---|---|
-| Instrument Serif (Rodrigo Fuenzalida, Jordan Egstad) | `instrument-serif-*.woff2` | SIL Open Font License 1.1 |
 | Inter (Rasmus Andersson), variable weight 400–700 | `inter-latin-normal.woff2` | SIL Open Font License 1.1 |
 
-Both families were downloaded from Google Fonts (https://fonts.google.com),
-which distributes them under the SIL Open Font License, version 1.1
+Inter was downloaded from Google Fonts (https://fonts.google.com), which
+distributes it under the SIL Open Font License, version 1.1
 (https://openfontlicense.org). The font software is used unmodified.

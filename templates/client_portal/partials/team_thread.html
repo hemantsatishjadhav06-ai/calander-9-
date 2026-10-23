@@ -2,34 +2,32 @@
 The client's thread with the team: messages and a form. Rendered INSIDE a container whose id is
 pt.dom_id ("team-thread" on the Talk to the team page, "post-thread-<post id>" on an approval card);
 the form swaps the container's content. Context: pt (apps.client_portal.views_team.thread_context).
+On an approval card the card's own Approve stays the main action, so Send is a secondary button there.
 {% endcomment %}
 {% include "client_portal/partials/team_messages.html" %}
-<form method="post" action="{{ pt.send_url }}" class="mt-3"
+<form method="post" action="{{ pt.send_url }}" class="mt-4"
       hx-post="{{ pt.send_url }}" hx-target="#{{ pt.dom_id }}" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="find button">
     {% csrf_token %}
     {% if not pt.post and pt.conversation %}<input type="hidden" name="c" value="{{ pt.conversation.pk }}">{% endif %}
     {% if pt.post %}<input type="hidden" name="d" value="{{ pt.dom_id }}">{% endif %}
     {% if pt.error %}
-    <p class="mb-2 text-[0.8125rem] rounded-lg px-3 py-2 bg-danger-50 text-danger-600 border border-danger-200" role="alert">{{ pt.error }}</p>
+    <p class="alert-error mb-2" role="alert">{{ pt.error }}</p>
     {% endif %}
     <label for="{{ pt.dom_id }}-body" class="sr-only">{% if pt.post %}Write to the team about this post{% else %}Write to the team{% endif %}</label>
-    <div class="flex flex-wrap sm:flex-nowrap items-end gap-2">
+    <div class="flex flex-wrap items-end gap-2 sm:flex-nowrap">
         <textarea id="{{ pt.dom_id }}-body" name="body" rows="2" maxlength="4000" required
                   placeholder="Write to the team…"
-                  class="w-full sm:flex-1 min-w-0 px-3 py-2 text-[0.875rem] rounded-xl resize-y border-[1.5px] border-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
-                  style="background: var(--surface-0); color: var(--text-primary);">{{ pt.body }}</textarea>
-        <div class="flex gap-2 flex-shrink-0">
+                  class="ui-input min-h-[68px] w-full min-w-0 resize-y rounded-xl sm:flex-1">{{ pt.body }}</textarea>
+        <div class="flex flex-shrink-0 gap-2 max-sm:w-full">
             {% if pt.post and pt.show_change_button %}
             <button type="submit" name="kind" value="change"
-                    class="px-4 py-2 text-[0.8125rem] font-semibold rounded-xl border border-ink-300 hover:bg-ink-25"
-                    style="background: var(--surface-0); color: var(--text-primary);">Request a change</button>
+                    class="ui-btn ui-btn-ghost max-sm:flex-1">Request a change</button>
             {% endif %}
             <button type="submit" name="kind" value="question"
-                    class="px-4 py-2 text-[0.8125rem] font-semibold rounded-xl text-white"
-                    style="background: var(--primary-strong);">Send</button>
+                    class="ui-btn {% if pt.post %}ui-btn-secondary{% else %}ui-btn-primary{% endif %} max-sm:flex-1">Send</button>
         </div>
     </div>
     {% if pt.post and pt.show_change_button %}
-    <p class="mt-1.5 text-[0.75rem]" style="color: var(--text-secondary);">“Request a change” sends this post back to the team; the new version comes back to you for your OK.</p>
+    <p class="ui-help">“Request a change” sends this post back to the team; the new version comes back to you for your OK.</p>
     {% endif %}
 </form>

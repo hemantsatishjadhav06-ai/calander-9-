@@ -16,7 +16,7 @@
 <section class="mk-section mk-section--flush-top">
     <div class="mk-container">
         <div class="mk-grid mk-grid--2">
-            <div class="mk-card mk-card--static reveal" style="padding: 36px;">
+            <div class="mk-card mk-card--static reveal">
                 <span class="mk-badge">Fastest</span>
                 <h2 class="mk-h3" style="font-size: 1.5rem;">Use the hosted app</h2>
                 <p style="margin: 12px 0 22px;">{% if SIGNUP_OPEN %}Create an account{% else %}Request an invitation{% endif %}, then make a workspace and connect an available channel. We run the hosted app; your team manages credentials, approvals and external service credits.</p>
@@ -30,7 +30,7 @@
                     <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
                 </div>
             </div>
-            <div class="mk-card mk-card--static reveal" data-delay="1" style="padding: 36px;">
+            <div class="mk-card mk-card--static reveal" data-delay="1">
                 <span class="mk-badge mk-badge--green">Own the stack</span>
                 <h2 class="mk-h3" style="font-size: 1.5rem;">Self-host it</h2>
                 <p style="margin: 12px 0 22px;">Clone the AGPL-3.0 source and run it on a small VPS with Docker Compose, or deploy the included Railway, Render or Heroku configuration. You bring the platform app credentials.</p>
@@ -40,7 +40,7 @@
                     <li>{% include "marketing/_icon.html" with name="check" %}<span>Local disk or S3-compatible storage for media</span></li>
                 </ul>
                 <div class="mk-btn-row">
-                    <a class="mk-btn mk-btn--dark" href="#docker">Docker Compose guide {% include "marketing/_icon.html" with name="arrow" %}</a>
+                    <a class="mk-btn mk-btn--ghost" href="#docker">Docker Compose guide {% include "marketing/_icon.html" with name="arrow" %}</a>
                     <a class="mk-btn mk-btn--ghost" href="{{ source_url }}" rel="noopener">Source code</a>
                 </div>
             </div>
@@ -57,14 +57,14 @@
         </div>
         <div class="mk-grid mk-grid--2" style="align-items: start;">
             <div class="reveal">
-                <div class="mk-code"><div class="mk-code__head"><span>On your server</span><button class="mk-copy" type="button" data-copy="code-docker">Copy</button></div><pre id="code-docker">git clone &lt;your-repository-url&gt; sm-bean
+                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>On your server</span><button class="mk-copy" type="button" data-copy="code-docker">Copy</button></div><pre id="code-docker">git clone &lt;your-repository-url&gt; sm-bean
 cd sm-bean
 cp .env.example .env
 <span class="c"># edit .env: SECRET_KEY, ALLOWED_HOSTS, APP_URL</span>
 <span class="c"># and DATABASE_URL pointing at the postgres service</span>
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose exec app python manage.py createsuperuser</pre></div>
-                <div class="mk-code" style="margin-top: 16px;"><div class="mk-code__head"><span>To update later</span><button class="mk-copy" type="button" data-copy="code-update">Copy</button></div><pre id="code-update">git pull
+                <div class="mk-code" tabindex="0" style="margin-top: 16px;"><div class="mk-code__head"><span>To update later</span><button class="mk-copy" type="button" data-copy="code-update">Copy</button></div><pre id="code-update">git pull
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build</pre></div>
             </div>
             <div class="reveal" data-delay="1">
@@ -128,7 +128,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build</p
                 </ul>
             </div>
             <div class="reveal" data-delay="1">
-                <div class="mk-code"><div class="mk-code__head"><span>Local setup</span><button class="mk-copy" type="button" data-copy="code-local">Copy</button></div><pre id="code-local">python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>Local setup</span><button class="mk-copy" type="button" data-copy="code-local">Copy</button></div><pre id="code-local">python3 -m venv .venv &amp;&amp; source .venv/bin/activate
 pip install -r requirements.txt
 (cd theme/static_src &amp;&amp; npm install)
 python manage.py migrate
@@ -150,7 +150,7 @@ python manage.py process_tasks</pre></div>
             <p class="mk-lead">The quickest way to judge it is to schedule one real post.</p>
             <div class="mk-btn-row">
                 <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
-                <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:developers' %}">Read the API docs</a>
+                <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:developers' %}">Read the API docs</a>
             </div>
         </div>
     </div>

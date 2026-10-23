@@ -4,17 +4,14 @@
 {% block title %}Authorize {{ application.name|default:"an app" }} · {{ SITE_NAME }}{% endblock title %}
 
 {% block content %}
-    <div class="bb-head">
-        <div class="bb-logo" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</div>
-        <span class="bb-eyebrow">{{ SITE_NAME }}</span>
-    </div>
+    {% include "account/_brand.html" %}
 
-    <div class="bb-card">
+    <div class="auth-card">
         {% if not error %}
-            <h1>{% blocktrans with name=application.name|default:"This application" %}Authorize {{ name }}?{% endblocktrans %}</h1>
-            <p>{% blocktrans with name=application.name|default:"This application" %}{{ name }} wants to connect to your {{ SITE_NAME }} workspace with the following permissions:{% endblocktrans %}</p>
+            <h1 class="text-h2 text-ink-950">{% blocktrans with name=application.name|default:"This application" %}Authorize {{ name }}?{% endblocktrans %}</h1>
+            <p class="mt-1.5 text-sm text-ink-600">{% blocktrans with name=application.name|default:"This application" %}{{ name }} wants to connect to your {{ SITE_NAME }} workspace with the following permissions:{% endblocktrans %}</p>
 
-            <form id="authorizationForm" method="post">
+            <form id="authorizationForm" method="post" class="mt-5">
                 {% csrf_token %}
 
                 {% comment %}
@@ -25,28 +22,33 @@
                     {% if field.is_hidden %}{{ field }}{% endif %}
                 {% endfor %}
 
-                <ul class="bb-scopes">
+                <ul class="space-y-2 rounded-xl bg-ink-50 p-4 text-sm text-ink-900 ring-1 ring-inset ring-ink-200">
                     {% for scope in scopes_descriptions %}
-                        <li>{{ scope }}</li>
+                        <li class="flex items-start gap-2.5">
+                            <svg class="mt-0.5 size-4 flex-none text-ink-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                            <span>{{ scope }}</span>
+                        </li>
                     {% endfor %}
                 </ul>
 
-                {% if form.errors %}<div class="bb-error">{{ form.errors }}</div>{% endif %}
-                {% if form.non_field_errors %}<div class="bb-error">{{ form.non_field_errors }}</div>{% endif %}
+                {% if form.errors %}<div class="alert-error mt-4">{{ form.errors }}</div>{% endif %}
+                {% if form.non_field_errors %}<div class="alert-error mt-4">{{ form.non_field_errors }}</div>{% endif %}
 
-                <div class="bb-actions">
+                <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
                     {# Cancel must NOT carry name="allow" — its absence signals denial to DOT. #}
-                    <input type="submit" class="bb-btn bb-btn-ghost" value="{% trans 'Cancel' %}"/>
+                    <input type="submit" class="ui-btn ui-btn-secondary ui-btn-lg flex-1" value="{% trans 'Cancel' %}"/>
                     {# Authorize MUST keep name="allow" — DOT checks for it to detect approval. #}
-                    <input type="submit" class="bb-btn bb-btn-primary" name="allow" value="{% trans 'Authorize' %}"/>
+                    <input type="submit" class="ui-btn ui-btn-primary ui-btn-lg flex-1" name="allow" value="{% trans 'Authorize' %}"/>
                 </div>
             </form>
 
-            <p class="bb-foot">{% trans "You can revoke this access at any time from {{ SITE_NAME }}." %}</p>
+            <p class="mt-5 text-center text-[13px]/[18px] text-ink-600">{% blocktrans %}You can revoke this access at any time from {{ SITE_NAME }}.{% endblocktrans %}</p>
         {% else %}
-            <h1>{% trans "Something went wrong" %}</h1>
-            <p>{{ error.error }}</p>
-            <p>{{ error.description }}</p>
+            <h1 class="text-h2 text-ink-950">{% trans "Something went wrong" %}</h1>
+            <div class="alert-error mt-4">
+                <p class="font-semibold">{{ error.error }}</p>
+                {% if error.description %}<p class="mt-1">{{ error.description }}</p>{% endif %}
+            </div>
         {% endif %}
     </div>
 {% endblock content %}

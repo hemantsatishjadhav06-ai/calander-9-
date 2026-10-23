@@ -1,0 +1,43 @@
+{% comment %}
+One form field on a sign-in card. Names, ids and attributes come from the form unchanged.
+  field        the bound field
+  placeholder  optional placeholder override
+  lock_email   make the email field read-only (an invitation fixed it)
+  hide_help    leave out the form's help text (the login form's own reset link)
+Passwords are never echoed back into the page.
+{% endcomment %}
+{% if field.field.widget.input_type == "checkbox" %}
+<div class="mb-4">
+    <label for="{{ field.id_for_label }}" class="inline-flex min-h-6 cursor-pointer items-center gap-2.5 text-sm text-ink-700 max-lg:min-h-11">
+        <input type="checkbox"
+               name="{{ field.html_name }}"
+               id="{{ field.id_for_label }}"
+               {% if field.value %}checked{% endif %}
+               class="ui-checkbox">
+        {% if field.name == "remember" %}Keep me signed in{% else %}{{ field.label }}{% endif %}
+    </label>
+</div>
+{% else %}
+<div class="mb-4">
+    <label for="{{ field.id_for_label }}" class="ui-label">{{ field.label }}</label>
+    <input type="{{ field.field.widget.input_type }}"
+           name="{{ field.html_name }}"
+           id="{{ field.id_for_label }}"
+           {% if field.field.widget.input_type != "password" %}value="{{ field.value|default:'' }}"{% endif %}
+           {% if placeholder %}placeholder="{{ placeholder }}"{% elif field.field.widget.attrs.placeholder %}placeholder="{{ field.field.widget.attrs.placeholder }}"{% endif %}
+           {% if field.field.widget.attrs.autocomplete %}autocomplete="{{ field.field.widget.attrs.autocomplete }}"{% endif %}
+           {% if field.field.required %}required{% endif %}
+           {% if field.name == 'email' and lock_email %}readonly{% endif %}
+           {% if field.errors %}aria-invalid="true" aria-describedby="{{ field.id_for_label }}-error"{% elif field.help_text and not hide_help %}aria-describedby="{{ field.id_for_label }}-help"{% endif %}
+           class="ui-input read-only:bg-ink-50 read-only:text-ink-600">
+    {% if field.errors %}
+    <p id="{{ field.id_for_label }}-error" class="ui-error">
+        <svg class="mt-0.5 size-3.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        <span>{{ field.errors.0 }}</span>
+    </p>
+    {% endif %}
+    {% if field.help_text and not hide_help %}
+    <div id="{{ field.id_for_label }}-help" class="ui-help [&_li]:mt-0.5 [&_ul]:list-disc [&_ul]:pl-4">{{ field.help_text }}</div>
+    {% endif %}
+</div>
+{% endif %}

@@ -10,19 +10,19 @@
   body { margin: 0; padding: 0; width: 100% !important; }
 </style>
 </head>
-<body style="margin:0;padding:0;background-color:#F6F7F8;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1C1F24;">
+<body style="margin:0;padding:0;background-color:#F6F7F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1C1F24;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F6F7F8;">
-<tr><td align="center" style="padding:40px 20px;">
+<tr><td align="center" style="padding:40px 16px;">
 
   <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-radius:12px;border:1px solid #E1E4E8;">
 
     <!-- Header -->
     <tr>
-      <td style="padding:28px 32px 20px;border-bottom:1px solid #EDEFF2;">
+      <td style="padding:24px 32px 20px;border-bottom:1px solid #E1E4E8;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td style="width:28px;height:28px;background-color:#115641;border-radius:6px;text-align:center;vertical-align:middle;color:#FFFFFF;font-weight:700;font-size:13px;">{{ SITE_NAME|first|upper }}</td>
-            <td style="padding-left:10px;font-weight:700;font-size:15px;color:#1C1F24;">{{ SITE_NAME }}</td>
+            <td style="width:28px;height:28px;background-color:#115641;border-radius:7px;text-align:center;vertical-align:middle;color:#FFFFFF;font-weight:700;font-size:13px;">{{ SITE_NAME|first|upper }}</td>
+            <td style="padding-left:10px;font-weight:600;font-size:15px;color:#0E1114;">{{ SITE_NAME }}</td>
           </tr>
         </table>
       </td>
@@ -31,21 +31,21 @@
     <!-- Title -->
     <tr>
       <td style="padding:28px 32px 12px;">
-        <h1 style="margin:0;font-size:20px;font-weight:700;color:#1C1F24;">{{ heading }}</h1>
-        <p style="margin:8px 0 0;font-size:13px;color:#656B73;">{{ date|date:"N j, Y" }} &mdash; {{ total }} item{{ total|pluralize }}</p>
+        <h1 style="margin:0;font-size:20px;line-height:26px;font-weight:700;letter-spacing:-0.01em;color:#0E1114;">{{ heading }}</h1>
+        <p style="margin:6px 0 0;font-size:13px;line-height:18px;color:#656B73;">{{ date|date:"j F Y" }} &middot; {{ total }} item{{ total|pluralize }}</p>
       </td>
     </tr>
 
     <!-- Notification list -->
     <tr>
-      <td style="padding:8px 32px 28px;">
+      <td style="padding:8px 32px 24px;">
         {% for n in notifications %}
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:8px;">
           <tr>
-            <td style="padding:12px 16px;background-color:#F6F7F8;border-radius:8px;border:1px solid #EDEFF2;">
-              <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#1C1F24;">{{ n.title }}</p>
-              {% if n.body %}<p style="margin:0;font-size:13px;color:#656B73;line-height:1.5;">{{ n.body|truncatewords:30 }}</p>{% endif %}
-              <p style="margin:6px 0 0;font-size:11px;color:#656B73;">{{ n.created_at|timesince }} ago</p>
+            <td style="padding:12px 16px;background-color:#F6F7F8;border-radius:8px;border:1px solid #E1E4E8;">
+              <p style="margin:0 0 2px;font-size:14px;line-height:20px;font-weight:600;color:#1C1F24;">{{ n.title }}</p>
+              {% if n.body %}<p style="margin:0;font-size:13px;line-height:18px;color:#52575F;">{{ n.body|truncatewords:30 }}</p>{% endif %}
+              <p style="margin:6px 0 0;font-size:12px;line-height:16px;color:#656B73;">{{ n.created_at|timesince }} ago</p>
             </td>
           </tr>
         </table>
@@ -58,12 +58,12 @@
 
     <!-- CTA -->
     <tr>
-      <td align="center" style="padding:0 32px 28px;">
+      <td style="padding:0 32px 28px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td style="border-radius:9999px;background-color:#115641;text-align:center;">
-              <a href="{{ app_url }}/notifications/" target="_blank" rel="noopener" style="display:inline-block;padding:10px 24px;color:#FFFFFF;font-size:13px;font-weight:600;text-decoration:none;">
-                View All Notifications
+            <td style="border-radius:8px;background-color:#115641;text-align:center;">
+              <a href="{{ app_url }}/notifications/" target="_blank" rel="noopener" style="display:inline-block;padding:10px 16px;color:#FFFFFF;font-size:14px;line-height:20px;font-weight:600;text-decoration:none;border-radius:8px;">
+                View all notifications
               </a>
             </td>
           </tr>
@@ -73,8 +73,8 @@
 
     <!-- Footer -->
     <tr>
-      <td style="padding:20px 32px 28px;border-top:1px solid #EDEFF2;">
-        <p style="margin:0;font-size:12px;color:#656B73;line-height:1.5;">
+      <td style="padding:20px 32px 24px;border-top:1px solid #E1E4E8;">
+        <p style="margin:0;font-size:12px;color:#656B73;line-height:18px;">
           You received this because of your notification settings.
           <a href="{{ app_url }}/notifications/preferences/" style="color:#115641;text-decoration:underline;">Manage preferences</a>
         </p>

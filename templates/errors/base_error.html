@@ -2,42 +2,48 @@
 {% comment %}
 Self-contained on purpose: the default 500 handler renders with no request
 context, so this template must not depend on context processors, {% load %}
-libraries, or {% url %}. Hardcode the brand and use plain links.
+libraries, or {% url %}. Hardcode the brand and use plain links. Colours are
+the design system's literal values (ink canvas, white card, one Pine button).
 {% endcomment %}
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F6F7F8">
   <title>{% block err_code %}Error{% endblock %} · SM Bean</title>
   <style>
-    :root{--bg:#f7f7f5;--surface:#ffffff;--ink:#1b1b1a;--muted:#6b6b66;--border:#e5e5e0;--accent:#115641;}
-    @media (prefers-color-scheme: dark){
-      :root{--bg:#121211;--surface:#1a1a19;--ink:#ededea;--muted:#a6a69f;--border:#2c2c2a;--accent:#f4924e;}
-    }
+    :root{--canvas:#F6F7F8;--surface:#FFFFFF;--title:#0E1114;--text:#1C1F24;--secondary:#52575F;--tertiary:#656B73;
+      --line:#E1E4E8;--brand:#115641;--brand-hover:#0D4534;--focus:#1E7057;}
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:center;
-      padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-      line-height:1.55;}
-    .card{max-width:30rem;width:100%;background:var(--surface);border:1px solid var(--border);
-      border-radius:16px;padding:36px 32px;text-align:center;}
-    .code{font-size:52px;font-weight:800;letter-spacing:-.02em;color:var(--accent);line-height:1;margin:0;
-      font-variant-numeric:tabular-nums;}
-    h1{font-size:20px;margin:14px 0 6px;}
-    p{color:var(--muted);margin:0 0 24px;font-size:15px;}
-    .btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;
-      font-size:14px;padding:11px 20px;border-radius:10px;}
-    .btn:hover{filter:brightness(.94);}
-    .brand{margin-top:24px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
+    body{margin:0;background:var(--canvas);color:var(--text);display:flex;align-items:center;justify-content:center;
+      padding:48px 16px;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans","Helvetica Neue",Arial,sans-serif;
+      line-height:1.5;-webkit-font-smoothing:antialiased;}
+    .wrap{width:100%;max-width:440px}
+    .brand{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 auto 32px;font-size:16px;font-weight:600;color:var(--title);text-decoration:none;width:fit-content;border-radius:8px}
+    .mark{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;background:var(--brand);color:#fff;font-size:14px;font-weight:700}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:40px;
+      box-shadow:0 12px 32px -8px rgba(14,17,20,.16),0 4px 8px -2px rgba(14,17,20,.06)}
+    .code{margin:0;font-size:13px;line-height:18px;font-weight:600;color:var(--tertiary);font-variant-numeric:tabular-nums}
+    h1{margin:6px 0 0;font-size:28px;line-height:34px;font-weight:700;letter-spacing:-.02em;color:var(--title)}
+    p.msg{margin:8px 0 28px;color:var(--secondary);font-size:15px;line-height:24px}
+    .btn{display:flex;align-items:center;justify-content:center;width:100%;height:44px;padding:0 18px;border-radius:10px;
+      background:var(--brand);color:#fff;text-decoration:none;font-weight:600;font-size:15px;
+      box-shadow:0 1px 2px rgba(14,17,20,.12),inset 0 1px 0 rgba(255,255,255,.12);transition:background-color .1s ease}
+    .btn:hover{background:var(--brand-hover)}
+    a:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+    @media (max-width:480px){.card{padding:28px 20px}h1{font-size:26px;line-height:32px}}
   </style>
 </head>
 <body>
-  <div class="card">
-    <p class="code">{% block code_display %}Error{% endblock %}</p>
-    <h1>{% block title %}Something went wrong{% endblock %}</h1>
-    <p>{% block message %}An unexpected error occurred.{% endblock %}</p>
-    <a class="btn" href="/">Back to SM Bean</a>
-    <div class="brand">SM Bean</div>
-  </div>
+  <main class="wrap">
+    <a class="brand" href="/"><span class="mark" aria-hidden="true">S</span>SM Bean</a>
+    <div class="card">
+      <p class="code">Error {% block code_display %}{% endblock %}</p>
+      <h1>{% block title %}Something went wrong{% endblock %}</h1>
+      <p class="msg">{% block message %}An unexpected error occurred.{% endblock %}</p>
+      <a class="btn" href="/">Back to SM Bean</a>
+    </div>
+  </main>
 </body>
 </html>
