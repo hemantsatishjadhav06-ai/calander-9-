@@ -61,7 +61,7 @@ or, when the workspace goes ahead on its own, "Started · See progress" with "St
     <form method="post" action="{{ thread.send_url }}" class="mt-4" data-confirm-brief="{{ m.pk }}"
           hx-post="{{ thread.send_url }}" hx-sync="closest [data-agency-thread]:replace" hx-target="#{{ thread.dom_id }}" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
         {% csrf_token %}
-        {% if thread.full_page %}<input type="hidden" name="full" value="1">{% endif %}
+        {% if thread.full_page %}<input type="hidden" name="full" value="1">{% endif %}{% if thread.home_panel %}<input type="hidden" name="home" value="1">{% endif %}
         <input type="hidden" name="kind" value="confirm_brief">
         <input type="hidden" name="confirmation_message_id" value="{{ m.pk }}">
         <input type="hidden" name="body" value="Go ahead with this brief.">
@@ -87,7 +87,7 @@ or, when the workspace goes ahead on its own, "Started · See progress" with "St
     <form method="post" action="{{ m.stop_url }}" class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" data-stop-brief="{{ m.created_brief.pk }}"
           hx-post="{{ m.stop_url }}" hx-sync="closest [data-agency-thread]:replace" hx-target="#{{ thread.dom_id }}" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
         {% csrf_token %}
-        {% if thread.full_page %}<input type="hidden" name="full" value="1">{% endif %}
+        {% if thread.full_page %}<input type="hidden" name="full" value="1">{% endif %}{% if thread.home_panel %}<input type="hidden" name="home" value="1">{% endif %}
         <button type="submit" class="ui-btn ui-btn-sm ui-btn-secondary">Stop</button>
         <span class="text-xs text-ink-600">Stops the team before the draft is made.</span>
     </form>

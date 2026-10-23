@@ -1522,8 +1522,9 @@ def thread_context(
             for receipt in _publication_receipts(selected_draft)
         )
     working = has_active_job(conversation)
-    # The panel on Home polls with ``?home=1`` so a card's "Turn on" returns to Home, not the thread page.
-    home_panel = request.GET.get("home") == "1"
+    # The panel on Home polls with ``?home=1`` so a card's "Turn on" returns to Home, not the thread page;
+    # its forms (Send, Go ahead, Stop) carry ``home=1`` so the panel they swap back in stays Home's too.
+    home_panel = request.GET.get("home") == "1" or (request.method == "POST" and request.POST.get("home") == "1")
     if home_panel and messages_url:
         messages_url += "?home=1"
     return {

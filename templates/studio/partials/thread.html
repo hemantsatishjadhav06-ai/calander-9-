@@ -27,7 +27,7 @@ Send renders as a secondary button, and on a post or article page (whose decisio
           hx-post="{{ thread.send_url }}" hx-sync="closest [data-agency-thread]:replace" hx-encoding="multipart/form-data" hx-target="#{{ thread.dom_id }}" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
         <input type="hidden" name="kind" value="question">
         {% csrf_token %}
-        {% if thread.full_page %}<input type="hidden" name="full" value="1">{% endif %}
+        {% if thread.full_page %}<input type="hidden" name="full" value="1">{% endif %}{% if thread.home_panel %}<input type="hidden" name="home" value="1">{% endif %}
         {% if thread.draft_choices %}
         <div class="mb-3">
             <label for="{{ thread.dom_id }}-draft" class="ui-label">Draft to discuss or revise</label>
