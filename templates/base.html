@@ -114,6 +114,13 @@
             border: none; outline: none; box-shadow: none; padding: 0; resize: none; background: transparent; line-height: 1.6;
         }
         .idea-modal-body textarea.idea-desc-input::placeholder { color: var(--text-tertiary); }
+        /* The modal's title and notes are borderless fields: show focus as a rule under them
+           (the same as /create/), and as a system outline in forced-colours mode. */
+        .idea-modal-body input.idea-title-input:focus-visible,
+        .idea-modal-body textarea.idea-desc-input:focus-visible {
+            outline: 2px solid transparent; border: none;
+            box-shadow: 0 2px 0 0 var(--focus-ring);
+        }
         .idea-pill-btn {
             display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px;
             border: 0; box-shadow: inset 0 0 0 1px var(--ink-300), var(--shadow-xs); border-radius: 9999px; font-size: 0.8125rem;
@@ -318,7 +325,8 @@
     {% block layout %}
     {% if user.is_authenticated %}
     <div class="flex h-screen overflow-hidden bg-ink-50"
-         x-data="{ sidebarCollapsed: window.bbSidebarStorage.get(), mobileMenuOpen: false }"
+         x-data="{ sidebarCollapsed: window.bbSidebarStorage.get(), mobileMenuOpen: false, isDesktop: window.matchMedia('(min-width: 1024px)').matches }"
+         x-init="window.matchMedia('(min-width: 1024px)').addEventListener('change', (e) => { isDesktop = e.matches; if (e.matches) mobileMenuOpen = false })"
          x-effect="window.bbSidebarStorage.set(sidebarCollapsed)"
          @keydown.escape.window="mobileMenuOpen = false">
 
@@ -333,8 +341,10 @@
              @click="mobileMenuOpen = false"
              class="fixed inset-0 bg-ink-950/35 z-30 lg:hidden"></div>
 
-        <!-- Sidebar: pale ink-100 with a hairline edge; a 280px drawer below 1024px -->
-        <aside class="flex flex-col flex-shrink-0 sidebar-initial
+        <!-- Sidebar: pale ink-100 with a hairline edge; a 280px drawer below 1024px.
+             Below 1024px the closed drawer is inert (out of the tab order and the accessibility tree);
+             open, it is a modal dialog that holds focus and hands it back to the menu button on close. -->
+        <aside id="app-sidebar" class="flex flex-col flex-shrink-0 sidebar-initial
                       fixed inset-y-0 left-0 z-40 w-[280px] bg-ink-100 border-r border-ink-200
                       transition-transform duration-300 ease-out
                       lg:relative lg:z-auto lg:translate-x-0"
@@ -342,12 +352,19 @@
                    sidebarCollapsed ? 'lg:w-[60px] sidebar-collapsed' : 'lg:w-60',
                    mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
                ]"
+               :inert="!isDesktop && !mobileMenuOpen"
+               :role="isDesktop ? null : 'dialog'"
+               :aria-modal="(!isDesktop && mobileMenuOpen) ? 'true' : null"
+               :aria-label="isDesktop ? null : 'Menu'"
+               x-trap.noscroll="!isDesktop && mobileMenuOpen"
                x-init="$el.classList.remove('sidebar-initial'); document.documentElement.classList.remove('sidebar-is-collapsed'); $nextTick(() => $el.classList.add('transition-all', 'duration-200'))"
                @click="if (window.innerWidth < 1024 && $event.target.closest('a')) { mobileMenuOpen = false }">
 
             <!-- Workspace switcher (top of sidebar) -->
-            <div class="relative px-3 pt-3 pb-1" :class="sidebarCollapsed && 'px-2'" x-data="{ wsOpen: false }">
-                <button aria-haspopup="true" :aria-expanded="wsOpen" @click="wsOpen = !wsOpen"
+            <div class="relative px-3 pt-3 pb-1" :class="sidebarCollapsed && 'px-2'" x-data="{ wsOpen: false }"
+                 @keydown.escape="if (wsOpen) { $event.stopPropagation(); wsOpen = false; $refs.wsBtn.focus() }"
+                 @focusout="if (wsOpen && $event.relatedTarget && !$el.contains($event.relatedTarget)) wsOpen = false">
+                <button x-ref="wsBtn" aria-haspopup="true" :aria-expanded="wsOpen" @click="wsOpen = !wsOpen"
                         class="sidebar-ws-btn w-full flex items-center gap-2.5 px-2 py-1.5 min-h-10 max-lg:min-h-11 text-left rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer"
                         :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-2.5 px-2'">
                     {% with current_ws=request.workspace %}
@@ -430,8 +447,10 @@
             {% if request.workspace %}
             <div class="sidebar-new-wrap px-3 pt-2 pb-2" :class="sidebarCollapsed && 'px-2'"
                  x-data="sidebarNewMenu()">
-                <div class="relative">
-                    <button aria-haspopup="true" :aria-expanded="newMenuOpen" @click="newMenuOpen = !newMenuOpen"
+                <div class="relative"
+                     @keydown.escape="if (newMenuOpen) { $event.stopPropagation(); newMenuOpen = false; $refs.newBtn.focus() }"
+                     @focusout="if (newMenuOpen && $event.relatedTarget && !$el.contains($event.relatedTarget)) newMenuOpen = false">
+                    <button x-ref="newBtn" aria-haspopup="true" :aria-expanded="newMenuOpen" @click="newMenuOpen = !newMenuOpen"
                             class="btn-outline w-full flex items-center justify-center gap-1.5 cursor-pointer"
                             :style="sidebarCollapsed ? 'padding-left:1.15rem;padding-right:1.15rem' : ''">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -476,7 +495,7 @@
                          class="idea-modal-overlay"
                          @click.self="closeCreateModal()"
                          @keydown.escape.window="closeCreateModal()">
-                        <div class="idea-modal" @click.stop role="dialog" aria-modal="true" aria-label="Create idea" x-trap.noscroll="showCreateModal">
+                        <div class="idea-modal" @click.stop role="dialog" aria-modal="true" aria-label="New idea" x-trap.noscroll="showCreateModal">
                             <button type="button" class="idea-modal-close" @click="closeCreateModal()" title="Close" aria-label="Close">
                                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
@@ -492,7 +511,7 @@
 
                                 <!-- Header -->
                                 <div class="idea-modal-header">
-                                    <h2 class="text-h2 text-ink-950">Create Idea</h2>
+                                    <h2 class="text-h2 text-ink-950">New idea</h2>
                                     <div class="flex items-center gap-2">
                                         <!-- Column selector dropdown -->
                                         <div class="relative" @click.away="createGroupDropdownOpen = false">
@@ -745,7 +764,7 @@
                     <div class="sidebar-more-items mt-0.5 flex flex-col gap-0.5">
                         <a href="{% url 'composer:create_landing' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'create_landing' %}active{% endif %}">
                             <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a7 7 0 00-4 12.73V16a1 1 0 001 1h6a1 1 0 001-1v-1.27A7 7 0 0012 2z"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
-                            <span class="sidebar-nav-label">Create Idea</span>
+                            <span class="sidebar-nav-label">Ideas</span>
                         </a>
                         <a href="{% url 'composer:drafts_list' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'drafts_list' %}active{% endif %}">
                             <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -757,7 +776,7 @@
                         </a>
                         <a href="{% url 'calendar:posting_slots' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'posting_slots' %}active{% endif %}">
                             <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                            <span class="sidebar-nav-label">Posting Schedule</span>
+                            <span class="sidebar-nav-label">Posting schedule</span>
                         </a>
                         <a href="{% url 'composer:template_list' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'template_list' %}active{% endif %}">
                             <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
@@ -769,7 +788,7 @@
                         </a>
                         <a href="{% url 'composer:csv_upload' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'csv_upload' %}active{% endif %}">
                             <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            <span class="sidebar-nav-label">Import CSV</span>
+                            <span class="sidebar-nav-label">Import from CSV</span>
                         </a>
                         <a href="{% url 'media_library:index' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.app_name == 'media_library' %}active{% endif %}">
                             <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
@@ -811,7 +830,7 @@
                         {% endif %}
                         <div class="flex-1 min-w-0 text-left">
                             <p class="text-[13px] leading-[18px] font-semibold text-ink-900 truncate">{{ request.org.name|default:"My Organization" }}</p>
-                            <p class="text-xs text-ink-500 truncate">{% if user.name %}{{ user.name }}{% else %}{{ user.email }}{% endif %}</p>
+                            <p class="text-xs text-ink-600 truncate">{% if user.name %}{{ user.name }}{% else %}{{ user.email }}{% endif %}</p>
                         </div>
                     </button>
                     <button aria-label="Collapse sidebar" @click="sidebarCollapsed = true"
@@ -890,7 +909,7 @@
         <div class="flex-1 flex flex-col overflow-hidden">
             <!-- Mobile top bar -->
             <div class="translucent-bar flex lg:hidden items-center gap-2 h-[52px] px-2 sm:px-4 flex-shrink-0 relative z-20">
-                <button aria-label="Toggle menu" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen"
+                <button aria-label="Toggle menu" aria-controls="app-sidebar" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen"
                         class="w-11 h-11 flex items-center justify-center rounded-lg text-ink-900 hover:bg-ink-900/5 transition-colors cursor-pointer"
                         title="Toggle menu">
                     <svg aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -939,8 +958,10 @@
                 {% endif %}
                 {% comment %}relative: the scrollers are the containing block, so an absolutely placed element
                    in the page (every sr-only label) scrolls and clips with it instead of stretching the
-                   window past the app shell into blank canvas.{% endcomment %}
-                <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden">
+                   window past the app shell into blank canvas.
+                   -m-1 p-1: a 4px gutter inside the clip box, so the 2px focus ring at a 2px offset is never
+                   cut off on a full-width button, a card or a breadcrumb that touches the edge.{% endcomment %}
+                <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-1 p-1">
                 {% block content %}{% endblock %}
                 </div>
             </main>
