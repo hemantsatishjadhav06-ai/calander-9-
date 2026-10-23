@@ -194,11 +194,24 @@ def test_cover_endpoint_needs_membership(client, world):
 
 
 def test_preview_and_detail_show_the_designed_cover(client, world):
+    """The preview is sandboxed (an opaque origin), so its image requests carry no session
+    cookie: a link to the login-only cover URL came back as a sign-in redirect and the hero
+    was blank. The preview inlines the very bytes the cover endpoint serves."""
+    import base64
+    import re
+
     post = make_post(world, cover_style="designed")
     client.force_login(world.owner)
     cover_url = _url("cover", world, post)
-    preview = client.get(_url("preview", world, post)).content.decode()
-    assert f'src="http://testserver{cover_url}?v=1"' in preview
+    response = client.get(_url("preview", world, post))
+    csp = response["Content-Security-Policy"]
+    assert "sandbox" in csp and "allow-same-origin" not in csp
+    assert "img-src https: data:" in csp
+    preview = response.content.decode()
+    assert cover_url not in preview
+    inline = re.search(r'src="data:image/jpeg;base64,([A-Za-z0-9+/=]+)"', preview)
+    assert inline, "the designed cover is inlined"
+    assert base64.b64decode(inline.group(1)) == client.get(cover_url).content
     detail = client.get(_url("detail", world, post)).content.decode()
     assert f"{cover_url}?v=1" in detail and "Designed (title over the picture)" in detail
 

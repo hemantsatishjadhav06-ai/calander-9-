@@ -6,6 +6,7 @@ about who may approve or publish live in :mod:`apps.blog.services` — these
 views only decide which buttons to show and translate refusals into messages.
 """
 
+import base64
 import uuid
 from typing import Any
 from urllib.parse import urlsplit
@@ -485,17 +486,19 @@ def _preview_csp(site, request) -> str:
 def post_preview(request, workspace_id, post_id):
     """The page exactly as it will be published, with asset URLs made absolute."""
     _workspace_obj, post = _get_post(request, workspace_id, post_id)
+    content = services.post_content(post)
     hero_src = None
     if post.cover_style == BlogPost.CoverStyle.DESIGNED:
-        hero_src = (
-            request.build_absolute_uri(
-                reverse("blog:cover", kwargs={"workspace_id": post.workspace_id, "post_id": post.id})
-            )
-            + f"?v={post.revision}"
-        )
+        # Inline, not a link to blog:cover: the preview is sandboxed (an opaque origin), so the
+        # browser sends no session cookie with its image requests and the login-only cover URL
+        # answered with a redirect to sign in, leaving the hero blank.
+        try:
+            hero_src = "data:image/jpeg;base64," + base64.b64encode(cover_for_post(post, content)).decode("ascii")
+        except ValueError:
+            hero_src = None
     elif post.featured_image_id and post.featured_image.file:
         hero_src = request.build_absolute_uri(post.featured_image.file.url)
-    page = render_post_page(post.site, services.post_content(post), hero_src=hero_src)
+    page = render_post_page(post.site, content, hero_src=hero_src)
     page = absolutize_urls(page, post.expected_url)
     response = HttpResponse(page, content_type="text/html; charset=utf-8")
     response["X-Robots-Tag"] = "noindex, nofollow"
