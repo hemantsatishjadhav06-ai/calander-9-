@@ -3,11 +3,15 @@
 {% block title %}New blog post - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl">
-    <nav aria-label="Breadcrumb" class="text-sm text-ink-600 mb-3">
-        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-ink-900">Blog</a>
-    </nav>
-    <h1 class="text-lg font-semibold text-ink-900 mb-2">No website to publish to</h1>
-    <p class="text-sm text-ink-700">This workspace isn't connected to a website, so there is nowhere to publish an article yet. <a href="{% url 'studio:setup' workspace_id=workspace.id %}" class="font-semibold text-brand-800 underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">Open Set up</a> to see how your owner connects one.</p>
+<div class="w-full max-w-2xl">
+    <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="ui-btn ui-btn-ghost -ml-3 mb-2 no-underline">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Blog
+    </a>
+    <div class="ui-card ui-empty">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+        <h1 class="ui-empty-title">No website to publish to</h1>
+        <p class="ui-empty-body">This workspace isn't connected to a website, so there is nowhere to publish an article yet. <a href="{% url 'studio:setup' workspace_id=workspace.id %}" class="link-inline">Open Set up</a> to see how your owner connects one.</p>
+    </div>
 </div>
 {% endblock %}

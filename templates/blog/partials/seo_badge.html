@@ -1,7 +1,5 @@
 {% comment %}The SEO score as a small pill for the blog list. Context: report.{% endcomment %}
-<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums whitespace-nowrap
-    {% if report.tone == 'good' %}bg-success-50 text-success-600 ring-1 ring-inset ring-success-200
-    {% elif report.tone == 'fair' %}bg-warning-50 text-warning-600 ring-1 ring-inset ring-warning-200
-    {% else %}bg-danger-50 text-danger-600 ring-1 ring-inset ring-danger-200{% endif %}">
+<span class="ui-pill tabular-nums {% if report.tone == 'good' %}ui-pill-success{% elif report.tone == 'fair' %}ui-pill-warning{% else %}ui-pill-danger{% endif %}">
+    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
     SEO {{ report.score }}<span class="sr-only"> of 100: {{ report.grade }}</span>
 </span>

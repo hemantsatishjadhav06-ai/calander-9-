@@ -1,27 +1,27 @@
 {% load analytics_extras %}
-<div class="a-card a-card-hover" style="padding: 20px; display: flex; gap: 18px; flex-wrap: wrap; align-items: stretch; height: 100%;">
-    <div style="flex: 1 1 150px; min-width: 140px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+<div class="a-card flex h-full flex-wrap items-stretch gap-5 p-5 max-sm:p-4">
+    <div class="flex min-w-[140px] flex-[1_1_150px] flex-col justify-between gap-3">
         <div>
-            <div style="font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">Engagement rate</div>
-            <div style="display: flex; align-items: flex-end; gap: 12px;">
-                <span style="font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); line-height: 0.95;">{{ engagement.rate.value|fmt_metric:"percent" }}</span>
-                <span class="a-delta {{ engagement.rate.delta|delta_color }}" style="font-size: 12.5px; padding: 3px 9px;">{{ engagement.rate.delta|fmt_signed }}</span>
+            <div class="text-small font-medium text-ink-600">Engagement rate</div>
+            <div class="mt-2 flex items-end gap-3">
+                <span class="text-[36px] font-bold leading-none tracking-[-0.025em] tabular-nums text-ink-950">{{ engagement.rate.value|fmt_metric:"percent" }}</span>
+                <span class="a-delta {{ engagement.rate.delta|delta_color }}">{{ engagement.rate.delta|fmt_signed }}</span>
             </div>
         </div>
-        {% sparkline engagement.rate.series primary_color 180 40 %}
+        <div class="[&_svg]:w-full" aria-hidden="true">{% sparkline engagement.rate.series "var(--ink-700)" 180 40 %}</div>
     </div>
 
-    <div style="width: 1px; background: var(--neutral-100); align-self: stretch;"></div>
+    <div class="hidden w-px self-stretch bg-ink-200 sm:block" aria-hidden="true"></div>
 
-    <div style="flex: 1 1 215px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; align-content: center;">
+    <dl class="grid flex-[1_1_215px] grid-cols-2 content-center gap-2.5">
         {% for p in engagement.parts %}
-        <div style="padding: 11px 13px; border-radius: var(--radius-lg); background: var(--surface-1); border: 1px solid var(--border);">
-            <div style="font-size: 0.6875rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">{{ p.label }}</div>
-            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 6px;">
-                <span class="a-mono" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">{{ p.derived.value|fmt_metric:p.derived.kind }}</span>
+        <div class="rounded-xl bg-ink-50 px-3 py-2.5 ring-1 ring-inset ring-ink-200">
+            <dt class="text-caption font-medium text-ink-600">{{ p.label }}</dt>
+            <dd class="mt-1 flex flex-wrap items-baseline justify-between gap-1.5">
+                <span class="text-[17px] font-semibold tabular-nums text-ink-950">{{ p.derived.value|fmt_metric:p.derived.kind }}</span>
                 <span class="a-delta {{ p.derived.delta|delta_color }}">{{ p.derived.delta|fmt_signed }}</span>
-            </div>
+            </dd>
         </div>
         {% endfor %}
-    </div>
+    </dl>
 </div>

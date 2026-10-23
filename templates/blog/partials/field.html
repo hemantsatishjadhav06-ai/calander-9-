@@ -1,17 +1,18 @@
-{% comment %}One labelled form field with help text and errors. Context: field, optional counter_model + counter_limit (Alpine character counter).{% endcomment %}
-<div class="mb-5">
-    <div class="flex items-baseline justify-between gap-3 mb-1.5">
-        <label for="{{ field.auto_id }}" class="block text-sm font-semibold text-ink-900">{{ field.label }}{% if field.field.required %} <span class="text-danger-600" aria-hidden="true">*</span><span class="sr-only">(required)</span>{% endif %}</label>
+{% comment %}One labelled form field with help text and errors. Context: field, optional counter_model + counter_limit (Alpine character counter).
+The widget's classes come from apps/blog/forms.py; the wrapper keeps fields 16px and 44px tall on touch screens.{% endcomment %}
+<div class="mb-5 max-lg:[&_input]:min-h-11 max-lg:[&_input]:text-base max-lg:[&_select]:min-h-11 max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base [&_input]:min-h-9 [&_select]:min-h-9">
+    <div class="mb-1.5 flex items-baseline justify-between gap-3">
+        <label for="{{ field.auto_id }}" class="ui-label !mb-0">{{ field.label }}{% if field.field.required %} <span class="text-danger-500" aria-hidden="true">*</span><span class="sr-only">(required)</span>{% endif %}</label>
         {% if counter_model %}
-        <span id="{{ field.auto_id }}_count" class="text-xs tabular-nums" aria-live="polite"
+        <span id="{{ field.auto_id }}_count" class="text-caption tabular-nums" aria-live="polite"
               :class="{{ counter_model }}.length > {{ counter_limit }} ? 'text-danger-600 font-semibold' : 'text-ink-600'"
               x-text="{{ counter_model }}.length + ' / {{ counter_limit }}'">{{ field.value|default:''|length }} / {{ counter_limit }}</span>
         {% endif %}
     </div>
     {{ field }}
-    {% if field.help_text %}<p id="{{ field.auto_id }}_helptext" class="mt-1 text-xs text-ink-600">{{ field.help_text }}</p>{% endif %}
+    {% if field.help_text %}<p id="{{ field.auto_id }}_helptext" class="ui-help">{{ field.help_text }}</p>{% endif %}
     {% if field.errors %}
-    <div id="{{ field.auto_id }}_errors" role="alert" class="mt-1 text-sm text-danger-600">
+    <div id="{{ field.auto_id }}_errors" role="alert" class="ui-error flex-col !gap-0.5">
         {% for error in field.errors %}<p>{{ error }}</p>{% endfor %}
     </div>
     {% endif %}

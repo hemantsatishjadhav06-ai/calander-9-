@@ -1,24 +1,24 @@
 {% load analytics_extras %}
-<div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px;">
-    <div style="text-align: center; max-width: 420px;">
-        <div style="position: relative; width: 72px; height: 72px; margin: 0 auto 20px;">
-            <div style="width: 72px; height: 72px; border-radius: var(--radius-2xl); background: var(--primary-soft); display: flex; align-items: center; justify-content: center;">
+<div class="ui-card flex flex-1 items-center justify-center !py-12">
+    <div class="max-w-[440px] text-center">
+        <div class="relative mx-auto mb-5 size-14">
+            <div class="grid size-14 place-items-center rounded-2xl bg-ink-50 ring-1 ring-inset ring-ink-200">
                 {% include "partials/_platform_icon.html" with platform=active_account.platform size="lg" %}
             </div>
-            <span style="position: absolute; right: -4px; bottom: -4px; width: 28px; height: 28px; border-radius: 50%; background: var(--success-500); border: 3px solid #fff; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700;">✓</span>
+            <span class="absolute -bottom-1.5 -right-1.5 grid size-6 place-items-center rounded-full bg-success-500 text-white ring-[3px] ring-white" aria-hidden="true">
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>
         </div>
-        <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.01em;">
-            {{ active_account.account_name }} is connected
-        </h2>
-        <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 8px;">
-            We started collecting analytics when you connected this account. Metrics for this {% if active_account.platform == "youtube" %}channel{% else %}account{% endif %} usually appear within <strong>24–48 hours</strong> of your first published post.
+        <h2 class="text-h2 text-ink-950">{{ active_account.account_name }} is connected</h2>
+        <p class="mt-2 text-body-lg text-ink-600">
+            Numbers for this {% if active_account.platform == "youtube" %}channel{% else %}account{% endif %} usually appear within <span class="font-semibold text-ink-900">24–48 hours</span> of your first published post.
         </p>
-        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-full); margin-top: 12px;">
-            <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--warning-500);"></span>
-            <span style="font-size: 0.8125rem; color: var(--text-secondary); font-weight: 500;">Awaiting first full sync</span>
-        </div>
-        <div style="margin-top: 28px; display: flex; gap: 10px; justify-content: center;">
-            <a href="{% url 'composer:create_landing' workspace_id=workspace.id %}" class="btn-brand" style="width: auto; padding: 9px 20px;">Create a post</a>
+        <span class="ui-pill ui-pill-info mt-4">
+            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Waiting for the first full sync
+        </span>
+        <div class="mt-6 flex justify-center">
+            <a href="{% url 'composer:create_landing' workspace_id=workspace.id %}" class="ui-btn ui-btn-primary no-underline">Create a post</a>
         </div>
     </div>
 </div>
