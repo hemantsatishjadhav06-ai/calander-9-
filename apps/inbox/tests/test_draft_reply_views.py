@@ -88,6 +88,25 @@ def test_save_as_draft_button_disables_itself(client, workspace, account, messag
 
 
 @pytest.mark.django_db
+def test_inbox_rows_are_one_button_beside_the_checkbox(client, workspace, account, message, org_owner, user):
+    """A row was role=button with the selection checkbox inside it (a control nested in a
+    control, and the checkbox had no clear space). The row opens through one named button;
+    the checkbox sits beside it, not inside."""
+    import re
+
+    _member(workspace, user, WorkspaceMembership.WorkspaceRole.OWNER)
+    client.force_login(user)
+
+    html = client.get(_url(workspace, "")).content.decode()
+
+    row = re.search(rf'<div id="msg-{message.id}"[^>]*>', html, flags=re.S)
+    assert row, "the message row is rendered"
+    assert 'role="button"' not in row.group(0) and "tabindex" not in row.group(0)
+    assert re.search(r'<button type="button"[^>]*aria-label="(Unread\. )?Comment from Ada"', html, flags=re.S)
+    assert 'aria-label="Select message from Ada"' in html
+
+
+@pytest.mark.django_db
 def test_save_reply_draft_denied_for_viewer(client, workspace, account, message, org_owner, user):
     _member(workspace, user, WorkspaceMembership.WorkspaceRole.VIEWER)
     client.force_login(user)

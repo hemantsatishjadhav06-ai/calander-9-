@@ -1,11 +1,7 @@
 {% load humanize %}
 <div id="msg-{{ message.id }}"
      class="inbox-row {% if message.status == 'unread' %}is-unread{% endif %}"
-     @click="selectMessage('{{ message.id }}', '{% url 'inbox:message_detail' workspace_id=workspace.id message_id=message.id %}')"
-     @keydown.enter.self.prevent="selectMessage('{{ message.id }}', '{% url 'inbox:message_detail' workspace_id=workspace.id message_id=message.id %}')"
-     role="button"
-     tabindex="0"
-     aria-label="{% if message.status == 'unread' %}Unread. {% endif %}{{ message.get_message_type_display }} from {{ message.sender_name }}">
+     @click="selectMessage('{{ message.id }}', '{% url 'inbox:message_detail' workspace_id=workspace.id message_id=message.id %}')">
 
     <!-- Checkbox -->
     <label class="-m-1 grid size-6 flex-shrink-0 cursor-pointer place-items-center self-start rounded" @click.stop>
@@ -16,7 +12,12 @@
                class="ui-checkbox cursor-pointer">
     </label>
 
-    <!-- Avatar with the platform's glyph -->
+    <!-- Avatar and text. One stretched button opens the message (its click reaches the row's handler);
+         the checkbox stays outside it, so no control sits inside another. -->
+    <div class="relative flex min-w-0 flex-1 gap-2.5">
+    <button type="button"
+            class="absolute -inset-1 z-0 rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600"
+            aria-label="{% if message.status == 'unread' %}Unread. {% endif %}{{ message.get_message_type_display }} from {{ message.sender_name }}"></button>
     <div class="relative flex-shrink-0 self-start">
         {% if message.sender_avatar_url %}
         <img src="{{ message.sender_avatar_url }}" alt="" class="size-9 rounded-full object-cover">
@@ -31,7 +32,7 @@
     </div>
 
     <!-- Content -->
-    <div class="min-w-0 flex-1">
+    <div class="relative min-w-0 flex-1">
         <div class="flex items-baseline gap-2">
             <span class="inbox-row-sender truncate text-sm font-semibold text-ink-900">{{ message.sender_name }}</span>
             {% if message.sender_handle %}
@@ -60,4 +61,5 @@
             {% endif %}
         </div>
     </div>
+</div>
 </div>
