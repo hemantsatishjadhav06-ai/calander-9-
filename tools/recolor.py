@@ -29,8 +29,9 @@ run changes nothing.
 Usage::
 
     python tools/recolor.py            # rewrite every target file
-    python tools/recolor.py --check    # change nothing; list files that would change and any
-                                       # old palette class left anywhere (exit 1 if either)
+    python tools/recolor.py --check    # change nothing; list files that would change, any old
+                                       # palette class left anywhere, and any marketing screenshot
+                                       # that still shows the orange interface (exit 1 if any)
     python tools/recolor.py path ...   # only these files
     python tools/recolor.py --diff     # print a unified diff instead of writing
 """
@@ -691,6 +692,49 @@ def leftovers(paths: Iterable[Path]) -> list[str]:
     return found
 
 
+# Product screenshots on the public site (static/img/marketing). The retired interface was orange
+# (Tailwind orange-400..700: hue 20-27 degrees, saturated, bright); the redesigned one has no orange at
+# all, so a screenshot where more than a sliver of pixels is that orange was captured before the
+# redesign. Creatives inside a screenshot keep their own colours; an amber or gold accent (hue 33+)
+# is outside the band. Measured: the old captures were 0.44-0.85% orange, the new ones 0.00-0.06%.
+MARKETING_IMAGES = ROOT / "static" / "img" / "marketing"
+ORANGE_HUE = (15, 32)  # degrees
+ORANGE_MIN_SATURATION = 150  # of 255
+ORANGE_MIN_VALUE = 140  # of 255
+ORANGE_LIMIT = 0.002  # share of pixels
+
+
+def orange_share(path: Path) -> float:
+    """The share of pixels in ``path`` that are the retired interface orange."""
+    from PIL import Image
+
+    with Image.open(path) as image:
+        hsv = image.convert("RGB").convert("HSV")
+        hsv.thumbnail((1000, 1000))
+        data = hsv.tobytes()
+    lo, hi = (round(d / 360 * 255) for d in ORANGE_HUE)
+    total = len(data) // 3
+    hits = sum(
+        1
+        for i in range(0, len(data), 3)
+        if lo <= data[i] <= hi and data[i + 1] >= ORANGE_MIN_SATURATION and data[i + 2] >= ORANGE_MIN_VALUE
+    )
+    return hits / total if total else 0.0
+
+
+def orange_screenshots(folder: Path = MARKETING_IMAGES) -> list[str]:
+    """Marketing screenshots that still show the retired orange interface (re-capture them)."""
+    found = []
+    for path in sorted(folder.glob("*")):
+        if path.suffix.lower() not in {".webp", ".png", ".jpg", ".jpeg"}:
+            continue
+        share = orange_share(path)
+        if share > ORANGE_LIMIT:
+            name = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+            found.append(f"{name}: {share:.2%} of its pixels are the retired orange interface")
+    return found
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("paths", nargs="*", type=Path, help="only these files (default: every target)")
@@ -726,12 +770,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.check:
         tests = sorted(p for p in (ROOT / "apps").rglob("*.py") if "tests" in p.parts or p.name.startswith("test_"))
         left = leftovers(html + js + py + tests) if not args.paths else leftovers(targets)
+        images = orange_screenshots() if not args.paths else []
         for name in rel:
             print(f"would recolour: {name}")
         for line in left:
             print(f"old palette class: {line}")
-        if rel or left:
-            print(f"{len(rel)} file(s) to recolour, {len(left)} old palette class line(s) left", file=sys.stderr)
+        for line in images:
+            print(f"old screenshot: {line}")
+        if rel or left or images:
+            print(
+                f"{len(rel)} file(s) to recolour, {len(left)} old palette class line(s) left, "
+                f"{len(images)} marketing screenshot(s) to re-capture",
+                file=sys.stderr,
+            )
             return 1
         print("recolor: nothing left to do")
         return 0
