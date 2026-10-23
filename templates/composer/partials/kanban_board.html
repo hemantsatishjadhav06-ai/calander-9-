@@ -6,7 +6,7 @@
     <!-- Add new column -->
     <div class="flex-shrink-0 w-[272px]" data-new-group-tile x-data="{ adding: false, newName: '' }">
         <button x-show="!adding" @click="adding = true; $nextTick(() => $refs.groupInput.focus())"
-                type="button" class="flex items-center gap-2 min-h-10 px-3 text-[13px] font-semibold text-ink-600 hover:text-ink-900 transition-colors rounded-xl hover:bg-ink-100 w-full">
+                type="button" class="flex items-center gap-2 min-h-10 px-3 text-[13px] font-semibold text-ink-600 hover:text-ink-900 transition-colors rounded-xl hover:bg-ink-100 w-full focus-visible:outline-offset-[-2px]">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New column
         </button>

@@ -1585,12 +1585,12 @@
                     <svg aria-hidden="true" class="w-4 h-4 flex-shrink-0 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
                     <span class="truncate text-ink-700">On hold: a client paused this. Resume it from Approvals.</span>
                     {% else %}
-                    <span class="truncate text-ink-900">Approval history</span>
+                    <span class="truncate text-ink-900">Approval history and comments</span>
                     {% endif %}
                 </span>
                 <span class="flex flex-shrink-0 items-center gap-1 text-[13px] font-medium text-brand-700">
-                    <span class="group-open:hidden"><span class="hidden sm:inline">History and comments</span><span class="sm:hidden">History</span></span>
-                    <span class="hidden group-open:inline">Hide</span>
+                    <span class="group-open:hidden">Show<span class="sr-only"> history and comments</span></span>
+                    <span class="hidden group-open:inline">Hide<span class="sr-only"> history and comments</span></span>
                     <svg class="size-3.5 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg>
                 </span>
             </summary>
@@ -1699,7 +1699,7 @@
             </div>
         </div>
 
-        <div id="preview-panel" class="flex-1 overflow-y-auto p-4 space-y-4 panel-scroll"
+        <div id="preview-panel" class="flex-1 overflow-y-auto p-4 space-y-4 panel-scroll focus-visible:outline-offset-[-2px]"
              tabindex="0" role="region" aria-label="Post preview"
              hx-post="{% url 'composer:preview' workspace_id=workspace.id %}"
              hx-trigger="previewUpdate from:body"

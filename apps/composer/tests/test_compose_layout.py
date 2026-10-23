@@ -116,3 +116,15 @@ class ComposerLayoutTests(TestCase):
         self.assertIn("action === 'schedule'", logic)
         self.assertIn("The time you picked is kept as a proposal", logic)
         self.assertIn("Sent for approval. Nothing goes out until someone approves it.", logic)
+
+    def test_new_workspaces_get_sentence_case_idea_columns(self):
+        from apps.composer.models import IdeaGroup
+
+        self.client.get(reverse("composer:create_landing", kwargs={"workspace_id": self.ws.id}))
+        names = list(IdeaGroup.objects.filter(workspace=self.ws).order_by("position").values_list("name", flat=True))
+        self.assertEqual(names, ["Unassigned", "To do", "In progress", "Done"])
+
+    def test_scroll_tracks_draw_focus_inside(self):
+        body = self._body(self._post(PlatformPost.Status.DRAFT))
+        start = body.index('id="preview-panel"')
+        self.assertIn("focus-visible:outline-offset-[-2px]", body[start : body.index(">", start)])

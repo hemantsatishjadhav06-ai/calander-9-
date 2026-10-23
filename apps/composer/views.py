@@ -2798,7 +2798,8 @@ def _idea_columns(workspace, tag=None):
     # Ensure default groups exist for this workspace
     if not groups.exists():
         created_groups = {}
-        for name, pos in [("Unassigned", 0), ("To Do", 1), ("In Progress", 2), ("Done", 3)]:
+        # Sentence case, like every other label (existing workspaces keep the names they have).
+        for name, pos in [("Unassigned", 0), ("To do", 1), ("In progress", 2), ("Done", 3)]:
             created_groups[name] = IdeaGroup.objects.create(workspace=workspace, name=name, position=pos)
         # Seed an introductory idea in the Unassigned column
         Idea.objects.create(

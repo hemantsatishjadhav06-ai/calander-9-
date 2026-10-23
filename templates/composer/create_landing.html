@@ -21,6 +21,8 @@
     @media (max-width: 1023px) { .create-tab { height: 44px; } }
     .create-tab:hover { color: var(--ink-900); }
     .create-tab.active { color: var(--ink-950); font-weight: 600; border-bottom-color: var(--ink-900); }
+    /* The tab row clips overflow: draw the focus ring just inside the tab so it is never cut off. */
+    .create-tab:focus-visible { outline-offset: -2px; }
 
     /* Kanban board */
     .kanban-column {
