@@ -1,21 +1,20 @@
-<div x-data="{ showForm: false }" @keydown.escape.window="showForm = false" style="flex-shrink: 0;">
-    <button type="button" :aria-expanded="showForm" aria-controls="connection-devto-form" @click="showForm = !showForm"
-            class="btn-primary-hover" style="padding: 7px 16px; font-size: 0.75rem; font-weight: 600; color: white; background: var(--primary-strong); border: none; border-radius: var(--radius-full); cursor: pointer; box-shadow: var(--shadow-primary);">
-        Connect <span aria-hidden="true">&rarr;</span>
+<div x-data="{ showForm: false }" @keydown.escape.window="showForm = false" class="flex-shrink-0">
+    <button type="button" :aria-expanded="showForm" aria-controls="connection-devto-form" @click="showForm = !showForm" class="ui-btn ui-btn-sm ui-btn-tinted">
+        Connect<span class="sr-only"> DEV.to</span>
     </button>
-    <div x-show="showForm" x-cloak @click.self="showForm = false"
-         style="position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(14, 17, 20,0.4); padding: 16px;">
+    <div x-show="showForm" x-cloak @click.self="showForm = false" class="ui-overlay z-50 flex items-center justify-center p-4">
         <form id="connection-devto-form" role="dialog" aria-modal="true" aria-labelledby="connection-devto-title" x-trap.noscroll="showForm"
-              method="post" action="{% url 'onboarding:connection_devto' token=link.token %}"
-              style="background: var(--surface-0); border-radius: var(--radius-xl); padding: 24px; width: 100%; max-width: 380px; box-shadow: var(--shadow-xl);">
+              method="post" action="{% url 'onboarding:connection_devto' token=link.token %}" class="ui-modal max-w-[400px]">
             {% csrf_token %}
-            <h3 id="connection-devto-title" style="font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Connect DEV.to</h3>
-            <label for="connection-devto-api-key" class="block text-sm font-semibold mb-1">API key</label>
-            <input type="password" id="connection-devto-api-key" name="api_key" required autocomplete="off" class="form-input-styled w-full">
-            <p class="text-xs text-ink-500 mt-2 mb-4">Create a key at DEV.to &rarr; Settings &rarr; Extensions &rarr; DEV Community API Keys.</p>
-            <div class="flex gap-2 justify-end">
-                <button type="button" @click="showForm = false" class="px-4 py-2 text-sm font-semibold border border-ink-200 rounded-full cursor-pointer">Cancel</button>
-                <button type="submit" class="btn-brand px-4 py-2 text-sm cursor-pointer">Connect</button>
+            <div class="ui-modal-header"><h2 id="connection-devto-title" class="ui-modal-title">Connect DEV.to</h2></div>
+            <div class="ui-modal-body">
+                <label for="connection-devto-api-key" class="ui-label">API key</label>
+                <input type="password" id="connection-devto-api-key" name="api_key" required autocomplete="off" aria-describedby="connection-devto-api-key-help" class="ui-input">
+                <p id="connection-devto-api-key-help" class="ui-help">Create a key at DEV.to &rarr; Settings &rarr; Extensions &rarr; DEV Community API Keys.</p>
+            </div>
+            <div class="ui-modal-footer">
+                <button type="button" @click="showForm = false" class="ui-btn ui-btn-secondary">Cancel</button>
+                <button type="submit" class="ui-btn ui-btn-primary">Connect</button>
             </div>
         </form>
     </div>
