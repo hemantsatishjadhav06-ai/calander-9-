@@ -32,11 +32,11 @@
                 </ul>
             </div>
             <div class="reveal" data-delay="1">
-                <div class="mk-code"><div class="mk-code__head"><span>Inspect what a key can do</span><button class="mk-copy" type="button" data-copy="code-me">Copy</button></div><pre id="code-me">curl <span class="s">"{{ api_base_url }}/me"</span> \
+                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>Inspect what a key can do</span><button class="mk-copy" type="button" data-copy="code-me">Copy</button></div><pre id="code-me">curl <span class="s">"{{ api_base_url }}/me"</span> \
   -H <span class="s">"Authorization: Bearer bb_studio_…"</span>
 
 <span class="c"># → workspace, allowed accounts and granted permissions</span></pre></div>
-                <div class="mk-code" style="margin-top: 16px;"><div class="mk-code__head"><span>Create and schedule a post</span><button class="mk-copy" type="button" data-copy="code-post">Copy</button></div><pre id="code-post">curl -X POST <span class="s">"{{ api_base_url }}/posts"</span> \
+                <div class="mk-code" tabindex="0" style="margin-top: 16px;"><div class="mk-code__head"><span>Create and schedule a post</span><button class="mk-copy" type="button" data-copy="code-post">Copy</button></div><pre id="code-post">curl -X POST <span class="s">"{{ api_base_url }}/posts"</span> \
   -H <span class="s">"Authorization: Bearer bb_studio_…"</span> \
   -H <span class="s">"Content-Type: application/json"</span> \
   -H <span class="s">"Idempotency-Key: launch-2026-10-01"</span> \
@@ -59,7 +59,7 @@
                 <h2 class="mk-h2" style="margin-bottom: 14px;">Generous, and always announced</h2>
                 <p class="mk-lead">A <code>429</code> carries <code>Retry-After</code>, <code>X-RateLimit-Limit</code> and <code>X-RateLimit-Remaining</code> headers so clients can back off precisely.</p>
             </div>
-            <div class="mk-table-wrap reveal" data-delay="1">
+            <div tabindex="0" class="mk-table-wrap reveal" data-delay="1">
                 <table class="mk-table" style="min-width: 0;">
                     <thead><tr><th>Scope</th><th>Limit</th></tr></thead>
                     <tbody>
@@ -80,7 +80,7 @@
             <h2 class="mk-h2">Endpoints</h2>
             <p class="mk-lead">Base URL <code>{{ api_base_url }}/</code>. Interactive documentation, generated from the same code, lives at <a href="/api/v1/docs">/api/v1/docs</a>.</p>
         </div>
-        <div class="mk-table-wrap reveal">
+        <div tabindex="0" class="mk-table-wrap reveal">
             <table class="mk-table">
                 <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Permission</th></tr></thead>
                 <tbody>
@@ -119,10 +119,10 @@
         </div>
         <div class="mk-grid mk-grid--2" style="align-items: start;">
             <div class="reveal">
-                <div class="mk-code"><div class="mk-code__head"><span>Claude Code</span><button class="mk-copy" type="button" data-copy="code-mcp">Copy</button></div><pre id="code-mcp">claude mcp add --transport http sm-bean \
+                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>Claude Code</span><button class="mk-copy" type="button" data-copy="code-mcp">Copy</button></div><pre id="code-mcp">claude mcp add --transport http sm-bean \
   <span class="s">"{{ api_base_url }}/mcp"</span> \
   --header <span class="s">"Authorization: Bearer bb_studio_…"</span></pre></div>
-                <div class="mk-code" style="margin-top: 16px;"><div class="mk-code__head"><span>Claude Desktop or any OAuth-capable connector</span></div><pre>Add a custom connector with the URL
+                <div class="mk-code" tabindex="0" style="margin-top: 16px;"><div class="mk-code__head"><span>Claude Desktop or any OAuth-capable connector</span></div><pre>Add a custom connector with the URL
 <span class="s">{{ api_base_url }}/mcp</span>
 
 The client discovers
@@ -131,7 +131,7 @@ The client discovers
 registers itself, and asks you to sign in.</pre></div>
             </div>
             <div class="reveal" data-delay="1">
-                <div class="mk-table-wrap">
+                <div tabindex="0" class="mk-table-wrap">
                     <table class="mk-table mk-table--dark" style="min-width: 0;">
                         <thead><tr><th>Tools</th><th>Needs</th></tr></thead>
                         <tbody>
