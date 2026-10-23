@@ -22,6 +22,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
     <link rel="manifest" href="{% static 'favicon/site.webmanifest' %}">
     <link rel="stylesheet" href="{% static 'css/marketing.css' %}">
+    {% block extra_head %}{% endblock %}
     <script nonce="{{ request.csp_nonce }}">document.documentElement.classList.add("js");</script>
 </head>
 <body class="mk-body">
@@ -39,7 +40,7 @@
             <a href="{% url 'marketing:platforms' %}" {% if page_key == 'platforms' %}class="is-active" aria-current="page"{% endif %}>Platforms</a>
             <a href="{% url 'marketing:developers' %}" {% if page_key == 'developers' %}class="is-active" aria-current="page"{% endif %}>Developers</a>
             <a href="{% url 'marketing:get_started' %}" {% if page_key == 'get_started' %}class="is-active" aria-current="page"{% endif %}>Get started</a>
-            <a href="{% url 'pricing' %}">Pricing</a>
+            <a href="{% url 'pricing' %}" {% if page_key == 'pricing' %}class="is-active" aria-current="page"{% endif %}>Pricing</a>
             <div class="mk-nav__mobile-cta">
                 <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
                 <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create account{% else %}Request early access{% endif %}</a>

@@ -1,149 +1,104 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pricing — {{ SITE_NAME }}</title>
-  <meta name="description" content="{{ SITE_NAME }} is open-source and free to self-host, with no per-seat or per-channel fees. Hosting, AI services and paid platform APIs have separate costs.">
-  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}/pricing/">
-  <meta name="theme-color" content="#FFFFFF">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="{{ SITE_NAME }}">
-  <meta property="og:title" content="{{ SITE_NAME }} pricing — free to self-host">
-  <meta property="og:description" content="Open-source and free to self-host. Managed hosting and agency support available.">
-  <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
-  <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
-  <link rel="stylesheet" href="{% static 'css/marketing.css' %}">
-  <style>
-    /* Pricing-only parts; everything else comes from marketing.css */
-    .pr-actions a.pr-text { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; font-size: 0.875rem; font-weight: 500; color: var(--mk-ink-2); }
-    .pr-actions a.pr-text:hover { color: var(--mk-ink); }
-    @media (max-width: 560px) { .pr-actions a.pr-hide-sm { display: none; } }
-    .pr-head { text-align: center; padding-top: 88px; padding-bottom: 8px; }
-    .pr-head .mk-lead { margin: 20px auto 0; max-width: 56ch; }
-    .pr-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; padding: 56px 0 8px; align-items: stretch; }
-    .pr-plan { position: relative; display: flex; flex-direction: column; background: var(--mk-surface); border: 1px solid var(--mk-line); border-radius: var(--mk-r-lg); padding: 28px 24px; box-shadow: var(--mk-shadow-xs); }
-    .pr-plan--featured { border-color: var(--mk-brand); box-shadow: var(--mk-shadow-sm); }
-    .pr-badge { position: absolute; top: -12px; left: 24px; display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--mk-r-pill); background: var(--mk-ink); color: #fff; font-size: 0.75rem; font-weight: 600; }
-    .pr-plan .mk-h3 { font-size: 1.125rem; }
-    .pr-price { margin: 12px 0 4px; font-size: 2.125rem; line-height: 1.15; font-weight: 700; color: var(--mk-ink-strong); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-    .pr-price small { font-size: 0.9375rem; font-weight: 500; letter-spacing: 0; color: var(--mk-ink-3); }
-    .pr-tag { color: var(--mk-ink-2); font-size: 0.9375rem; line-height: 1.5; min-height: 46px; }
-    .pr-feats { margin: 20px 0 24px; padding-top: 20px; border-top: 1px solid var(--mk-line); display: flex; flex-direction: column; gap: 10px; font-size: 0.875rem; line-height: 1.45; color: var(--mk-ink-body); }
-    .pr-feats li { display: flex; gap: 10px; align-items: flex-start; }
-    .pr-feats svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--mk-ink); }
-    .pr-cta { margin-top: auto; }
-    .pr-cta .mk-btn { width: 100%; height: 44px; }
-    .pr-cta-note { font-size: 0.875rem; line-height: 1.5; color: var(--mk-ink-3); }
-    .pr-note { text-align: center; color: var(--mk-ink-3); font-size: 0.875rem; line-height: 1.55; padding: 24px 0 8px; max-width: 72ch; margin: 0 auto; }
-    .pr-faq { padding-top: 72px; padding-bottom: 96px; max-width: 760px; margin: 0 auto; }
-    .pr-faq .mk-h2 { text-align: center; margin-bottom: 32px; font-size: clamp(1.625rem, 3vw, 2rem); }
-    .pr-qa { border-top: 1px solid var(--mk-line); padding: 20px 0; }
-    .pr-qa:last-child { border-bottom: 1px solid var(--mk-line); }
-    .pr-qa .mk-h4 { margin-bottom: 6px; }
-    .pr-qa p { font-size: 0.9375rem; line-height: 1.6; color: var(--mk-ink-2); }
-    .pr-foot { border-top: 1px solid var(--mk-line); padding: 32px 0; background: var(--mk-bg-2); color: var(--mk-ink-3); font-size: 0.8125rem; }
-    .pr-foot__inner { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .pr-foot__links { display: flex; gap: 4px 20px; flex-wrap: wrap; }
-    .pr-foot__links a { display: inline-flex; align-items: center; min-height: 32px; color: var(--mk-ink-2); }
-    @media (max-width: 1023px) { .pr-foot__links a { min-height: 44px; } }
-    .pr-foot__links a:hover { color: var(--mk-ink); text-decoration: underline; text-underline-offset: 3px; }
-    @media (max-width: 860px) { .pr-plans { grid-template-columns: minmax(0, 1fr); max-width: 460px; margin: 0 auto; gap: 28px; } .pr-tag { min-height: 0; } }
-    @media (max-width: 640px) { .pr-head { padding-top: 48px; } .pr-faq { padding-top: 56px; padding-bottom: 72px; } }
-  </style>
-</head>
-<body class="mk-body">
-  <header class="mk-header is-scrolled">
-    <div class="mk-container mk-header__inner">
-      <a class="mk-logo" href="/"><span class="mk-logo__mark" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</span>{{ SITE_NAME }}</a>
-      <div class="mk-header__actions pr-actions">
-        <a class="pr-text pr-hide-sm" href="{% url 'marketing:features' %}">Features</a>
-        <a class="pr-text" href="{% url 'account_login' %}">Sign in</a>
-        <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Get started{% else %}Request access{% endif %}</a>
-      </div>
+{% extends "marketing/base.html" %}
+{% comment %}
+Pricing: the marketing site's own header, navigation and footer (marketing/base.html), so the nav,
+the "Create account" call to action and the four-column footer stay the same from page to page.
+{% endcomment %}
+
+{% block extra_head %}
+<style nonce="{{ request.csp_nonce }}">
+  /* Pricing-only parts; everything else comes from marketing.css */
+  .pr-head { text-align: center; padding-top: 88px; padding-bottom: 8px; }
+  .pr-head .mk-lead { margin: 20px auto 0; max-width: 56ch; }
+  .pr-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; padding: 56px 0 8px; align-items: stretch; }
+  .pr-plan { position: relative; display: flex; flex-direction: column; background: var(--mk-surface); border: 1px solid var(--mk-line); border-radius: var(--mk-r-lg); padding: 28px 24px; box-shadow: var(--mk-shadow-xs); }
+  .pr-plan--featured { border-color: var(--mk-brand); box-shadow: var(--mk-shadow-sm); }
+  .pr-badge { position: absolute; top: -12px; left: 24px; display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--mk-r-pill); background: var(--mk-ink); color: #fff; font-size: 0.75rem; font-weight: 600; }
+  .pr-plan .mk-h3 { font-size: 1.125rem; }
+  .pr-price { margin: 12px 0 4px; font-size: 2.125rem; line-height: 1.15; font-weight: 700; color: var(--mk-ink-strong); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .pr-price small { font-size: 0.9375rem; font-weight: 500; letter-spacing: 0; color: var(--mk-ink-3); }
+  .pr-tag { color: var(--mk-ink-2); font-size: 0.9375rem; line-height: 1.5; min-height: 46px; }
+  .pr-feats { margin: 20px 0 24px; padding-top: 20px; border-top: 1px solid var(--mk-line); display: flex; flex-direction: column; gap: 10px; font-size: 0.875rem; line-height: 1.45; color: var(--mk-ink-body); }
+  .pr-feats li { display: flex; gap: 10px; align-items: flex-start; }
+  .pr-feats svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--mk-ink); }
+  .pr-cta { margin-top: auto; }
+  .pr-cta .mk-btn { width: 100%; height: 44px; }
+  .pr-cta-note { font-size: 0.875rem; line-height: 1.5; color: var(--mk-ink-3); }
+  .pr-note { text-align: center; color: var(--mk-ink-3); font-size: 0.875rem; line-height: 1.55; padding: 24px 0 8px; max-width: 72ch; margin: 0 auto; }
+  .pr-faq { padding-top: 72px; padding-bottom: 96px; max-width: 760px; margin: 0 auto; }
+  .pr-faq .mk-h2 { text-align: center; margin-bottom: 32px; font-size: clamp(1.625rem, 3vw, 2rem); }
+  .pr-qa { border-top: 1px solid var(--mk-line); padding: 20px 0; }
+  .pr-qa:last-child { border-bottom: 1px solid var(--mk-line); }
+  .pr-qa .mk-h4 { margin-bottom: 6px; }
+  .pr-qa p { font-size: 0.9375rem; line-height: 1.6; color: var(--mk-ink-2); }
+  @media (max-width: 860px) { .pr-plans { grid-template-columns: minmax(0, 1fr); max-width: 460px; margin: 0 auto; gap: 28px; } .pr-tag { min-height: 0; } }
+  @media (max-width: 640px) { .pr-head { padding-top: 48px; } .pr-faq { padding-top: 56px; padding-bottom: 72px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="pr-head mk-container">
+    <h1 class="mk-h1">Free to run yourself. <span class="mk-accent">Or let us run it for you.</span></h1>
+    <p class="mk-lead">{{ SITE_NAME }} is open-source (AGPL-3.0). Self-host it for free — every publishing feature, integrations for supported platforms, and seats, channels and workspaces that are never metered. Or hand the servers to us.</p>
+  </div>
+
+  <div class="mk-container">
+    <div class="pr-plans">
+      <section class="pr-plan" aria-labelledby="plan-self">
+        <h2 class="mk-h3" id="plan-self">Self-hosted</h2>
+        <div class="pr-price">Free<small> forever</small></div>
+        <p class="pr-tag">Deploy on your own VPS or cloud. You own the data and the infra.</p>
+        <ul class="pr-feats">
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Every publishing, approval &amp; analytics feature</span></li>
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Unlimited orgs, workspaces, members &amp; channels — never metered</span></li>
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Integrations for supported platforms (bring your own developer apps)</span></li>
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Community support</span></li>
+        </ul>
+        <div class="pr-cta"><a class="mk-btn mk-btn--ghost" href="{% if SOURCE_URL %}{{ SOURCE_URL }}{% else %}{% url 'account_signup' %}{% endif %}"{% if SOURCE_URL %} target="_blank" rel="noopener"{% endif %}>Get the source</a></div>
+      </section>
+
+      <section class="pr-plan pr-plan--featured" aria-labelledby="plan-cloud">
+        <span class="pr-badge">Now in early access</span>
+        <h2 class="mk-h3" id="plan-cloud">Managed Cloud</h2>
+        <div class="pr-price">Early access</div>
+        <p class="pr-tag">We run and update {{ SITE_NAME }} for you — no servers to manage. Free while it's in early access, by invitation.</p>
+        <ul class="pr-feats">
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Fully hosted &amp; kept up to date</span></li>
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Live today on {{ LIVE_PLATFORM_NAMES|join:", " }}; more networks as each passes platform review</span></li>
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Onboarding with the team that builds it</span></li>
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Service levels and pricing set before any paid plan starts, with notice</span></li>
+        </ul>
+        <div class="pr-cta">
+          {% if SUPPORT_EMAIL %}<a class="mk-btn mk-btn--primary" href="mailto:{{ SUPPORT_EMAIL }}?subject=Managed%20Cloud%20early%20access">Request early access</a>
+          {% else %}<p class="pr-cta-note">Managed hosting isn't offered on this instance. Contact whoever runs it.</p>{% endif %}
+        </div>
+      </section>
+
+      <section class="pr-plan" aria-labelledby="plan-agency">
+        <h2 class="mk-h3" id="plan-agency">Agency &amp; Enterprise</h2>
+        <div class="pr-price">Custom</div>
+        <p class="pr-tag">For teams running many clients who want a direct line to the people building it.</p>
+        <ul class="pr-feats">
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Migration &amp; onboarding help</span></li>
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Roadmap input from day one</span></li>
+          <li>{% include "marketing/_icon.html" with name="check" %}<span>Volume &amp; reseller terms, when paid plans launch</span></li>
+        </ul>
+        <div class="pr-cta">
+          {% if SUPPORT_EMAIL %}<a class="mk-btn mk-btn--ghost" href="mailto:{{ SUPPORT_EMAIL }}?subject=Agency%20%2F%20Enterprise%20inquiry">Talk to us</a>
+          {% else %}<p class="pr-cta-note">Agency plans aren't offered on this instance. Contact whoever runs it.</p>{% endif %}
+        </div>
+      </section>
     </div>
-  </header>
+    <p class="pr-note">The software stays free and open-source under AGPL-3.0. Managed Cloud and Agency service fees cover hosting, maintenance and support. External usage is separate: the Agency and AI Intelligence make paid model requests; generated pictures use a paid image service. Your operator should explain who supplies and pays for the model service, the image service and platform API credits before you generate content. The Agency monthly budget is a soft usage limit, not a prepaid balance or a guaranteed billing cap.</p>
+  </div>
 
-  <main id="main">
-    <div class="pr-head mk-container">
-      <h1 class="mk-h1">Free to run yourself. <span class="mk-accent">Or let us run it for you.</span></h1>
-      <p class="mk-lead">{{ SITE_NAME }} is open-source (AGPL-3.0). Self-host it for free — every publishing feature, integrations for supported platforms, and seats, channels and workspaces that are never metered. Or hand the servers to us.</p>
-    </div>
-
-    <div class="mk-container">
-      <div class="pr-plans">
-        <section class="pr-plan" aria-labelledby="plan-self">
-          <h2 class="mk-h3" id="plan-self">Self-hosted</h2>
-          <div class="pr-price">Free<small> forever</small></div>
-          <p class="pr-tag">Deploy on your own VPS or cloud. You own the data and the infra.</p>
-          <ul class="pr-feats">
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Every publishing, approval &amp; analytics feature</span></li>
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Unlimited orgs, workspaces, members &amp; channels — never metered</span></li>
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Integrations for supported platforms (bring your own developer apps)</span></li>
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Community support</span></li>
-          </ul>
-          <div class="pr-cta"><a class="mk-btn mk-btn--ghost" href="{% if SOURCE_URL %}{{ SOURCE_URL }}{% else %}{% url 'account_signup' %}{% endif %}"{% if SOURCE_URL %} target="_blank" rel="noopener"{% endif %}>Get the source</a></div>
-        </section>
-
-        <section class="pr-plan pr-plan--featured" aria-labelledby="plan-cloud">
-          <span class="pr-badge">Now in early access</span>
-          <h2 class="mk-h3" id="plan-cloud">Managed Cloud</h2>
-          <div class="pr-price">Early access</div>
-          <p class="pr-tag">We run and update {{ SITE_NAME }} for you — no servers to manage. Free while it's in early access, by invitation.</p>
-          <ul class="pr-feats">
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Fully hosted &amp; kept up to date</span></li>
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Live today on {{ LIVE_PLATFORM_NAMES|join:", " }}; more networks as each passes platform review</span></li>
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Onboarding with the team that builds it</span></li>
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Service levels and pricing set before any paid plan starts, with notice</span></li>
-          </ul>
-          <div class="pr-cta">
-            {% if SUPPORT_EMAIL %}<a class="mk-btn mk-btn--primary" href="mailto:{{ SUPPORT_EMAIL }}?subject=Managed%20Cloud%20early%20access">Request early access</a>
-            {% else %}<p class="pr-cta-note">Managed hosting isn't offered on this instance. Contact whoever runs it.</p>{% endif %}
-          </div>
-        </section>
-
-        <section class="pr-plan" aria-labelledby="plan-agency">
-          <h2 class="mk-h3" id="plan-agency">Agency &amp; Enterprise</h2>
-          <div class="pr-price">Custom</div>
-          <p class="pr-tag">For teams running many clients who want a direct line to the people building it.</p>
-          <ul class="pr-feats">
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Migration &amp; onboarding help</span></li>
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Roadmap input from day one</span></li>
-            <li>{% include "marketing/_icon.html" with name="check" %}<span>Volume &amp; reseller terms, when paid plans launch</span></li>
-          </ul>
-          <div class="pr-cta">
-            {% if SUPPORT_EMAIL %}<a class="mk-btn mk-btn--ghost" href="mailto:{{ SUPPORT_EMAIL }}?subject=Agency%20%2F%20Enterprise%20inquiry">Talk to us</a>
-            {% else %}<p class="pr-cta-note">Agency plans aren't offered on this instance. Contact whoever runs it.</p>{% endif %}
-          </div>
-        </section>
-      </div>
-      <p class="pr-note">The software stays free and open-source under AGPL-3.0. Managed Cloud and Agency service fees cover hosting, maintenance and support. External usage is separate: the Agency and AI Intelligence make paid model requests; generated pictures use a paid image service. Your operator should explain who supplies and pays for the model service, the image service and platform API credits before you generate content. The Agency monthly budget is a soft usage limit, not a prepaid balance or a guaranteed billing cap.</p>
-    </div>
-
-    <section class="pr-faq mk-container" aria-labelledby="faq-title">
-      <h2 class="mk-h2" id="faq-title">Common questions</h2>
-      <div class="pr-qa"><h3 class="mk-h4">Is it really free?</h3><p>The self-hosted software is free, and seats, workspaces and channels are never metered. You still pay your own hosting and any external services you enable. The Agency and AI Intelligence require model credits; generated pictures require image-service credits. Supplied photos can be used without generating a new picture.</p></div>
-      <div class="pr-qa"><h3 class="mk-h4">What does the Agency do?</h3><p>It prepares brand content for human review, then delivers the approved content at the approved time to your connected accounts. An AI review or a brief confirmation does not approve publication. Enquiries and site visits can be recorded by your team; post engagement alone does not establish sales or qualified leads.</p></div>
-      <div class="pr-qa"><h3 class="mk-h4">How does the AI budget work?</h3><p>The Agency records provider-reported model cost when available and otherwise estimates usage from known prices. Failed requests and images can cost money. Calls already in progress, unreported charges and separately billed platform fees can exceed that estimate. Check the provider's balance and invoice for the actual charge; the budget pauses new work once recorded usage reaches the limit.</p></div>
-      <div class="pr-qa"><h3 class="mk-h4">How long does it take to connect my accounts?</h3><p>It depends on the platform. Bluesky, Mastodon and DEV.to connect in minutes. Meta (Facebook/Instagram/Threads), TikTok, LinkedIn and the others need an approved developer app first: self-hosters register their own (we document each step), and on the hosted service they appear as each platform approves ours.</p></div>
-      <div class="pr-qa"><h3 class="mk-h4">What am I paying for on Managed Cloud?</h3><p>Convenience: we host and update the app so you don't run servers. It's free during early access; we'll publish service levels and pricing, with notice, before anything is charged. The code stays open-source.</p></div>
-      <div class="pr-qa"><h3 class="mk-h4">Can I move between self-hosted and managed?</h3><p>It's the same open-source app on both, so nothing you rely on is proprietary. Moving an existing workspace between instances is a database migration we'll help with today; a self-serve export is on the roadmap.</p></div>
-      <div class="pr-qa"><h3 class="mk-h4">Which platforms are supported?</h3><p>Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business, Mastodon, DEV.to and X — via each platform's official API. X publishes only: its API is pay-per-use, billed to the developer account behind the app.</p></div>
-    </section>
-  </main>
-
-  <footer class="pr-foot">
-    <div class="mk-container pr-foot__inner">
-      <div>© {{ SITE_NAME }} · Open-source (AGPL-3.0)</div>
-      <nav class="pr-foot__links" aria-label="Footer">
-        <a href="/">Home</a>
-        <a href="{% url 'account_login' %}">Sign in</a>
-        <a href="{{ LEGAL_TERMS_URL }}">Terms</a>
-        <a href="{{ LEGAL_PRIVACY_URL }}">Privacy</a>
-        {% if SOURCE_URL %}<a href="{{ SOURCE_URL }}" target="_blank" rel="noopener">Source</a>{% endif %}
-      </nav>
-    </div>
-  </footer>
-</body>
-</html>
+  <section class="pr-faq mk-container" aria-labelledby="faq-title">
+    <h2 class="mk-h2" id="faq-title">Common questions</h2>
+    <div class="pr-qa"><h3 class="mk-h4">Is it really free?</h3><p>The self-hosted software is free, and seats, workspaces and channels are never metered. You still pay your own hosting and any external services you enable. The Agency and AI Intelligence require model credits; generated pictures require image-service credits. Supplied photos can be used without generating a new picture.</p></div>
+    <div class="pr-qa"><h3 class="mk-h4">What does the Agency do?</h3><p>It prepares brand content for human review, then delivers the approved content at the approved time to your connected accounts. An AI review or a brief confirmation does not approve publication. Enquiries and site visits can be recorded by your team; post engagement alone does not establish sales or qualified leads.</p></div>
+    <div class="pr-qa"><h3 class="mk-h4">How does the AI budget work?</h3><p>The Agency records provider-reported model cost when available and otherwise estimates usage from known prices. Failed requests and images can cost money. Calls already in progress, unreported charges and separately billed platform fees can exceed that estimate. Check the provider's balance and invoice for the actual charge; the budget pauses new work once recorded usage reaches the limit.</p></div>
+    <div class="pr-qa"><h3 class="mk-h4">How long does it take to connect my accounts?</h3><p>It depends on the platform. Bluesky, Mastodon and DEV.to connect in minutes. Meta (Facebook/Instagram/Threads), TikTok, LinkedIn and the others need an approved developer app first: self-hosters register their own (we document each step), and on the hosted service they appear as each platform approves ours.</p></div>
+    <div class="pr-qa"><h3 class="mk-h4">What am I paying for on Managed Cloud?</h3><p>Convenience: we host and update the app so you don't run servers. It's free during early access; we'll publish service levels and pricing, with notice, before anything is charged. The code stays open-source.</p></div>
+    <div class="pr-qa"><h3 class="mk-h4">Can I move between self-hosted and managed?</h3><p>It's the same open-source app on both, so nothing you rely on is proprietary. Moving an existing workspace between instances is a database migration we'll help with today; a self-serve export is on the roadmap.</p></div>
+    <div class="pr-qa"><h3 class="mk-h4">Which platforms are supported?</h3><p>Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads, Bluesky, Google Business, Mastodon, DEV.to and X — via each platform's official API. X publishes only: its API is pay-per-use, billed to the developer account behind the app.</p></div>
+  </section>
+{% endblock %}

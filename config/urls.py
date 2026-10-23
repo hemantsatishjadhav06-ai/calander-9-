@@ -15,6 +15,7 @@ from apps.accounts.views import health_check
 from apps.api.api import api as agent_api
 from apps.blog import views_search_console as search_console_views
 from apps.common import views_mail as mail_views
+from apps.marketing import views as marketing_views
 from apps.oauth_server import views as oauth_views
 
 logger = logging.getLogger(__name__)
@@ -134,7 +135,7 @@ urlpatterns = [
     path("ops/email/connect/", mail_views.gmail_connect, name="ops_email_connect"),
     path("ops/email/callback/", mail_views.gmail_callback, name="ops_email_callback"),
     path("support/", TemplateView.as_view(template_name="legal/support.html"), name="support"),
-    path("pricing/", TemplateView.as_view(template_name="pricing.html"), name="pricing"),
+    path("pricing/", marketing_views.pricing, name="pricing"),
     # Silence the two probes seen 404ing in production and give crawlers a robots.
     path("robots.txt", robots_txt, name="robots_txt"),
     path("sitemap.xml", sitemap_xml, name="sitemap_xml"),

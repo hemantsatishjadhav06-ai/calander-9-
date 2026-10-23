@@ -210,6 +210,21 @@ def home(request: HttpRequest) -> HttpResponse:
 
 
 @require_GET
+def pricing(request: HttpRequest) -> HttpResponse:
+    # The same header, navigation and footer as every other public page (marketing/base.html).
+    return _page(
+        request,
+        "pricing.html",
+        key="pricing",
+        title="Pricing · SM Bean",
+        description=(
+            "SM Bean is open-source and free to self-host, with no per-seat or per-channel fees. "
+            "Hosting, AI services and paid platform APIs have separate costs."
+        ),
+    )
+
+
+@require_GET
 def features(request: HttpRequest) -> HttpResponse:
     return _page(
         request,
