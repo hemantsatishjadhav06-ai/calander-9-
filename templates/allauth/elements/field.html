@@ -1,17 +1,11 @@
 {% load allauth %}
-{% if attrs.errors %}
-<div class="mb-1">
-    <ul class="text-xs" style="color: var(--error-500);">
-        {% for error in attrs.errors %}<li>{{ error }}</li>{% endfor %}
-    </ul>
-</div>
-{% endif %}
 <div class="mb-4">
     {% if attrs.type == "textarea" %}
-        <label for="{{ attrs.id }}" class="block text-sm font-semibold mb-1.5" style="color: var(--text-primary);">
+        <label for="{{ attrs.id }}" class="ui-label">
             {% slot label %}{% endslot %}
         </label>
-        <textarea class="form-input-styled {% if attrs.errors %}is-error{% endif %}"
+        <textarea class="ui-input"
+                  {% if attrs.errors %}aria-invalid="true"{% endif %}
                   {% if attrs.required %}required{% endif %}
                   {% if attrs.rows %}rows="{{ attrs.rows }}"{% endif %}
                   {% if attrs.disabled %}disabled{% endif %}
@@ -20,9 +14,8 @@
                   {% if attrs.id %}id="{{ attrs.id }}"{% endif %}
                   {% if attrs.placeholder %}placeholder="{{ attrs.placeholder }}"{% endif %}>{% slot value %}{% endslot %}</textarea>
     {% elif attrs.type == "checkbox" or attrs.type == "radio" %}
-        <label for="{{ attrs.id }}" class="inline-flex items-center gap-2 text-sm cursor-pointer" style="color: var(--text-secondary);">
-            <input class="w-4 h-4 rounded border-2 accent-[var(--primary)]"
-                   style="border-color: var(--border);"
+        <label for="{{ attrs.id }}" class="inline-flex min-h-6 cursor-pointer items-center gap-2.5 text-sm text-ink-700 max-lg:min-h-11">
+            <input class="ui-checkbox"
                    {% if attrs.required %}required{% endif %}
                    {% if attrs.disabled %}disabled{% endif %}
                    {% if attrs.checked %}checked{% endif %}
@@ -33,10 +26,11 @@
             {% slot label %}{% endslot %}
         </label>
     {% else %}
-        <label for="{{ attrs.id }}" class="block text-sm font-semibold mb-1.5" style="color: var(--text-primary);">
+        <label for="{{ attrs.id }}" class="ui-label">
             {% slot label %}{% endslot %}
         </label>
-        <input class="form-input-styled {% if attrs.errors %}is-error{% endif %}"
+        <input class="ui-input"
+               {% if attrs.errors %}aria-invalid="true"{% endif %}
                {% if attrs.required %}required{% endif %}
                {% if attrs.disabled %}disabled{% endif %}
                {% if attrs.readonly %}readonly{% endif %}
@@ -47,8 +41,16 @@
                {% if attrs.value is not None %}value="{{ attrs.value }}"{% endif %}
                type="{{ attrs.type }}">
     {% endif %}
+    {% if attrs.errors %}
+        {% for error in attrs.errors %}
+        <p class="ui-error">
+            <svg class="mt-0.5 size-3.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            <span>{{ error }}</span>
+        </p>
+        {% endfor %}
+    {% endif %}
     {% if slots.help_text %}
-        <p class="mt-1 text-xs" style="color: var(--text-tertiary);">
+        <p class="ui-help">
             {% slot help_text %}{% endslot %}
         </p>
     {% endif %}
