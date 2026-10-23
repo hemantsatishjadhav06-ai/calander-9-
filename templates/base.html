@@ -925,7 +925,7 @@
                 {% endif %}
             </div>
             <!-- Main content -->
-            <main id="main-content" tabindex="-1" class="flex-1 min-w-0 bg-ink-50 px-4 pt-5 pb-12 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-16 overflow-y-auto flex flex-col focus:outline-none">
+            <main id="main-content" tabindex="-1" class="relative flex-1 min-w-0 bg-ink-50 px-4 pt-5 pb-12 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-16 overflow-y-auto flex flex-col focus:outline-none">
                 {% block page_header %}{% endblock %}
                 {% if messages %}
                 <div class="mb-5 space-y-2 w-full max-w-[1180px] mx-auto">
@@ -937,7 +937,10 @@
                     {% endfor %}
                 </div>
                 {% endif %}
-                <div class="flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden">
+                {% comment %}relative: the scrollers are the containing block, so an absolutely placed element
+                   in the page (every sr-only label) scrolls and clips with it instead of stretching the
+                   window past the app shell into blank canvas.{% endcomment %}
+                <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden">
                 {% block content %}{% endblock %}
                 </div>
             </main>
