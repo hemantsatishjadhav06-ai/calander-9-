@@ -598,6 +598,29 @@ def test_a_failing_snapshot_never_breaks_home(client, world, monkeypatch):
     assert response.status_code == 200 and "data-live-strip" not in response.content.decode()
 
 
+def test_a_failing_snapshot_answers_the_refresh_with_nothing_to_swap(client, world, monkeypatch):
+    def boom(workspace, **kwargs):
+        raise RuntimeError("snapshot failed")
+
+    monkeypatch.setattr(live, "snapshot", boom)
+    client.force_login(world.owner)
+    for suffix in ("", "?part=strip"):
+        response = client.get(_url("studio:team_board", world) + suffix)
+        # 204: htmx swaps nothing and raises no error toast; the next refresh tries again.
+        assert response.status_code == 204 and response.content == b"", suffix
+        assert response["Cache-Control"] == "no-store"
+
+
+def test_the_live_boards_never_raise_the_error_toast(client, world):
+    client.force_login(world.owner)
+    team_html = client.get(_url("studio:team", world)).content.decode()
+    assert 'id="team-board" data-live-board data-no-error-toast' in team_html
+    strip = client.get(_url("studio:team_board", world) + "?part=strip").content.decode()
+    assert 'id="live-strip" data-live-strip data-no-error-toast' in strip
+    # The hour chart's arrow keys are read out through a live region outside the role="img" chart.
+    assert "data-chart-live" in team_html
+
+
 def test_the_home_card_adds_no_queries_once_the_snapshot_is_cached(client, world, monkeypatch):
     from apps.studio import views
 

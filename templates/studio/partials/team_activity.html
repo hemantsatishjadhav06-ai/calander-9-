@@ -43,6 +43,8 @@ Context: live.
         </svg>
         <div class="chart-tip absolute left-0 top-0 z-10 hidden whitespace-nowrap" data-chart-tip aria-hidden="true"></div>
     </div>
+    {# The hour the arrow keys land on, read out politely (the tooltip above is visual only). #}
+    <p class="sr-only" data-chart-live role="status" aria-live="polite" aria-atomic="true"></p>
     <div class="relative mt-1.5 h-4 w-full max-w-[620px] text-xs font-medium text-ink-500 tabular-nums" aria-hidden="true">
         {% for tick in activity.axis %}
         <span class="absolute top-0 whitespace-nowrap{% if tick.align == 'center' %} -translate-x-1/2{% elif tick.align == 'end' %} -translate-x-full{% endif %}" style="left: {{ tick.pct }}%">{{ tick.label }}</span>

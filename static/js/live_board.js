@@ -1,12 +1,16 @@
 /* The live team view: quiet refreshes, the hour chart's tooltips, the check-in age.
  *
  * - A refresh whose board is unchanged (same data-board-digest) swaps nothing, so nothing
- *   moves under the reader; a response without a board (a login page, an error) is ignored.
+ *   moves under the reader; a response without a board (a login page, an error) is ignored,
+ *   and the boards carry data-no-error-toast so a failed refresh never raises the error toast.
  * - Background refreshes never flash the page's loading bar.
- * - Open "Show as table" panels, focus and inner scroll positions survive a swap.
+ * - Open "Show as table" panels, focus and inner scroll positions survive a swap. Focus is
+ *   found again by id, or else by the same kind of control with the same link and words, so a
+ *   keyboard or screen-reader user is never thrown back to the top of the page.
  * - Only a change in the numbers is announced, politely (#team-live-announce).
  * - Hour chart: hover or focus a bar for "10:00–11:00 · 6 turns"; arrow keys move
- *   between hours; Escape hides the tooltip. Text is set with textContent only.
+ *   between hours and each hour is read out through a polite live region beside the chart
+ *   ([data-chart-live]); Escape hides the tooltip. Text is set with textContent only.
  * - "checked 12 s ago" keeps counting between refreshes.
  */
 (function () {
@@ -65,7 +69,7 @@
       open: Array.prototype.map.call(elt.querySelectorAll("details[open][id]"), function (d) {
         return d.id;
       }),
-      focus: document.activeElement && elt.contains(document.activeElement) ? document.activeElement.id || null : null,
+      focus: document.activeElement && elt.contains(document.activeElement) ? focusKey(document.activeElement, elt) : null,
       chartIndex: activeIndexOf(elt.querySelector("[data-hour-chart]")),
       scroll: Array.prototype.map.call(elt.querySelectorAll("[data-keep-scroll]"), function (box) {
         return [box.getAttribute("data-keep-scroll"), box.scrollTop];
@@ -92,7 +96,7 @@
     });
     init(document);
     if (state.focus) {
-      var target = document.getElementById(state.focus);
+      var target = findFocus(state.focus, container);
       if (target) {
         target.focus({ preventScroll: true });
         if (target.hasAttribute("data-hour-chart") && state.chartIndex !== null) showBar(target, state.chartIndex);
@@ -105,6 +109,46 @@
       if (text && text !== state.announce) region.textContent = text;
     }
   });
+
+  /* ---- Focus that survives a swap ---------------------------------------- */
+
+  var FOCUSABLE = 'a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])';
+
+  function focusablesIn(container) {
+    return Array.prototype.slice.call(container.querySelectorAll(FOCUSABLE));
+  }
+
+  function signature(el) {
+    var words = (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 120);
+    return [el.tagName, el.getAttribute("href") || "", el.getAttribute("name") || "", words].join("|");
+  }
+
+  // Remember the focused control by id, or else by what it is (kind, link, words) and where it sat.
+  function focusKey(el, container) {
+    var list = focusablesIn(container);
+    var sig = signature(el);
+    var same = list.filter(function (item) {
+      return signature(item) === sig;
+    });
+    return { id: el.id || null, sig: sig, nth: same.indexOf(el), index: list.indexOf(el) };
+  }
+
+  // Find it again after the swap: same id, then the same control, then whatever now sits in its
+  // place, then the board itself, so focus stays where the reader was instead of falling to <body>.
+  function findFocus(key, container) {
+    if (key.id) {
+      var byId = document.getElementById(key.id);
+      if (byId && container.contains(byId)) return byId;
+    }
+    var list = focusablesIn(container);
+    var same = list.filter(function (item) {
+      return signature(item) === key.sig;
+    });
+    if (same.length) return same[Math.max(0, Math.min(same.length - 1, key.nth))];
+    if (list.length && key.index >= 0) return list[Math.min(list.length - 1, key.index)];
+    if (!container.hasAttribute("tabindex")) container.setAttribute("tabindex", "-1");
+    return container;
+  }
 
   /* ---- Hour chart ------------------------------------------------------- */
 
@@ -150,7 +194,18 @@
     return svg;
   }
 
-  function showBar(chart, index) {
+  // Read the hour out for screen readers: the tooltip itself is visual only (aria-hidden, inside role=img).
+  function announceBar(chart, hit) {
+    var region = chart.parentNode ? chart.parentNode.querySelector("[data-chart-live]") : null;
+    if (!region) return;
+    var total = parseInt(hit.getAttribute("data-total"), 10) || 0;
+    var failed = parseInt(hit.getAttribute("data-failed"), 10) || 0;
+    var text = (hit.getAttribute("data-range") || "") + ": " + total + (total === 1 ? " turn" : " turns");
+    if (failed) text += ", " + failed + " stopped";
+    region.textContent = text;
+  }
+
+  function showBar(chart, index, announce) {
     var list = hits(chart);
     if (!list.length) return;
     index = Math.max(0, Math.min(list.length - 1, index));
@@ -197,6 +252,7 @@
     var barTop = parseFloat(hit.getAttribute("data-top")) || 0;
     tip.style.left = left + "px";
     tip.style.top = Math.max(0, svgTop + barTop - tip.offsetHeight - 8) + "px";
+    if (announce) announceBar(chart, hit);
   }
 
   function initChart(chart) {
@@ -230,7 +286,7 @@
       }
       if (next !== null) {
         event.preventDefault();
-        showBar(chart, next);
+        showBar(chart, next, true);
       }
     });
   }

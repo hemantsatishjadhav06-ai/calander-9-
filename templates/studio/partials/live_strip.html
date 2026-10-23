@@ -7,7 +7,7 @@ To include it on Home: add "live": apps.studio.live.snapshot(workspace) to the c
 {% endcomment %}
 {% load static %}
 {% if not refresh %}<script nonce="{{ request.csp_nonce }}" src="{% static 'js/live_board.js' %}" defer></script>{% endif %}
-<section id="live-strip" data-live-strip data-board-digest="{{ live.digest }}" aria-labelledby="live-strip-heading" class="ui-card"
+<section id="live-strip" data-live-strip data-no-error-toast data-board-digest="{{ live.digest }}" aria-labelledby="live-strip-heading" class="ui-card"
          hx-get="{% url 'studio:team_board' workspace_id=workspace.id %}?part=strip"
          hx-trigger="every 15s [document.visibilityState === 'visible']"
          hx-swap="outerHTML">

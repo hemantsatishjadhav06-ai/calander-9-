@@ -10,6 +10,8 @@ from ``apps.studio.live.snapshot``, cached for a few seconds per workspace.
 
 from __future__ import annotations
 
+import logging
+
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -18,6 +20,8 @@ from django.views.decorators.http import require_GET
 
 from . import dashboard, live
 from .views import _perms, _workspace
+
+logger = logging.getLogger(__name__)
 
 
 def _context(request, workspace) -> dict:
@@ -46,8 +50,17 @@ def team_board(request, workspace_id):
     template = (
         "studio/partials/live_strip.html" if request.GET.get("part") == "strip" else "studio/partials/team_board.html"
     )
+    # A snapshot that fails never turns into an error page on screen: answer 204 so the board
+    # keeps what it shows, and the next refresh tries again (Home's _live_strip does the same).
+    try:
+        context = _context(request, workspace)
+    except Exception:
+        logger.exception("Studio: could not build the live team snapshot for the refresh")
+        response = HttpResponse(status=204)
+        response["Cache-Control"] = "no-store"
+        return response
     # Rendered without the request: a refresh every few seconds needs none of the page's context
     # processors (sidebar counts, channels), only the snapshot.
-    response = HttpResponse(render_to_string(template, {**_context(request, workspace), "refresh": True}))
+    response = HttpResponse(render_to_string(template, {**context, "refresh": True}))
     response["Cache-Control"] = "no-store"
     return response

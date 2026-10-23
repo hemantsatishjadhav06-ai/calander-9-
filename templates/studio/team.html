@@ -23,7 +23,7 @@ nothing swaps nothing, and only meaningful changes are announced in #team-live-a
         {% include "components/agency_tabs.html" %}
     </div>
 
-    <div id="team-board" data-live-board
+    <div id="team-board" data-live-board data-no-error-toast
          hx-get="{% url 'studio:team_board' workspace_id=workspace.id %}"
          hx-trigger="every 5s [document.visibilityState === 'visible']"
          hx-swap="innerHTML">
