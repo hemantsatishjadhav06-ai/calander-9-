@@ -419,7 +419,7 @@ def test_ready_brief_command_issues_exact_one_use_card_without_another_model_job
     job = AgencyJob.objects.get()
     engine.run_step(str(job.pk), job.revision, job.stage)
     response = send(hub, "/brief")
-    assert "reply_markup" in response and "Confirm facts" in response["reply_markup"]["inline_keyboard"][0][0]["text"]
+    assert "reply_markup" in response and response["reply_markup"]["inline_keyboard"][0][0]["text"] == "Go ahead"
     assert AgencyJob.objects.count() == 1
     assert "Send /brief" in Message.objects.filter(author_kind="agent").get().body
 

@@ -469,7 +469,7 @@ def test_week_confirmation_keeps_large_signed_analysis_out_of_callback_data(worl
         assert summary in card["text"]
     assert "585141221346435" not in card["text"]
     labels = [button["text"] for row in card["inline_keyboard"] for button in row]
-    assert labels == ["Confirm analysis & prepare week", "Show evidence"]
+    assert labels == ["Prepare the week", "Show evidence"]
     # The complete evidence sits behind its own one-use button, never in callback data.
     evidence_payload = callback(world, "week_evidence", card)
     assert len(evidence_payload["data"].encode()) < 64

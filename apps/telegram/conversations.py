@@ -369,6 +369,9 @@ def _control(bound, link, member, action):
 
     if not internal_member(member) or not studio_chat.is_staff_membership(member):
         return _response("Only a team member can control the team's tasks.")
+    if bound.audience == "client":
+        # The reply names the task, which may be the team's own work: a client group never reads that.
+        return _response("Send /pause, /resume or /retry in your private chat or the team group.")
     workspace = bound.connection.workspace
     private_active = AgencyJob.objects.filter(
         workspace_id=workspace.pk,

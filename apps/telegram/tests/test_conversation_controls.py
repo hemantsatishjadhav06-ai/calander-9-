@@ -39,8 +39,10 @@ def test_brief_card_with_confirm_button_is_attached_to_the_mirrored_intake(hub, 
     assert notifications.brief_card(reply.pk, bound.pk) == 1
     row = TelegramDelivery.objects.get(source_key=f"conversation:{bound.conversation_id}:message:{reply.pk}:part:0")
     button = row.payload["reply_markup"]["inline_keyboard"][0][0]
-    assert button["text"] == "Confirm facts & prepare draft" and button["callback_data"].startswith("tg:a:")
+    # The same tap as the web card, with the same name.
+    assert button["text"] == "Go ahead" and button["callback_data"].startswith("tg:a:")
     assert "Send /brief" not in row.payload["text"]
+    assert "Go ahead confirms the brief and its facts" in row.payload["text"]
     assert "Nothing publishes without your approval" in row.payload["text"]
     before = TelegramDelivery.objects.count()
     assert notifications.brief_card(reply.pk, bound.pk) == 1 and TelegramDelivery.objects.count() == before
@@ -57,7 +59,7 @@ def test_mirror_outside_agency_work_issues_the_button_inline_and_only_to_the_req
     TelegramDelivery.objects.all().delete()
     assert notifications.mirror_message(reply.pk) == 1
     row = TelegramDelivery.objects.get(chat=bound)
-    assert row.payload["reply_markup"]["inline_keyboard"][0][0]["text"] == "Confirm facts & prepare draft"
+    assert row.payload["reply_markup"]["inline_keyboard"][0][0]["text"] == "Go ahead"
     other = TelegramChat.objects.create(
         connection=hub.connection,
         chat_id=hub.links["editor"].telegram_user_id,
@@ -135,6 +137,24 @@ def test_retry_points_at_the_failed_task_and_clients_cannot_control(hub):  # noq
     assert "Only a team member" in send(hub, "/pause", role="client")["text"]
     job.refresh_from_db()
     assert job.status == "failed"
+
+
+def test_task_controls_in_a_client_group_are_refused_and_name_no_internal_task(hub, monkeypatch):  # noqa: F811
+    """A team member's /pause in the client group neither acts on nor echoes their internal-thread task."""
+    from apps.telegram import workflow_bridge
+
+    monkeypatch.setattr(workflow_bridge, "job_control_event", lambda *a, **k: 0)
+    send(hub, "/brief SECRET internal plan for the team", bound=hub.team_chat)
+    job = AgencyJob.objects.get()
+    assert job.status == "queued" and "SECRET" in job.title
+    for command in ("/pause", "/resume", "/retry"):
+        response = send(hub, command, bound=hub.client_chat)
+        assert "private chat or the team group" in response["text"] and "reply_markup" not in response
+        assert "SECRET" not in response["text"] and "Paused" not in response["text"]
+    job.refresh_from_db()
+    assert job.status == "queued" and "_opendots_control" not in (job.state or {})
+    # The same person in the team group is still answered, and the task is still theirs to pause.
+    assert send(hub, "/pause", bound=hub.team_chat)["text"].startswith("Paused")
 
 
 def test_week_evidence_shows_the_sources_without_a_button(hub, monkeypatch):  # noqa: F811

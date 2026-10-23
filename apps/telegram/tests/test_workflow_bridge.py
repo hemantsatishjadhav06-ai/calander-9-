@@ -63,7 +63,8 @@ def hub(organization, user, monkeypatch):
         action="new_post",
         body="PRIVATE cost/token/provider details that must never leave as a prompt",
     )
-    job.result = {"message_id": str(message.pk), "creative_brief": {"topic": "Launch"}, "awaiting_confirmation": False}
+    # A team member's brief needs only a topic; without one the manager's reply is a question the author can answer.
+    job.result = {"message_id": str(message.pk), "creative_brief": {}, "awaiting_confirmation": False}
     job.save(update_fields=["result"])
     api = Mock()
     api.call.return_value = {"message_id": 700, "chat": {"id": 99, "type": "private"}}
@@ -114,16 +115,13 @@ def test_complete_question_callback_receipt_reply_and_original_web_thread(hub, d
     source, source_job = hub[4:6]
     with django_capture_on_commit_callbacks(execute=True), transaction.atomic():
         message = chat.post_agent_message(source, "Actual intake question", job=source_job, action="new_post")
-        source_job.result = {
-            "message_id": str(message.pk),
-            "creative_brief": {"topic": "Launch"},
-            "awaiting_confirmation": False,
-        }
+        source_job.result = {"message_id": str(message.pk), "creative_brief": {}, "awaiting_confirmation": False}
         source_job.save(update_fields=["result"])
     prompt = TelegramWorkflowPrompt.objects.get(source_message=message)
     payload = prompt.delivery.payload
-    assert "Before the team creates a draft" in payload["text"]
-    assert "Reply to this message" in payload["text"]
+    # Only the topic is asked for: a team member's other fields come from the brand's defaults.
+    assert "Before the team creates a draft: what should this post be about?" in payload["text"]
+    assert "goal" not in payload["text"] and "Reply to this message" in payload["text"]
     assert outbox.send_one(prompt.delivery_id) == "sent"
     row = incoming(hub)
     assert process_one(row.pk) == "processed"
@@ -138,6 +136,38 @@ def test_complete_question_callback_receipt_reply_and_original_web_thread(hub, d
     assert chat.web_conversations().filter(pk=source.pk).exists()
     assert not hub[3].conversation.messages.filter(body__contains="first-time homeowners").exists()
     assert prompt.response_message.action == "" and (job.input or {}).get("kind") == ""
+
+
+@pytest.mark.parametrize("queued_brief", [False, True])
+def test_a_started_or_queued_brief_is_told_as_started_never_as_a_stale_question(hub, queued_brief):
+    """An idea the manager went ahead with (auto mode, or queued behind the cap) has no question left to ask."""
+    connection, _, _, private, source, job, message, _ = hub
+    job.result = {
+        "message_id": str(message.pk),
+        "creative_brief": {"topic": "Launch"},
+        "awaiting_confirmation": False,
+        "brief_id": str(uuid.uuid4()),
+        "queued": queued_brief,
+        "auto_started": not queued_brief,
+    }
+    job.save(update_fields=["result"])
+
+    assert workflow_bridge.queue_workflow_message(message.pk) == 1
+
+    prompt = TelegramWorkflowPrompt.objects.get(source_message=message)
+    text = prompt.delivery.payload["text"]
+    assert prompt.source_key == f"message:{message.pk}" and prompt.chat_id == private.pk
+    assert ("queued" if queued_brief else "started") in text and "for approval" in text
+    assert "What" not in text and "goal" not in text and "Reply to this message" not in text
+
+
+def test_a_topic_without_accounts_points_at_set_up_not_at_a_question(hub):
+    _, _, _, _, _, job, message, _ = hub
+    job.result = {"message_id": str(message.pk), "creative_brief": {"topic": "Launch"}, "awaiting_confirmation": False}
+    job.save(update_fields=["result"])
+    assert workflow_bridge.queue_workflow_message(message.pk) == 1
+    prompt = TelegramWorkflowPrompt.objects.get(source_message=message)
+    assert prompt.source_key.startswith("message:") and "connected accounts" in prompt.delivery.payload["text"]
 
 
 def test_question_content_dedup_and_encryption_exclude_history_setup_and_costs(hub):
@@ -492,11 +522,7 @@ def test_current_bot_receipt_namespace_does_not_route_into_older_prompt(hub):
         action="new_post",
         body="Fresh question",
     )
-    source_job.result = {
-        "message_id": str(message.pk),
-        "creative_brief": {"topic": "Fresh topic"},
-        "awaiting_confirmation": False,
-    }
+    source_job.result = {"message_id": str(message.pk), "creative_brief": {}, "awaiting_confirmation": False}
     source_job.save(update_fields=["result"])
     assert workflow_bridge.queue_workflow_message(message.pk) == 1
     fresh = TelegramWorkflowPrompt.objects.get(source_message=message)

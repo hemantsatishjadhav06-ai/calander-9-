@@ -197,6 +197,12 @@ def _queue_card(chat, card, key):
 
 def _queue_post(chat, link, post, key, *, fallback_text):
     """The review card, led by ``fallback_text`` when there is one (a reminder's line); else a preview and a link."""
+    already = list(TelegramDelivery.objects.filter(chat=chat, source_key=f"{key}:part:0"))
+    if already:
+        # The outbox would drop the repeat anyway (same chat, same key): issue no
+        # second one-use card for it, so a reminder fanned out per reviewer
+        # leaves no orphan buttons behind.
+        return already
     card, reason = _review_card(chat, link, post)
     if card is not None:
         if fallback_text:

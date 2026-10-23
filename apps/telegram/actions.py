@@ -313,10 +313,15 @@ def issue_brief_confirmation(chat, user_link, brief=None, *, confirmation_messag
     snapshot = _confirmation_snapshot(message)
     if message.job.requested_by_id != member.user_id:
         raise TelegramActionError("Ask for a fresh brief addressed to your paired account.")
-    text = message.body + "\n\nTap to confirm the facts and start the draft. " + FOOTER
+    text = (
+        message.body
+        + "\n\nGo ahead confirms the brief and its facts; the draft comes back for your approval. "
+        + FOOTER
+    )
     if len(text) > 3900:
         raise TelegramActionError("Review and confirm this complete brief inside SM Bean.")
-    button = _issue(chat, user_link, "prepare", {"confirmation": snapshot}, label="Confirm facts & prepare draft")
+    # The same tap as the web card, with the same name.
+    button = _issue(chat, user_link, "prepare", {"confirmation": snapshot}, label="Go ahead")
     return {"text": text, "inline_keyboard": [[button]], "reply_markup": {"inline_keyboard": [[button]]}}
 
 
@@ -351,7 +356,7 @@ def issue_week_confirmation(chat, user_link, preview):
         user_link,
         "week_plan",
         {"week_start": preview["week_start"], "analysis_token": preview["analysis_token"]},
-        label="Confirm analysis & prepare week",
+        label="Prepare the week",
     )
     show = _issue(
         chat,

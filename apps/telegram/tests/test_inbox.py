@@ -158,6 +158,19 @@ def test_quiet_hours_hold_everything_except_reminders_and_failed_deliveries(agen
     assert inbox.tell(agency.ws, "morning", source_key="unit:morning", event="autopilot_planned") == 3
 
 
+def test_a_draft_held_by_quiet_hours_goes_out_when_the_sweep_tells_it_again(agency, monkeypatch):
+    """Quiet hours queue nothing, so nothing is deduped away: the next sweep after seven o'clock delivers the card."""
+    post = _pending(agency.ws, agency.users["editor"], agency.account, when=timezone.now() + timedelta(days=2))
+    late = datetime(2026, 10, 19, 23, 30, tzinfo=IST)
+    monkeypatch.setattr(timezone, "now", lambda: late)
+    assert inbox.tell(agency.ws, "", source_key="draft:held", event="draft_ready", post=post) == 0
+    assert not TelegramDelivery.objects.exists() and not TelegramAction.objects.exists()
+    morning = datetime(2026, 10, 20, 8, 0, tzinfo=IST)
+    monkeypatch.setattr(timezone, "now", lambda: morning)
+    assert inbox.tell(agency.ws, "", source_key="draft:held", event="draft_ready", post=post) == 3
+    assert TelegramDelivery.objects.count() == 3
+
+
 def test_workspaces_stay_separate(agency):
     other = Workspace.objects.create(organization=agency.org, name="Other brand", timezone="Asia/Kolkata")
     WorkspaceMembership.objects.create(workspace=other, user=agency.users["lead"], workspace_role="owner")
@@ -182,9 +195,9 @@ def test_a_post_arrives_as_its_review_card_when_the_person_may_act(agency):
     assert "Nothing publishes without your approval" in row.payload["text"]
     assert TelegramAction.objects.filter(post=post, used_at__isnull=True).count() == 12  # four per approver
     assert not TelegramDelivery.objects.filter(chat__private_user=agency.users["editor"]).exists()
-    # The same draft never arrives twice.
-    inbox.tell(agency.ws, "", source_key="draft:1", event="draft_ready", post=post)
-    assert TelegramDelivery.objects.count() == 3
+    # The same draft never arrives twice, and the repeat issues no second set of one-use buttons.
+    assert inbox.tell(agency.ws, "", source_key="draft:1", event="draft_ready", post=post) == 3
+    assert TelegramDelivery.objects.count() == 3 and TelegramAction.objects.count() == 12
 
 
 def test_a_post_the_card_cannot_carry_arrives_as_a_preview_with_a_link(agency):
@@ -260,10 +273,11 @@ def test_a_reminder_brings_a_fresh_card_once_a_day_and_never_a_notification_body
     assert "Exact post review" in text and "SECRET" not in text
     labels = [button["text"] for line in rows[0].payload["reply_markup"]["inline_keyboard"] for button in line]
     assert labels[0] == "Approve only"
-    # Another reviewer's copy of the same day's reminder adds nothing; tomorrow's brings a fresh card.
+    # Another reviewer's copy of the same day's reminder adds nothing, not even an unsent button; tomorrow's brings a fresh card.
+    issued = TelegramAction.objects.count()
     again = Notification.objects.create(user=agency.users["backup"], event_type="approval_reminder", data=notice.data)
     notifications.notification_event(again.pk)
-    assert TelegramDelivery.objects.count() == 3
+    assert TelegramDelivery.objects.count() == 3 and TelegramAction.objects.count() == issued
     monkeypatch.setattr(timezone, "now", lambda: NOON + timedelta(days=1))
     later = Notification.objects.create(user=agency.users["lead"], event_type="approval_reminder", data=notice.data)
     notifications.notification_event(later.pk)
