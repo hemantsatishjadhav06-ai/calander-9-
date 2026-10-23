@@ -61,7 +61,7 @@
                       class="ui-input !min-h-[72px] resize-none text-body-lg"
                       required></textarea>
             <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <p class="text-caption text-ink-600">Posts on {{ message.social_account.get_platform_display|default:message.social_account.platform|title }} as {{ message.social_account.account_name|default:message.social_account.account_handle }}</p>
+                <p class="text-caption text-ink-600">Posts on {{ message.social_account.get_platform_display|default:message.social_account.platform }} as {{ message.social_account.account_name|default:message.social_account.account_handle }}</p>
                 <div class="flex items-center gap-2">
                     <button type="button"
                             hx-post="{% url 'inbox:save_reply_draft' workspace_id=workspace.id message_id=message.id %}"

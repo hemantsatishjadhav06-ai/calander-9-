@@ -8,11 +8,16 @@ schedules the exact proposed time, and only a person can press either.
 <div class="bg-white border border-ink-200 rounded-xl shadow-xs transition-colors hover:border-ink-300"
      x-data="{ expanded: false, panel: null, comment: '' }">
     <div class="flex flex-wrap sm:flex-nowrap items-start gap-3 p-4">
-        {% if can_approve and post.is_actionable %}
+        {% if can_approve %}
+        {% if post.is_actionable %}
         <label class="-m-2 p-2 flex-shrink-0 cursor-pointer self-start mt-2">
             <input type="checkbox" :value="'{{ post.id }}'" x-model="selectedPosts" aria-label="Select post"
                    class="ui-checkbox block cursor-pointer">
         </label>
+        {% else %}
+        {# Not selectable: a spacer the checkbox's size keeps thumbnails and titles in one column. #}
+        <span class="-m-2 p-2 flex-shrink-0 self-start mt-2" aria-hidden="true" data-select-spacer><span class="ui-checkbox block"></span></span>
+        {% endif %}
         {% endif %}
 
         {# media thumbnail #}

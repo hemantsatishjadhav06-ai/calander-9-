@@ -50,7 +50,9 @@
 
     <!-- Post detail drawer (slides from right) -->
     <div class="a-drawer-backdrop" :class="drawerOpen ? 'open' : ''" @click="drawerOpen = false"></div>
+    {# x-trap: focus moves into the drawer when it opens, stays there, and goes back to the row that opened it. #}
     <div class="a-drawer" :class="drawerOpen ? 'open' : ''" @keydown.escape.window="drawerOpen = false"
+         x-trap.noscroll="drawerOpen"
          role="dialog" aria-modal="true" aria-label="Post details" :aria-hidden="drawerOpen ? 'false' : 'true'">
         <div x-html="drawerContent" id="drawer-host" style="display: flex; flex-direction: column; height: 100%;"></div>
     </div>

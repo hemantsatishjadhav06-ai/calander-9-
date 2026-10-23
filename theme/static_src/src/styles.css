@@ -893,6 +893,12 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-tab:hover { color: var(--ink-900); }
   .ui-tab[aria-current="page"], .ui-tab[aria-selected="true"], .ui-tab.is-active { border-bottom-color: var(--ink-900); color: var(--ink-950); font-weight: 600; }
 
+  /* Tabs, segments, filter pills and filter selects live in horizontally scrolling tracks, and
+     overflow-x:auto clips overflow-y too, so the global ring (2px at a 2px offset) would be cut off.
+     Draw it just inside the item instead: same width and colour, always whole. */
+  .ui-tab:focus-visible, .ui-segment:focus-visible, .ui-filter-chip:focus-visible,
+  .ml-filter-pill:focus-visible, .cal-filter-select:focus-visible { outline-offset: -2px; }
+
   /* List rows inside a card: <ul class="ui-list"><li class="ui-row">… */
   .ui-list > * + * { border-top: 1px solid var(--border); }
   .ui-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px 16px; }
@@ -1062,6 +1068,14 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-segment[aria-current="page"], .ui-btn-secondary, .ui-pill,
   [aria-selected="true"], [aria-pressed="true"], [aria-checked="true"][role="radio"] { outline: 2px solid Highlight; outline-offset: -2px; }
   .live-dot, .stage-node, .receipt-node, .hour-bar, .hour-bar-fail { forced-color-adjust: none; }
+  /* Toggles are drawn with background colours only, which forced colours flatten to Canvas: give the
+     track an edge, the knob a system colour, and "on" the Highlight fill so on and off stay apart. */
+  .bb-toggle-track { border: 1px solid ButtonText; background: Canvas; }
+  .bb-toggle-track::after { background: ButtonText; top: 1px; left: 1px; }
+  .bb-toggle input:checked + .bb-toggle-track { background: Highlight; border-color: Highlight; }
+  .bb-toggle input:checked + .bb-toggle-track::after { background: HighlightText; }
+  .bb-toggle input:disabled + .bb-toggle-track { border-color: GrayText; }
+  .bb-toggle input:disabled + .bb-toggle-track::after { background: GrayText; }
 }
 
 /* Keyframes repeated outside @theme so plain CSS that reads var(--animate-*) always finds them */

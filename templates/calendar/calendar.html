@@ -132,13 +132,17 @@
     .post-chip.status-approved, .post-chip.status-published { background: var(--success-50); border-color: var(--success-200); }
     .post-chip.status-failed, .post-chip.status-rejected { background: var(--danger-50); border-color: var(--danger-200); }
 
-    /* Phones: a month cell is ~50px wide, so a chip shows only its status shape and channel. */
+    /* Phones: a month cell is ~50px wide, so a chip shows only its status shape and channel.
+       The title and the "Repeats" mark are hidden from sight only (the sr-only technique, not
+       display:none), so each link is still named "Scheduled: Saturday site visit reminder". */
     @media (max-width: 639px) {
         .cal-day .post-chip { justify-content: center; gap: 3px; padding: 0 3px; height: 22px; }
-        .cal-day .post-chip > .truncate, .cal-day .post-chip .chip-thumb,
-        .cal-day .post-chip .cal-select-box, .cal-day .post-chip > svg,
-        .cal-day .cal-event .truncate { display: none; }
-        .cal-day .cal-event { justify-content: center; padding: 0; }
+        .cal-day .post-chip .chip-thumb, .cal-day .post-chip .cal-select-box { display: none; }
+        .cal-day .post-chip > .truncate, .cal-day .post-chip > svg, .cal-day .cal-event .truncate {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+            clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+        }
+        .cal-day .cal-event { position: relative; justify-content: center; padding: 0; }
     }
 
     /* ── Add-post button on calendar cells (tinted, appears on hover) ── */
