@@ -4,14 +4,14 @@
 {% block page_title %}Posting schedule{% endblock %}
 
 {% block page_header %}
-<div class="w-full max-w-[880px] mx-auto mb-6">
+<div class="w-full max-w-[880px] min-w-0 mb-6">
     <h1 class="ui-page-title">Posting schedule</h1>
     <p class="ui-page-status">The weekly times each channel posts at. Queues fill these slots in order.</p>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="w-full max-w-[880px] mx-auto space-y-4">
+<div class="w-full max-w-[880px] min-w-0 space-y-4">
     {% for account in accounts %}
     <section class="ui-card p-0 overflow-hidden" aria-labelledby="slots-title-{{ account.id }}">
         <div class="px-5 py-3.5 border-b border-ink-200 flex items-center gap-3">

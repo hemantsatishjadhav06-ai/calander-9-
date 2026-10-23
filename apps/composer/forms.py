@@ -166,7 +166,7 @@ class PlatformOverrideForm(forms.Form):
             attrs={
                 "rows": 4,
                 "placeholder": "Custom caption for this platform (leave empty to use shared caption)...",
-                "class": "form-input w-full text-sm",
+                "class": "ui-input",
             }
         ),
     )
@@ -176,7 +176,7 @@ class PlatformOverrideForm(forms.Form):
             attrs={
                 "rows": 2,
                 "placeholder": "Custom first comment...",
-                "class": "form-input w-full text-sm",
+                "class": "ui-input",
             }
         ),
     )

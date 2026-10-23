@@ -24,10 +24,9 @@ STUDIO_PLATFORMS = (
     "mastodon",
 )
 
-_FIELD = (
-    "w-full text-sm px-3 py-2.5 rounded-xl border border-ink-400 bg-white outline-none "
-    "focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all"
-)
+# The design system's field (styles.css .ui-input): 36px, 8px radius, the edge-plus-halo focus, a
+# chevron on selects, and 16px text with a 44px height below 1024px so phones do not zoom.
+_FIELD = "ui-input"
 
 
 def studio_accounts(workspace):

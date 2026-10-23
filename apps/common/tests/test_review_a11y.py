@@ -129,3 +129,42 @@ class PageTests(TestCase):
         self.assertIn('aria-label="Dismiss"', script)
         self.assertIn("el.addEventListener('mouseenter', pause);", script)
         self.assertIn("el.addEventListener('focusin', pause);", script)
+
+
+class FormFieldTests(TestCase):
+    """Fields built in Python use the design system's .ui-input (16px and 44px tall on phones, so
+    iOS does not zoom; the edge-plus-halo focus; the select chevron) instead of text-sm utilities."""
+
+    def test_blog_and_studio_fields_use_ui_input(self):
+        from apps.blog.forms import BlogPostForm
+        from apps.composer.forms import PlatformOverrideForm
+        from apps.studio import forms as studio_forms
+
+        self.assertEqual(studio_forms._FIELD, "ui-input")
+        for name in ("title", "excerpt", "seo_title", "site", "focus_keyword"):
+            classes = BlogPostForm._meta.widgets[name].attrs["class"].split()
+            self.assertIn("ui-input", classes, name)
+            self.assertNotIn("text-sm", classes, name)
+        for name in ("platform_specific_caption", "platform_specific_first_comment"):
+            self.assertEqual(PlatformOverrideForm.base_fields[name].widget.attrs["class"], "ui-input")
+
+
+class PublishingPagesAlignTests(PageTests):
+    """Drafts, Queues, Posting schedule, Templates, Categories and Import from CSV were centred while every
+    other app page sits left, so the title jumped about 120px sideways when moving between them."""
+
+    def test_publishing_sub_pages_sit_left_like_the_rest(self):
+        names = [
+            "composer:drafts_list",
+            "calendar:queue_list",
+            "calendar:posting_slots",
+            "composer:template_list",
+            "composer:category_list",
+            "composer:csv_upload",
+        ]
+        for name in names:
+            response = self.client.get(reverse(name, kwargs=self.kw))
+            self.assertEqual(response.status_code, 200, name)
+            html = response.content.decode()
+            self.assertNotIn("max-w-[880px] mx-auto", html, name)
+            self.assertIn("w-full max-w-[880px] min-w-0", html, name)

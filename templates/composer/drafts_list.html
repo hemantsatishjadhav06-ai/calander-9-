@@ -5,7 +5,7 @@
 {% block page_title %}Drafts{% endblock %}
 
 {% block page_header %}
-<div class="w-full max-w-[880px] mx-auto mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+<div class="w-full max-w-[880px] min-w-0 mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
     <div class="min-w-0">
         <h1 class="ui-page-title">Drafts</h1>
         <p class="ui-page-status tabular-nums">{{ drafts|length }} draft{{ drafts|length|pluralize }}. Open one to finish it and schedule it.</p>
@@ -18,7 +18,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="w-full max-w-[880px] mx-auto">
+<div class="w-full max-w-[880px] min-w-0">
     {% if drafts %}
     <ul class="ui-list rounded-xl border border-ink-200 bg-white shadow-xs overflow-hidden">
         {% for draft in drafts %}
