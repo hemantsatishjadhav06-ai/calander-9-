@@ -1,0 +1,7 @@
+{% comment %}Errors that belong to the whole form, not one field: "The email address and/or password you specified are not correct." on sign in, for example. Field errors stay under their field (account/_field.html).{% endcomment %}
+{% if form.non_field_errors %}
+<div class="alert-error mb-5 flex items-start gap-2" role="alert" data-form-errors>
+    <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+    <div class="min-w-0">{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}

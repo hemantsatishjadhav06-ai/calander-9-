@@ -19,6 +19,7 @@
             {% url 'account_signup' as signup_action_url %}
             <form method="post" action="{{ signup_action_url }}">
                 {% csrf_token %}
+                {% include "account/_form_errors.html" %}
                 {{ redirect_field }}
 
                 {% for field in form %}
