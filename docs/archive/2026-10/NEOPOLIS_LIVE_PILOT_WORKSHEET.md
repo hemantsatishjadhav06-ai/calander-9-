@@ -18,7 +18,7 @@ Workspace: `b1cb458c-cfaf-43cf-8e23-f5e18a9717c7`. Week: Monday 19 through Sunda
 
 OpenRouter does **not** configure image generation. Current generated-picture integration uses `FAL_KEY` and `FAL_IMAGE_MODEL`; the default is `fal-ai/flux/dev`. Without it the renderer can produce an explicit brand-background graphic. A successful fallback is insufficient acceptance for a property campaign that needs authentic site or listing photographs. Generated imagery stays illustrative and cannot prove a named project's appearance.
 
-The existing `python manage.py live_verify --strict --json` checks the deployed app. It includes a temporary storage write/read/delete and rolled-back fixture checks, as well as live identity reads; it is not a purely read-only database inspection. It never publishes a real post. Configuration/key presence cannot prove real credits, usable graphics or publication. The [read-only release inspector](../tools/telegram_release_inspect.py) inspects DB/configuration without those external calls; follow the [controlled Railway rollout](TELEGRAM_RAILWAY_ROLLOUT.md).
+The existing `python manage.py live_verify --strict --json` checks the deployed app. It includes a temporary storage write/read/delete and rolled-back fixture checks, as well as live identity reads; it is not a purely read-only database inspection. It never publishes a real post. Configuration/key presence cannot prove real credits, usable graphics or publication. The [read-only release inspector](../../../tools/telegram_release_inspect.py) inspects DB/configuration without those external calls; follow the [controlled Railway rollout](TELEGRAM_RAILWAY_ROLLOUT.md).
 
 ## 2. Establish the client/team Telegram boundary
 

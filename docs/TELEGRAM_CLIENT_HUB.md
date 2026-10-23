@@ -43,7 +43,7 @@ Deploy first, confirm the webhook route exists and a wrong-secret POST returns 4
 
 Telegram group privacy mode normally delivers commands, mentions and replies directed to the bot. Use those for the initial rollout. Reading every ordinary group message requires a deliberate BotFather privacy/admin configuration and informed group membership; it is not silently enabled here. The bot does not scrape inaccessible Telegram history or arbitrary channels. Automatic completion notices for a Telegram-requested week go only to its original internal team/private conversation; `/week` remains the current status view.
 
-Railway/OpenRouter runtime credentials are unavailable in this environment. There is no proof here of live model balance, Telegram bot identity, native social permissions or production publication. See [CTO readiness](CTO_AGENCY_READINESS.md) and [safe operations](LIVE_OPERATIONS.md).
+Railway/OpenRouter runtime credentials are unavailable in this environment. There is no proof here of live model balance, Telegram bot identity, native social permissions or production publication. See [CTO readiness](archive/2026-10/CTO_AGENCY_READINESS.md) and [safe operations](LIVE_OPERATIONS.md).
 
 ## Set up Telegram (the guided page)
 
@@ -113,6 +113,6 @@ The live acceptance gates remain actual bot/webhook identity, deployed services/
 
 ## Controlled release and Neopolis pilot
 
-Follow the [Railway rollout](TELEGRAM_RAILWAY_ROLLOUT.md) before merging the first singleton-worker release. It controls automatic deployment, drains the preceding worker, freezes writes for backup and migrates through only the web service. Use the [read-only inspector](../tools/telegram_release_inspect.py) and [pending receipt](TELEGRAM_RAILWAY_RELEASE_RECEIPT.json) to record actual evidence. The [Neopolis worksheet](NEOPOLIS_LIVE_PILOT_WORKSHEET.md) covers the 19–25 October 2026 campaign, real Telegram pairing, graphics acceptance and human publication approval.
+Follow the [Railway rollout](archive/2026-10/TELEGRAM_RAILWAY_ROLLOUT.md) before merging the first singleton-worker release. It controls automatic deployment, drains the preceding worker, freezes writes for backup and migrates through only the web service. Use the [read-only inspector](../tools/telegram_release_inspect.py) and [pending receipt](archive/2026-10/TELEGRAM_RAILWAY_RELEASE_RECEIPT.json) to record actual evidence. The [Neopolis worksheet](archive/2026-10/NEOPOLIS_LIVE_PILOT_WORKSHEET.md) covers the 19–25 October 2026 campaign, real Telegram pairing, graphics acceptance and human publication approval.
 
 The tested application source is `6cb392ff35494a0cb3172c95e654663cfe6dfce9` (4,306 passed; one Redis-only check skipped). A later documentation/tooling or merge commit has a different deployment SHA; record that verified SHA and pass it to the inspector with `--expected-deployment-commit`. Source/key presence and local fixtures do not establish live deployment or delivery.

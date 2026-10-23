@@ -271,7 +271,7 @@ ruff format .
 
 ## Production Deployment
 
-Read the [13 October release review](docs/audit/LAUNCH_READINESS_2026-10-13.md), [critical user review](docs/audit/USER_REVIEW_2026-10-13.md) and [Neopolis preparation worksheet](docs/audit/NEOPOLIS_WEEK_2026-10-19.md) before opening registration. Code checks do not establish that email, storage or social-platform credentials work on your deployment.
+Read the [13 October release review](docs/archive/2026-10/audit/LAUNCH_READINESS_2026-10-13.md), [critical user review](docs/archive/2026-10/audit/USER_REVIEW_2026-10-13.md) and [Neopolis preparation worksheet](docs/archive/2026-10/audit/NEOPOLIS_WEEK_2026-10-19.md) before opening registration. Code checks do not establish that email, storage or social-platform credentials work on your deployment.
 
 ### Docker Compose on a VPS (recommended)
 
@@ -387,6 +387,8 @@ calander-9-/
 │   └── static_src/
 │       ├── src/styles.css     # Tailwind directives
 │       └── tailwind.config.js
+├── CLAUDE.md                  # Engineers and coding agents: run, test, invariants, module map
+├── docs/                      # PRODUCT_MAP.md (every page, how work flows), LIVE_OPERATIONS.md, Telegram, archive/
 ├── Dockerfile                 # Canonical production build, including Railway
 ├── Dockerfile.cloud           # Generated BuildKit variant for optional CA trust
 ├── docker-compose.yml         # Dev: app + worker + postgres
@@ -712,74 +714,36 @@ Each post's **Cover** setting chooses between the designed cover (default) and t
 
 ## AI Agency
 
-**Start a post** is the first workspace screen for staff who can create posts. Save an idea, answer missing-detail questions, confirm the direction, review the draft and choose an approved posting time. Each idea keeps its conversation and progress together. Optional Telegram replies continue that same idea after personal pairing and explicit opt-in; verified channels receive status updates. [Customer workflow](docs/SM_BEAN_GUIDED_WORKFLOW.md) explains the steps, [Telegram channels](docs/TELEGRAM_CHANNELS.md) explains setup, and [OpenDots integration](docs/OPENDOTS_INTEGRATION.md) describes the persistent pause/resume and reviewed retry controls.
+**Home is a conversation.** Every workspace opens on Home. Say what you want in plain words — "a post inviting families to Saturday's site visit, with this photo" — and your manager (the account manager agent) answers, proposes a brief with the brand's defaults already filled in, and the team gets to work: strategist, copywriter, art director, prompt engineer, illustrator, designer, brand reviewer, channel editor, QA inspector, scheduler, producer. The **Today** card shows what is waiting for you, what goes out today and what was made overnight; **In progress** follows every idea from brief to approval; **Recent work** keeps the drafts. Ask for a change on any post ("shorter headline", "new picture") and the right agent does it. Clients have the same conversation in the client portal (**Talk to the team**); their requests still need internal approval. A workspace chooses how a team member's idea starts: **Show me the brief first** (one tap on **Go ahead**) or **Go ahead unless I say stop** (the card shows **Stop** for a minute).
 
-**Agency** in the sidebar has 28 configured agent roles across seven departments: model-backed roles use the selected Anthropic/OpenRouter provider, image generation uses fal.ai, and rendering and orchestration also use ordinary code. These are software roles, not 28 employees or a guarantee of parallel execution. The workflow plans, writes, designs, checks and proposes times for posts and blog articles, uses available audience/performance evidence, and learns from reviewed creatives. **Nothing it makes goes out until a person approves the exact final version**: every post and article lands in the normal approval queue.
+**Routines** are standing instructions in plain words with a schedule: "every weekday at 08:30 tell me what's waiting" (the morning briefing), "Mondays at 09:00 plan the week's posts from our pillars", "weekdays at 17:00 draft replies to new comments". A routine runs by itself to the minute, posts its result in the team thread, skips a run when the workspace, the provider or the budget says no, and never retries an interrupted run without a person. **Autopilot** (Settings → Autopilot) plans a whole week at the chosen time — posts per week, accounts, content pillars, articles per month, a monthly soft budget — and tells the lead approver once when the drafts are ready.
 
-| Department | Agents |
-|---|---|
-| Client services | **Account manager** (answers questions and change requests in the team thread, and hands them to the right agent) · **Client reporter** (the weekly report) |
-| Strategy | **Content strategist** (three angles from one idea) · **Content planner** (next week's posts for your open slots) · **Moments scout** (festivals, seasons, industry dates) |
-| Insights | **Performance analyst** (what worked, against each account's own average) · **Audience listener** (questions, praise and complaints in comments, messages and reviews) · **Creative memory curator** (studies your best creatives and your designer's references and writes down the house style) |
-| Creative | **Copywriter** · **Channel editor** (the version each network needs) · **Art director** · **Prompt engineer** (writes the image prompt from the art director's direction and your best past creatives) · **Illustrator** (fal.ai) · **Graphic designer** (Pillow) |
-| Quality | **Brand reviewer** · **QA inspector** (lengths per network, hashtags, links, alt text, contrast) · **Fact checker** · **Editor-in-chief** |
-| Publishing | **Scheduler** (proposes the best free time from the account's history; never schedules) · **Producer** (creates the draft and submits it for approval) · **Community manager** and **Reviews manager** (draft replies for a person to send; unhappy reviews are flagged) |
-| Blog & SEO | **SEO strategist** · **Outline editor** · **Blog writer** · **SEO editor** · **Repurposer** (turns an article into posts) · **SEO monitor** (scores published articles, reads Google rankings, suggests refreshes) |
+**Telegram is the manager in your pocket.** Each workspace has its own bot. Pair your account from Agency → Telegram and your private chat becomes your inbox: a finished draft arrives as a review card (or a preview with **Open to approve**), plus reminders, a planned week, a failed delivery, the weekly report and the morning briefing, with quiet hours, a daily cap and `/mute`. Plain text in that chat is an instruction to your manager, with the same **Go ahead** card as the web; `/status`, `/approvals`, `/week`, `/routines`, `/pause`, `/resume`, `/retry` and `/help` do the rest. Team and client groups and a status channel are optional. See [Telegram](docs/TELEGRAM_CLIENT_HUB.md) and [status channels](docs/TELEGRAM_CHANNELS.md).
 
-**A post**, after the source-backed brief is confirmed: strategist → copywriter → art director → prompt engineer → illustrator → designer → brand reviewer → channel editor → QA inspector → scheduler → producer. It waits on the agency home under *Waiting for you* with a proposed time; a current approver reviews the final copy, visual, destination and time before **Approve & schedule**. Preparation time depends on providers and worker capacity; it is not a delivery deadline.
+**Set up** is one checklist with live state and one button per row — AI team, Pictures, Social accounts, Approvers, Autopilot, Creation mode, Telegram, Email, Verified facts, Blog website, Monthly AI budget — so a workspace always knows what is missing; owners see the variable names there and nowhere else. The same line appears under the Home greeting. Brand, Verified facts, Creative memory, Outcomes, Autopilot, Telegram and Budget sit behind the Settings tab.
 
-**Telegram client hub.** Each workspace has its own bot. Clients can link their
-own Telegram account from a passwordless portal session; staff use Agency →
-Telegram for separate team/client groups and permitted brainstorming, references,
-reviews and weekly preparation. A capable manager bot can request a new company
-bot through Telegram's human-consent screen and finish setup automatically;
-ordinary bots use BotFather. See [Telegram setup and boundaries](docs/TELEGRAM_CLIENT_HUB.md).
+**Nothing goes out without you.** Everything the team makes — posts, articles, inbox reply drafts, weekly plans — stops at the approval gate. A current approver reviews the exact copy, visual, destination and time and chooses **Approve & schedule** (plain **Approve** does not schedule); any change afterwards withdraws the approval; the publisher checks it again before sending; an uncertain delivery is held for a person to reconcile, never resent on its own. Agents cannot approve, schedule, publish or send a reply — not from the web, the API, MCP, the portal or Telegram. Every agent turn is recorded with its estimated cost, and the team stops starting new work when the month's budget is reached. The task controls — Pause, Resume, Retry after review — come from [OpenDots](docs/OPENDOTS_INTEGRATION.md).
 
-**Same look as your best work.** With *Match the look of the last post* on (the default), the next graphic copies the layout, canvas, colour treatment and picture style of the last one. **Agency → Creative memory** ranks published creatives against each account's own average, lets you mark any of them — or upload your designer's best work — as *Learn from this*, and keeps a house-style paragraph the curator writes (editable by managers). The art director, the prompt engineer and the reviewer all read it.
+**Blog & SEO** and **inbox drafts** work the same way. **Write with the team** turns a topic into an article with a live SEO score and a designed cover; it waits for approval and is then committed to the website repository with its sitemap and feed. **Draft replies with the team** (or the autopilot switch) drafts replies to comments, messages and reviews that a person sends; unhappy reviews are flagged. Connect Google Search Console on the blog list for rankings and the weekly SEO check-up.
 
-**Autopilot** (**Agency → Autopilot**, workspace owners): posts per week, accounts, content pillars, the weekday and hour to plan, blog articles per month and a monthly budget. At the planning time the planner fills next week's open slots and the team makes every post; the lead approver gets one notification when they are all ready. It never approves or schedules — *Nothing goes out without you*.
-
-**Ask the team.** The agency home and every post have a thread with the account manager: ask a question, or ask for a change ("make the headline shorter", "new picture", "write one about Saturday's site visit") and the right agent does it. Staff can leave internal notes clients never see. Clients get the same thread in the client portal (**Talk to the team**, and *Ask a question* / *Request a change* on each post waiting for them), and the portal's **Reports** page shows the weekly report. Their requests still need internal approval.
-
-**Blog & SEO.** **Write with the team** on the blog list turns a topic into a full article: keyword and intent, outline, the article with links to your other articles, a fact check against the brand facts, the search title, description and slug, an editor's final read and a designed cover — then it waits for approval like any article. The editor shows a live **SEO score** (0–100, each check with its fix) and the Google result preview; *Ask the SEO team* and *Improve SEO* send an article back for a revision; *Make social posts* turns an approved article into posts. Published pages get complete Open Graph and Article structured data, related articles, and the blog's `sitemap.xml` and RSS `feed.xml` are written in the same commit. Connect **Google Search Console** on the blog list to see each article's position, clicks and top searches; **Run an SEO check-up** (and a weekly run) has the SEO monitor suggest what to refresh.
-
-**Inbox drafts.** With *Draft replies to comments, messages and reviews* on in Autopilot (or **Draft replies with the team** in the inbox), new comments, mentions, reviews and recent messages get a reply drafted by the community manager or the reviews manager, labelled as such in the inbox. A person sends it; one- and two-star reviews are flagged to the inbox staff.
-
-**Cost control.** Every agent's turn is recorded with tokens and an estimated cost at known model list prices; fal.ai pictures have a separate estimate. Treat the workspace budget as a soft pre-call threshold, not an exact provider bill or a reserved hard ceiling. Autopilot, the thread and the blog team stop starting new work when the month's estimated spend reaches the workspace's budget, and the agency home shows the meter. The thread has a daily reply cap per workspace. Agent work runs below publishing in the worker's queue, but a running turn cannot be preempted; its duration and retries can delay publishing. Measure that delay before promising a delivery-time guarantee.
-
-Setup — on the web **and** worker services (the agents run in the background worker). For OpenRouter:
+Setup — on the web **and** worker services (the team runs in the worker):
 
 ```text
-STUDIO_PROVIDER=openrouter
+STUDIO_PROVIDER=                   # which model provider; the key below must match it
 OPENROUTER_API_KEY=                # enter securely in environment settings
-STUDIO_MODEL=anthropic/claude-sonnet-4.5
-STUDIO_WEB_SEARCH=false
-```
-
-OpenRouter keys belong in `OPENROUTER_API_KEY`. Do not put them in `ANTHROPIC_API_KEY`: the providers use different endpoints and request formats. Empty `STUDIO_MODEL` selects the chosen provider's default. An old explicit Anthropic model ID must be replaced with an OpenRouter namespaced ID when switching providers. Confirm model availability, structured-output/image support and credits in your OpenRouter account. The OpenRouter adapter validates structured answers and retains usage from unusable answers; web research is disabled for this provider. Images still use fal.ai independently.
-
-For direct Anthropic access, use the existing provider:
-
-```text
-STUDIO_PROVIDER=anthropic
-ANTHROPIC_API_KEY=                 # enter securely; console.anthropic.com
-STUDIO_MODEL=claude-opus-5-5        # optional; the Claude model every agent uses
-STUDIO_EFFORT=                      # optional; low|medium|high|xhigh|max for every agent (default: per agent)
-STUDIO_TIMEOUT=300                  # optional; seconds per agent turn
-STUDIO_FALLBACKS=true               # optional; retry a falsely declined request on Anthropic's fallback model
-STUDIO_WEB_SEARCH=false             # optional; lets the moments scout and SEO strategist search the web ($0.01 a search)
-AGENCY_MAX_ACTIVE_BRIEFS=3          # optional; posts the autopilot has in the works at once, across workspaces
-FAL_KEY=...                         # optional; pictures (see fal.ai above)
-GSC_CLIENT_ID=                      # optional; Google Search Console rankings (see below)
+ANTHROPIC_API_KEY=                 # the other provider's key; never put one provider's key in the other's variable
+STUDIO_MODEL=                      # optional; empty = the provider's default
+STUDIO_EFFORT=                     # optional; low|medium|high|xhigh|max for every agent
+STUDIO_TIMEOUT=300                 # optional; seconds per agent turn
+STUDIO_WEB_SEARCH=false            # optional; lets the moments scout and the SEO strategist search the web (billed per search)
+AGENCY_MAX_ACTIVE_BRIEFS=3         # optional; posts the team has in the works at once, across workspaces
+FAL_KEY=                           # optional; pictures (see the cover-pictures section above)
+GSC_CLIENT_ID=                     # optional; Google Search Console rankings
 GSC_CLIENT_SECRET=
-INDEXNOW_KEY=                       # optional; tells Bing and other IndexNow engines when an article goes live
+INDEXNOW_KEY=                      # optional; tells search engines when an article goes live
 ```
 
-For production activation, recovery gaps and the pilot that verifies real delivery after human **Approve & schedule**, see [CTO agency readiness](docs/CTO_AGENCY_READINESS.md). Plain **Approve** does not schedule a post.
-
-**Create in the team thread.** The account manager asks focused questions, gathers the saved brand website and connected Meta channel context, and shows a creative brief for your explicit confirmation before starting a draft. Attach a photo and draw on saved creative memory, then review the graphic and captions in that same conversation. Measured loss of essential graphic text blocks handoff for correction. Finished content still needs human **Approve & schedule**. See [guided post creation](docs/GUIDED_POST_CREATION.md) for the flow and source limitations.
-
-The [Neopolis launch audit](docs/NEOPOLIS_LAUNCH_AUDIT.md) records failure, concurrency and usage regressions plus the required live acceptance pilot. Before its first rollout, drain the old worker and review/reapprove queued approvals: the new worker singleton lease and native-destination approval fingerprint change those operating requirements.
+The owner's Set up page is the one place in the product that names these variables and shows which are missing. `python manage.py live_verify` reports `agency.provider`, `agency.fal_key` and `telegram.webhook` with the rest. The canonical variable table — which service, required or optional, how to verify — is in [Live operations](docs/LIVE_OPERATIONS.md#environment-variables); every page and flow is described in the [product map](docs/PRODUCT_MAP.md).
 
 **Google Search Console** (optional): in Google Cloud Console create an OAuth client ID (Web application), enable the *Google Search Console API*, add the redirect URI `{APP_URL}/blog/search-console/callback/`, and set `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` on both services. Then an owner chooses **Connect Google Search Console** on the blog list and picks the property for that website (the Google account must have access to it). Rankings sync daily.
 
