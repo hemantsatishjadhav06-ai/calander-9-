@@ -31,10 +31,10 @@ fired by the same response doesn't tear down the toast before it's seen.
   if (window.__bbToastInit) return;
   window.__bbToastInit = true;
   var TONES = {
-    success: { accent: '#95E097', bg: '#1C1F24', icon: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>' },
-    info:    { accent: '#95CDEB', bg: '#1C1F24', icon: '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>' },
-    warn:    { accent: '#FFCA82', bg: '#1C1F24', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
-    error:   { accent: '#FEA69C', bg: '#1C1F24', icon: '<path d="M6 18L18 6M6 6l12 12"/>' },
+    success: { accent: 'var(--success-300)', bg: 'var(--ink-900)', icon: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>' },
+    info:    { accent: 'var(--info-300)', bg: 'var(--ink-900)', icon: '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>' },
+    warn:    { accent: 'var(--warning-300)', bg: 'var(--ink-900)', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
+    error:   { accent: 'var(--danger-300)', bg: 'var(--ink-900)', icon: '<path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><path d="M15 9l-6 6M9 9l6 6"/>' },
   };
   function render(detail) {
     if (!detail || !detail.title) return;

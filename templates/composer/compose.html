@@ -14,6 +14,8 @@
     main:has(.composer-main) > div { overflow: hidden !important; }
     .composer-main { padding: 0 !important; overflow: hidden; }
 
+/* Page styles sit in the components layer so a utility on the same element still wins. */
+@layer components {
     /* Panels */
     .panel-center { flex: 1; min-width: 0; }
     .panel-right  {
@@ -22,14 +24,14 @@
         width: 100%; max-width: 380px;
         z-index: 58;
         transform: translateX(100%);
-        transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-        box-shadow: -8px 0 24px rgba(14, 17, 20,0.08);
+        transition: transform var(--dur-slow) var(--ease-out);
+        box-shadow: var(--shadow-xl);
     }
     .panel-right.is-open { transform: translateX(0); }
     @media (min-width: 1024px) {
         .panel-right {
             position: static; inset: auto;
-            width: 340px; max-width: none;
+            width: 360px; max-width: none;
             flex-shrink: 0;
             transform: none; transition: none;
             box-shadow: none;
@@ -37,46 +39,43 @@
     }
     .panel-right-backdrop {
         position: fixed; inset: 0;
-        background: #000;
+        background: var(--overlay);
         z-index: 57;
     }
     @media (min-width: 1024px) {
         .panel-right-backdrop { display: none !important; }
     }
 
-    /* Platform account checkbox pill - compact for header row */
+    /* Channel picker: a selectable chip with a real checkbox look (selected = Pine edge + tint) */
     .acct-pill {
-        display: flex; align-items: center; gap: 6px;
-        padding: 5px 10px; border-radius: 9999px;
-        border: 1.5px solid var(--border);
-        background: #FFFFFF;
+        display: flex; align-items: center; gap: 8px;
+        min-height: 40px; padding: 4px 12px 4px 8px; border-radius: 9999px;
+        border: 1px solid var(--ink-300);
+        background: var(--surface-0);
+        box-shadow: var(--shadow-xs);
         cursor: pointer; user-select: none;
-        transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+        transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
         white-space: nowrap;
     }
-    .acct-pill:hover { border-color: var(--ink-300); background: var(--surface-1); }
-    .acct-pill.selected {
-        border-color: var(--primary); background: var(--primary-soft);
-        box-shadow: 0 0 0 3px rgba(17, 86, 65,0.08);
-    }
+    @media (max-width: 1023px) { .acct-pill { min-height: 44px; } }
+    .acct-pill:hover { border-color: var(--ink-400); background: var(--ink-25); }
+    .acct-pill.selected { border-color: var(--brand-700); background: var(--brand-50); }
     .acct-pill .checkmark {
         width: 16px; height: 16px; border-radius: 4px;
-        border: 1.5px solid var(--ink-300); flex-shrink: 0;
+        border: 1.5px solid var(--ink-400); flex-shrink: 0;
+        background: var(--surface-0);
         display: flex; align-items: center; justify-content: center;
-        transition: all 150ms ease;
+        transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
     }
-    .acct-pill.selected .checkmark {
-        background: var(--primary); border-color: var(--primary);
-    }
+    .acct-pill.selected .checkmark { background: var(--brand-700); border-color: var(--brand-700); }
     .acct-pill.selected .checkmark svg { display: block; }
     .acct-pill .checkmark svg { display: none; }
 
-    /* Platform icon circles */
+    /* Platform icon tiles (official colours: content, not interface) */
     .platform-icon {
         width: 26px; height: 26px; border-radius: 7px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 11px; font-weight: 700; color: white; flex-shrink: 0;
-        letter-spacing: -0.02em;
+        font-size: 12px; font-weight: 700; color: white; flex-shrink: 0;
     }
     .pi-facebook   { background: #1877F2; }
     .pi-instagram  { background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF); }
@@ -94,32 +93,31 @@
 
     /* Character counter bar */
     .char-bar {
-        height: 3px; border-radius: 2px;
-        background: var(--border); overflow: hidden;
-        transition: all 200ms ease;
+        height: 4px; border-radius: 9999px;
+        background: var(--ink-200); overflow: hidden;
     }
     .char-bar-fill {
-        height: 100%; border-radius: 2px;
-        transition: width 150ms ease, background 150ms ease;
+        height: 100%; border-radius: 9999px;
+        transition: width var(--dur-fast) ease, background-color var(--dur-fast) ease;
     }
 
-    /* Caption area - the star of the show */
+    /* Caption box: the composer recipe (control edge at rest, Pine edge while writing) */
     .caption-wrap {
-        border: 1.5px solid var(--border);
-        border-radius: 12px;
-        background: #FFFFFF;
-        transition: border-color 150ms ease, box-shadow 150ms ease;
+        border: 1px solid var(--border-control);
+        border-radius: var(--radius-xl);
+        background: var(--surface-0);
+        transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
         position: relative;
     }
-    .caption-wrap:hover { border-color: var(--ink-300); }
+    .caption-wrap:hover { border-color: var(--ink-500); }
     .caption-wrap:focus-within {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(17, 86, 65,0.1);
+        border-color: var(--focus-ring);
+        box-shadow: 0 0 0 1px var(--focus-ring), 0 0 0 4px var(--primary-halo);
     }
     .caption-editor {
-        font-family: system-ui, -apple-system, sans-serif;
-        font-size: 15px; line-height: 1.65;
-        padding: 16px 18px 8px;
+        font-family: var(--font-body);
+        font-size: 15px; line-height: 24px;
+        padding: 14px 16px 8px;
         background: transparent;
         color: var(--text-primary);
         border: none;
@@ -127,118 +125,118 @@
         outline: none;
         width: 100%;
     }
+    /* The box shows focus, so the borderless textarea inside must not draw a second ring. */
+    .caption-editor:focus-visible { outline: none; box-shadow: none; }
     .caption-editor::placeholder { color: var(--text-tertiary); }
 
     /* First-comment editor - thinner variant */
     .comment-editor {
-        font-family: system-ui, -apple-system, sans-serif;
-        font-size: 14px; line-height: 1.55;
-        padding: 10px 14px;
-        border: 1.5px solid var(--border);
-        border-radius: 10px;
-        background: #FFFFFF;
+        font-family: var(--font-body);
+        font-size: 14px; line-height: 20px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-control);
+        border-radius: var(--radius-lg);
+        background: var(--surface-0);
         color: var(--text-primary);
         resize: none; min-height: 0;
-        outline: none;
         width: 100%;
-        transition: border-color 150ms ease, box-shadow 150ms ease;
+        transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
     }
     .comment-editor::placeholder { color: var(--text-tertiary); }
-    .comment-editor:hover { border-color: var(--ink-300); }
+    .comment-editor:hover { border-color: var(--ink-500); }
     .comment-editor:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(17, 86, 65,0.1);
+        outline: 2px solid transparent;
+        border-color: var(--focus-ring);
+        box-shadow: 0 0 0 1px var(--focus-ring), 0 0 0 4px var(--primary-halo);
     }
 
     /* Media dropzone - square tile, first in the media row */
     .media-dropzone-inline {
         width: 96px; height: 96px;
-        border: 1.5px dashed var(--ink-300);
-        border-radius: 8px;
+        border: 1px dashed var(--ink-400);
+        border-radius: 10px;
         padding: 8px;
+        background: var(--ink-25);
         display: flex; flex-direction: column;
         align-items: center; justify-content: center;
         gap: 4px; text-align: center;
-        transition: all 200ms ease;
+        transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
         cursor: pointer;
         flex-shrink: 0;
     }
     .media-dropzone-inline:hover,
     .media-dropzone-inline.dragover {
-        border-color: var(--primary);
-        background: var(--primary-soft);
+        border-color: var(--brand-600);
+        background: var(--brand-50);
     }
 
     /* Unsplash icon button next to the dropzone - bare logo mark, no tile */
     .media-unsplash-btn {
         height: 96px;
-        padding: 0 6px;
+        padding: 0 8px;
         display: flex; align-items: center; justify-content: center;
-        background: transparent; border: none;
+        background: transparent; border: none; border-radius: 8px;
         color: var(--ink-700);
         cursor: pointer;
-        transition: color 150ms ease;
+        transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease;
         flex-shrink: 0;
     }
-    .media-unsplash-btn:hover { color: var(--text-primary); }
+    .media-unsplash-btn:hover { color: var(--text-primary); background: rgb(14 17 20 / .05); }
 
     /* Media thumbnail grid */
     .media-thumb {
         width: 96px; height: 96px;
-        border-radius: 8px;
+        border-radius: 10px;
         overflow: hidden;
         position: relative;
-        border: 1px solid var(--border);
+        box-shadow: inset 0 0 0 1px rgb(14 17 20 / .06), 0 0 0 1px var(--border);
     }
     .media-thumb img { width: 100%; height: 100%; object-fit: cover; }
     .media-thumb .remove-btn {
         position: absolute; top: 4px; right: 4px;
-        width: 20px; height: 20px; border-radius: 50%;
-        background: rgba(14, 17, 20,0.55); color: white;
+        width: 24px; height: 24px; border-radius: 50%;
+        background: rgb(14 17 20 / .6); color: white;
         display: flex; align-items: center; justify-content: center;
-        font-size: 10px; cursor: pointer;
-        transition: background 150ms ease;
+        font-size: 12px; cursor: pointer;
+        transition: background-color var(--dur-fast) ease;
         z-index: 2;
     }
-    .media-thumb .remove-btn:hover { background: var(--error-500); }
+    .media-thumb .remove-btn:hover { background: var(--danger-500); }
+    .media-thumb .remove-btn:focus-visible { outline-color: #fff; }
 
     /* Upload progress overlay */
     .media-thumb .upload-overlay {
         position: absolute; inset: 0;
-        background: rgba(14, 17, 20,0.45);
+        background: rgb(14 17 20 / .45);
         display: flex; align-items: center; justify-content: center;
         z-index: 1;
     }
-    .media-thumb .upload-overlay svg { filter: drop-shadow(0 1px 2px rgba(14, 17, 20,0.3)); }
-    .media-thumb .upload-progress-ring { transition: stroke-dashoffset 150ms ease; }
-    .media-thumb.upload-failed { border-color: var(--error-500); }
-    .media-thumb.upload-failed .upload-overlay { background: rgba(153, 22, 24,0.25); }
+    .media-thumb .upload-overlay svg { filter: drop-shadow(0 1px 2px rgb(14 17 20 / .3)); }
+    .media-thumb .upload-progress-ring { transition: stroke-dashoffset var(--dur-fast) ease; }
+    .media-thumb.upload-failed { box-shadow: 0 0 0 1px var(--danger-500); }
+    .media-thumb.upload-failed .upload-overlay { background: rgb(153 22 24 / .25); }
     .media-thumb .retry-btn {
         position: absolute; inset: 0;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         gap: 2px; cursor: pointer; z-index: 3;
-        background: rgba(14, 17, 20,0.5); color: white;
-        font-size: 9px; font-weight: 600;
-        border: none; border-radius: 8px;
+        background: rgb(14 17 20 / .55); color: white;
+        font-size: 12px; font-weight: 600;
+        border: none; border-radius: 10px;
     }
-    .media-thumb .retry-btn:hover { background: rgba(14, 17, 20,0.65); }
+    .media-thumb .retry-btn:hover { background: rgb(14 17 20 / .7); }
 
-    /* Preview panel cards */
+    /* Preview panel cards: hairline only, no hover lift */
     .preview-card {
-        background: #FFFFFF;
+        background: var(--surface-0);
         border: 1px solid var(--border);
-        border-radius: 14px;
+        border-radius: var(--radius-xl);
         overflow: hidden;
-        transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .preview-card:hover {
-        box-shadow: 0 10px 15px rgba(14, 17, 20,0.08), 0 4px 6px rgba(14, 17, 20,0.04);
-        border-color: transparent;
+        box-shadow: var(--shadow-xs);
     }
 
     /* Action bar */
     .action-bar {
-        background: #FFFFFF;
+        background: var(--surface-0);
         border-top: 1px solid var(--border);
         padding: 12px 16px;
         display: flex; align-items: center; gap: 6px;
@@ -246,35 +244,39 @@
         z-index: 51;
     }
     @media (min-width: 640px) {
-        .action-bar { padding: 20px 24px; gap: 8px; }
+        .action-bar { padding: 14px 24px; gap: 8px; }
     }
-
-    /* Subtle entrance animation - uses 'both' but resets transform at 100% to avoid
-       creating a permanent stacking context (which traps z-index of child popovers). */
-    @keyframes slideUp {
-        0%   { opacity: 0; transform: translateY(8px); }
-        100% { opacity: 1; transform: none; }
-    }
-    .animate-in { animation: slideUp 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-    .animate-in-d1 { animation-delay: 50ms; opacity: 0; }
-    .animate-in-d2 { animation-delay: 100ms; opacity: 0; }
-    .animate-in-d3 { animation-delay: 150ms; opacity: 0; }
 
     /* Toast notification */
     .toast-saved {
         position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
         background: var(--ink-900); color: white;
-        padding: 8px 16px; border-radius: 9999px;
-        font-size: 13px; font-weight: 500;
-        box-shadow: 0 10px 15px rgba(14, 17, 20,0.2);
+        padding: 10px 14px; border-radius: var(--radius-xl);
+        font-size: 14px; font-weight: 500;
+        box-shadow: var(--shadow-lg);
         z-index: 100;
     }
 
     /* Scrollbar refinement */
-    .panel-scroll::-webkit-scrollbar { width: 4px; }
+    .panel-scroll::-webkit-scrollbar { width: 6px; }
     .panel-scroll::-webkit-scrollbar-track { background: transparent; }
-    .panel-scroll::-webkit-scrollbar-thumb { background: var(--ink-300); border-radius: 2px; }
+    .panel-scroll::-webkit-scrollbar-thumb { background: var(--ink-300); border-radius: 3px; }
     .panel-scroll::-webkit-scrollbar-thumb:hover { background: var(--ink-400); }
+}
+
+    /* Subtle entrance animation - uses 'both' but resets transform at 100% to avoid
+       creating a permanent stacking context (which traps z-index of child popovers). */
+    @keyframes slideUp {
+        0%   { opacity: 0; transform: translateY(6px); }
+        100% { opacity: 1; transform: none; }
+    }
+    .animate-in { animation: slideUp 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .animate-in-d1 { animation-delay: 50ms; opacity: 0; }
+    .animate-in-d2 { animation-delay: 100ms; opacity: 0; }
+    .animate-in-d3 { animation-delay: 150ms; opacity: 0; }
+    @media (prefers-reduced-motion: reduce) {
+        .animate-in, .animate-in-d1, .animate-in-d2, .animate-in-d3 { animation: none; opacity: 1; }
+    }
 </style>
 {% endblock %}
 
@@ -285,20 +287,20 @@
      @keydown.ctrl.s.prevent="saveDraft()">
 
     <!-- Page header -->
-    <div class="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-ink-100 flex-shrink-0">
-        <button aria-label="Back" @click="if (document.referrer && document.referrer.startsWith(location.origin)) { history.back(); } else { location.href='{% url 'composer:create_landing' workspace_id=workspace.id %}'; }"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-ink-200 text-ink-500 hover:text-ink-700 hover:border-ink-300 hover:bg-ink-25 transition-all duration-150 cursor-pointer">
-            <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    <div class="flex items-center gap-2 px-4 sm:px-6 py-2.5 bg-white border-b border-ink-200 flex-shrink-0">
+        <button type="button" aria-label="Back" @click="if (document.referrer && document.referrer.startsWith(location.origin)) { history.back(); } else { location.href='{% url 'composer:create_landing' workspace_id=workspace.id %}'; }"
+                class="ui-btn ui-btn-icon -ml-2">
+            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
         </button>
-        <h1 class="text-base font-semibold text-ink-900" style="letter-spacing: -0.01em;">{% if is_edit %}Edit{% else %}Create{% endif %}</h1>
+        <h1 class="text-[17px] leading-[22px] font-semibold tracking-[-0.01em] text-ink-950">{% if is_edit %}Edit post{% else %}New post{% endif %}</h1>
         <!-- Preview toggle (mobile only) -->
         <button type="button" @click="showPreviewPanel = true"
-                class="lg:hidden ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-ink-200 text-ink-600 text-xs font-semibold hover:border-ink-300 hover:bg-ink-25 transition-all duration-150 cursor-pointer">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                class="lg:hidden ml-auto ui-btn ui-btn-secondary ui-btn-sm">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             <span>Preview</span>
             <span x-show="selectedAccounts.length > 0"
                   x-text="selectedAccounts.length"
-                  class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold tabular-nums"></span>
+                  class="ui-badge"></span>
         </button>
     </div>
 
@@ -354,7 +356,7 @@
                     {# The one empty state that matters most: with no channel there is nothing to publish to, so say where to fix that. #}
                     <div class="text-xs text-ink-500 leading-relaxed">
                         No channels connected yet, so this post can only be saved as a draft.
-                        <a href="{% url 'social_accounts:connect' workspace_id=workspace.id %}" class="font-semibold underline hover:no-underline" style="color: var(--primary-strong);">Connect a channel</a>
+                        <a href="{% url 'social_accounts:connect' workspace_id=workspace.id %}" class="link-inline font-semibold">Connect a channel</a>
                         to schedule or publish it.
                     </div>
                     {% endfor %}
@@ -400,7 +402,7 @@
                         {{ pp.first_comment_error|default:"The first comment couldn't be added. Add it manually on the post." }}
                     </p>
                     {% endfor %}
-                    <p class="text-[11px] text-warning-600 pl-5.5">The post itself published successfully — only the comment failed.</p>
+                    <p class="text-xs text-warning-600 pl-5.5">The post itself published successfully — only the comment failed.</p>
                 </div>
                 {% endif %}
 
@@ -418,7 +420,7 @@
                         <p class="text-xs text-ink-600">This post is <span class="font-semibold">{{ post.get_status_display|default:post.status }}</span> and read-only. Use <span class="font-semibold">Clone</span> to repost an editable copy.</p>
                     </div>
                     <button type="button"
-                            class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-ink-800 text-white hover:bg-ink-900 flex-shrink-0 cursor-pointer"
+                            class="ui-btn ui-btn-secondary ui-btn-sm flex-shrink-0"
                             hx-post="{% url 'composer:clone_post' workspace_id=workspace.id post_id=post.id %}"
                             title="Create an editable draft copy">
                         Clone
@@ -442,17 +444,16 @@
 
                 <!-- Title (conditional - only when YouTube/Pinterest selected) -->
                 <div x-show="anyPlatformNeedsTitle" x-transition x-cloak>
-                    <label for="post-title" class="block text-sm font-semibold text-ink-500 uppercase tracking-wider mb-2"
+                    <label for="post-title" class="block text-[13px] font-semibold text-ink-900 mb-2"
                            x-text="titleLabel">Title</label>
                     <input type="text" id="post-title" name="title"
-                           class="w-full text-[15px] font-medium text-ink-900 px-4 py-3 rounded-xl border border-ink-400 bg-white outline-none transition-all duration-150 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
-                           style="letter-spacing: -0.01em;"
+                           class="ui-input !h-11 lg:!text-[15px] font-medium !rounded-xl !px-4"
                            x-model="title"
                            :placeholder="autoSuggestedTitle || 'Enter a title…'"
                            maxlength="255"
                            @input="debouncedPreviewUpdate()">
                     <div class="flex items-center justify-end mt-1">
-                        <span class="text-[11px] tabular-nums font-medium"
+                        <span class="text-xs tabular-nums font-medium"
                               :class="title.length > titleMaxLength ? 'text-danger-500' : 'text-ink-500'"
                               x-text="title.length + ' / ' + titleMaxLength"></span>
                     </div>
@@ -465,25 +466,25 @@
                 <!-- Caption with inline media -->
                 <div x-data="{ showTemplatePicker: false }">
                     <div class="flex items-center justify-between mb-2">
-                        <label class="text-sm font-semibold text-ink-500 uppercase tracking-wider"
+                        <label class="text-[13px] font-semibold text-ink-900"
                                x-text="captionLabel">Caption</label>
                         <div class="flex items-center gap-2 relative">
                             {% if post and is_edit %}
                             <div x-data="{ showSaveTemplate: false }">
                                 <button type="button" @click="showSaveTemplate = !showSaveTemplate"
-                                        class="text-xs font-semibold py-1.5 px-3 rounded-full border border-ink-200 text-ink-500 hover:border-ink-300 hover:text-ink-700 transition-colors flex items-center gap-1">
+                                        class="ui-btn ui-btn-ghost ui-btn-sm">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-                                    Save as Template
+                                    Save as template
                                 </button>
                                 <div x-show="showSaveTemplate" x-cloak x-transition
                                      @click.outside="showSaveTemplate = false"
                                      class="absolute z-50 mt-1 right-0 p-3 bg-white rounded-xl shadow-lg ring-1 ring-ink-200 w-72 max-w-[calc(100vw-2rem)]">
                                     <div x-data="{ tplName: '', tplDesc: '' }">
                                         <input type="text" x-model="tplName" placeholder="Template name…" aria-label="Template name"
-                                               class="form-input w-full text-sm mb-2">
+                                               class="ui-input mb-2">
                                         <textarea x-model="tplDesc" placeholder="Description (optional)…" aria-label="Template description (optional)" rows="2"
-                                                  class="form-input w-full text-xs mb-2"></textarea>
-                                        <button type="button" class="btn-brand text-xs py-1.5 px-3 w-full"
+                                                  class="ui-input !min-h-0 mb-2"></textarea>
+                                        <button type="button" class="ui-btn ui-btn-secondary ui-btn-sm w-full"
                                                 :disabled="!tplName.trim()"
                                                 @click="if (!tplName.trim()) return;
                                                     fetch('{% url 'composer:save_as_template' workspace_id=workspace.id post_id=post.id %}', {
@@ -491,7 +492,7 @@
                                                         headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value, 'Content-Type': 'application/x-www-form-urlencoded' },
                                                         body: 'template_name=' + encodeURIComponent(tplName) + '&template_description=' + encodeURIComponent(tplDesc)
                                                     }).then(() => { showSaveTemplate = false; tplName = ''; tplDesc = ''; });">
-                                            Save Template
+                                            Save template
                                         </button>
                                     </div>
                                 </div>
@@ -499,9 +500,9 @@
                             {% endif %}
                             <button type="button"
                                     @click="showTemplatePicker = !showTemplatePicker; if (showTemplatePicker) $nextTick(() => htmx.trigger($refs.templatePicker, 'load-picker'))"
-                                    class="text-xs font-semibold py-1.5 px-3 rounded-full border border-ink-200 text-ink-500 hover:border-ink-300 hover:text-ink-700 transition-colors flex items-center gap-1">
+                                    class="ui-btn ui-btn-ghost ui-btn-sm">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                Use Template
+                                Use template
                             </button>
                             <!-- Template picker modal -->
                             <!-- hx-swap="innerHTML" is explicit because composer-form ancestor sets hx-swap="none" -->
@@ -537,7 +538,7 @@
                                  @drop.prevent="handleFileDrop($event); $el.classList.remove('dragover')"
                                  @click="$refs.fileInput.click()">
                                 <svg class="w-6 h-6 text-ink-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                <span class="text-[11px] text-ink-500 leading-tight">Drag & drop or <span class="text-brand-700 font-medium">select files</span></span>
+                                <span class="text-xs text-ink-500 leading-tight">Drag & drop or <span class="text-brand-700 font-medium">select files</span></span>
                             </div>
                             {% if unsplash_enabled %}
                             <button aria-label="Search Unsplash" type="button" class="media-unsplash-btn" title="Search Unsplash"
@@ -556,11 +557,11 @@
                         </div>
 
                         <!-- Bottom bar: media library + char counter -->
-                        <div class="flex items-center justify-between px-4 py-2 border-t border-ink-100">
+                        <div class="flex items-center justify-between px-4 py-1.5 border-t border-ink-200">
                             <button type="button" @click="showMediaPicker = true"
-                                    class="text-xs font-medium text-ink-500 hover:text-brand-800 transition-colors flex items-center gap-1.5 cursor-pointer">
+                                    class="min-h-8 text-xs font-medium text-ink-600 hover:text-ink-900 transition-colors flex items-center gap-1.5 cursor-pointer rounded-md">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                                Media Library
+                                Media library
                             </button>
                             <span class="text-xs tabular-nums font-medium"
                                   :class="captionOverLimit() ? 'text-danger-500' : 'text-ink-500'"
@@ -586,18 +587,18 @@
                             <span class="platform-icon w-5 h-5 rounded-[5px] flex items-center justify-center"
                                   :class="'pi-' + (charLimits[accId]?.platform || '')"
                                   x-html="platformIconSvg(charLimits[accId]?.platform || '')"></span>
-                            <span class="text-xs font-semibold text-ink-600" x-text="charLimits[accId]?.name + ' - Video Settings'"></span>
+                            <span class="text-xs font-semibold text-ink-600" x-text="charLimits[accId]?.name + ' · video settings'"></span>
                         </div>
                         <div>
-                            <label :for="'fb-post-type-' + accId" class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1">Publish as</label>
+                            <label :for="'fb-post-type-' + accId" class="block text-xs font-semibold text-ink-700 mb-1">Publish as</label>
                             <select :id="'fb-post-type-' + accId" :name="'facebook_post_type_' + accId"
                                     x-model="facebookPostType"
                                     :disabled="charLimits[accId]?.platform !== 'facebook' || !hasSingleVideoAttached"
-                                    class="w-full text-sm px-3 py-2 rounded-lg border border-ink-400 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all">
+                                    class="ui-input">
                                 <option value="video">Regular Page video</option>
                                 <option value="reel">Facebook Reel</option>
                             </select>
-                            <p class="text-[11px] text-ink-500 mt-1">Reels use Facebook's dedicated vertical-video flow and must be 3-90 seconds. Regular Page video suits long-form and landscape uploads.</p>
+                            <p class="text-xs text-ink-500 mt-1">Reels use Facebook's dedicated vertical-video flow and must be 3-90 seconds. Regular Page video suits long-form and landscape uploads.</p>
                         </div>
                     </div>
                 </template>
@@ -619,15 +620,15 @@
                             <span class="platform-icon w-5 h-5 rounded-[5px] flex items-center justify-center"
                                   :class="'pi-' + (charLimits[accId]?.platform || '')"
                                   x-html="platformIconSvg(charLimits[accId]?.platform || '')"></span>
-                            <span class="text-xs font-semibold text-ink-600" x-text="charLimits[accId]?.name + ' - Pin Settings'"></span>
+                            <span class="text-xs font-semibold text-ink-600" x-text="charLimits[accId]?.name + ' · pin settings'"></span>
                         </div>
                         <!-- Select Board -->
                         <div>
-                            <label :for="'pin-board-' + accId" class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1">
-                                Select Board <span class="text-danger-500">*</span>
+                            <label :for="'pin-board-' + accId" class="block text-xs font-semibold text-ink-700 mb-1">
+                                Board <span class="text-danger-500">*</span>
                             </label>
                             <select :id="'pin-board-' + accId" :name="'pin_board_id_' + accId"
-                                    class="w-full text-sm px-3 py-2 rounded-lg border border-ink-400 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all"
+                                    class="ui-input"
                                     :required="charLimits[accId]?.platform === 'pinterest' && selectedAccounts.includes(accId)">
                                 <option value="">Select a board…</option>
                                 <template x-for="board in boards" :key="board.id">
@@ -636,34 +637,34 @@
                                             x-text="board.name"></option>
                                 </template>
                             </select>
-                            <p x-show="boardsLoading" class="text-[11px] text-ink-500 mt-1">Loading boards…</p>
-                            <p x-show="boardsLoaded && boards.length === 0" class="text-[11px] text-danger-500 mt-1">No boards found. Create a board on Pinterest first.</p>
+                            <p x-show="boardsLoading" class="text-xs text-ink-500 mt-1">Loading boards…</p>
+                            <p x-show="boardsLoaded && boards.length === 0" class="text-xs text-danger-500 mt-1">No boards found. Create a board on Pinterest first.</p>
                         </div>
                         <!-- Destination Link -->
                         <div>
-                            <label :for="'pin-link-' + accId" class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1">Destination Link</label>
+                            <label :for="'pin-link-' + accId" class="block text-xs font-semibold text-ink-700 mb-1">Destination link</label>
                             <input type="url"
                                    :id="'pin-link-' + accId" :name="'pin_link_url_' + accId"
                                    :value="platformExtras[accId]?.link_url || ''"
                                    placeholder="https://example.com/your-page"
                                    maxlength="2048"
-                                   class="w-full text-sm px-3 py-2 rounded-lg border border-ink-400 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all">
-                            <p class="text-[11px] text-ink-500 mt-1">Where people go when they click the pin</p>
+                                   class="ui-input">
+                            <p class="text-xs text-ink-500 mt-1">Where people go when they click the pin</p>
                         </div>
                         <!-- Tag Products -->
                         <div>
-                            <label :for="'pin-products-' + accId" class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1">Tag Products</label>
+                            <label :for="'pin-products-' + accId" class="block text-xs font-semibold text-ink-700 mb-1">Tag products</label>
                             <input type="text"
                                    :id="'pin-products-' + accId" :name="'pin_tag_products_' + accId"
                                    :value="platformExtras[accId]?.tag_products || ''"
                                    placeholder="Product URLs or IDs (comma-separated)"
-                                   class="w-full text-sm px-3 py-2 rounded-lg border border-ink-400 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all">
-                            <p class="text-[11px] text-ink-500 mt-1">Requires a connected product catalog</p>
+                                   class="ui-input">
+                            <p class="text-xs text-ink-500 mt-1">Requires a connected product catalog</p>
                         </div>
                         <!-- Advanced -->
-                        <div class="border-t border-ink-100 pt-3">
+                        <div class="border-t border-ink-200 pt-3">
                             <button type="button"
-                                    class="text-xs font-semibold text-ink-500 hover:text-ink-700 flex items-center gap-1 cursor-pointer"
+                                    class="min-h-8 text-xs font-semibold text-ink-600 hover:text-ink-900 flex items-center gap-1 cursor-pointer rounded-md"
                                     @click="advancedOpen[accId] = !advancedOpen[accId]">
                                 <svg class="w-3 h-3 transition-transform"
                                      :class="advancedOpen[accId] ? 'rotate-90' : ''"
@@ -679,7 +680,7 @@
                                            :name="'pin_allow_comments_' + accId"
                                            value="true"
                                            :checked="platformExtras[accId]?.allow_comments !== false"
-                                           class="w-4 h-4 mt-0.5 rounded border-ink-400 text-brand-700 focus:ring-brand-600/20">
+                                           class="ui-checkbox mt-0.5 flex-shrink-0">
                                     <span class="text-sm text-ink-700">Allow people to comment</span>
                                 </label>
                                 <!-- Show Similar Products -->
@@ -688,23 +689,23 @@
                                            :name="'pin_show_similar_' + accId"
                                            value="true"
                                            :checked="platformExtras[accId]?.show_similar_products !== false"
-                                           class="w-4 h-4 mt-0.5 rounded border-ink-400 text-brand-700 focus:ring-brand-600/20">
+                                           class="ui-checkbox mt-0.5 flex-shrink-0">
                                     <span class="text-sm text-ink-700">Show similar products</span>
                                 </label>
                                 <!-- Alt Text -->
                                 <div>
-                                    <label :for="'pin-alt-' + accId" class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1">Alt Text</label>
+                                    <label :for="'pin-alt-' + accId" class="block text-xs font-semibold text-ink-700 mb-1">Alt text</label>
                                     <textarea :id="'pin-alt-' + accId" :name="'pin_alt_text_' + accId"
                                               placeholder="Describe this pin for accessibility…"
                                               maxlength="500"
                                               rows="2"
-                                              class="w-full text-sm px-3 py-2 rounded-lg border border-ink-400 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all resize-none"
+                                              class="ui-input resize-none"
                                               x-init="$el.value = platformExtras[accId]?.alt_text || ''"></textarea>
                                 </div>
                                 <!-- Video Cover Image (only when video media is attached) -->
                                 <template x-if="mediaItems && mediaItems.some(m => m.is_video)">
                                     <div>
-                                        <label class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1">Video Cover Image</label>
+                                        <label class="block text-xs font-semibold text-ink-700 mb-1">Video cover image</label>
                                         <input type="hidden"
                                                :name="'pin_cover_image_asset_id_' + accId"
                                                :value="platformExtras[accId]?.cover_image_asset_id || ''">
@@ -715,13 +716,13 @@
                                             </template>
                                             <button type="button"
                                                     @click="openThumbnailPicker(accId)"
-                                                    class="text-xs font-medium px-3 py-1.5 rounded-lg border border-ink-200 text-ink-700 hover:border-ink-400 hover:text-brand-800 transition-all cursor-pointer">
-                                                <span x-text="platformExtras[accId]?.cover_image_asset_id ? 'Change' : 'Pick from Library'"></span>
+                                                    class="ui-btn ui-btn-secondary ui-btn-sm">
+                                                <span x-text="platformExtras[accId]?.cover_image_asset_id ? 'Change' : 'Pick from library'"></span>
                                             </button>
                                             <button type="button"
                                                     @click="triggerThumbnailUpload(accId)"
                                                     :disabled="thumbnailUploading[accId]"
-                                                    class="text-xs font-medium px-3 py-1.5 rounded-lg border border-ink-200 text-ink-700 hover:border-ink-400 hover:text-brand-800 transition-all disabled:opacity-50 cursor-pointer">
+                                                    class="ui-btn ui-btn-secondary ui-btn-sm">
                                                 <span x-text="thumbnailUploading[accId] ? 'Uploading…' : 'Upload'"></span>
                                             </button>
                                             <input type="file"
@@ -734,7 +735,7 @@
                                                     @click="clearThumbnail(accId)"
                                                     class="text-xs text-ink-500 hover:text-danger-500 cursor-pointer">Remove</button>
                                         </div>
-                                        <p class="text-[11px] text-ink-500 mt-1">Required for video pins. PNG or JPG, same dimensions as video.</p>
+                                        <p class="text-xs text-ink-500 mt-1">Required for video pins. PNG or JPG, same dimensions as video.</p>
                                     </div>
                                 </template>
                             </div>
@@ -750,24 +751,24 @@
                             <span class="platform-icon w-5 h-5 rounded-[5px] flex items-center justify-center"
                                   :class="'pi-' + (charLimits[accId]?.platform || '')"
                                   x-html="platformIconSvg(charLimits[accId]?.platform || '')"></span>
-                            <span class="text-xs font-semibold text-ink-600" x-text="charLimits[accId]?.name + ' - Video Settings'"></span>
+                            <span class="text-xs font-semibold text-ink-600" x-text="charLimits[accId]?.name + ' · video settings'"></span>
                         </div>
                         <!-- Thumbnail -->
                         <div>
-                            <label class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1.5">Custom Thumbnail</label>
+                            <label class="block text-xs font-semibold text-ink-700 mb-1.5">Custom thumbnail</label>
                             <input type="hidden"
                                    :name="'yt_thumbnail_asset_id_' + accId"
                                    :value="platformExtras[accId]?.thumbnail_asset_id || ''">
                             <div class="flex items-stretch gap-3">
                                 {% include "composer/partials/choose_from_video_card.html" with mode="upload" %}
                                 <template x-if="!platformExtras[accId]?.thumbnail_url">
-                                    <div class="flex-1 max-w-[480px] rounded-lg border-2 border-dashed border-ink-200 bg-ink-50 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-ink-300 hover:bg-brand-50 transition-colors min-h-[104px]"
+                                    <div class="flex-1 max-w-[480px] rounded-lg border border-dashed border-ink-300 bg-ink-25 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-ink-300 hover:bg-brand-50 transition-colors min-h-[104px]"
                                          @dragover.prevent="$el.classList.add('border-ink-400', 'bg-brand-50')"
                                          @dragleave="$el.classList.remove('border-ink-400', 'bg-brand-50')"
                                          @drop.prevent="handleThumbnailDrop(accId, $event); $el.classList.remove('border-ink-400', 'bg-brand-50')"
                                          @click="triggerThumbnailUpload(accId)">
                                         <svg class="w-6 h-6 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                        <span class="text-[11px] text-ink-500" x-text="thumbnailUploading[accId] ? 'Uploading…' : 'Drag & drop a thumbnail'"></span>
+                                        <span class="text-xs text-ink-500" x-text="thumbnailUploading[accId] ? 'Uploading…' : 'Drag & drop a thumbnail'"></span>
                                     </div>
                                 </template>
                                 <template x-if="platformExtras[accId]?.thumbnail_url">
@@ -776,7 +777,7 @@
                                              class="h-[104px] w-auto max-w-[480px] object-cover rounded-lg border border-ink-200">
                                         <button aria-label="Remove thumbnail" type="button" @click="clearThumbnail(accId)"
                                                 title="Remove thumbnail"
-                                                class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/55 hover:bg-danger-500 text-white flex items-center justify-center transition-colors cursor-pointer">
+                                                class="absolute top-2 right-2 w-7 h-7 rounded-full bg-ink-950/60 hover:bg-danger-500 text-white flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-white">
                                             <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </div>
@@ -788,25 +789,25 @@
                                    class="hidden thumb-upload-input"
                                    @change="uploadThumbnail(accId, $event)">
                             <button type="button" @click="openThumbnailPicker(accId)"
-                                    class="mt-2 text-xs font-medium text-ink-500 hover:text-brand-800 transition-colors flex items-center gap-1.5 cursor-pointer">
+                                    class="mt-2 min-h-8 text-xs font-medium text-ink-600 hover:text-ink-900 transition-colors flex items-center gap-1.5 cursor-pointer rounded-md">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                                Media Library
+                                Media library
                             </button>
                         </div>
                         <!-- Visibility -->
                         <div>
-                            <label :for="'yt-privacy-' + accId" class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1">Visibility</label>
+                            <label :for="'yt-privacy-' + accId" class="block text-xs font-semibold text-ink-700 mb-1">Visibility</label>
                             <select :id="'yt-privacy-' + accId" :name="'yt_privacy_status_' + accId"
-                                    class="bb-select w-full text-sm px-3 py-2 rounded-lg border border-ink-400 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all">
+                                    class="ui-input">
                                 <option value="public" :selected="(platformExtras[accId]?.privacy_status || 'public') === 'public'">Public</option>
                                 <option value="unlisted" :selected="platformExtras[accId]?.privacy_status === 'unlisted'">Unlisted</option>
                                 <option value="private" :selected="platformExtras[accId]?.privacy_status === 'private'">Private</option>
                             </select>
                         </div>
                         <!-- Advanced -->
-                        <div class="border-t border-ink-100 pt-3">
+                        <div class="border-t border-ink-200 pt-3">
                             <button type="button"
-                                    class="text-xs font-semibold text-ink-500 hover:text-ink-700 flex items-center gap-1 cursor-pointer"
+                                    class="min-h-8 text-xs font-semibold text-ink-600 hover:text-ink-900 flex items-center gap-1 cursor-pointer rounded-md"
                                     @click="advancedOpen[accId] = !advancedOpen[accId]">
                                 <svg class="w-3 h-3 transition-transform"
                                      :class="advancedOpen[accId] ? 'rotate-90' : ''"
@@ -822,21 +823,21 @@
                                            :name="'yt_made_for_kids_' + accId"
                                            value="true"
                                            :checked="platformExtras[accId]?.self_declared_made_for_kids"
-                                           class="w-4 h-4 mt-0.5 rounded border-ink-400 text-brand-700 focus:ring-brand-600/20">
+                                           class="ui-checkbox mt-0.5 flex-shrink-0">
                                     <span class="text-sm text-ink-700">
                                         Made for Kids
-                                        <span class="block text-[11px] text-ink-500 font-normal">Required by COPPA - mark if this video is directed at children under 13</span>
+                                        <span class="block text-xs text-ink-500 font-normal">Required by COPPA - mark if this video is directed at children under 13</span>
                                     </span>
                                 </label>
                                 <!-- Tags -->
                                 <div>
-                                    <label :for="'yt-tags-' + accId" class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1">Tags</label>
+                                    <label :for="'yt-tags-' + accId" class="block text-xs font-semibold text-ink-700 mb-1">Tags</label>
                                     <input type="text"
                                            :id="'yt-tags-' + accId" :name="'yt_tags_' + accId"
                                            :value="(platformExtras[accId]?.tags || []).join(', ')"
                                            placeholder="vlog, travel, daily"
-                                           class="w-full text-sm px-3 py-2 rounded-lg border border-ink-400 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all">
-                                    <p class="text-[11px] text-ink-500 mt-1">Comma-separated</p>
+                                           class="ui-input">
+                                    <p class="text-xs text-ink-500 mt-1">Comma-separated</p>
                                 </div>
                             </div>
                         </div>
@@ -916,11 +917,11 @@
                                   :class="'pi-' + (charLimits[accId]?.platform || '')"
                                   x-html="platformIconSvg(charLimits[accId]?.platform || '')"></span>
                             <span class="text-xs font-semibold text-ink-600" x-text="charLimits[accId]?.name + ' - Post Settings'"></span>
-                            <span class="ml-auto text-[11px] text-ink-500" x-show="tt?.creator_nickname" x-text="'Posting to @' + (tt?.creator_nickname || '')"></span>
+                            <span class="ml-auto text-xs text-ink-500" x-show="tt?.creator_nickname" x-text="'Posting to @' + (tt?.creator_nickname || '')"></span>
                         </div>
                         <!-- Privacy: TikTok requires an explicit choice from the creator's allowed options -->
                         <div>
-                            <label class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1">
+                            <label class="block text-xs font-semibold text-ink-700 mb-1">
                                 Who can see this post <span class="text-danger-500">*</span>
                             </label>
                             <!-- Custom dropdown (not a native <select>): native <option>s never
@@ -985,7 +986,7 @@
                                             <!-- Required hover prompt for the disabled private option (mouse); the
                                                  always-visible note below the dropdown covers keyboard/SR users. -->
                                             <span x-show="ttBrandContent && lvl === 'SELF_ONLY'"
-                                                  class="pointer-events-none absolute left-3 -top-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity bg-ink-800 text-white text-[11px] rounded px-2 py-1 whitespace-nowrap z-50 shadow">
+                                                  class="pointer-events-none absolute left-3 -top-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity bg-ink-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-50 shadow">
                                                 Branded content visibility cannot be set to private.
                                             </span>
                                         </li>
@@ -998,15 +999,15 @@
                                        :required="charLimits[accId]?.platform === 'tiktok' && selectedAccounts.includes(accId)"
                                        tabindex="-1" aria-hidden="true" class="sr-only">
                             </div>
-                            <p x-show="ttLoading" class="text-[11px] text-ink-500 mt-1">Loading account settings…</p>
-                            <p x-show="ttSelfOnlyLocked" class="text-[11px] text-warning-600 mt-1">
+                            <p x-show="ttLoading" class="text-xs text-ink-500 mt-1">Loading account settings…</p>
+                            <p x-show="ttSelfOnlyLocked" class="text-xs text-warning-600 mt-1">
                                 This TikTok app hasn't passed TikTok's content audit yet — only private posting ("Only you") is available until the audit is approved.
                             </p>
-                            <p x-show="ttBrandContent" class="text-[11px] text-ink-500 mt-1">Branded content visibility cannot be set to private.</p>
+                            <p x-show="ttBrandContent" class="text-xs text-ink-500 mt-1">Branded content visibility cannot be set to private.</p>
                         </div>
                         <!-- Cover: TikTok takes a frame timestamp, not an uploaded image -->
                         <div>
-                            <label class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1.5">Cover</label>
+                            <label class="block text-xs font-semibold text-ink-700 mb-1.5">Cover</label>
                             <input type="hidden"
                                    :name="'tiktok_video_cover_timestamp_ms_' + accId"
                                    :value="platformExtras[accId]?.video_cover_timestamp_ms ?? ''">
@@ -1018,7 +1019,7 @@
                                              class="h-[104px] w-auto max-w-[480px] object-cover rounded-lg border border-ink-200">
                                         <button aria-label="Reset to default cover" type="button" @click="clearTiktokCover(accId)"
                                                 title="Reset to default cover"
-                                                class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/55 hover:bg-danger-500 text-white flex items-center justify-center transition-colors cursor-pointer">
+                                                class="absolute top-2 right-2 w-7 h-7 rounded-full bg-ink-950/60 hover:bg-danger-500 text-white flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-white">
                                             <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </div>
@@ -1029,7 +1030,7 @@
                                               x-text="'Cover at ' + formatTimecode((platformExtras[accId]?.video_cover_timestamp_ms || 0) / 1000)"></span>
                                         <button aria-label="Reset to default cover" type="button" @click="clearTiktokCover(accId)"
                                                 title="Reset to default cover"
-                                                class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/55 hover:bg-danger-500 text-white flex items-center justify-center transition-colors cursor-pointer">
+                                                class="absolute top-2 right-2 w-7 h-7 rounded-full bg-ink-950/60 hover:bg-danger-500 text-white flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-white">
                                             <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </div>
@@ -1040,34 +1041,34 @@
                              TikTok requires an independent checkbox per interaction,
                              greyed out individually when disabled in creator settings. -->
                         <div>
-                            <label class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1.5">Allow users to:</label>
+                            <label class="block text-xs font-semibold text-ink-700 mb-1.5">Allow users to:</label>
                             <div class="space-y-2">
                                 <label class="flex items-center gap-2" :class="tt?.comment_disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'">
                                     <input type="checkbox" :name="'tiktok_allow_comment_' + accId" value="true"
                                            x-model="ttAllowComment" :disabled="!!tt?.comment_disabled"
-                                           class="bb-checkbox w-4 h-4 rounded border-ink-400">
+                                           class="bb-checkbox flex-shrink-0">
                                     <span class="text-sm text-ink-700">Comment</span>
                                 </label>
                                 <label class="flex items-center gap-2" :class="tt?.duet_disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'">
                                     <input type="checkbox" :name="'tiktok_allow_duet_' + accId" value="true"
                                            x-model="ttAllowDuet" :disabled="!!tt?.duet_disabled"
-                                           class="bb-checkbox w-4 h-4 rounded border-ink-400">
+                                           class="bb-checkbox flex-shrink-0">
                                     <span class="text-sm text-ink-700">Duet</span>
                                 </label>
                                 <label class="flex items-center gap-2" :class="tt?.stitch_disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'">
                                     <input type="checkbox" :name="'tiktok_allow_stitch_' + accId" value="true"
                                            x-model="ttAllowStitch" :disabled="!!tt?.stitch_disabled"
-                                           class="bb-checkbox w-4 h-4 rounded border-ink-400">
+                                           class="bb-checkbox flex-shrink-0">
                                     <span class="text-sm text-ink-700">Stitch</span>
                                 </label>
                             </div>
                         </div>
                         <!-- Commercial content disclosure -->
-                        <div class="border-t border-ink-100 pt-3">
+                        <div class="border-t border-ink-200 pt-3">
                             <div class="flex items-start justify-between gap-3">
                                 <span class="text-sm text-ink-700">
                                     Disclose post content
-                                    <span class="block text-[11px] text-ink-500 font-normal">Let others know this post promotes a brand, product or service.</span>
+                                    <span class="block text-xs text-ink-500 font-normal">Let others know this post promotes a brand, product or service.</span>
                                 </span>
                                 <label class="bb-toggle mt-0.5">
                                     <input type="checkbox" x-model="ttDisclose"
@@ -1079,10 +1080,10 @@
                                 <label class="flex items-start gap-2 cursor-pointer">
                                     <input type="checkbox" :name="'tiktok_brand_organic_' + accId" value="true"
                                            x-model="ttBrandOrganic"
-                                           class="bb-checkbox w-4 h-4 mt-0.5 rounded border-ink-400">
+                                           class="bb-checkbox mt-0.5 flex-shrink-0">
                                     <span class="text-sm text-ink-700">
                                         Your brand
-                                        <span class="block text-[11px] text-ink-500 font-normal">You are promoting yourself or your own business.</span>
+                                        <span class="block text-xs text-ink-500 font-normal">You are promoting yourself or your own business.</span>
                                     </span>
                                 </label>
                                 <label class="flex items-start gap-2"
@@ -1090,27 +1091,27 @@
                                     <input type="checkbox" :name="'tiktok_brand_content_' + accId" value="true"
                                            x-model="ttBrandContent"
                                            :disabled="ttBrandingBlocked"
-                                           class="bb-checkbox w-4 h-4 mt-0.5 rounded border-ink-400">
+                                           class="bb-checkbox mt-0.5 flex-shrink-0">
                                     <span class="text-sm text-ink-700">
                                         Branded content
-                                        <span class="block text-[11px] text-ink-500 font-normal">You are promoting another brand or a third party.</span>
+                                        <span class="block text-xs text-ink-500 font-normal">You are promoting another brand or a third party.</span>
                                     </span>
                                 </label>
                                 <!-- Branded content can't be posted privately, so the option is
                                      locked while visibility is "Only you"; explain why. -->
-                                <p x-show="ttSelfOnlyLocked" class="text-[11px] text-warning-600 -mt-1">
+                                <p x-show="ttSelfOnlyLocked" class="text-xs text-warning-600 -mt-1">
                                     Branded content isn't available until your TikTok app passes TikTok's content audit, because branded content can't be posted privately.
                                 </p>
-                                <p x-show="ttPrivacy === 'SELF_ONLY' && !ttSelfOnlyLocked" class="text-[11px] text-ink-500 -mt-1">
+                                <p x-show="ttPrivacy === 'SELF_ONLY' && !ttSelfOnlyLocked" class="text-xs text-ink-500 -mt-1">
                                     Set visibility to public, friends, or followers to enable branded content.
                                 </p>
                                 <!-- Exact TikTok content label prompt, shown once a disclosure option is selected -->
                                 <template x-if="ttLabelPrompt">
-                                    <p class="text-[11px] text-ink-600 bg-ink-50 border border-ink-200 rounded-md px-2 py-1.5" x-text="ttLabelPrompt"></p>
+                                    <p class="text-xs text-ink-600 bg-ink-50 border border-ink-200 rounded-md px-2 py-1.5" x-text="ttLabelPrompt"></p>
                                 </template>
                                 <!-- Disclosure requires at least one sub-option; gate submit via native validity -->
                                 <template x-if="!ttBrandOrganic && !ttBrandContent">
-                                    <p class="text-[11px] text-danger-500">You need to indicate if your content promotes yourself, a third party, or both.</p>
+                                    <p class="text-xs text-danger-500">You need to indicate if your content promotes yourself, a third party, or both.</p>
                                 </template>
                                 <input type="text" tabindex="-1" aria-hidden="true" class="sr-only"
                                        :required="ttDisclose"
@@ -1118,11 +1119,11 @@
                             </div>
                         </div>
                         <!-- AI-generated content -->
-                        <div class="border-t border-ink-100 pt-3">
+                        <div class="border-t border-ink-200 pt-3">
                             <div class="flex items-start justify-between gap-3">
                                 <span class="text-sm text-ink-700">
                                     AI-generated content
-                                    <span class="block text-[11px] text-ink-500 font-normal">Add TikTok's AI-generated label if the post contains AI-generated content.</span>
+                                    <span class="block text-xs text-ink-500 font-normal">Add TikTok's AI-generated label if the post contains AI-generated content.</span>
                                 </span>
                                 <label class="bb-toggle mt-0.5">
                                     <input type="checkbox" :name="'tiktok_is_aigc_' + accId" value="true"
@@ -1132,7 +1133,7 @@
                             </div>
                         </div>
                         <!-- Compliance declaration (required by TikTok's integration guidelines) -->
-                        <p class="text-[11px] text-ink-500 border-t border-ink-100 pt-3">
+                        <p class="text-xs text-ink-500 border-t border-ink-200 pt-3">
                             By posting, you agree to TikTok's
                             <template x-if="ttBrandContent">
                                 <span><a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener" class="underline hover:text-ink-600">Branded Content Policy</a> and </span>
@@ -1140,7 +1141,7 @@
                             <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener" class="underline hover:text-ink-600">Music Usage Confirmation</a>.
                         </p>
                         <!-- Processing-time notice (TikTok requires informing users of the publish delay) -->
-                        <p class="text-[11px] text-ink-500">
+                        <p class="text-xs text-ink-500">
                             After you publish, it may take a few minutes for your video to process and appear on your TikTok profile.
                         </p>
                     </div>
@@ -1150,12 +1151,12 @@
                 <div class="flex flex-wrap gap-1.5" x-show="selectedAccounts.length > 0">
                     <template x-for="accId in selectedAccounts" :key="'toggle-' + accId">
                         <button type="button"
-                                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border transition-all duration-150 cursor-pointer"
-                                :class="overrides[accId] ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-ink-200 bg-white text-ink-500 hover:text-ink-600 hover:border-ink-300'"
+                                class="inline-flex items-center gap-1 h-8 max-lg:h-11 px-3 text-xs font-semibold rounded-full transition-colors cursor-pointer"
+                                :class="overrides[accId] ? 'bg-ink-900 text-white' : 'bg-white text-ink-700 ring-1 ring-inset ring-ink-300 hover:bg-ink-25'"
                                 @click="overrides[accId] = !overrides[accId]"
                                 x-show="!overrides[accId]">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            <span x-text="'Customize ' + (charLimits[accId]?.platform || '')"></span>
+                            <span x-text="'Own wording for ' + (charLimits[accId]?.name || charLimits[accId]?.platform || '')"></span>
                         </button>
                     </template>
                 </div>
@@ -1168,24 +1169,23 @@
                             <span class="platform-icon w-5 h-5 rounded-[5px] flex items-center justify-center"
                                   :class="'pi-' + (charLimits[accId]?.platform || '')"
                                   x-html="platformIconSvg(charLimits[accId]?.platform || '')"></span>
-                            <span class="text-xs font-semibold text-ink-600" x-text="charLimits[accId]?.name + ' - Custom Override'"></span>
-                            <button type="button" class="ml-auto text-xs text-danger-500 hover:text-danger-500 cursor-pointer" @click="overrides[accId] = false">Remove override</button>
+                            <span class="text-xs font-semibold text-ink-600" x-text="charLimits[accId]?.name + ' · its own wording'"></span>
+                            <button type="button" class="ml-auto ui-btn ui-btn-danger-ghost ui-btn-sm" @click="overrides[accId] = false">Remove override</button>
                         </div>
                         <!-- Title override (only for platforms that need it) -->
                         <template x-if="charLimits[accId]?.needs_title">
                             <div class="mb-3">
-                                <label :for="'override-title-' + accId" class="block text-[11px] font-semibold text-ink-500 uppercase tracking-wider mb-1"
-                                       x-text="(charLimits[accId]?.title_label || 'Title') + ' Override'"></label>
+                                <label :for="'override-title-' + accId" class="block text-xs font-semibold text-ink-700 mb-1"
+                                       x-text="(charLimits[accId]?.title_label || 'Title') + ' for this channel'"></label>
                                 <input type="text" :id="'override-title-' + accId" :name="'override_title_' + accId"
-                                       class="w-full text-sm px-3 py-2 rounded-lg border border-ink-400 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all"
+                                       class="ui-input"
                                        :placeholder="'Custom ' + (charLimits[accId]?.title_label || 'title') + '…'"
                                        :maxlength="charLimits[accId]?.title_max_length || 255">
                             </div>
                         </template>
                         <textarea :name="'override_caption_' + accId"
                                   :aria-label="(charLimits[accId]?.caption_label || 'Caption') + ' override'"
-                                  class="w-full text-sm px-3 py-2 rounded-lg border border-ink-400 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all resize-none"
-                                  style="font-family: system-ui, -apple-system, sans-serif;"
+                                  class="ui-input resize-none"
                                   :placeholder="'Custom ' + (charLimits[accId]?.caption_label || 'caption') + ' for this platform...'"
                                   rows="3"></textarea>
 
@@ -1194,7 +1194,7 @@
 
                 <!-- First Comment (conditional - only when a platform supporting comments is selected) -->
                 <div x-show="anyPlatformSupportsFirstComment" x-transition x-cloak>
-                    <label for="post-first-comment" class="block text-sm font-semibold text-ink-500 uppercase tracking-wider mb-2">First Comment</label>
+                    <label for="post-first-comment" class="block text-[13px] font-semibold text-ink-900 mb-2">First comment</label>
                     <textarea id="post-first-comment" name="first_comment"
                               class="comment-editor"
                               placeholder="First comment posted after the main post…"
@@ -1208,15 +1208,13 @@
                 <!-- Content Category -->
                 {% if categories %}
                 <div>
-                    <label for="post-category" class="block text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Category</label>
+                    <label for="post-category" class="block text-[13px] font-semibold text-ink-900 mb-2">Category</label>
                     <select id="post-category" name="category"
-                            class="w-full text-sm px-4 py-2.5 rounded-xl border border-ink-400 bg-white text-ink-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all duration-150">
+                            class="ui-input">
                         <option value="">No category</option>
                         {% for cat in categories %}
-                        <option value="{{ cat.id }}" {% if post and post.category_id == cat.id %}selected{% endif %}
-                                style="padding-left: 24px;">
-                            ● {{ cat.name }}
-                        </option>
+                        {# A native option cannot carry the category's colour, so no grey bullet pretending to. #}
+                        <option value="{{ cat.id }}" {% if post and post.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -1266,42 +1264,42 @@
                     },
                 }" @click.away="tagDropdownOpen = false">
                     <div class="flex items-center gap-2 mb-2">
-                        <label class="text-sm font-semibold text-ink-500 uppercase tracking-wider">Tags</label>
-                        <span class="text-[10px] font-semibold text-ink-500 bg-ink-100 px-2 py-0.5 rounded-full uppercase tracking-wider">Internal team only</span>
+                        <label class="text-[13px] font-semibold text-ink-900">Tags</label>
+                        <span class="ui-chip gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Internal team only</span>
                     </div>
                     <input type="hidden" name="tags" :value="tags.join(',')">
 
                     <!-- Selected tags chips + trigger -->
-                    <div class="flex flex-wrap items-center gap-1.5 w-full min-h-[42px] px-3 py-2 rounded-xl border border-ink-200 bg-white transition-all duration-150 cursor-pointer"
-                         :class="tagDropdownOpen && 'border-brand-600 ring-2 ring-brand-100'"
+                    <div class="flex flex-wrap items-center gap-1.5 w-full min-h-9 max-lg:min-h-11 px-3 py-1.5 rounded-lg border border-ink-400 bg-white hover:border-ink-500 transition-[border-color,box-shadow] duration-150 cursor-pointer"
+                         :class="tagDropdownOpen && '!border-brand-600 shadow-[0_0_0_1px_var(--focus-ring),0_0_0_4px_var(--primary-halo)]'"
                          @click="tagDropdownOpen = !tagDropdownOpen; if(tagDropdownOpen) $nextTick(() => { $refs.tagSearchInput.focus(); $refs.tagSearchInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); })">
                         <template x-for="(tag, idx) in tags" :key="tag">
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-ink-100 text-ink-700">
+                            <span class="ui-chip">
                                 <span x-text="tag"></span>
-                                <button :aria-label="'Remove tag ' + tag" type="button" @click.stop="removeTag(idx)" class="w-3.5 h-3.5 rounded-full flex items-center justify-center text-ink-500 hover:text-danger-500 hover:bg-danger-50 transition-colors">
+                                <button :aria-label="'Remove tag ' + tag" type="button" @click.stop="removeTag(idx)" class="hover:!text-danger-500 hover:!bg-danger-50">
                                     <svg aria-hidden="true" class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
                             </span>
                         </template>
-                        <span x-show="!tags.length" class="text-sm text-ink-500">Select tags...</span>
+                        <span x-show="!tags.length" class="text-sm text-ink-500">Choose tags…</span>
                         <svg class="w-4 h-4 ml-auto text-ink-400 shrink-0 transition-transform duration-150" :class="tagDropdownOpen && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                     </div>
 
                     <!-- Dropdown -->
                     <div x-show="tagDropdownOpen" x-cloak x-transition
-                         class="mt-1 bg-white rounded-xl shadow-lg ring-1 ring-ink-200 py-1 max-h-[220px] overflow-y-auto"
+                         class="ui-menu mt-1 max-h-[240px] overflow-y-auto"
                          @click.stop>
                         <!-- Search input -->
-                        <div class="px-2 py-1.5 border-b border-ink-100">
+                        <div class="px-1 pt-1 pb-1.5 mb-1 border-b border-ink-200">
                             <input type="text" x-ref="tagSearchInput" x-model="tagSearch"
                                    @keydown.enter.prevent="if (tagSearch.trim() && !filteredTags.includes(tagSearch.trim())) { createTag(); } else if (filteredTags.length === 1) { toggleTag(filteredTags[0]); tagSearch = ''; }"
-                                   class="w-full text-sm px-2 py-1.5 rounded-lg border border-ink-400 outline-none focus:border-brand-600 transition-colors"
-                                   placeholder="Search or create tag..." aria-label="Search or create tag">
+                                   class="ui-input !h-9"
+                                   placeholder="Search or create a tag…" aria-label="Search or create tag">
                         </div>
                         <!-- Tag list -->
                         <template x-for="tag in filteredTags" :key="tag">
-                            <label class="flex items-center gap-2 px-3 py-1.5 text-sm text-ink-700 hover:bg-ink-25 cursor-pointer rounded-md mx-1">
-                                <input type="checkbox" class="rounded accent-brand-700"
+                            <label class="flex items-center gap-2 min-h-[34px] max-lg:min-h-11 px-3 text-sm text-ink-900 hover:bg-ink-50 cursor-pointer rounded-lg mx-1">
+                                <input type="checkbox" class="ui-checkbox"
                                        :checked="tags.includes(tag)"
                                        @change="toggleTag(tag)">
                                 <span x-text="tag"></span>
@@ -1310,15 +1308,15 @@
                         <!-- No results / Create -->
                         <template x-if="tagSearch.trim() && !filteredTags.length">
                             <button type="button" @click="createTag()"
-                                    class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-ink-600 hover:bg-ink-25 rounded-md mx-1">
+                                    class="flex items-center gap-2 w-full min-h-[34px] px-3 text-sm text-ink-900 hover:bg-ink-50 rounded-lg mx-1">
                                 <svg class="w-3.5 h-3.5 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                 Create "<span x-text="tagSearch.trim()" class="font-semibold"></span>"
                             </button>
                         </template>
                         <template x-if="tagSearch.trim() && filteredTags.length && !filteredTags.includes(tagSearch.trim())">
-                            <div class="border-t border-ink-100 mt-1 pt-1">
+                            <div class="border-t border-ink-200 mt-1 pt-1">
                                 <button type="button" @click="createTag()"
-                                        class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-ink-600 hover:bg-ink-25 rounded-md mx-1">
+                                        class="flex items-center gap-2 w-full min-h-[34px] px-3 text-sm text-ink-900 hover:bg-ink-50 rounded-lg mx-1">
                                     <svg class="w-3.5 h-3.5 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                     Create "<span x-text="tagSearch.trim()" class="font-semibold"></span>"
                                 </button>
@@ -1328,9 +1326,9 @@
                             <div class="px-3 py-2 text-xs text-ink-500">No tags yet. Type to create one.</div>
                         </template>
                         <!-- Create new tag -->
-                        <div class="border-t border-ink-100 px-1 py-1">
+                        <div class="border-t border-ink-200 mt-1 pt-1">
                             <button type="button" @click="tagDropdownOpen = false; showCreateTagModal = true; newTagName = tagSearch; tagSearch = ''; $nextTick(() => $refs.newTagNameInput.focus())"
-                                    class="flex items-center gap-2 w-full px-2.5 py-1.5 text-sm text-ink-600 hover:bg-ink-25 rounded-md cursor-pointer transition-colors">
+                                    class="flex items-center gap-2 w-full min-h-[34px] px-2.5 text-sm text-ink-900 hover:bg-ink-50 rounded-lg cursor-pointer transition-colors">
                                 <svg class="w-3.5 h-3.5 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                 Create new tag
                             </button>
@@ -1341,22 +1339,21 @@
                     <template x-teleport="body">
                         <div x-show="showCreateTagModal" x-cloak class="fixed inset-0 z-[200] flex items-center justify-center" @keydown.escape.window="showCreateTagModal = false">
                             <div class="fixed inset-0 bg-ink-950/35" @click="showCreateTagModal = false"></div>
-                            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" @click.stop
+                            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6" @click.stop
                                  x-trap.noscroll="showCreateTagModal" role="dialog" aria-modal="true" aria-labelledby="compose-create-tag-title">
-                                <h3 id="compose-create-tag-title" class="text-base font-semibold text-ink-800 mb-4">Create new tag</h3>
+                                <h3 id="compose-create-tag-title" class="ui-modal-title mb-4">Create a tag</h3>
                                 <input type="text" x-ref="newTagNameInput" x-model="newTagName" aria-labelledby="compose-create-tag-title"
                                        @keydown.enter.prevent="if(newTagName.trim()) { _persistTag(newTagName.trim()); showCreateTagModal = false; newTagName = ''; }"
-                                       class="w-full text-sm px-3 py-2.5 rounded-xl border border-ink-400 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all"
-                                       placeholder="Tag name...">
+                                       class="ui-input"
+                                       placeholder="Tag name…">
                                 <div class="flex justify-end gap-2 mt-4">
                                     <button type="button" @click="showCreateTagModal = false; newTagName = ''"
-                                            class="px-4 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100 rounded-lg cursor-pointer transition-colors">
+                                            class="ui-btn ui-btn-ghost">
                                         Cancel
                                     </button>
                                     <button type="button"
                                             @click="if(newTagName.trim()) { _persistTag(newTagName.trim()); showCreateTagModal = false; newTagName = ''; }"
-                                            class="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors"
-                                            style="background: var(--primary-strong);"
+                                            class="ui-btn ui-btn-primary"
                                             :class="newTagName.trim() ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'">
                                         Create
                                     </button>
@@ -1370,12 +1367,12 @@
                 {% if can_view_internal_notes %}
                 <div>
                     <div class="flex items-center gap-2 mb-2">
-                        <label for="post-internal-notes" class="text-sm font-semibold text-ink-500 uppercase tracking-wider">Notes</label>
-                        <span class="text-[10px] font-semibold text-ink-500 bg-ink-100 px-2 py-0.5 rounded-full uppercase tracking-wider">Internal team only</span>
+                        <label for="post-internal-notes" class="text-[13px] font-semibold text-ink-900">Notes</label>
+                        <span class="ui-chip gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Internal team only</span>
                     </div>
                     <textarea id="post-internal-notes" name="internal_notes"
-                              class="w-full text-sm font-normal px-4 py-3 rounded-xl border border-dashed border-ink-400 bg-ink-25 text-ink-600 outline-none focus:border-ink-400 transition-all duration-150 resize-none"
-                              placeholder="Internal team notes - not visible to clients…"
+                              class="ui-input !h-auto min-h-[72px] py-2.5 border-dashed !bg-ink-25 resize-none"
+                              placeholder="Notes for the team. Clients never see these."
                               rows="2">{{ form.internal_notes.value|default:"" }}</textarea>
                 </div>
                 {% endif %}
@@ -1386,7 +1383,7 @@
                 {% if is_edit %}
                 <!-- Delete Post -->
                 <button type="button" @click="$dispatch('open-delete-modal')"
-                        class="inline-flex items-center gap-1.5 px-2 sm:px-3 py-2 text-sm font-semibold text-danger-500 hover:text-danger-600 rounded-lg hover:bg-danger-50 transition-all duration-150 cursor-pointer flex-shrink-0">
+                        class="ui-btn ui-btn-danger-ghost flex-shrink-0 max-sm:px-2.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     <span class="hidden sm:inline">Delete</span>
                 </button>
@@ -1394,7 +1391,7 @@
 
                 <!-- Autosave indicator -->
                 <div id="autosave-status" class="text-xs text-ink-500 mr-auto hidden sm:flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 rounded-full bg-ink-300" :class="{ 'bg-success-500': lastSaved }"></span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-ink-400" :class="{ '!bg-success-500': lastSaved }" aria-hidden="true"></span>
                     <span x-text="lastSaved ? 'Saved ' + lastSaved : 'Not saved yet'"></span>
                 </div>
                 <div class="mr-auto sm:hidden"></div>
@@ -1402,9 +1399,9 @@
                 {% if not post_is_readonly %}
                 <!-- Save Draft -->
                 <button type="submit" name="action" value="save_draft"
-                        class="inline-flex items-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold text-ink-600 hover:text-ink-800 rounded-lg hover:bg-ink-100 transition-all duration-150 cursor-pointer flex-shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-                    <span class="hidden sm:inline">Save Draft</span>
+                        class="ui-btn ui-btn-ghost flex-shrink-0 max-sm:px-2.5">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                    <span class="hidden sm:inline">Save draft</span><span class="sr-only sm:hidden">Save draft</span>
                 </button>
                 {% endif %}
 
@@ -1412,10 +1409,10 @@
                 <button type="submit" name="action" value="submit_for_approval"
                         :disabled="selectedAccounts.length === 0"
                         :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
-                        class="inline-flex items-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold text-brand-700 hover:text-brand-800 rounded-lg hover:bg-brand-50 transition-all duration-150 cursor-pointer flex-shrink-0">
+                        class="ui-btn ui-btn-secondary flex-shrink-0 max-sm:px-2.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="hidden sm:inline">Submit for Approval</span>
-                    <span class="sm:hidden">For Approval</span>
+                    <span class="hidden sm:inline">Submit for approval</span>
+                    <span class="sm:hidden">For approval</span>
                 </button>
                 {% endif %}
 
@@ -1423,7 +1420,7 @@
                 <button type="submit" name="action" value="resubmit_for_approval"
                         :disabled="selectedAccounts.length === 0"
                         :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
-                        class="inline-flex items-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold text-brand-700 hover:text-brand-800 rounded-lg hover:bg-brand-50 transition-all duration-150 cursor-pointer flex-shrink-0">
+                        class="ui-btn ui-btn-secondary flex-shrink-0 max-sm:px-2.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
                     <span class="hidden sm:inline">Resubmit</span>
                 </button>
@@ -1436,73 +1433,74 @@
                     <button type="button" id="publish-mode-btn"
                             :disabled="selectedAccounts.length === 0"
                             :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
-                            class="inline-flex items-center gap-1.5 pl-2 sm:pl-3 pr-1.5 sm:pr-2 py-2 text-sm font-semibold text-brand-700 bg-brand-100 rounded-l-lg hover:bg-brand-200 border border-brand-200 border-r-0 transition-all duration-150 cursor-pointer">
+                            class="inline-flex items-center gap-1.5 h-9 max-lg:h-11 pl-2.5 sm:pl-3 pr-2 text-sm font-semibold text-ink-900 bg-white rounded-l-lg hover:bg-ink-25 ring-1 ring-inset ring-ink-300 transition-colors duration-100 cursor-pointer"
+                            aria-haspopup="menu" aria-label="When to publish">
                         <svg id="publish-mode-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span id="publish-mode-label" class="hidden sm:inline">Next available</span>
-                        <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                        <svg class="w-3 h-3 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <!-- Action button (right) -->
                     <button type="submit" id="publish-action-btn" name="action" value="add_to_queue"
                             :disabled="selectedAccounts.length === 0"
                             :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
-                            class="inline-flex items-center gap-1.5 pl-3 sm:pl-4 pr-3 sm:pr-5 py-2 text-sm font-semibold text-white bg-brand-700 rounded-r-lg hover:bg-brand-800 border border-brand-600 hover:border-brand-600 shadow-sm transition-all duration-150 cursor-pointer">
-                        <span id="publish-action-label">Add to Queue</span>
+                            class="inline-flex items-center gap-1.5 h-9 max-lg:h-11 px-3.5 sm:px-4 text-sm font-semibold text-white bg-brand-700 rounded-r-lg hover:bg-brand-800 active:bg-brand-900 shadow-[var(--shadow-button)] transition-colors duration-100 cursor-pointer">
+                        <span id="publish-action-label">Add to queue</span>
                     </button>
 
                     <!-- Mode popover - positioned above -->
-                    <div id="publish-popover" class="hidden absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-ink-200" style="z-index: 50;">
+                    <div id="publish-popover" class="hidden absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-2rem)] ui-menu" style="z-index: 50;">
                             <!-- Main menu -->
-                            <div id="publish-menu" class="p-1.5">
+                            <div id="publish-menu">
                                 <!-- Next Available -->
-                                <button type="button" data-mode="add_to_queue" data-label="Next available" data-action-label="Add to Queue"
+                                <button type="button" data-mode="add_to_queue" data-label="Next available" data-action-label="Add to queue"
                                         data-icon="clock"
-                                        class="publish-mode-option w-full flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-ink-25 transition-colors text-left cursor-pointer">
-                                    <div class="w-8 h-8 rounded-lg bg-info-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <svg class="w-4 h-4 text-info-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        class="publish-mode-option w-full flex items-start gap-3 px-2.5 py-2.5 rounded-lg hover:bg-ink-50 transition-colors text-left cursor-pointer">
+                                    <div class="w-8 h-8 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <svg class="w-4 h-4 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     </div>
                                     <div>
-                                        <div class="text-sm font-semibold text-ink-800">Next Available</div>
-                                        <div class="text-xs text-ink-500 mt-0.5">Place in next available slot</div>
+                                        <div class="text-sm font-semibold text-ink-900">Next available</div>
+                                        <div class="text-xs text-ink-600 mt-0.5">Goes into the next free slot</div>
                                     </div>
                                 </button>
 
                                 <!-- Prioritise -->
                                 <button type="button" data-mode="add_to_queue_priority" data-label="Prioritise" data-action-label="Prioritise"
                                         data-icon="priority"
-                                        class="publish-mode-option w-full flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-ink-25 transition-colors text-left cursor-pointer">
-                                    <div class="w-8 h-8 rounded-lg bg-warning-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <svg class="w-4 h-4 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>
+                                        class="publish-mode-option w-full flex items-start gap-3 px-2.5 py-2.5 rounded-lg hover:bg-ink-50 transition-colors text-left cursor-pointer">
+                                    <div class="w-8 h-8 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <svg class="w-4 h-4 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>
                                     </div>
                                     <div>
-                                        <div class="text-sm font-semibold text-ink-800">Prioritise</div>
-                                        <div class="text-xs text-ink-500 mt-0.5">Add to top of queue</div>
+                                        <div class="text-sm font-semibold text-ink-900">Prioritise</div>
+                                        <div class="text-xs text-ink-600 mt-0.5">Goes to the top of the queue</div>
                                     </div>
                                 </button>
 
                                 <!-- Now -->
-                                <button type="button" data-mode="publish_now" data-label="Now" data-action-label="Publish Now"
+                                <button type="button" data-mode="publish_now" data-label="Now" data-action-label="Publish now"
                                         data-icon="play"
-                                        class="publish-mode-option w-full flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-ink-25 transition-colors text-left cursor-pointer">
-                                    <div class="w-8 h-8 rounded-lg bg-success-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <svg class="w-4 h-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/></svg>
+                                        class="publish-mode-option w-full flex items-start gap-3 px-2.5 py-2.5 rounded-lg hover:bg-ink-50 transition-colors text-left cursor-pointer">
+                                    <div class="w-8 h-8 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <svg class="w-4 h-4 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/></svg>
                                     </div>
                                     <div>
-                                        <div class="text-sm font-semibold text-ink-800">Now</div>
-                                        <div class="text-xs text-ink-500 mt-0.5">Publish immediately</div>
+                                        <div class="text-sm font-semibold text-ink-900">Now</div>
+                                        <div class="text-xs text-ink-600 mt-0.5">Publishes straight away</div>
                                     </div>
                                 </button>
 
                                 <!-- Set Date and Time -->
-                                <button type="button" data-mode="schedule" data-label="Schedule" data-action-label="Schedule Post"
+                                <button type="button" data-mode="schedule" data-label="Schedule" data-action-label="Schedule post"
                                         data-icon="calendar"
-                                        class="publish-mode-option w-full flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-ink-25 transition-colors text-left cursor-pointer"
+                                        class="publish-mode-option w-full flex items-start gap-3 px-2.5 py-2.5 rounded-lg hover:bg-ink-50 transition-colors text-left cursor-pointer"
                                         id="publish-schedule-btn">
-                                    <div class="w-8 h-8 rounded-lg bg-ink-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <svg class="w-4 h-4 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <div class="w-8 h-8 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <svg class="w-4 h-4 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                     </div>
                                     <div>
-                                        <div class="text-sm font-semibold text-ink-800">Set Date and Time</div>
-                                        <div class="text-xs text-ink-500 mt-0.5">Choose a specific time</div>
+                                        <div class="text-sm font-semibold text-ink-900">Set date and time</div>
+                                        <div class="text-xs text-ink-600 mt-0.5">Pick the day and time</div>
                                     </div>
                                 </button>
                             </div>
@@ -1510,19 +1508,19 @@
                             <!-- Schedule sub-view -->
                             <div id="publish-schedule-view" class="hidden p-4">
                                 <div class="flex items-center gap-2 mb-4">
-                                    <button aria-label="Back" type="button" id="publish-schedule-back" class="w-6 h-6 rounded-md hover:bg-ink-100 flex items-center justify-center transition-colors">
+                                    <button aria-label="Back" type="button" id="publish-schedule-back" class="ui-btn ui-btn-icon -ml-1.5">
                                         <svg aria-hidden="true" class="w-4 h-4 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                                     </button>
-                                    <span class="text-sm font-semibold text-ink-800">Schedule Post</span>
+                                    <span class="text-sm font-semibold text-ink-950">Schedule post</span>
                                 </div>
 
                                 <div class="space-y-3">
                                     <div>
-                                        <label for="post-scheduled-date" class="block text-xs font-medium text-ink-500 mb-1">Date</label>
+                                        <label for="post-scheduled-date" class="block text-xs font-semibold text-ink-700 mb-1">Date</label>
                                         <input type="date" id="post-scheduled-date" name="scheduled_date" class="form-datetime" value="{{ form.scheduled_date.value|default:'' }}">
                                     </div>
                                     <div>
-                                        <label for="post-scheduled-time" class="block text-xs font-medium text-ink-500 mb-1">Time</label>
+                                        <label for="post-scheduled-time" class="block text-xs font-semibold text-ink-700 mb-1">Time</label>
                                         <input type="time" id="post-scheduled-time" name="scheduled_time" class="form-datetime" value="{{ form.scheduled_time.value|default:'' }}">
                                     </div>
                                     <div class="text-xs text-ink-500 flex items-center gap-1">
@@ -1535,12 +1533,12 @@
 
                                 {% if not post_is_scheduled %}
                                 <p class="mt-3 text-xs text-ink-500 leading-relaxed">
-                                    Saving as a draft keeps this as a <span class="font-medium text-ink-500">proposed</span> time. Use <span class="font-medium text-ink-500">Set Schedule</span> to publish at this time.
+                                    Saving as a draft keeps this as a <span class="font-semibold text-ink-700">proposed</span> time. Use <span class="font-semibold text-ink-700">Set schedule</span> to publish at this time.
                                 </p>
                                 {% endif %}
 
-                                <button type="button" id="publish-schedule-confirm" class="mt-4 w-full py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition-colors cursor-pointer">
-                                    Set Schedule
+                                <button type="button" id="publish-schedule-confirm" class="ui-btn ui-btn-primary mt-4 w-full">
+                                    Set schedule
                                 </button>
                             </div>
                     </div>
@@ -1558,48 +1556,48 @@
         <div class="mt-4 border-t border-ink-200 pt-4">
             <!-- Status banner -->
             {% if post.status == 'pending_review' %}
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-50 border border-brand-100 mb-3">
-                <svg class="w-4 h-4 text-brand-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span class="text-sm font-medium text-brand-700">Awaiting internal review</span>
+            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-warning-50 ring-1 ring-inset ring-warning-200 mb-3">
+                <svg class="w-4 h-4 text-warning-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span class="text-sm font-medium text-warning-700">Awaiting internal review</span>
             </div>
             {% elif post.status == 'pending_client' %}
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-warning-50 border border-warning-200 mb-3">
-                <svg class="w-4 h-4 text-warning-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span class="text-sm font-medium text-warning-600">Awaiting client approval</span>
+            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-warning-50 ring-1 ring-inset ring-warning-200 mb-3">
+                <svg aria-hidden="true" class="w-4 h-4 text-warning-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span class="text-sm font-medium text-warning-700">Awaiting client approval</span>
             </div>
             {% elif post.status == 'changes_requested' %}
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-50 border border-brand-100 mb-3">
-                <svg class="w-4 h-4 text-brand-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
-                <span class="text-sm font-medium text-brand-700">Changes requested - edit and resubmit</span>
+            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-warning-50 ring-1 ring-inset ring-warning-200 mb-3">
+                <svg aria-hidden="true" class="w-4 h-4 text-warning-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+                <span class="text-sm font-medium text-warning-700">Changes requested: edit and resubmit</span>
             </div>
             {% elif post.status == 'rejected' %}
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-danger-50 border border-danger-200 mb-3">
+            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-danger-50 ring-1 ring-inset ring-danger-200 mb-3">
                 <svg class="w-4 h-4 text-danger-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                <span class="text-sm font-medium text-danger-600">Rejected - edit and resubmit or delete</span>
+                <span class="text-sm font-medium text-danger-700">Rejected: edit and resubmit, or delete it</span>
             </div>
             {% elif post.status == 'approved' %}
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-success-50 border border-success-200 mb-3">
+            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-success-50 ring-1 ring-inset ring-success-200 mb-3">
                 <svg class="w-4 h-4 text-success-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span class="text-sm font-medium text-success-600">Approved - saving changes sends it back for re-approval</span>
+                <span class="text-sm font-medium text-success-700">Approved. Saving changes sends it back for approval.</span>
             </div>
             {% elif post.status == 'on_hold' %}
-            <div class="flex items-center gap-2 px-3 py-2 rounded-lg mb-3" style="background:var(--ink-100);border:1px solid var(--ink-200);">
-                <svg class="w-4 h-4 flex-shrink-0" style="color:var(--ink-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-                <span class="text-sm font-medium" style="color:var(--ink-700);">On hold - a client paused this; resume it from the approvals queue</span>
+            <div class="flex items-center gap-2 px-3 py-2 rounded-xl mb-3 bg-ink-50 ring-1 ring-inset ring-ink-200">
+                <svg aria-hidden="true" class="w-4 h-4 flex-shrink-0 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                <span class="text-sm font-medium text-ink-700">On hold: a client paused this. Resume it from Approvals.</span>
             </div>
             {% endif %}
 
             <!-- Reviewer feedback to address (latest changes-requested / rejected comment) -->
             {% if show_resubmit_button and latest_feedback %}
-            <div class="flex gap-3 p-4 rounded-xl mb-3" style="background:var(--primary-soft);border:1px solid var(--brand-200);">
-                <span class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style="background: var(--primary-strong);">{{ latest_feedback.user.display_name|default:"?"|make_list|first|upper }}</span>
+            <div class="flex gap-3 p-4 rounded-xl mb-3 bg-ink-50 ring-1 ring-inset ring-ink-200">
+                <span class="w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center text-xs font-semibold flex-shrink-0" aria-hidden="true">{{ latest_feedback.user.display_name|default:"?"|make_list|first|upper }}</span>
                 <div class="min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-[0.8125rem] font-semibold text-ink-800">{{ latest_feedback.user.display_name|default:"Reviewer" }}</span>
-                        <span class="text-[0.6875rem] font-semibold px-2 py-0.5 rounded-full" style="background:var(--brand-100);color:var(--primary);">{% if latest_feedback.action == 'rejected' %}rejected{% else %}requested changes{% endif %}</span>
-                        <span class="text-[0.6875rem] text-ink-500">{{ latest_feedback.created_at|timesince }} ago</span>
+                        <span class="text-[13px] font-semibold text-ink-900">{{ latest_feedback.user.display_name|default:"Reviewer" }}</span>
+                        <span class="ui-pill ui-pill-warning">{% if latest_feedback.action == 'rejected' %}rejected{% else %}requested changes{% endif %}</span>
+                        <span class="text-xs text-ink-500">{{ latest_feedback.created_at|timesince }} ago</span>
                     </div>
-                    <p class="text-[0.875rem] text-ink-700 mt-1 leading-relaxed">{{ latest_feedback.comment }}</p>
+                    <p class="text-sm text-ink-900 mt-1 leading-relaxed">{{ latest_feedback.comment }}</p>
                 </div>
             </div>
             {% endif %}
@@ -1608,28 +1606,28 @@
             {% if can_approve and post.status == 'pending_review' or can_approve and post.status == 'pending_client' %}
             <div class="flex gap-2 mb-3 relative" x-data="{ showReviewComment: false, reviewComment: '' }">
                 <button hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-swap="none"
-                        class="px-3 py-1.5 text-xs font-semibold rounded-full bg-success-500 hover:bg-success-500 text-white transition-colors">Approve</button>
-                <button @click="showReviewComment = !showReviewComment" class="px-3 py-1.5 text-xs font-semibold rounded-full border border-ink-200 text-ink-600 hover:bg-ink-25 transition-colors">Request Changes</button>
-                <div x-show="showReviewComment" x-cloak class="absolute mt-9 z-10 bg-white rounded-lg shadow-lg border border-ink-200 p-3 w-80">
-                    <textarea id="composer-review-comment" name="comment" rows="2" x-model="reviewComment" aria-label="What needs to change?" class="w-full px-2 py-1.5 text-sm border border-ink-400 rounded-lg resize-none" placeholder="What needs to change?"></textarea>
+                        class="ui-btn ui-btn-tinted ui-btn-sm">Approve</button>
+                <button type="button" @click="showReviewComment = !showReviewComment" :aria-expanded="showReviewComment.toString()" class="ui-btn ui-btn-ghost ui-btn-sm">Request changes</button>
+                <div x-show="showReviewComment" x-cloak class="absolute top-full mt-2 z-10 ui-menu p-3 w-80 max-w-[calc(100vw-2rem)]">
+                    <textarea id="composer-review-comment" name="comment" rows="2" x-model="reviewComment" aria-label="What needs to change?" class="ui-input !min-h-0 resize-none" placeholder="What needs to change?"></textarea>
                     <button hx-post="{% url 'approvals:request_changes' workspace_id=workspace.id post_id=post.id %}"
                             hx-include="#composer-review-comment" hx-swap="none"
                             :disabled="!reviewComment.trim()" :class="!reviewComment.trim() && 'opacity-50 cursor-not-allowed'"
-                            class="mt-2 px-3 py-1 text-xs font-semibold rounded-full bg-warning-500 text-white">Submit</button>
+                            class="ui-btn ui-btn-primary ui-btn-sm mt-2">Send back for changes</button>
                 </div>
             </div>
             {% endif %}
 
             <!-- Approval timeline -->
-            <h4 class="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Approval History</h4>
+            <h4 class="text-xs font-semibold text-ink-500 mb-2">Approval history</h4>
             <div class="space-y-2 mb-4">
                 {% for action in approval_history %}
                 <div class="flex items-start gap-2">
-                    <div class="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 {% if action.action == 'approved' %}bg-success-500{% elif action.action == 'rejected' %}bg-danger-500{% elif action.action == 'changes_requested' %}bg-warning-500{% else %}bg-ink-300{% endif %}"></div>
+                    <div class="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 {% if action.action == 'approved' %}bg-success-500{% elif action.action == 'rejected' %}bg-danger-500{% elif action.action == 'changes_requested' %}bg-warning-500{% else %}bg-ink-400{% endif %}" aria-hidden="true"></div>
                     <div>
                         <p class="text-xs text-ink-600"><span class="font-semibold">{{ action.user.display_name }}</span> {{ action.get_action_display|lower }}</p>
                         {% if action.comment %}<p class="text-xs text-ink-500 mt-0.5">"{{ action.comment|truncatechars:80 }}"</p>{% endif %}
-                        <p class="text-[10px] text-ink-500">{{ action.created_at|timesince }} ago</p>
+                        <p class="text-xs text-ink-500">{{ action.created_at|timesince }} ago</p>
                     </div>
                 </div>
                 {% endfor %}
@@ -1637,7 +1635,7 @@
 
             <!-- Comments -->
             {% if post_comments or post %}
-            <h4 class="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Comments</h4>
+            <h4 class="text-xs font-semibold text-ink-500 mb-2">Comments</h4>
             <div id="composer-comments">
                 {% include "approvals/partials/comment_list.html" with comments=post_comments post=post %}
             </div>
@@ -1678,8 +1676,8 @@
          class="panel-right-backdrop"></div>
     <div class="panel-right border-l border-ink-200 bg-ink-50 lg:bg-ink-50 flex flex-col"
          :class="{ 'is-open': showPreviewPanel }">
-        <div class="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
-            <h3 class="text-xs font-semibold text-ink-500 uppercase tracking-wider">Preview</h3>
+        <div class="px-4 py-3 border-b border-ink-200 flex items-center justify-between">
+            <h3 class="text-[13px] font-semibold text-ink-900">Preview</h3>
             <div class="flex items-center gap-2">
                 <span class="text-xs text-ink-500 tabular-nums"
                       x-show="selectedAccounts.length > 0"
@@ -1715,17 +1713,17 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="absolute inset-0 bg-ink-950/35 backdrop-blur-sm" @click="showMediaPicker = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl border border-ink-200 w-[calc(100vw-1rem)] sm:w-[640px] mx-2 sm:mx-0 max-h-[85vh] sm:max-h-[70vh] overflow-hidden"
+        <div class="absolute inset-0 bg-ink-950/35" @click="showMediaPicker = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[640px] mx-2 sm:mx-0 max-h-[85vh] sm:max-h-[70vh] overflow-hidden"
              x-trap.noscroll="showMediaPicker" role="dialog" aria-modal="true" aria-labelledby="compose-media-picker-title"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100">
-            <div class="px-4 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-                <h2 id="compose-media-picker-title" class="text-base font-semibold text-ink-900">Media Library</h2>
+            <div class="px-4 sm:px-6 py-4 border-b border-ink-200 flex items-center justify-between">
+                <h2 id="compose-media-picker-title" class="text-h3 text-ink-950">Media library</h2>
                 <button @click="showMediaPicker = false" aria-label="Close"
-                        class="w-8 h-8 rounded-lg border border-ink-200 text-ink-500 hover:text-ink-600 hover:border-ink-300 flex items-center justify-center transition-all duration-150 cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        class="ui-btn ui-btn-icon">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             <div class="p-4 sm:p-6 overflow-y-auto max-h-[calc(85vh-72px)] sm:max-h-[calc(70vh-72px)]"
@@ -1751,14 +1749,14 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="absolute inset-0 bg-ink-950/35 backdrop-blur-sm" @click="showThumbnailPicker = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl border border-ink-200 w-[calc(100vw-1rem)] sm:w-[640px] mx-2 sm:mx-0 max-h-[85vh] sm:max-h-[70vh] overflow-hidden"
+        <div class="absolute inset-0 bg-ink-950/35" @click="showThumbnailPicker = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[640px] mx-2 sm:mx-0 max-h-[85vh] sm:max-h-[70vh] overflow-hidden"
              x-trap.noscroll="showThumbnailPicker" role="dialog" aria-modal="true" aria-labelledby="compose-thumbnail-picker-title">
-            <div class="px-4 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-                <h2 id="compose-thumbnail-picker-title" class="text-base font-semibold text-ink-900">Select Thumbnail</h2>
+            <div class="px-4 sm:px-6 py-4 border-b border-ink-200 flex items-center justify-between">
+                <h2 id="compose-thumbnail-picker-title" class="text-h3 text-ink-950">Choose a thumbnail</h2>
                 <button @click="showThumbnailPicker = false" aria-label="Close"
-                        class="w-8 h-8 rounded-lg border border-ink-200 text-ink-500 hover:text-ink-600 hover:border-ink-300 flex items-center justify-center transition-all duration-150 cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        class="ui-btn ui-btn-icon">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             <div class="p-4 sm:p-6 overflow-y-auto max-h-[calc(85vh-72px)] sm:max-h-[calc(70vh-72px)]"
@@ -1783,40 +1781,40 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="absolute inset-0 bg-ink-950/35 backdrop-blur-sm" @click="closeUnsplashModal()"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl border border-ink-200 w-[calc(100vw-1rem)] sm:w-[760px] mx-2 sm:mx-0 h-[640px] max-h-[85vh] flex flex-col overflow-hidden"
+        <div class="absolute inset-0 bg-ink-950/35" @click="closeUnsplashModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[760px] mx-2 sm:mx-0 h-[640px] max-h-[85vh] flex flex-col overflow-hidden"
              x-trap.noscroll="showUnsplashModal" role="dialog" aria-modal="true" aria-labelledby="compose-unsplash-title"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100">
-            <div class="px-4 sm:px-6 py-4 border-b border-ink-100 flex items-center gap-3">
-                <span class="w-9 h-9 rounded-lg bg-ink-900 text-white flex items-center justify-center flex-shrink-0">
+            <div class="px-4 sm:px-6 py-4 border-b border-ink-200 flex items-center gap-3">
+                <span class="w-9 h-9 rounded-lg bg-ink-900 text-white flex items-center justify-center flex-shrink-0" aria-hidden="true">
                     <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.5 6.75V0h9v6.75h-9zm9 3.75H24V24H0V10.5h7.5v6.75h9V10.5z"/></svg>
                 </span>
                 <div class="min-w-0">
-                    <h2 id="compose-unsplash-title" class="text-base font-semibold text-ink-900">Search Unsplash</h2>
+                    <h2 id="compose-unsplash-title" class="text-h3 text-ink-950">Search Unsplash</h2>
                     <p class="text-xs text-ink-500 truncate">Free high-resolution photos &middot; add one or many</p>
                 </div>
                 <button @click="closeUnsplashModal()" aria-label="Close"
-                        class="ml-auto w-8 h-8 rounded-lg border border-ink-200 text-ink-500 hover:text-ink-600 hover:border-ink-300 flex items-center justify-center transition-all duration-150 cursor-pointer flex-shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        class="ml-auto ui-btn ui-btn-icon flex-shrink-0">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             <div class="px-4 sm:px-6 pt-4 space-y-3 flex-shrink-0">
-                <div class="flex items-center gap-2 rounded-xl border-2 border-ink-400/70 focus-within:border-brand-600 transition-colors pl-4 pr-1.5 py-1.5">
+                <div class="flex items-center gap-2 rounded-xl border border-ink-400 bg-white hover:border-ink-500 focus-within:border-brand-600 focus-within:shadow-[0_0_0_1px_var(--focus-ring),0_0_0_4px_var(--primary-halo)] transition-[border-color,box-shadow] pl-3.5 pr-1 py-1">
                     <svg class="w-4 h-4 text-ink-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     <input type="text" x-model="unsplashQuery" aria-label="Search Unsplash photos"
                            @keydown.enter.prevent="unsplashActiveChip = ''; searchUnsplash()"
                            placeholder="Search free high-resolution photos…"
-                           class="flex-1 text-sm bg-transparent outline-none border-none placeholder-ink-500 text-ink-900">
+                           class="flex-1 min-w-0 h-9 text-sm bg-transparent border-none placeholder-ink-500 text-ink-900 focus-visible:!shadow-none focus-visible:!outline-none">
                     <button type="button" @click="unsplashActiveChip = ''; searchUnsplash()"
-                            class="px-4 py-2 rounded-lg bg-brand-700 hover:bg-brand-800 text-white text-sm font-semibold transition-colors cursor-pointer flex-shrink-0">Search</button>
+                            class="ui-btn ui-btn-secondary ui-btn-sm flex-shrink-0">Search</button>
                 </div>
                 <div class="flex flex-wrap gap-1.5">
                     <template x-for="chip in unsplashChips" :key="chip">
                         <button type="button" @click="selectUnsplashChip(chip)"
-                                class="px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer"
-                                :class="unsplashActiveChip === chip ? 'bg-ink-900 text-white' : 'border border-ink-200 text-ink-600 hover:border-ink-300 hover:bg-ink-25'"
+                                class="ui-filter-chip"
+                                :class="unsplashActiveChip === chip ? 'is-selected' : 'ring-1 ring-inset ring-ink-200'"
                                 x-text="chip"></button>
                     </template>
                 </div>
@@ -1837,25 +1835,25 @@
                             <img :src="photo.thumb" :alt="photo.alt" loading="lazy"
                                  class="w-full block" :style="photo.color ? `background:${photo.color}` : ''">
                             <span class="absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
-                                  :class="unsplashSelected[photo.id] ? 'bg-brand-700 border-brand-600' : 'bg-black/25 border-white/90'">
+                                  :class="unsplashSelected[photo.id] ? 'bg-brand-700 border-white' : 'bg-ink-950/30 border-white/90'">
                                 <svg x-show="unsplashSelected[photo.id]" class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                             </span>
-                            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pt-4 pb-1.5 text-[10px] text-white truncate opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                            <span class="absolute inset-x-0 bottom-0 bg-ink-950/65 px-2 py-1 text-xs text-white truncate opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                                   x-text="photo.photographer + ' / Unsplash'"></span>
                         </div>
                     </template>
                 </div>
             </div>
-            <div class="px-4 sm:px-6 py-4 border-t border-ink-100 flex items-center gap-3 flex-shrink-0">
+            <div class="px-4 sm:px-6 py-4 border-t border-ink-200 flex items-center gap-3 flex-shrink-0">
                 <span class="text-sm text-ink-500"
                       x-text="unsplashSelectedCount ? unsplashSelectedCount + (unsplashSelectedCount === 1 ? ' photo selected' : ' photos selected') : 'Select photos to add'"></span>
                 <div class="ml-auto flex items-center gap-2">
                     <button type="button" @click="closeUnsplashModal()"
-                            class="px-4 py-2 rounded-lg text-sm font-semibold text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">Cancel</button>
+                            class="ui-btn ui-btn-ghost">Cancel</button>
                     <button type="button"
                             :disabled="!unsplashSelectedCount || unsplashImporting"
                             @click="importUnsplashPhotos()"
-                            class="px-5 py-2 rounded-lg bg-brand-700 hover:bg-brand-800 text-white text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="ui-btn ui-btn-primary"
                             x-text="unsplashImporting ? 'Adding…' : (unsplashSelectedCount > 1 ? 'Add ' + unsplashSelectedCount + ' images' : 'Add images')"></button>
                 </div>
             </div>
@@ -1875,20 +1873,20 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="absolute inset-0 bg-ink-950/35 backdrop-blur-sm" @click="closeFramePicker()"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl border border-ink-200 w-[calc(100vw-1rem)] sm:w-[720px] mx-2 sm:mx-0 max-h-[90vh] flex flex-col overflow-hidden"
+        <div class="absolute inset-0 bg-ink-950/35" @click="closeFramePicker()"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[720px] mx-2 sm:mx-0 max-h-[90vh] flex flex-col overflow-hidden"
              x-trap.noscroll="showFramePicker" role="dialog" aria-modal="true" aria-labelledby="compose-frame-picker-title"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100">
-            <div class="px-4 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
+            <div class="px-4 sm:px-6 py-4 border-b border-ink-200 flex items-center justify-between">
                 <div>
-                    <h2 id="compose-frame-picker-title" class="text-base font-semibold text-ink-900">Choose thumbnail from video</h2>
+                    <h2 id="compose-frame-picker-title" class="text-h3 text-ink-950">Choose thumbnail from video</h2>
                     <p class="text-xs text-ink-500">Scrub to the frame you want, then grab it</p>
                 </div>
                 <button @click="closeFramePicker()" aria-label="Close"
-                        class="w-8 h-8 rounded-lg border border-ink-200 text-ink-500 hover:text-ink-600 hover:border-ink-300 flex items-center justify-center transition-all duration-150 cursor-pointer flex-shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        class="ui-btn ui-btn-icon flex-shrink-0">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             <div class="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3">
@@ -1899,7 +1897,7 @@
                            muted playsinline preload="metadata"
                            @loadedmetadata="frameDuration = $el.duration"
                            @timeupdate="frameCurrentTime = $el.currentTime"></video>
-                    <span class="absolute top-3 right-3 px-2 py-1 rounded bg-black/70 text-white text-xs font-mono tabular-nums"
+                    <span class="absolute top-3 right-3 px-2 py-1 rounded-md bg-ink-950/70 text-white text-xs font-mono tabular-nums"
                           x-text="formatTimecode(frameCurrentTime) + ' / ' + formatTimecode(frameDuration)"></span>
                 </div>
                 <input type="range" min="0" :max="frameDuration || 0" step="0.04" aria-label="Video position"
@@ -1909,30 +1907,30 @@
                 <div x-show="filmstripLoading" class="flex items-center justify-center py-3 text-ink-500">
                     <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 </div>
-                <p x-show="!filmstripLoading && filmstripError" class="text-[11px] text-ink-500 text-center" x-text="filmstripError"></p>
+                <p x-show="!filmstripLoading && filmstripError" class="text-xs text-ink-500 text-center" x-text="filmstripError"></p>
                 <div x-show="filmstrip.length" class="flex gap-1.5 overflow-x-auto pb-1">
                     <template x-for="(frame, idx) in filmstrip" :key="idx">
                         <button type="button"
                                 class="flex-shrink-0 rounded-md overflow-hidden border-2 transition-colors cursor-pointer"
-                                :class="Math.abs(frameCurrentTime - frame.time) < (frameDuration / 16) ? 'border-brand-600' : 'border-transparent hover:border-ink-300'"
+                                :class="Math.abs(frameCurrentTime - frame.time) < (frameDuration / 16) ? 'border-ink-900' : 'border-transparent hover:border-ink-300'"
                                 @click="frameCurrentTime = frame.time; if ($refs.frameVideo) $refs.frameVideo.currentTime = frame.time">
                             <img :src="frame.dataUrl" class="w-[76px] aspect-video object-cover block" :alt="'Frame at ' + formatTimecode(frame.time)">
                         </button>
                     </template>
                 </div>
             </div>
-            <div class="px-4 sm:px-6 py-4 border-t border-ink-100 flex items-center gap-3 flex-shrink-0">
+            <div class="px-4 sm:px-6 py-4 border-t border-ink-200 flex items-center gap-3 flex-shrink-0">
                 <p x-show="frameError" class="text-xs text-danger-500 flex-1" x-text="frameError"></p>
                 <span x-show="!frameError" class="text-sm text-ink-500">
                     Frame at <span class="font-mono font-semibold text-ink-700 tabular-nums" x-text="formatTimecode(frameCurrentTime)"></span>
                 </span>
                 <div class="ml-auto flex items-center gap-2">
                     <button type="button" @click="closeFramePicker()"
-                            class="px-4 py-2 rounded-lg text-sm font-semibold text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">Cancel</button>
+                            class="ui-btn ui-btn-ghost">Cancel</button>
                     <button type="button"
                             :disabled="frameCapturing"
                             @click="captureFrame()"
-                            class="px-5 py-2 rounded-lg bg-brand-700 hover:bg-brand-800 text-white text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+                            class="ui-btn ui-btn-primary">
                         <svg x-show="!frameCapturing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                         <span x-text="frameCapturing ? 'Saving…' : 'Use this frame'"></span>
                     </button>
@@ -1950,25 +1948,24 @@
          x-transition:leave-start="opacity-100 translate-y-0"
          x-transition:leave-end="opacity-0 translate-y-4">
         <span class="flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-success-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <svg class="w-4 h-4 text-success-300" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
             <span x-text="saveToastText">Post saved</span>
         </span>
     </div>
 
     <!-- Error toast -->
     <div x-show="formError" x-cloak role="alert" aria-live="assertive"
-         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg max-w-[90vw] whitespace-pre-line"
-         style="background: var(--error-500); color: white;"
+         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-3.5 py-3 rounded-xl bg-ink-900 text-white text-sm font-medium shadow-lg max-w-[min(420px,90vw)] whitespace-pre-line"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0 translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100 translate-y-0"
          x-transition:leave-end="opacity-0 translate-y-4">
-        <span class="flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <span class="flex items-start gap-2.5">
+            <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-danger-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             <span x-text="formError"></span>
-            <button type="button" @click="formError = ''" class="ml-2 opacity-80 hover:opacity-100 cursor-pointer" aria-label="Dismiss error">&times;</button>
+            <button type="button" @click="formError = ''" class="ml-2 -my-1 w-7 h-7 rounded-md flex-shrink-0 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 focus-visible:outline-white cursor-pointer max-lg:w-11 max-lg:h-11" aria-label="Dismiss error">&times;</button>
         </span>
     </div>
 
@@ -1978,7 +1975,7 @@
          @open-delete-modal.window="showDeleteModal = true">
         <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center"
              @keydown.escape.window="showDeleteModal = false">
-            <div class="fixed inset-0 bg-ink-950/35 backdrop-blur-sm" @click="showDeleteModal = false"
+            <div class="fixed inset-0 bg-ink-950/35" @click="showDeleteModal = false"
                  x-show="showDeleteModal"
                  x-transition:enter="transition ease-out duration-150"
                  x-transition:enter-start="opacity-0"
@@ -1986,7 +1983,7 @@
                  x-transition:leave="transition ease-in duration-100"
                  x-transition:leave-start="opacity-100"
                  x-transition:leave-end="opacity-0"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl border border-ink-200 p-6 w-full max-w-sm mx-4"
+            <div class="relative bg-white rounded-2xl shadow-xl p-6 w-full max-w-[400px] mx-4"
                  x-show="showDeleteModal"
                  x-trap.noscroll="showDeleteModal" role="dialog" aria-modal="true" aria-labelledby="compose-delete-title"
                  x-transition:enter="transition ease-out duration-150"
@@ -1995,16 +1992,13 @@
                  x-transition:leave="transition ease-in duration-100"
                  x-transition:leave-start="opacity-100 scale-100"
                  x-transition:leave-end="opacity-0 scale-95">
-                <div class="text-center">
-                    <div class="w-12 h-12 mx-auto rounded-full bg-danger-50 flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                    </div>
-                    <h3 id="compose-delete-title" class="text-base font-semibold text-ink-900 mb-1">Delete post?</h3>
-                    <p class="text-sm text-ink-500 mb-6">This action cannot be undone. The post and all associated data will be permanently removed.</p>
+                <div>
+                    <h3 id="compose-delete-title" class="ui-modal-title mb-1.5">Delete post?</h3>
+                    <p class="text-sm text-ink-700 mb-6">This can't be undone. The post and everything attached to it are removed for good.</p>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex justify-end gap-2">
                     <button @click="showDeleteModal = false"
-                            class="flex-1 px-4 py-2 text-sm font-semibold text-ink-700 bg-ink-100 rounded-full hover:bg-ink-200 transition-colors cursor-pointer">
+                            class="ui-btn ui-btn-secondary">
                         Cancel
                     </button>
                     <button :disabled="deleting"
@@ -2023,8 +2017,8 @@
                                 }).catch(() => { deleting = false; });
                             "
                             :class="deleting && 'opacity-50 cursor-not-allowed'"
-                            class="flex-1 px-4 py-2 text-sm font-semibold text-white bg-danger-500 rounded-full hover:bg-danger-500 transition-colors cursor-pointer">
-                        <span x-text="deleting ? 'Deleting...' : 'Delete'"></span>
+                            class="ui-btn ui-btn-danger">
+                        <span x-text="deleting ? 'Deleting…' : 'Delete post'"></span>
                     </button>
                 </div>
             </div>
@@ -3104,7 +3098,7 @@ function composerApp() {
                 return;
             }
             if (errEl) { errEl.classList.add('hidden'); }
-            setMode('schedule', 'Set date and time', 'Schedule Post', 'calendar');
+            setMode('schedule', 'Set date and time', 'Schedule post', 'calendar');
             hidePopover();
         });
     }
@@ -3132,7 +3126,7 @@ function composerApp() {
     var schedDateInput = document.querySelector('input[name="scheduled_date"]');
     var schedTimeInput = document.querySelector('input[name="scheduled_time"]');
     if (schedDateInput && schedDateInput.value && schedTimeInput && schedTimeInput.value && !prefillIsProposed) {
-        setMode('schedule', 'Set date and time', 'Schedule Post', 'calendar');
+        setMode('schedule', 'Set date and time', 'Schedule post', 'calendar');
     }
 })();
 </script>

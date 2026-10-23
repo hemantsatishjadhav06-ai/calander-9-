@@ -4,73 +4,70 @@
 {% block title %}Drafts - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Drafts{% endblock %}
 
-{% block content %}
-<div class="max-w-4xl">
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h2 class="text-lg font-semibold text-ink-900">Drafts</h2>
-            <p class="text-sm text-ink-500 mt-0.5">{{ drafts|length }} draft{{ drafts|length|pluralize }}</p>
-        </div>
-        <a href="{% url 'composer:compose' workspace_id=workspace.id %}"
-           class="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-700 rounded-full shadow-[0_4px_14px_rgba(249,115,22,0.28)] hover:bg-brand-800 hover:shadow-[0_6px_20px_rgba(249,115,22,0.35)] hover:-translate-y-px transition-all duration-150">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            New Post
-        </a>
+{% block page_header %}
+<div class="w-full max-w-[880px] mx-auto mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+    <div class="min-w-0">
+        <h1 class="ui-page-title">Drafts</h1>
+        <p class="ui-page-status tabular-nums">{{ drafts|length }} draft{{ drafts|length|pluralize }}. Open one to finish it and schedule it.</p>
     </div>
+    <a href="{% url 'composer:compose' workspace_id=workspace.id %}" class="ui-btn ui-btn-primary">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New post
+    </a>
+</div>
+{% endblock %}
 
+{% block content %}
+<div class="w-full max-w-[880px] mx-auto">
     {% if drafts %}
-    <div class="space-y-3">
+    <ul class="ui-list rounded-xl border border-ink-200 bg-white shadow-xs overflow-hidden">
         {% for draft in drafts %}
+        <li>
         <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=draft.id %}"
-           class="block bg-white border border-ink-200 rounded-xl p-4 hover:shadow-lg hover:border-transparent hover:-translate-y-px transition-all duration-200 group">
-            <div class="flex items-start gap-4">
-                <div class="flex-1 min-w-0">
-                    {% if draft.title %}
-                    <p class="text-sm font-medium text-ink-800 truncate group-hover:text-ink-900 transition-colors">{{ draft.title }}</p>
-                    {% endif %}
-                    {% if draft.caption_snippet or not draft.title %}
-                    <p class="text-sm text-ink-700 line-clamp-2 group-hover:text-ink-900 transition-colors">
-                        {{ draft.caption_snippet|default:"(No caption)" }}
-                    </p>
-                    {% endif %}
-                    <div class="flex items-center gap-3 mt-2">
-                        <span class="inline-flex items-center gap-1 text-xs text-ink-500">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            {{ draft.updated_at|timesince }} ago
-                        </span>
-                        {% if draft.author %}
-                        <span class="text-xs text-ink-500">by {{ draft.author.display_name }}</span>
-                        {% endif %}
-                        {% if draft.proposed_publish_at %}
-                        <span class="inline-flex items-center gap-1 text-xs font-medium text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full" title="Proposed publishing time">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            Proposed Publishing {% timezone workspace.effective_timezone|default:"UTC" %}{{ draft.proposed_publish_at|date:"M j, g:i A" }}{% endtimezone %}
-                        </span>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="flex items-center gap-1 flex-shrink-0">
-                    {% for platform in draft.platform_posts_summary %}
-                    <span class="w-5 h-5 rounded-[5px] flex items-center justify-center text-[8px] font-bold text-white pi-{{ platform }}">
-                        {{ platform|truncatechars:2|upper }}
+           class="ui-row items-start group">
+            <div class="flex-1 min-w-0">
+                {% if draft.title %}
+                <p class="text-sm font-semibold text-ink-900 truncate">{{ draft.title }}</p>
+                {% endif %}
+                {% if draft.caption_snippet or not draft.title %}
+                <p class="text-sm {% if draft.title %}text-ink-600{% else %}font-medium text-ink-900{% endif %} line-clamp-2">
+                    {{ draft.caption_snippet|default:"(No caption)" }}
+                </p>
+                {% endif %}
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-ink-500">
+                    <span class="inline-flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        {{ draft.updated_at|timesince }} ago
                     </span>
-                    {% endfor %}
+                    {% if draft.author %}
+                    <span>by {{ draft.author.display_name }}</span>
+                    {% endif %}
+                    {% if draft.proposed_publish_at %}
+                    {# A proposed time is not a schedule: ink with a clock, never the accent. #}
+                    <span class="inline-flex items-center gap-1 font-medium text-ink-700" title="Proposed publishing time">
+                        <svg class="w-3 h-3 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Proposed for {% timezone workspace.effective_timezone|default:"UTC" %}{{ draft.proposed_publish_at|date:"M j, g:i A" }}{% endtimezone %}
+                    </span>
+                    {% endif %}
                 </div>
             </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0 pt-0.5" aria-hidden="true">
+                {% for platform in draft.platform_posts_summary %}
+                <span class="w-4 h-4 flex items-center justify-center">
+                    {% include "partials/_platform_icon.html" with platform=platform size="sm" %}
+                </span>
+                {% endfor %}
+                <svg class="w-4 h-4 text-ink-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </div>
         </a>
+        </li>
         {% endfor %}
-    </div>
+    </ul>
     {% else %}
-    <div class="text-center py-16">
-        <div class="w-16 h-16 mx-auto rounded-2xl bg-ink-100 flex items-center justify-center mb-4">
-            <svg class="w-7 h-7 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-        </div>
-        <p class="text-sm font-medium text-ink-500 mb-1">No drafts</p>
-        <p class="text-xs text-ink-500 mb-4">Start composing to create your first draft</p>
-        <a href="{% url 'composer:compose' workspace_id=workspace.id %}"
-           class="inline-flex items-center gap-1.5 px-5 py-1.5 text-sm font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-full hover:bg-brand-100 hover:border-ink-300 active:bg-brand-100 transition-all duration-150">
-            Create Post
-        </a>
+    <div class="ui-card ui-empty">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        <p class="ui-empty-title">No drafts</p>
+        <p class="ui-empty-body">Start a post and save it without scheduling. It waits here.</p>
     </div>
     {% endif %}
 </div>

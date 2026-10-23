@@ -151,7 +151,7 @@ class ProcessingStatusPollTests(UploadFeedbackBase):
         response = self._poll(asset)
 
         self.assertContains(response, "ml-asset-card")
-        self.assertContains(response, "FAILED")
+        self.assertContains(response, "Failed")  # the card's tag, in sentence case
         self.assertNotContains(response, 'hx-trigger="every 3s"')
 
     def test_non_htmx_callers_still_get_json(self):

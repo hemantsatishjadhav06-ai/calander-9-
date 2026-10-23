@@ -1,29 +1,25 @@
 <!-- Step 4: Import Complete (loaded via HTMX after confirm) -->
-<div class="bg-white rounded-xl border border-ink-200 p-8 text-center">
-    <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
-         style="background: var(--primary-strong); opacity: 0.1;">
-    </div>
-    <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto -mt-[72px] mb-4"
-         style="color: var(--primary);">
-        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+<div class="ui-card p-8 max-sm:p-6 text-center">
+    <div class="w-12 h-12 rounded-full bg-success-50 ring-1 ring-inset ring-success-200 text-success-500 flex items-center justify-center mx-auto mb-4" aria-hidden="true">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
     </div>
 
-    <h2 class="text-lg font-semibold text-ink-900 mb-1">Import Complete</h2>
+    <h2 class="text-h2 text-ink-950 mb-1">Import complete</h2>
 
-    <div class="flex items-center justify-center gap-4 mt-4 mb-6">
-        <div class="px-4 py-2 rounded-lg bg-success-50 border border-success-200">
-            <span class="text-2xl font-bold text-success-600">{{ created_count }}</span>
-            <span class="text-xs text-success-600 block">post{{ created_count|pluralize }} created</span>
+    <div class="flex items-center justify-center gap-6 mt-4 mb-6">
+        <div>
+            <span class="block text-[28px] leading-[34px] font-bold text-ink-950 tabular-nums">{{ created_count }}</span>
+            <span class="text-xs text-ink-600 block">post{{ created_count|pluralize }} created</span>
         </div>
         {% if error_count > 0 %}
-        <div class="px-4 py-2 rounded-lg bg-danger-50 border border-danger-200">
-            <span class="text-2xl font-bold text-danger-600">{{ error_count }}</span>
-            <span class="text-xs text-danger-600 block">row{{ error_count|pluralize }} skipped</span>
+        <div>
+            <span class="block text-[28px] leading-[34px] font-bold text-danger-600 tabular-nums">{{ error_count }}</span>
+            <span class="text-xs text-ink-600 block">row{{ error_count|pluralize }} skipped</span>
         </div>
         {% endif %}
     </div>
 
-    <p class="text-sm text-ink-500 mb-6">
+    <p class="text-sm text-ink-600 mb-6">
         {% if created_count > 0 %}
         Your imported posts are now on the calendar.
         {% else %}
@@ -31,14 +27,14 @@
         {% endif %}
     </p>
 
-    <div class="flex items-center justify-center gap-3">
+    <div class="flex flex-wrap items-center justify-center gap-2">
         <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}"
-           class="btn-brand text-sm py-2 px-5">
-            View Calendar
+           class="ui-btn ui-btn-primary">
+            View calendar
         </a>
         <a href="{% url 'composer:csv_upload' workspace_id=workspace.id %}"
-           class="text-sm font-semibold py-2 px-5 rounded-full border border-ink-200 hover:border-ink-300 text-ink-700 hover:text-ink-900 transition-colors">
-            Import More
+           class="ui-btn ui-btn-secondary">
+            Import more
         </a>
     </div>
 </div>

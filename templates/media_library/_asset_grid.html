@@ -12,15 +12,14 @@
 </div>
 
 <div x-show="viewMode === 'list'" x-cloak>
-  <div class="rounded-xl border overflow-hidden" style="border-color: var(--border); background: var(--surface-0);">
+  <div class="rounded-xl border border-ink-200 bg-white shadow-xs overflow-hidden">
     <!-- List header -->
-    <div class="grid grid-cols-12 gap-3 px-4 py-2 text-xs font-bold uppercase tracking-wider border-b"
-         style="color: var(--text-tertiary); border-color: var(--surface-2); background: var(--surface-1);">
-      <div class="col-span-5">Name</div>
-      <div class="col-span-2">Type</div>
-      <div class="col-span-2">Size</div>
-      <div class="col-span-2">Uploaded</div>
-      <div class="col-span-1"></div>
+    <div class="grid grid-cols-12 gap-3 px-4 py-2 text-xs font-semibold text-ink-600 border-b border-ink-200 bg-ink-25">
+      <div class="col-span-8 sm:col-span-5">Name</div>
+      <div class="hidden sm:block col-span-2">Type</div>
+      <div class="col-span-3 sm:col-span-2">Size</div>
+      <div class="hidden sm:block col-span-2">Uploaded</div>
+      <div class="col-span-1"><span class="sr-only">Star</span></div>
     </div>
     {% for asset in page.object_list %}
       {% include "media_library/_asset_list_row.html" %}
@@ -33,8 +32,7 @@
 <div class="flex items-center justify-center gap-2 mt-6 pb-4">
   {% if page.has_previous %}
   <a href="?page={{ page.previous_page_number }}&q={{ query|urlencode }}&sort={{ current_sort|urlencode }}"
-     class="px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors"
-     style="border-color: var(--border); color: var(--text-secondary);"
+     class="ui-btn ui-btn-secondary ui-btn-sm"
      hx-get="{% url 'media_library:index' workspace_id=workspace.id %}?page={{ page.previous_page_number }}&q={{ query|urlencode }}&sort={{ current_sort|urlencode }}"
      hx-target="#asset-grid"
      hx-swap="innerHTML">
@@ -42,14 +40,13 @@
   </a>
   {% endif %}
 
-  <span class="text-xs px-3" style="color: var(--text-tertiary);">
+  <span class="text-xs px-3 text-ink-600 tabular-nums">
     Page {{ page.number }} of {{ page.paginator.num_pages }}
   </span>
 
   {% if page.has_next %}
   <a href="?page={{ page.next_page_number }}&q={{ query|urlencode }}&sort={{ current_sort|urlencode }}"
-     class="px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors"
-     style="border-color: var(--border); color: var(--text-secondary);"
+     class="ui-btn ui-btn-secondary ui-btn-sm"
      hx-get="{% url 'media_library:index' workspace_id=workspace.id %}?page={{ page.next_page_number }}&q={{ query|urlencode }}&sort={{ current_sort|urlencode }}"
      hx-target="#asset-grid"
      hx-swap="innerHTML">

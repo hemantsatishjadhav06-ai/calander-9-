@@ -1,124 +1,142 @@
 {% extends "base.html" %}
 {% block title %}Connect Social Account · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Connect Social Account{% endblock %}
+
+{% block extra_head %}
+<style>
+/* Page styles sit in the components layer so a utility on the same element still wins. */
+@layer components {
+  /* Each platform's glyph keeps its own colour on a neutral tile: identity, not decoration */
+  .pc-glyph-facebook { color: #1877F2; }
+  .pc-glyph-instagram, .pc-glyph-instagram_login { color: #E4405F; }
+  .pc-glyph-linkedin_personal, .pc-glyph-linkedin_company { color: #0A66C2; }
+  .pc-glyph-tiktok, .pc-glyph-threads, .pc-glyph-x, .pc-glyph-devto { color: #0E1114; }
+  .pc-glyph-youtube { color: #FF0000; }
+  .pc-glyph-pinterest { color: #E60023; }
+  .pc-glyph-bluesky { color: #0085FF; }
+  .pc-glyph-mastodon { color: #6364FF; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-4xl">
     <!-- Header -->
-    <div class="mb-8">
-        <a href="{% url 'social_accounts:list' workspace_id=workspace_id %}" class="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-700 transition-colors mb-4">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            Back to Social Accounts
+    <div class="mb-6">
+        <a href="{% url 'social_accounts:list' workspace_id=workspace_id %}" class="inline-flex items-center gap-1 -ml-1 mb-2 min-h-8 px-1 rounded-md text-[13px] font-medium text-ink-600 hover:text-ink-900">
+            <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            Back to social accounts
         </a>
-        <h2 class="text-xl font-semibold text-ink-900">Connect a Platform</h2>
-        <p class="text-sm text-ink-500 mt-1">Select a platform to connect your social media account.</p>
+        <h1 class="ui-page-title">Connect a platform</h1>
+        <p class="ui-page-status">Pick where you want to post. You sign in on that platform and come straight back here.</p>
     </div>
 
-    <!-- Platform grid -->
-    <div class="overflow-y-auto pr-1">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {% for value, label in platform_choices %}
-        <div class="relative bg-white rounded-xl border border-ink-200 p-5 transition-all duration-200 {% if value in configured_platforms %}{% else %}opacity-60{% endif %}">
-            <div class="flex items-start gap-4">
-                <!-- Platform icon -->
-                <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center
-                    {% if value == 'facebook' %}bg-info-50 text-info-600
-                    {% elif value == 'instagram' %}bg-gradient-to-br from-ink-50 to-ink-50 text-ink-700
-                    {% elif value == 'instagram_login' %}bg-gradient-to-br from-ink-50 to-ink-50 text-ink-700
-                    {% elif value == 'linkedin_personal' %}bg-info-50 text-info-600
-                    {% elif value == 'linkedin_company' %}bg-info-50 text-info-600
-                    {% elif value == 'tiktok' %}bg-ink-900 text-white
-                    {% elif value == 'youtube' %}bg-danger-50 text-danger-600
-                    {% elif value == 'pinterest' %}bg-danger-50 text-danger-500
-                    {% elif value == 'threads' %}bg-ink-100 text-ink-800
-                    {% elif value == 'bluesky' %}bg-info-50 text-info-600
-                    {% elif value == 'google_business' %}bg-info-50 text-info-600
-                    {% elif value == 'mastodon' %}bg-info-50 text-info-600
-                    {% elif value == 'devto' %}bg-ink-100 text-ink-900
-                    {% elif value == 'x' %}bg-ink-900 text-white
-                    {% endif %}">
+    {% if configured_platforms %}
+    <!-- Ready to connect -->
+    <section aria-labelledby="connect-ready" class="mb-8">
+        <h2 id="connect-ready" class="text-h3 text-ink-950 mb-3">Ready to connect</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {% for value, label in platform_choices %}
+            {% if value in configured_platforms %}
+            <div class="ui-card flex flex-col">
+                <div class="flex items-start gap-3">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-ink-50 ring-1 ring-inset ring-ink-200 flex items-center justify-center pc-glyph-{{ value }}" aria-hidden="true">
+                        {% include "social_accounts/partials/_platform_icon.html" with platform=value size="5" %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-[15px] leading-[22px] font-semibold text-ink-900">{{ label }}</h3>
+                        <p class="text-[13px] leading-[18px] text-ink-600 mt-0.5">{% include "social_accounts/partials/_platform_blurb.html" %}</p>
+                    </div>
+                </div>
+
+                {% if value == 'x' %}
+                {# X bills every request, so the inbox and analytics never call it. Say so before anyone connects. #}
+                <p class="mt-3 text-xs leading-snug text-ink-600">
+                    Publishing only: no comments, DMs or insights. X charges the developer account behind this site's app for every post.
+                </p>
+                {% endif %}
+
+                <form method="post" action="{% url 'social_accounts:connect' workspace_id=workspace_id %}" class="mt-auto pt-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="platform" value="{{ value }}">
+                    <button type="submit" class="ui-btn ui-btn-secondary w-full">
+                        Connect {{ label }}
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Not available yet: said in words, never a greyed-out button -->
+    <section aria-labelledby="connect-later" class="[&:not(:has(li))]:hidden">
+        <h2 id="connect-later" class="text-h3 text-ink-950 mb-1">Not available yet</h2>
+        <p class="text-[13px] text-ink-600 mb-3">Each one opens once the platform approves this site's app.</p>
+        <ul class="ui-card !p-0 divide-y divide-ink-100 overflow-hidden">
+            {% for value, label in platform_choices %}
+            {% if value not in configured_platforms %}
+            <li class="flex items-start gap-3 px-4 sm:px-5 py-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-ink-50 ring-1 ring-inset ring-ink-200 flex items-center justify-center pc-glyph-{{ value }}" aria-hidden="true">
                     {% include "social_accounts/partials/_platform_icon.html" with platform=value size="5" %}
                 </div>
-
                 <div class="flex-1 min-w-0">
-                    <h3 class="text-sm font-semibold text-ink-900">{{ label }}</h3>
-                    <p class="text-xs text-ink-500 mt-0.5">
-                        {% if value == 'facebook' %}Your Pages &amp; Groups
-                        {% elif value == 'instagram' %}For accounts linked to a Facebook Page
-                        {% elif value == 'instagram_login' %}Sign in with Instagram &middot; no Facebook needed
-                        {% elif value == 'linkedin_personal' %}Personal profile
-                        {% elif value == 'linkedin_company' %}Company pages
-                        {% elif value == 'tiktok' %}Video content
-                        {% elif value == 'youtube' %}Videos &amp; Shorts
-                        {% elif value == 'pinterest' %}Pins &amp; Boards
-                        {% elif value == 'threads' %}Text &amp; Media
-                        {% elif value == 'bluesky' %}AT Protocol
-                        {% elif value == 'google_business' %}Local posts
-                        {% elif value == 'mastodon' %}Federated social
-                        {% elif value == 'devto' %}Articles &amp; posts
-                        {% elif value == 'x' %}Posts &middot; pay-per-use API
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <h3 class="text-sm font-semibold text-ink-900">{{ label }}</h3>
+                        {% if value == 'x' %}
+                        {# X has no app review to wait for: it is unavailable only until this site's X credentials are set, so "Coming soon" would be untrue. #}
+                        <span class="ui-pill">
+                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><circle cx="12" cy="12" r="7"/></svg>
+                            Not configured
+                        </span>
+                        {% else %}
+                        <span class="ui-pill">
+                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><circle cx="12" cy="12" r="7"/></svg>
+                            Coming soon
+                        </span>
                         {% endif %}
+                    </div>
+                    <p class="text-[13px] leading-[18px] text-ink-600 mt-0.5">{% include "social_accounts/partials/_platform_blurb.html" %}</p>
+
+                    {% if value == 'x' %}
+                    <p class="mt-2 text-xs leading-snug text-ink-600">
+                        Publishing only: no comments, DMs or insights. X charges the developer account behind this site's app for every post.
                     </p>
+                    {% if request.user.is_staff %}
+                    <p class="mt-2 text-xs leading-snug text-ink-600">
+                        Create an app at console.x.com with OAuth 2.0 (Web App, confidential client) and the callback
+                        <code class="text-[11px] break-all">{{ request.scheme }}://{{ request.get_host }}{% url 'social_accounts:oauth_callback' platform='x' %}</code>,
+                        then set <code class="text-[11px]">PLATFORM_X_CLIENT_ID</code> and <code class="text-[11px]">PLATFORM_X_CLIENT_SECRET</code>
+                        (or add them under <span class="font-medium text-ink-700">Admin → Platform credentials</span>). Add API credits before connecting: X has no free tier.
+                    </p>
+                    {% else %}
+                    <p class="mt-2 text-xs leading-snug text-ink-600">
+                        Available once this site's X developer app is set up{% if SUPPORT_EMAIL %}. <a href="mailto:{{ SUPPORT_EMAIL }}?subject={{ label|urlencode }}%20access" class="link-inline">Ask for it</a>{% endif %}.
+                    </p>
+                    {% endif %}
+                    {% else %}
+                    {# Visible, not a hover title: this has to work on touch and for keyboard users, and it has to say what to do. #}
+                    {% if request.user.is_staff %}
+                    <p class="mt-2 text-xs leading-snug text-ink-600">
+                        Needs a developer app from this platform. Add its credentials under
+                        <span class="font-medium text-ink-700">Admin → Platform credentials</span>
+                        (or the <code class="text-[11px]">PLATFORM_*</code> environment variables). The README walks through each platform's app review.
+                    </p>
+                    {% else %}
+                    {# Customers are not the people who can fix this; server-admin instructions only confused them. The section line already says why it is not open; the row only adds a way to hear when it is. #}
+                    {% if SUPPORT_EMAIL %}
+                    <p class="mt-2 text-xs leading-snug text-ink-600">
+                        <a href="mailto:{{ SUPPORT_EMAIL }}?subject={{ label|urlencode }}%20access" class="link-inline">Ask to be notified</a> when it opens.
+                    </p>
+                    {% endif %}
+                    {% endif %}
+                    {% endif %}
                 </div>
-            </div>
-
-            {% if value == 'x' %}
-            {# X bills every request, so the inbox and analytics never call it. Say so before anyone connects. #}
-            <p class="mt-3 text-[11px] leading-snug text-ink-500">
-                Publishing only: no comments, DMs or insights. X charges the developer account behind this site's app for every post.
-            </p>
+            </li>
             {% endif %}
-
-            {% if value in configured_platforms %}
-            <form method="post" action="{% url 'social_accounts:connect' workspace_id=workspace_id %}" class="mt-4">
-                {% csrf_token %}
-                <input type="hidden" name="platform" value="{{ value }}">
-                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-full hover:bg-brand-100 hover:border-ink-300 active:bg-brand-100 transition-all duration-200 cursor-pointer">
-                    Connect
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                </button>
-            </form>
-            {% elif value == 'x' %}
-            {# X has no app review to wait for: it is unavailable only until this site's X credentials are set, so "Coming soon" would be untrue. #}
-            <div class="mt-4">
-                <span class="w-full inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-ink-500 bg-ink-100 rounded-full cursor-not-allowed">
-                    Not configured
-                </span>
-                {% if request.user.is_staff %}
-                <p class="mt-2 text-[11px] leading-snug text-ink-500">
-                    Create an app at console.x.com with OAuth 2.0 (Web App, confidential client) and the callback
-                    <code class="text-[10px] break-all">{{ request.scheme }}://{{ request.get_host }}{% url 'social_accounts:oauth_callback' platform='x' %}</code>,
-                    then set <code class="text-[10px]">PLATFORM_X_CLIENT_ID</code> and <code class="text-[10px]">PLATFORM_X_CLIENT_SECRET</code>
-                    (or add them under <span class="font-medium text-ink-600">Admin → Platform credentials</span>). Add API credits before connecting: X has no free tier.
-                </p>
-                {% else %}
-                <p class="mt-2 text-[11px] leading-snug text-ink-500">
-                    Available once this site's X developer app is set up{% if SUPPORT_EMAIL %}. <a href="mailto:{{ SUPPORT_EMAIL }}?subject={{ label|urlencode }}%20access" class="underline hover:text-ink-700">Ask for it</a>{% endif %}.
-                </p>
-                {% endif %}
-            </div>
-            {% else %}
-            <div class="mt-4">
-                <span class="w-full inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-ink-500 bg-ink-100 rounded-full cursor-not-allowed">
-                    Coming soon
-                </span>
-                {# Visible, not a hover title: this has to work on touch and for keyboard users, and it has to say what to do. #}
-                {% if request.user.is_staff %}
-                <p class="mt-2 text-[11px] leading-snug text-ink-500">
-                    Needs a developer app from this platform. Add its credentials under
-                    <span class="font-medium text-ink-600">Admin → Platform credentials</span>
-                    (or the <code class="text-[10px]">PLATFORM_*</code> environment variables). The README walks through each platform's app review.
-                </p>
-                {% else %}
-                {# Customers are not the people who can fix this; server-admin instructions only confused them. #}
-                <p class="mt-2 text-[11px] leading-snug text-ink-500">
-                    Available once this platform approves our app{% if SUPPORT_EMAIL %}. <a href="mailto:{{ SUPPORT_EMAIL }}?subject={{ label|urlencode }}%20access" class="underline hover:text-ink-700">Ask to be notified</a>{% endif %}.
-                </p>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    </div>
+            {% endfor %}
+        </ul>
+    </section>
 </div>
 {% endblock %}

@@ -4,179 +4,231 @@
 {% block title %}Publish - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-wrap items-center justify-between gap-3 mb-4 lg:mb-[25px]">
-    <h1 class="text-xl sm:text-2xl font-semibold text-ink-900" style="letter-spacing: -0.01em;">Publish</h1>
+<div class="w-full max-w-[1180px] mx-auto mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+    <div class="min-w-0">
+        <h1 class="ui-page-title">Publish</h1>
+        <p class="ui-page-status">Plan your posts, approve them, and see what went out.</p>
+    </div>
 
-    <div class="flex items-center gap-3">
-        <!-- List / Calendar toggle -->
-        <div class="flex items-center bg-ink-50 rounded-full p-0.5" x-data="{ activeMode: '{{ mode|default:'calendar' }}' }">
-            <button class="view-btn{% if mode == 'list' %} active{% endif %}" :class="{ active: activeMode === 'list' }"
-                    @click="activeMode = 'list'"
-                    hx-get="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&tab={{ active_tab|default:'queue' }}&_switch_mode=1"
-                    hx-target="#publish-body"
-                    hx-swap="innerHTML"
-                    hx-push-url="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&tab={{ active_tab|default:'queue' }}">
-                <svg class="w-3.5 h-3.5 inline -mt-px mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                List
-            </button>
-            <button class="view-btn{% if mode == 'calendar' %} active{% endif %}" :class="{ active: activeMode === 'calendar' }"
-                    @click="activeMode = 'calendar'"
-                    hx-get="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view={{ view_type|default:'month' }}&_switch_mode=1"
-                    hx-target="#publish-body"
-                    hx-swap="innerHTML"
-                    hx-push-url="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view={{ view_type|default:'month' }}">
-                <svg class="w-3.5 h-3.5 inline -mt-px mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                Calendar
-            </button>
-        </div>
-
+    <!-- List / Calendar: peer views, so a segmented control -->
+    <div class="ui-segmented" role="group" aria-label="View" x-data="{ activeMode: '{{ mode|default:'calendar' }}' }">
+        <button type="button" class="ui-segment view-btn gap-1.5{% if mode == 'list' %} is-active{% endif %}"
+                :class="{ 'is-active': activeMode === 'list' }"
+                aria-pressed="{% if mode == 'list' %}true{% else %}false{% endif %}" :aria-pressed="(activeMode === 'list').toString()"
+                @click="activeMode = 'list'"
+                hx-get="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&tab={{ active_tab|default:'queue' }}&_switch_mode=1"
+                hx-target="#publish-body"
+                hx-swap="innerHTML"
+                hx-push-url="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&tab={{ active_tab|default:'queue' }}">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
+            List
+        </button>
+        <button type="button" class="ui-segment view-btn gap-1.5{% if mode == 'calendar' %} is-active{% endif %}"
+                :class="{ 'is-active': activeMode === 'calendar' }"
+                aria-pressed="{% if mode == 'calendar' %}true{% else %}false{% endif %}" :aria-pressed="(activeMode === 'calendar').toString()"
+                @click="activeMode = 'calendar'"
+                hx-get="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view={{ view_type|default:'month' }}&_switch_mode=1"
+                hx-target="#publish-body"
+                hx-swap="innerHTML"
+                hx-push-url="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view={{ view_type|default:'month' }}">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Calendar
+        </button>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_head %}
 <style>
-    /* Fix parent overflow clipping the calendar */
+    /* Let the page (main) scroll instead of nesting a scroller around the calendar. */
     main:has(#publish-body) > div { overflow: visible !important; }
 
-    /* Calendar-specific styles */
+/* Page styles sit in the components layer, so a Tailwind utility on the same
+   element still wins (the ui_select filter's active border, for example). */
+@layer components {
+    /* ── Month grid ─────────────────────────────────────────────── */
     .cal-day {
-        min-height: 80px;
+        position: relative;
+        min-height: 88px;
         border-right: 1px solid var(--border);
         border-bottom: 1px solid var(--border);
-        padding: 6px;
-        transition: background 150ms ease;
-        background: white;
+        padding: 4px;
+        background: var(--surface-0);
+        transition: background-color var(--dur-fast) var(--ease-out);
     }
-    @media (min-width: 768px) {
-        .cal-day { min-height: 130px; padding: 8px; }
-    }
-    .cal-day:hover { background: var(--surface-1); }
-    .cal-day.past { background: var(--surface-2); }
-    .cal-day.past:hover { background: #EEEEEC; }
-    .cal-day.today { background: var(--primary-soft); }
-    .cal-day.other-month { opacity: 0.4; }
+    @media (min-width: 640px) { .cal-day { min-height: 128px; padding: 8px; } }
+    .cal-day:nth-child(7n) { border-right: 0; }
+    .cal-day:hover { background: var(--ink-25); }
+    .cal-day.past, .cal-day.other-month { background: var(--ink-25); }
     .cal-day .day-num {
-        font-size: 13px; font-weight: 600;
-        width: 28px; height: 28px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        margin-bottom: 4px;
-        color: var(--ink-700);
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 26px; height: 26px; padding: 0 4px; border-radius: 9999px;
+        font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+        color: var(--ink-900);
     }
-    .cal-day.past .day-num { color: var(--text-tertiary); }
-    .cal-day.today .day-num {
-        background: var(--primary); color: white;
-    }
+    .cal-day.past .day-num, .cal-day.other-month .day-num { color: var(--ink-500); font-weight: 500; }
+    /* Today: an ink circle, like the "Now" line. Today is not an action, so never the accent. */
+    .cal-day.today .day-num { background: var(--ink-900); color: #fff; }
 
+    /* Week and day cells already in the past, and the current hour */
+    .cal-cell-past { background: var(--ink-25); }
+    .cal-now { background: var(--ink-25); box-shadow: inset 2px 0 0 var(--ink-900); }
+
+    /* Custom events: neutral line, the event's own colour only as a dot */
+    .cal-event {
+        display: flex; align-items: center; gap: 6px; min-width: 0;
+        height: 20px; margin-bottom: 2px; padding: 0 6px; border-radius: 6px;
+        background: var(--ink-50); color: var(--ink-800);
+        font-size: 12px; font-weight: 500;
+    }
+    .cal-event-dot { width: 8px; height: 8px; border-radius: 9999px; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgb(14 17 20 / .12); }
+
+    /* ── Post chip: one post on the grid ────────────────────────── */
     .post-chip {
-        display: flex; align-items: center; gap: 4px;
-        padding: 3px 6px; border-radius: 6px;
-        font-size: 11px; font-weight: 500;
-        margin-bottom: 2px; cursor: pointer;
-        transition: all 150ms ease;
-        text-decoration: none;
-        max-width: 100%; overflow: hidden;
-    }
-    .post-chip:hover { transform: translateX(1px); }
-    .post-chip .chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-
-    /* Status colors */
-    .status-draft      { background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border); }
-    .status-draft .chip-dot { background: var(--ink-400); }
-    .status-pending_review, .status-pending_client { background: var(--primary-soft); color: var(--primary); border: 1px solid var(--brand-200); }
-    .status-pending_review .chip-dot, .status-pending_client .chip-dot { background: var(--primary); }
-    .status-scheduled  { background: var(--info-50); color: var(--info-600); border: 1px solid var(--info-200); }
-    .status-scheduled .chip-dot { background: var(--info-500); }
-    .status-published  { background: var(--success-50); color: var(--success-600); border: 1px solid var(--success-200); }
-    .status-published .chip-dot { background: var(--success-500); }
-    .status-approved   { background: var(--success-50); color: var(--success-600); border: 1px solid var(--success-200); }
-    .status-approved .chip-dot { background: var(--success-500); }
-    .status-changes_requested { background: var(--primary-soft); color: var(--primary); border: 1px solid var(--brand-200); }
-    .status-changes_requested .chip-dot { background: var(--primary); }
-    .status-rejected   { background: var(--error-50); color: var(--error-700); border: 1px solid var(--danger-200); }
-    .status-rejected .chip-dot { background: var(--error-500); }
-    .status-publishing { background: var(--info-50); color: var(--info-600); border: 1px solid var(--info-200); }
-    .status-publishing .chip-dot { background: var(--info-500); }
-    .status-partially_published { background: var(--warning-50); color: var(--warning-600); border: 1px solid var(--warning-200); }
-    .status-partially_published .chip-dot { background: var(--warning-500); }
-    .status-failed     { background: var(--error-50); color: var(--error-700); border: 1px solid var(--danger-200); }
-    .status-failed .chip-dot { background: var(--error-500); }
-    .status-on_hold    { background: var(--ink-100); color: var(--ink-700); border: 1px solid var(--ink-200); }
-    .status-on_hold .chip-dot { background: var(--ink-500); }
-
-    /* View switcher */
-    .view-btn {
-        padding: 6px 14px; border-radius: 9999px;
-        font-size: 12px; font-weight: 600;
-        color: var(--text-tertiary); border: none; background: transparent;
-        cursor: pointer; transition: all 150ms ease;
-    }
-    .view-btn:hover { color: var(--text-primary); background: var(--surface-2); }
-    .view-btn.active { color: var(--primary); background: var(--primary-soft); border: 1px solid var(--brand-300); box-shadow: 0 1px 2px rgba(17, 86, 65, 0.08); }
-
-    /* Filter chips */
-    .filter-chip {
-        display: inline-flex; align-items: center; gap: 4px;
-        padding: 4px 10px; border-radius: 9999px;
-        font-size: 11px; font-weight: 600;
-        background: var(--primary-soft); color: var(--primary);
-        border: 1px solid var(--brand-200);
-    }
-    .filter-chip button {
-        width: 14px; height: 14px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        background: transparent; border: none; cursor: pointer;
-        color: var(--brand-600); font-size: 10px;
-    }
-    .filter-chip button:hover { background: var(--brand-100); }
-
-    /* Publish tab styles */
-    .publish-tab {
-        padding: 10px 16px; border-radius: 0;
-        font-size: 13px; font-weight: 600;
-        color: var(--text-tertiary); background: transparent;
-        border: none; cursor: pointer;
-        transition: all 150ms ease;
         position: relative;
-        border-bottom: 2px solid transparent;
-        margin-bottom: -1px;
+        display: flex; align-items: center; gap: 5px;
+        min-width: 0; max-width: 100%; height: 26px;
+        margin-bottom: 3px; padding: 0 6px;
+        border-radius: 7px; border: 1px solid var(--border);
+        background: var(--surface-0); color: var(--ink-900);
+        font-size: 12px; line-height: 16px; font-weight: 500;
+        text-decoration: none; overflow: hidden; cursor: pointer;
+        transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
     }
-    .publish-tab:hover { color: var(--text-primary); border-bottom-color: var(--ink-300); }
-    .publish-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
-    .publish-tab-strip { scrollbar-width: none; }
-    .publish-tab-strip::-webkit-scrollbar { display: none; }
+    .post-chip:hover { border-color: var(--ink-300); box-shadow: var(--shadow-sm); }
+    .post-chip .chip-glyph { display: inline-flex; flex-shrink: 0; }
+    .post-chip .chip-glyph svg { width: 14px; height: 14px; }
+    .post-chip .chip-thumb { width: 18px; height: 18px; border-radius: 4px; object-fit: cover; flex-shrink: 0; box-shadow: var(--shadow-creative); }
 
-    /* Hide scrollbar on filter containers */
-    .cal-filters-scroll::-webkit-scrollbar { display: none; }
+    /* Status shape (calendar dots use the design's fixed shapes):
+       ring = nothing happening, diamond = a person is needed, filled circle = in the
+       team's hands, check = done, square = stopped. */
+    .post-chip .chip-dot, .cal-legend-dot {
+        width: 8px; height: 8px; flex-shrink: 0; border-radius: 9999px;
+        background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-400);
+    }
+    .status-pending_review .chip-dot, .status-pending_client .chip-dot,
+    .status-changes_requested .chip-dot, .status-partially_published .chip-dot,
+    .cal-legend-dot.is-warning {
+        width: 8px; height: 8px; border-radius: 1px; transform: rotate(45deg);
+        background: var(--warning-500); box-shadow: none;
+    }
+    .status-scheduled .chip-dot, .status-publishing .chip-dot,
+    .cal-legend-dot.is-info { background: var(--info-500); box-shadow: none; }
+    .status-approved .chip-dot, .status-published .chip-dot,
+    .cal-legend-dot.is-success {
+        width: 10px; height: 10px; border-radius: 0; box-shadow: none;
+        background: var(--success-500);
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+    .status-failed .chip-dot, .status-rejected .chip-dot,
+    .cal-legend-dot.is-danger { width: 8px; height: 8px; border-radius: 1.5px; background: var(--danger-500); box-shadow: none; }
 
-    /* Filter dropdowns (shared by list and calendar modes) */
+    /* Tone of the chip: a pale fill and hairline; the words stay ink. */
+    .post-chip.status-pending_review, .post-chip.status-pending_client,
+    .post-chip.status-changes_requested, .post-chip.status-partially_published { background: var(--warning-50); border-color: var(--warning-200); }
+    .post-chip.status-scheduled, .post-chip.status-publishing { background: var(--info-50); border-color: var(--info-200); }
+    .post-chip.status-approved, .post-chip.status-published { background: var(--success-50); border-color: var(--success-200); }
+    .post-chip.status-failed, .post-chip.status-rejected { background: var(--danger-50); border-color: var(--danger-200); }
+
+    /* Phones: a month cell is ~50px wide, so a chip shows only its status shape and channel. */
+    @media (max-width: 639px) {
+        .cal-day .post-chip { justify-content: center; gap: 3px; padding: 0 3px; height: 22px; }
+        .cal-day .post-chip > .truncate, .cal-day .post-chip .chip-thumb,
+        .cal-day .post-chip .cal-select-box, .cal-day .post-chip > svg,
+        .cal-day .cal-event .truncate { display: none; }
+        .cal-day .cal-event { justify-content: center; padding: 0; }
+    }
+
+    /* ── Add-post button on calendar cells (tinted, appears on hover) ── */
+    .cal-add-btn {
+        display: none;
+        position: absolute; top: 6px; right: 6px;
+        width: 24px; height: 24px; border-radius: 9999px;
+        background: var(--brand-100); color: var(--brand-700); border: none;
+        align-items: center; justify-content: center;
+        cursor: pointer; line-height: 1;
+        transition: background-color var(--dur-instant) var(--ease-out);
+        z-index: 5;
+    }
+    .cal-add-btn:hover { background: var(--brand-200); color: var(--brand-800); }
+    .cal-add-cell { position: relative; }
+    .cal-add-cell.has-posts:hover .cal-add-btn { display: flex; }
+
+    /* Empty cells: a larger centred button */
+    .cal-add-cell:not(.has-posts) .cal-add-btn {
+        top: 50%; left: 50%; right: auto;
+        transform: translate(-50%, -50%);
+        width: 32px; height: 32px;
+    }
+    .cal-add-cell:not(.has-posts) .cal-add-btn svg { width: 16px; height: 16px; }
+    .cal-add-cell:not(.has-posts):hover .cal-add-btn { display: flex; }
+
+    /* Day/week grids (non-month cells): hide add button entirely when cell has posts */
+    .cal-add-cell.has-posts:not(.cal-day) .cal-add-btn,
+    .cal-add-cell.has-posts:not(.cal-day):hover .cal-add-btn { display: none; }
+
+    /* Inline variant (day/week grid): flow in normal layout, no translate centering */
+    .cal-add-cell:not(.has-posts) .cal-add-btn.cal-add-btn--inline,
+    .cal-add-cell:not(.has-posts) .cal-add-btn.cal-add-btn--inline:hover {
+        top: auto; left: auto; right: auto;
+        transform: none;
+    }
+
+    /* ── Open channel slots (week and day) ─────────────────────── */
+    .calendar-channel-slot {
+        display: inline-flex; align-items: center; gap: 5px;
+        max-width: 100%; min-height: 26px; padding: 2px 6px;
+        border-radius: 7px; border: 1px dashed var(--ink-300);
+        background: var(--surface-0); color: var(--ink-700);
+        font-size: 12px; font-weight: 500;
+    }
+    .calendar-channel-slot--week { width: 100%; gap: 4px; }
+    .calendar-channel-slot.is-past-open { background: var(--ink-25); color: var(--ink-500); }
+    .calendar-slot-platform-icon {
+        flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+        width: 16px; height: 16px; border-radius: 9999px;
+        background: var(--ink-100); color: var(--ink-600);
+    }
+    .calendar-slot-add {
+        flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+        width: 20px; height: 20px; margin-left: auto; border-radius: 9999px;
+        background: var(--brand-100); color: var(--brand-700);
+    }
+    .calendar-slot-add:hover { background: var(--brand-200); color: var(--brand-800); }
+    .calendar-slot-state { margin-left: auto; color: var(--ink-500); }
+    .calendar-post-slot-check {
+        flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+        width: 16px; height: 16px; margin-left: auto; border-radius: 9999px;
+        color: var(--success-600);
+    }
+
+    /* ── Filter dropdowns (ui_select) ───────────────────────────── */
     .publish-filter-select,
     .cal-filter-select {
-        padding: 6px 28px 6px 10px; border-radius: 8px;
-        font-size: 12px; font-weight: 600;
-        color: var(--text-secondary); background: white;
-        border: 1px solid var(--border);
-        cursor: pointer; transition: all 150ms ease;
-        appearance: none;
-        white-space: nowrap;
-        flex-shrink: 0;
-        background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23656B73' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 8px center;
+        height: 32px; padding: 0 10px; border-radius: 8px;
+        font-size: 13px; font-weight: 500;
+        color: var(--ink-800); background: var(--surface-0);
+        border: 1px solid var(--ink-300);
+        box-shadow: var(--shadow-xs);
+        cursor: pointer; white-space: nowrap; flex-shrink: 0;
+        transition: border-color var(--dur-instant) var(--ease-out), background-color var(--dur-instant) var(--ease-out);
     }
+    @media (max-width: 1023px) { .publish-filter-select, .cal-filter-select { height: 44px; } }
     .publish-filter-select.has-icon,
-    .cal-filter-select.has-icon { padding-left: 28px; }
+    .cal-filter-select.has-icon { padding-left: 30px; }
     .publish-filter-select:hover,
-    .cal-filter-select:hover { border-color: var(--ink-300); }
-    .publish-filter-select:focus,
-    .cal-filter-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(17, 86, 65,0.15); }
+    .cal-filter-select:hover { border-color: var(--ink-400); background: var(--ink-25); }
     .publish-filter-icon,
     .cal-filter-icon {
-        position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
-        width: 14px; height: 14px; color: var(--text-tertiary); pointer-events: none;
+        position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+        width: 14px; height: 14px; color: var(--ink-500); pointer-events: none;
     }
+    .cal-filters-scroll { scrollbar-width: none; }
+    .cal-filters-scroll::-webkit-scrollbar { display: none; }
 
-    /* Platform icon badges */
+    /* Platform icon tiles (filter menus) */
     .pi-facebook   { background: #1877F2; }
     .pi-instagram  { background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF); }
     .pi-linkedin   { background: #0A66C2; }
@@ -191,118 +243,22 @@
     .pi-mastodon   { background: #6364FF; }
     .pi-x          { background: #000000; }
 
-    /* Add-post button on calendar cells - default (has posts): small top-right */
-    .cal-add-btn {
-        display: none;
-        position: absolute; top: 6px; right: 6px;
-        width: 22px; height: 22px; border-radius: 50%;
-        background: var(--primary); color: white; border: none;
-        align-items: center; justify-content: center;
-        cursor: pointer; font-size: 14px; line-height: 1;
-        box-shadow: 0 2px 6px rgba(17, 86, 65,0.35);
-        transition: transform 100ms ease, background 100ms ease;
-        z-index: 5;
+    /* ── Section tabs (Queue / Drafts / Approvals / Sent) ───────── */
+    .publish-tab {
+        display: inline-flex; align-items: center; gap: 6px;
+        height: 40px; margin-bottom: -1px; padding: 0;
+        font-size: 14px; font-weight: 500; white-space: nowrap;
+        color: var(--ink-600); background: transparent;
+        border: 0; border-bottom: 2px solid transparent; cursor: pointer;
+        transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
     }
-    .cal-add-btn:hover { background: var(--brand-600); transform: scale(1.1); }
-    .cal-add-cell { position: relative; }
-    .cal-add-cell.has-posts:hover .cal-add-btn { display: flex; }
+    .publish-tab:hover { color: var(--ink-900); }
+    .publish-tab.active { color: var(--ink-950); font-weight: 600; border-bottom-color: var(--ink-900); }
+    @media (max-width: 1023px) { .publish-tab { height: 44px; } }
+    .publish-tab-strip { scrollbar-width: none; }
+    .publish-tab-strip::-webkit-scrollbar { display: none; }
 
-    /* Empty cells: larger centered button */
-    .cal-add-cell:not(.has-posts) .cal-add-btn {
-        top: 50%; left: 50%; right: auto;
-        transform: translate(-50%, -50%);
-        width: 32px; height: 32px;
-        background: var(--primary); color: white;
-        box-shadow: 0 2px 6px rgba(17, 86, 65,0.35);
-        border: none;
-    }
-    .cal-add-cell:not(.has-posts) .cal-add-btn svg { width: 16px; height: 16px; }
-    .cal-add-cell:not(.has-posts):hover .cal-add-btn {
-        display: flex;
-    }
-    .cal-add-cell:not(.has-posts) .cal-add-btn:hover {
-        background: var(--brand-600);
-        transform: translate(-50%, -50%) scale(1.1);
-        box-shadow: 0 6px 20px rgba(17, 86, 65,0.35);
-    }
-
-    /* Day/week grids (non-month cells): hide add button entirely when cell has posts */
-    .cal-add-cell.has-posts:not(.cal-day) .cal-add-btn,
-    .cal-add-cell.has-posts:not(.cal-day):hover .cal-add-btn { display: none; }
-
-    /* Inline variant (day/week grid): flow in normal layout, no translate centering */
-    .cal-add-cell:not(.has-posts) .cal-add-btn.cal-add-btn--inline,
-    .cal-add-cell:not(.has-posts) .cal-add-btn.cal-add-btn--inline:hover {
-        top: auto; left: auto; right: auto;
-        transform: none;
-    }
-    .cal-add-cell:not(.has-posts) .cal-add-btn.cal-add-btn--inline:hover {
-        transform: scale(1.1);
-    }
-
-    .calendar-channel-slot {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        max-width: 100%;
-        min-height: 24px;
-        padding: 3px 5px;
-        border-radius: 6px;
-        font-size: 11px;
-        font-weight: 600;
-        border: 1px dashed var(--border);
-        background: #FFFFFF;
-        color: var(--text-tertiary);
-    }
-    .calendar-channel-slot--week {
-        width: 100%;
-        font-size: 10px;
-        gap: 4px;
-    }
-    .calendar-channel-slot.is-past-open {
-        opacity: 0.45;
-        background: var(--surface-1);
-    }
-    .calendar-slot-platform-icon {
-        flex-shrink: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 16px;
-        height: 16px;
-        border-radius: 9999px;
-        background: var(--surface-2);
-        color: var(--text-tertiary);
-    }
-    .calendar-slot-add {
-        flex-shrink: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 18px;
-        height: 18px;
-        border-radius: 9999px;
-        background: var(--brand-100);
-        color: var(--primary);
-    }
-    .calendar-slot-add:hover {
-        background: var(--brand-200);
-        transform: scale(1.05);
-    }
-    .calendar-post-slot-check {
-        flex-shrink: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 16px;
-        height: 16px;
-        border-radius: 9999px;
-        background: rgba(255,255,255,0.72);
-        color: var(--success-600);
-        margin-left: auto;
-    }
-
-    /* Drag-and-drop (SortableJS) feedback */
+    /* ── Drag-and-drop (SortableJS) feedback ────────────────────── */
     .post-chip.is-draggable { cursor: grab; }
     .post-chip.is-draggable:active { cursor: grabbing; }
     /* Hide the source-cell placeholder entirely: for a day-granularity calendar
@@ -311,47 +267,55 @@
        the cursor-following drag clone stays visible. */
     .chip-ghost { display: none !important; }
     /* Highlight the day cell currently under the drag (toggled in onMove). */
-    .cal-drop.cal-drop-active { background: var(--primary-soft); box-shadow: inset 0 0 0 2px var(--primary); }
+    .cal-drop.cal-drop-active { background: var(--brand-50); box-shadow: inset 0 0 0 2px var(--brand-600); }
     /* While dragging, suppress the per-cell "+" add buttons that would otherwise
        flicker under the cursor as it crosses cells. */
     body.cal-dragging .cal-add-btn { display: none !important; }
 
-    /* Bulk-selection checkbox (chips + list rows). Hover-reveal on chips; always
-       shown once checked or when a selection is active. */
+    /* ── Bulk-selection checkbox (chips + list rows) ─────────────
+       Hover-reveal on chips; always shown once checked or when a selection is active. */
     .cal-select-box {
-        width: 15px; height: 15px; flex-shrink: 0; border: 1.5px solid var(--ink-400);
+        width: 16px; height: 16px; flex-shrink: 0; border: 1.5px solid var(--ink-400);
         border-radius: 4px; background: #fff; cursor: pointer; color: #fff;
         display: inline-flex; align-items: center; justify-content: center;
-        opacity: 0; transition: opacity 120ms ease, background 120ms ease;
+        opacity: 0; transition: opacity var(--dur-fast) ease, background-color var(--dur-fast) ease;
     }
     .post-chip:hover .cal-select-box,
     .cal-select-box.is-checked,
     body.has-selection .cal-select-box { opacity: 1; }
-    .cal-select-box.is-checked { background: var(--primary); border-color: var(--primary); }
-    .cal-select-box:hover { border-color: var(--primary); }
-    /* Keyboard access: reveal + outline the checkbox when focused (it's
-       otherwise opacity:0 until hover, unreachable by keyboard). */
+    .cal-select-box.is-checked { background: var(--brand-700); border-color: var(--brand-700); }
+    .cal-select-box:hover { border-color: var(--brand-700); }
+    /* Keyboard access: reveal the checkbox when its chip is focused. */
     .post-chip:focus-within .cal-select-box { opacity: 1; }
-    .cal-select-box:focus-visible { opacity: 1; outline: 2px solid var(--primary); outline-offset: 2px; }
+    .cal-select-box:focus-visible { opacity: 1; outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+    /* On a chip the checkbox sits over the status shape, so a hidden box takes no room. */
+    .post-chip .cal-select-box { position: absolute; left: 3px; top: 50%; margin-top: -8px; z-index: 1; }
     /* In list rows the checkbox is always visible (there's room). */
     .row-select-box { opacity: 1; }
-    /* The shared toast host and the selection bar both sit bottom-centre. Lift
+}
+    /* The shared toast host and the selection bar both sit at the bottom. Lift
        the toasts clear while a selection is active, so a rejected bulk action
        doesn't render its own explanation on top of the bar it came from. */
-    body.has-selection #bb-toast-host { bottom: 5rem; }
+    body.has-selection #bb-toast-host { bottom: 5.5rem; }
+
+    /* Outside the layer on purpose: the timezone is always set, so ui_select's
+       "has a value" border would make it look like a filter that is switched on. */
+    .cal-tz-filter .cal-filter-select { border-color: var(--ink-300); color: var(--ink-800); }
+    .cal-tz-filter .cal-filter-select:hover { border-color: var(--ink-400); }
 
     @keyframes slideUp {
-        from { opacity: 0; transform: translateY(8px); }
+        from { opacity: 0; transform: translateY(6px); }
         to   { opacity: 1; transform: translateY(0); }
     }
 
     /* Play slideUp only on HTMX-swapped tab content, not initial server render */
-    .tab-slide-in { animation: slideUp 200ms cubic-bezier(0.16,1,0.3,1) both; }
+    .tab-slide-in { animation: slideUp 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+    @media (prefers-reduced-motion: reduce) { .tab-slide-in { animation: none; } }
 </style>
 {% endblock %}
 
 {% block content %}
-<div id="publish-body" class="flex-1 flex flex-col min-h-0">
+<div id="publish-body" class="flex-1 flex flex-col w-full max-w-[1180px] mx-auto">
     {% if mode == 'list' %}
         {% include "calendar/partials/publish_list_shell.html" %}
     {% else %}
@@ -365,16 +329,17 @@
 selection survives grid reloads / tab switches. Shown when ≥1 chip/row is
 ticked (see the `sel` Alpine store).{% endcomment %}
 <div x-data="bulkBar()">
-    {# Floating action bar #}
+    {# Floating action bar: a dark surface, so white focus rings #}
     <div x-cloak x-show="$store.sel.count > 0"
          x-effect="document.body.classList.toggle('has-selection', $store.sel.count > 0)"
-         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 bg-ink-900 text-white rounded-full shadow-2xl pl-4 pr-2 py-2">
-        <span class="text-sm font-medium whitespace-nowrap" x-text="$store.sel.count + ' selected'"></span>
-        <span class="w-px h-5 bg-white/20 mx-1.5"></span>
-        <button @click="ask('draft')" :disabled="busy" class="px-3 py-1.5 text-xs font-semibold rounded-full hover:bg-white/10 transition-colors disabled:opacity-50">Draft</button>
-        <button @click="ask('publish')" :disabled="busy" class="px-3 py-1.5 text-xs font-semibold rounded-full bg-success-500 hover:bg-success-500 transition-colors disabled:opacity-50">Publish</button>
-        <button @click="ask('delete')" :disabled="busy" class="px-3 py-1.5 text-xs font-semibold rounded-full text-danger-300 hover:bg-danger-500/20 transition-colors disabled:opacity-50">Delete</button>
-        <button aria-label="Clear selection" @click="$store.sel.clear()" class="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors" title="Clear selection">
+         role="region" aria-label="Selected posts"
+         class="fixed bottom-6 max-sm:bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 max-w-[calc(100vw-2rem)] bg-ink-900 text-white rounded-xl shadow-lg pl-4 pr-1.5 py-1.5">
+        <span class="text-sm font-medium whitespace-nowrap tabular-nums" x-text="$store.sel.count + ' selected'" aria-live="polite"></span>
+        <span class="w-px h-5 bg-white/20 mx-1.5" aria-hidden="true"></span>
+        <button type="button" @click="ask('draft')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-white hover:bg-white/10 focus-visible:outline-white transition-colors disabled:opacity-50">Draft</button>
+        <button type="button" @click="ask('publish')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg bg-brand-200 text-brand-950 hover:bg-brand-300 focus-visible:outline-white transition-colors disabled:opacity-50">Publish</button>
+        <button type="button" @click="ask('delete')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-danger-300 hover:bg-white/10 hover:text-danger-200 focus-visible:outline-white transition-colors disabled:opacity-50">Delete</button>
+        <button type="button" aria-label="Clear selection" @click="$store.sel.clear()" class="w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg text-ink-300 hover:bg-white/10 hover:text-white focus-visible:outline-white flex items-center justify-center transition-colors" title="Clear selection">
             <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>
@@ -382,24 +347,24 @@ ticked (see the `sel` Alpine store).{% endcomment %}
     {% comment %}Confirmation dialog for impactful actions (publish / delete).
     Draft is reversible so it runs without a prompt.{% endcomment %}
     <div x-cloak x-show="confirmAction" @keydown.escape.window="confirmAction = null"
-         class="fixed inset-0 z-[70] flex items-center justify-center bg-ink-950/35 px-4" @click.self="confirmAction = null">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xs text-center"
-             x-trap.noscroll="confirmAction" role="dialog" aria-modal="true" aria-labelledby="bulk-confirm-title">
-            <div class="w-11 h-11 mx-auto rounded-full flex items-center justify-center mb-3"
-                 :class="confirmAction === 'delete' ? 'bg-danger-50 text-danger-500' : 'bg-success-50 text-success-600'">
-                <svg x-show="confirmAction === 'delete'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                <svg x-show="confirmAction === 'publish'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+         class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center ui-overlay sm:px-4" @click.self="confirmAction = null">
+        <div class="ui-modal sm:max-w-[400px] max-sm:rounded-b-none"
+             x-trap.noscroll="confirmAction" role="dialog" aria-modal="true" aria-labelledby="bulk-confirm-title" aria-describedby="bulk-confirm-body">
+            <div class="ui-modal-header">
+                <h3 id="bulk-confirm-title" class="ui-modal-title" x-text="confirmAction === 'delete' ? 'Delete posts?' : 'Publish now?'"></h3>
+                <button type="button" @click="confirmAction = null" class="ui-btn ui-btn-icon -mr-2 -mt-1" aria-label="Close">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
-            <h3 id="bulk-confirm-title" class="text-base font-bold text-ink-900" x-text="confirmAction === 'delete' ? 'Delete posts?' : 'Publish now?'"></h3>
-            <p class="text-sm text-ink-500 mt-1 leading-relaxed"
+            <p id="bulk-confirm-body" class="ui-modal-body"
                x-text="confirmAction === 'delete'
                    ? ('Permanently delete ' + $store.sel.count + ' selected post' + ($store.sel.count === 1 ? '' : 's') + '. This can\'t be undone.')
                    : ('Publish ' + $store.sel.count + ' selected post' + ($store.sel.count === 1 ? '' : 's') + ' now — they go out on their platforms shortly.')"></p>
-            <div class="flex gap-2 mt-5">
-                <button @click="confirmAction = null" class="flex-1 px-4 py-2 text-sm font-semibold rounded-full border border-ink-200 text-ink-600 hover:bg-ink-25 transition-colors">Cancel</button>
-                <button @click="exec(confirmAction)" :disabled="busy"
-                        :class="confirmAction === 'delete' ? 'bg-danger-500 hover:bg-danger-500' : 'bg-success-500 hover:bg-success-500'"
-                        class="flex-1 px-4 py-2 text-sm font-semibold rounded-full text-white transition-colors disabled:opacity-50"
+            <div class="ui-modal-footer">
+                <button type="button" @click="confirmAction = null" class="ui-btn ui-btn-secondary">Cancel</button>
+                <button type="button" @click="exec(confirmAction)" :disabled="busy"
+                        :class="confirmAction === 'delete' ? 'ui-btn-danger' : 'ui-btn-primary'"
+                        class="ui-btn"
                         x-text="confirmAction === 'delete' ? 'Delete' : 'Publish'"></button>
             </div>
         </div>

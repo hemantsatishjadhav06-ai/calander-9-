@@ -3,30 +3,31 @@
 {% block title %}Import from CSV - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block page_header %}
-<div class="flex items-center justify-between mb-6">
-    <div>
-        <h1 class="text-base font-semibold text-ink-900" style="letter-spacing: -0.01em;">Import from CSV</h1>
-        <p class="text-sm text-ink-500 mt-1">Bulk import posts from a CSV or TSV file.</p>
-    </div>
-    <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}" class="text-sm text-ink-500 hover:text-ink-700 flex items-center gap-1">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+<div class="w-full max-w-[880px] mx-auto mb-6">
+    <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}" class="inline-flex items-center gap-1 -ml-1 mb-2 min-h-8 px-1 rounded-md text-[13px] font-medium text-ink-600 hover:text-ink-900">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         Back to Calendar
     </a>
+    <h1 class="ui-page-title">Import from CSV</h1>
+    <p class="ui-page-status">Bring in many posts at once from a CSV or TSV file. You check every row before anything is saved.</p>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="max-w-3xl" id="csv-import-container">
+<div class="w-full max-w-[880px] mx-auto" id="csv-import-container">
 
     {% if error %}
-    <div class="rounded-lg p-4 bg-danger-50 text-danger-600 text-sm mb-4">{{ error }}</div>
+    <div class="ui-callout ui-callout-danger mb-4" role="alert">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><path d="M12 8v4M12 16h.01"/></svg>
+        <span class="text-sm">{{ error }}</span>
+    </div>
     {% endif %}
 
     <!-- Step 1: Upload -->
-    <div class="bg-white rounded-xl border border-ink-200 p-6">
+    <section class="ui-card" aria-labelledby="csv-step-1">
         <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background: var(--primary-strong);">1</div>
-            <h2 class="text-sm font-semibold text-ink-800">Upload CSV File</h2>
+            <span class="w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center text-xs font-semibold tabular-nums" aria-hidden="true">1</span>
+            <h2 id="csv-step-1" class="text-h3 text-ink-950">Upload your file</h2>
         </div>
 
         <form hx-post="{% url 'composer:csv_upload' workspace_id=workspace.id %}"
@@ -35,35 +36,36 @@
               hx-encoding="multipart/form-data">
             {% csrf_token %}
 
-            <div class="border-2 border-dashed border-ink-200 rounded-xl p-8 text-center cursor-pointer hover:border-ink-300 transition-colors"
+            <div class="border border-dashed border-ink-400 bg-ink-25 rounded-xl p-8 max-sm:p-6 text-center cursor-pointer hover:border-ink-500 transition-colors"
                  x-data="{ dragging: false, filename: '' }"
                  role="button"
                  tabindex="0"
+                 aria-label="Choose a CSV file"
                  @click="$refs.fileInput.click()"
                  @keydown.enter.prevent="$refs.fileInput.click()"
                  @keydown.space.prevent="$refs.fileInput.click()"
                  @dragover.prevent="dragging = true"
                  @dragleave="dragging = false"
                  @drop.prevent="dragging = false; $refs.fileInput.files = $event.dataTransfer.files; filename = $event.dataTransfer.files[0]?.name"
-                 :class="dragging && 'border-ink-300 bg-brand-50'">
-                <svg class="w-10 h-10 text-ink-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-                <p class="text-sm text-ink-600 mb-1">Drop your CSV file here, or <label for="csv-file" class="font-semibold cursor-pointer" style="color: var(--primary);">browse</label></p>
+                 :class="dragging && '!border-brand-600 !bg-brand-50'">
+                <svg class="w-8 h-8 text-ink-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+                <p class="text-sm text-ink-700 mb-1">Drop your CSV file here, or <label for="csv-file" class="link-inline font-semibold cursor-pointer">browse</label></p>
                 <p class="text-xs text-ink-500">Supports .csv and .tsv files</p>
-                <p class="text-xs text-ink-600 mt-2 font-medium" x-show="filename" x-text="filename" x-cloak></p>
+                <p class="text-sm text-ink-900 mt-3 font-semibold" x-show="filename" x-text="filename" x-cloak></p>
                 <input type="file" name="csv_file" id="csv-file" accept=".csv,.tsv" required class="hidden"
                        x-ref="fileInput"
                        @change="filename = $event.target.files[0]?.name">
             </div>
 
-            <div class="mt-4 flex items-center justify-between">
-                <div class="text-xs text-ink-500">
-                    Expected columns: date, time, platforms, caption, media_url, category, tags, first_comment
-                </div>
-                <button type="submit" class="btn-brand text-sm py-2 px-5">
-                    Upload &amp; Map Columns
+            <div class="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p class="text-xs text-ink-600">
+                    Expected columns: <span class="font-mono text-ink-700">date, time, platforms, caption, media_url, category, tags, first_comment</span>
+                </p>
+                <button type="submit" class="ui-btn ui-btn-primary flex-shrink-0">
+                    Upload and match columns
                 </button>
             </div>
         </form>
-    </div>
+    </section>
 </div>
 {% endblock %}

@@ -1,9 +1,9 @@
 {% if events %}
 {% for event in events %}
 {% with event_url=event.link|default:event.feed_website_url|default:'#' %}
-<article class="flex items-start gap-4 p-3 border border-ink-200 rounded-xl hover:bg-ink-25 transition-colors">
+<article class="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 p-3 bg-white rounded-xl ring-1 ring-inset ring-ink-200 hover:ring-ink-300 transition-shadow">
     <a aria-label="{{ event.title }}" href="{{ event_url }}" target="_blank" rel="noopener noreferrer"
-       class="block w-[140px] h-[96px] rounded-lg overflow-hidden bg-ink-100 flex-shrink-0">
+       class="block w-full sm:w-[140px] h-[160px] sm:h-[96px] rounded-[10px] overflow-hidden bg-ink-50 flex-shrink-0 shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]">
         {% if event.image_url %}
         <img src="{{ event.image_url }}" alt="" loading="lazy" class="w-full h-full object-cover">
         {% else %}
@@ -14,10 +14,10 @@
     </a>
     <div class="flex-1 min-w-0">
         <a href="{{ event_url }}" target="_blank" rel="noopener noreferrer"
-           class="block text-lg sm:text-xl leading-snug font-semibold text-ink-800 hover:text-ink-900">
+           class="block text-[17px] leading-[22px] font-semibold text-ink-900 hover:underline underline-offset-3">
             {{ event.title }}
         </a>
-        <div class="mt-1 flex items-center gap-1.5 text-sm text-ink-500">
+        <div class="mt-1 flex items-center gap-1.5 text-[13px] text-ink-600">
             {% if event.feed_favicon_url %}
             <img src="{{ event.feed_favicon_url }}" alt="" loading="lazy" class="w-4 h-4 rounded object-contain"
                  x-data @error="$el.style.display='none'; $el.nextElementSibling.classList.remove('hidden');">
@@ -29,13 +29,13 @@
         <p class="mt-1 text-sm text-ink-600">
             {{ event.summary|truncatechars:220 }}
             {% if event_url != '#' %}
-            <a href="{{ event_url }}" target="_blank" rel="noopener noreferrer" class="text-ink-700 hover:text-ink-900">
-                View Entire Post
+            <a href="{{ event_url }}" target="_blank" rel="noopener noreferrer" class="link-inline">
+                Read the full post
             </a>
             {% endif %}
         </p>
         {% endif %}
-        <div class="mt-2 text-sm text-ink-500">
+        <div class="mt-2 text-xs text-ink-500">
             {% if event.published_at %}
             {{ event.published_at|timesince }} ago
             {% else %}
@@ -58,6 +58,6 @@
      hx-swap="outerHTML"
      hx-trigger="intersect once"
      class="py-5 flex items-center justify-center">
-    <div class="animate-spin w-5 h-5 border-2 border-ink-300 border-t-info-500 rounded-full"></div>
+    <div class="ui-spinner !w-5 !h-5"></div>
 </div>
 {% endif %}

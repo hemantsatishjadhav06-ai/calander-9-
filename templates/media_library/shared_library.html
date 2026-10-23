@@ -5,77 +5,80 @@
 
 {% block extra_head %}
 <style>
+/* Page styles sit in the components layer so a utility on the same element still wins. */
+@layer components {
+  /* Asset card: hairline + 1px shadow; hover darkens the edge, never lifts */
   .ml-asset-card {
     background: var(--surface-0);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
-    transition: all var(--dur-base) var(--ease-out);
+    box-shadow: var(--shadow-xs);
+    transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
   }
-  .ml-asset-card:hover {
-    box-shadow: var(--shadow-lg);
-    border-color: transparent;
-    transform: translateY(-2px);
-  }
+  .ml-asset-card:hover { border-color: var(--ink-300); box-shadow: var(--shadow-sm); }
+  /* Type filters: filter chips (selected is ink-900) */
   .ml-filter-pill {
-    font-size: 0.75rem; font-weight: 600; padding: 5px 12px;
-    border-radius: 9999px; border: 1px solid var(--border);
-    background: var(--surface-0); color: var(--text-secondary);
-    cursor: pointer; transition: all 150ms ease;
+    display: inline-flex; align-items: center;
+    height: 32px; padding: 0 12px;
+    font-size: 0.8125rem; font-weight: 500;
+    border-radius: 9999px;
+    color: var(--ink-700);
+    white-space: nowrap; text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
   }
-  .ml-filter-pill:hover { border-color: var(--border-hover); }
-  .ml-filter-pill.active { background: var(--primary-strong); color: var(--text-inverse); border-color: var(--primary); }
+  @media (max-width: 1023px) { .ml-filter-pill { height: 44px; } }
+  .ml-filter-pill:hover { background: var(--ink-100); }
+  .ml-filter-pill.active { background: var(--ink-900); color: #fff; font-weight: 600; }
+  /* File type tag on a card: sentence case, 12px, neutral */
   .ml-type-badge {
-    font-size: 9px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.06em; padding: 2px 6px; border-radius: var(--radius-sm);
+    font-size: 12px;
+    line-height: 18px;
+    font-weight: 600;
+    padding: 0 6px;
+    border-radius: 6px;
   }
-  .ml-search-input {
-    border-color: var(--border);
-    transition: border-color 150ms, box-shadow 150ms;
-  }
-  .ml-search-input:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-ring);
-  }
+}
 </style>
 {% endblock %}
 
-{% block page_title %}Shared Library{% endblock %}
+{% block page_title %}Shared library{% endblock %}
 
 {% block content %}
 <div>
   <!-- Header -->
-  <div class="flex items-center justify-between mb-5">
-    <div>
-      <p class="text-sm" style="color: var(--text-secondary);">Organization-wide assets available to all workspaces.</p>
+  <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+    <div class="min-w-0">
+      <h1 class="ui-page-title">Shared library</h1>
+      <p class="ui-page-status">Pictures and videos every workspace in your organization can use.</p>
     </div>
     {% if is_admin %}
-    <label class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-full hover:bg-brand-100 hover:border-ink-300 active:bg-brand-100 transition-all duration-150 cursor-pointer">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-      Upload to Shared
-      <input id="shared-upload-input" type="file" multiple accept="{{ accepted_file_types }}" class="hidden">
+    <label class="ui-btn ui-btn-primary cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus-ring)]">
+      <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Upload
+      <input id="shared-upload-input" type="file" multiple accept="{{ accepted_file_types }}" class="sr-only">
     </label>
     {% endif %}
   </div>
 
   <!-- Rejected uploads -->
-  <div id="shared-upload-errors" hidden role="alert" class="mb-4 rounded-xl border px-4 py-3"
-       style="border-color: var(--error-200); background: var(--error-50); color: var(--error-700);">
+  <div id="shared-upload-errors" hidden role="alert" class="mb-4 rounded-xl ring-1 ring-inset ring-danger-200 bg-danger-50 text-danger-700 px-4 py-3">
     <p class="text-xs font-semibold"></p>
     <ul class="mt-1 space-y-0.5"></ul>
   </div>
 
   <!-- Filters -->
-  <div class="flex items-center gap-3 mb-4">
-    <div class="relative flex-1 max-w-sm">
-      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--text-ghost);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-      <input type="search" name="q" value="{{ query }}" placeholder="Search shared assets..." aria-label="Search shared assets"
-             class="ml-search-input w-full pl-9 pr-4 py-2 text-sm border rounded-lg outline-none"
+  <div class="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
+    <div class="relative flex-1 min-w-0 basis-full sm:basis-auto sm:max-w-sm">
+      <svg aria-hidden="true" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input type="search" name="q" value="{{ query }}" placeholder="Search shared media…" aria-label="Search shared assets"
+             class="ui-input !pl-9"
              hx-get="{% url 'media_library_org:shared_index' %}"
              hx-trigger="keyup changed delay:400ms"
              hx-target="#shared-grid"
              hx-include="[name='q']">
     </div>
-    <div class="flex items-center gap-1.5">
+    <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap min-w-0 max-w-full">
       <a href="{% url 'media_library_org:shared_index' %}" class="ml-filter-pill {% if not current_type %}active{% endif %}">All</a>
       {% for type_val, type_label in file_types %}
       <a href="{% url 'media_library_org:shared_index' %}?type={{ type_val }}" class="ml-filter-pill {% if current_type == type_val %}active{% endif %}">{{ type_label }}</a>
