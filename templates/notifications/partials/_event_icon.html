@@ -1,0 +1,16 @@
+{% comment %}The icon for one notification: a shape per event, tinted by what it means (done is leaf, stopped is red,
+waiting for a person is amber, in the team's hands is petrol, anything else neutral). Context: n, size ("sm" for the drawer).{% endcomment %}
+{% if n.event_type == "post_approved" or n.event_type == "post_published" or n.event_type == "report_generated" %}<div class="{% if size == 'sm' %}w-8 h-8{% else %}w-9 h-9{% endif %} flex-shrink-0 rounded-lg bg-success-50 ring-1 ring-inset ring-success-200 flex items-center justify-center text-success-500" aria-hidden="true">{% elif n.event_type == "post_rejected" or n.event_type == "post_failed" or n.event_type == "inbox_sla_overdue" %}<div class="{% if size == 'sm' %}w-8 h-8{% else %}w-9 h-9{% endif %} flex-shrink-0 rounded-lg bg-danger-50 ring-1 ring-inset ring-danger-200 flex items-center justify-center text-danger-500" aria-hidden="true">{% elif n.event_type == "social_account_disconnected" or n.event_type == "post_submitted" or n.event_type == "post_changes_requested" %}<div class="{% if size == 'sm' %}w-8 h-8{% else %}w-9 h-9{% endif %} flex-shrink-0 rounded-lg bg-warning-50 ring-1 ring-inset ring-warning-200 flex items-center justify-center text-warning-500" aria-hidden="true">{% elif n.event_type == "new_inbox_message" %}<div class="{% if size == 'sm' %}w-8 h-8{% else %}w-9 h-9{% endif %} flex-shrink-0 rounded-lg bg-info-50 ring-1 ring-inset ring-info-200 flex items-center justify-center text-info-500" aria-hidden="true">{% else %}<div class="{% if size == 'sm' %}w-8 h-8{% else %}w-9 h-9{% endif %} flex-shrink-0 rounded-lg bg-ink-100 ring-1 ring-inset ring-ink-200 flex items-center justify-center text-ink-500" aria-hidden="true">{% endif %}
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    {% if n.event_type == "post_approved" %}<path d="M5 13l4 4L19 7"/>
+    {% elif n.event_type == "post_published" %}<path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+    {% elif n.event_type == "report_generated" %}<path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+    {% elif n.event_type == "post_rejected" or n.event_type == "post_failed" %}<path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/>
+    {% elif n.event_type == "inbox_sla_overdue" %}<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    {% elif n.event_type == "social_account_disconnected" %}<path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/>
+    {% elif n.event_type == "post_changes_requested" %}<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/>
+    {% elif n.event_type == "post_submitted" %}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+    {% elif n.event_type == "new_inbox_message" %}<path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+    {% else %}<path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>{% endif %}
+    </svg>
+</div>

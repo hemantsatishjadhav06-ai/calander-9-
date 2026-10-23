@@ -669,7 +669,10 @@ class TestStaffPages:
         assert "Talk to the team" in listing and '2<span class="sr-only"> unread</span>' in listing
 
         opened = client.get(_url("studio:thread", world) + f"?c={client_thread.pk}").content.decode()
-        assert "Internal note" in opened and "Checking the price first" in opened and "(client)" in opened
+        # A client's message carries the neutral "Client" tag (it used to be a "(client)" suffix).
+        assert (
+            "Internal note" in opened and "Checking the price first" in opened and "data-client-tag>Client<" in opened
+        )
         assert "With the client" in opened
 
     def test_a_non_htmx_send_redirects_to_the_thread(self, client, world, jobs):

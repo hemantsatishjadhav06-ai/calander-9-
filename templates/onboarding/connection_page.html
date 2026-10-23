@@ -4,96 +4,37 @@
 {% block title %}Connect your accounts - {{ org.name }}{% endblock %}
 
 {% block auth_content %}
-<div style="width: 100%; max-width: 640px; padding: 0 16px;">
+<div class="w-full max-w-[640px]">
 
-    <!-- Header card -->
-    <div style="text-align: center; margin-bottom: 32px;">
-        <!-- Org identity -->
-        <div style="
-            width: 56px; height: 56px;
-            background: var(--primary-strong);
-            border-radius: var(--radius-xl);
-            display: inline-flex; align-items: center; justify-content: center;
-            color: white; font-weight: 700; font-size: 1.25rem;
-            box-shadow: var(--shadow-primary);
-            margin-bottom: 20px;
-        ">{{ org.name|make_list|first|upper }}</div>
-
-        <h1 style="
-            font-family: var(--font-display);
-            font-size: clamp(1.5rem, 3.5vw, 1.875rem);
-            font-weight: 700;
-            color: var(--text-primary);
-            letter-spacing: -0.02em;
-            line-height: 1.2;
-            margin-bottom: 8px;
-        ">Connect your social accounts</h1>
-        <p style="
-            font-size: 0.9375rem;
-            color: var(--text-secondary);
-            line-height: 1.6;
-        ">to <strong style="color: var(--text-primary); font-weight: 600;">{{ workspace.name }}</strong> on {{ org.name }}</p>
+    <!-- Header -->
+    <div class="mb-8 text-center">
+        <div class="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-ink-900 text-xl font-bold text-white" aria-hidden="true">{{ org.name|make_list|first|upper }}</div>
+        <h1 class="text-h1 text-ink-950">Connect your social accounts</h1>
+        <p class="mt-2 text-body-lg text-ink-600">to <strong class="font-semibold text-ink-900">{{ workspace.name }}</strong> on {{ org.name }}</p>
     </div>
 
     <!-- Error message -->
     {% if error %}
-    <div role="alert" style="
-        background: var(--error-50);
-        border: 1px solid rgba(153, 22, 24,0.15);
-        border-radius: var(--radius-lg);
-        padding: 12px 16px;
-        margin-bottom: 20px;
-        display: flex; align-items: center; gap: 10px;
-        font-size: 0.8125rem; color: var(--error-700);
-    ">
-        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-        {{ error }}
+    <div role="alert" class="mb-5 ui-callout ui-callout-danger text-sm">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+        <span>{{ error }}</span>
     </div>
     {% endif %}
 
-    <!-- Platform grid -->
-    <div style="
-        background: var(--surface-0);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-xl);
-        box-shadow: var(--shadow-sm);
-        overflow: hidden;
-        margin-bottom: 24px;
-    ">
+    <!-- Platform list -->
+    <ul class="mb-6 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs divide-y divide-ink-200">
         {% for value, label in platform_choices %}
         {% if value in configured_platforms %}
-        <div style="
-            padding: 16px 20px;
-            {% if not forloop.last %}border-bottom: 1px solid var(--surface-2);{% endif %}
-            display: flex; align-items: center; gap: 14px;
-        ">
-            <!-- Platform icon -->
-            <div style="
-                width: 40px; height: 40px; flex-shrink: 0;
-                border-radius: var(--radius-lg);
-                display: flex; align-items: center; justify-content: center;
-            " class="
-                {% if value == 'facebook' %}bg-info-50 text-info-600
-                {% elif value == 'instagram' %}bg-gradient-to-br from-ink-50 to-ink-50 text-ink-700
-                {% elif value == 'linkedin_personal' %}bg-info-50 text-info-600
-                {% elif value == 'linkedin_company' %}bg-info-50 text-info-600
-                {% elif value == 'tiktok' %}bg-ink-900 text-white
-                {% elif value == 'youtube' %}bg-danger-50 text-danger-600
-                {% elif value == 'pinterest' %}bg-danger-50 text-danger-500
-                {% elif value == 'threads' %}bg-ink-100 text-ink-800
-                {% elif value == 'bluesky' %}bg-info-50 text-info-600
-                {% elif value == 'google_business' %}bg-info-50 text-info-600
-                {% elif value == 'mastodon' %}bg-info-50 text-info-600
-                {% elif value == 'x' %}bg-ink-900 text-white
-                {% endif %}
-            ">
-                {% include "social_accounts/partials/_platform_icon.html" with platform=value size="5" %}
+        <li class="flex items-center gap-3.5 px-4 sm:px-5 py-4">
+            <!-- Platform glyph, in its own colours on a neutral tile -->
+            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-ink-50 ring-1 ring-inset ring-ink-200" aria-hidden="true">
+                {% include "partials/_platform_icon.html" with platform=value size="md" %}
             </div>
 
             <!-- Platform info -->
-            <div style="flex: 1; min-width: 0;">
-                <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary);">{{ label }}</div>
-                <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 1px;">
+            <div class="min-w-0 flex-1">
+                <div class="text-sm font-semibold text-ink-900">{{ label }}</div>
+                <div class="mt-px text-xs text-ink-500">
                     {% if value == 'facebook' %}Pages
                     {% elif value == 'instagram' %}Business &amp; Creator
                     {% elif value == 'linkedin_personal' %}Personal profile
@@ -113,153 +54,53 @@
 
             <!-- Connect button or connected state -->
             {% if value in connected_accounts %}
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 0.8125rem; font-weight: 500; color: var(--success-700);">
-                    Connected
-                </span>
-                <div style="
-                    width: 28px; height: 28px;
-                    background: var(--success-50);
-                    border-radius: var(--radius-full);
-                    display: flex; align-items: center; justify-content: center;
-                ">
-                    <svg width="14" height="14" fill="none" stroke="var(--success-500)" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                </div>
-            </div>
+            {% include "studio/partials/pill.html" with tone="success" icon="check" label="Connected" data_state="" %}
             {% else %}
             {% if value == 'bluesky' %}
             <!-- Bluesky: inline form (no OAuth) -->
-            <div x-data="{ showForm: false }" @keydown.escape.window="showForm = false" style="flex-shrink: 0;">
-                <button type="button" :aria-expanded="showForm" aria-controls="connection-bluesky-form" @click="showForm = !showForm"
-                        class="btn-primary-hover"
-                        style="
-                    display: inline-flex; align-items: center; gap: 6px;
-                    padding: 7px 16px;
-                    font-size: 0.75rem; font-weight: 600;
-                    color: white; background: var(--primary-strong);
-                    border: none; border-radius: var(--radius-full);
-                    cursor: pointer;
-                    box-shadow: var(--shadow-primary);
-                    transition: all 200ms ease;
-                ">
-                    Connect
-                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            <div x-data="{ showForm: false }" @keydown.escape.window="showForm = false" class="flex-shrink-0">
+                <button type="button" :aria-expanded="showForm" aria-controls="connection-bluesky-form" @click="showForm = !showForm" class="ui-btn ui-btn-sm ui-btn-tinted">
+                    Connect<span class="sr-only"> {{ label }}</span>
                 </button>
-                <div x-show="showForm" x-cloak style="
-                    position: fixed; inset: 0; z-index: 50;
-                    display: flex; align-items: center; justify-content: center;
-                    background: rgba(14, 17, 20,0.4); padding: 16px;
-                " @click.self="showForm = false">
-                    <form id="connection-bluesky-form" role="dialog" aria-modal="true" aria-labelledby="connection-bluesky-title" x-trap.noscroll="showForm" method="post" action="{% url 'onboarding:connection_bluesky' token=link.token %}" style="
-                        background: var(--surface-0);
-                        border-radius: var(--radius-xl);
-                        padding: 24px;
-                        width: 100%; max-width: 380px;
-                        box-shadow: var(--shadow-xl);
-                    ">
+                <div x-show="showForm" x-cloak class="ui-overlay z-50 flex items-center justify-center p-4" @click.self="showForm = false">
+                    <form id="connection-bluesky-form" role="dialog" aria-modal="true" aria-labelledby="connection-bluesky-title" x-trap.noscroll="showForm" method="post" action="{% url 'onboarding:connection_bluesky' token=link.token %}" class="ui-modal max-w-[400px]">
                         {% csrf_token %}
-                        <h3 id="connection-bluesky-title" style="font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Connect Bluesky</h3>
-                        <div style="margin-bottom: 12px;">
-                            <label for="bsky-handle" style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">Handle</label>
-                            <input type="text" id="bsky-handle" name="handle" placeholder="you.bsky.social" required style="
-                                width: 100%; padding: 9px 12px;
-                                font-size: 0.875rem; font-family: var(--font-body);
-                                border: 1.5px solid var(--border);
-                                border-radius: var(--radius-lg);
-                                background: var(--surface-0);
-                                color: var(--text-primary);
-                                outline: none;
-                            ">
+                        <div class="ui-modal-header"><h2 id="connection-bluesky-title" class="ui-modal-title">Connect Bluesky</h2></div>
+                        <div class="ui-modal-body space-y-4">
+                            <div>
+                                <label for="bsky-handle" class="ui-label">Handle</label>
+                                <input type="text" id="bsky-handle" name="handle" placeholder="you.bsky.social" required class="ui-input">
+                            </div>
+                            <div>
+                                <label for="bsky-app-password" class="ui-label">App password</label>
+                                <input type="password" id="bsky-app-password" name="app_password" required aria-describedby="bsky-app-password-help" class="ui-input">
+                                <p id="bsky-app-password-help" class="ui-help">Create one in Bluesky under Settings &rarr; App passwords.</p>
+                            </div>
                         </div>
-                        <div style="margin-bottom: 16px;">
-                            <label for="bsky-app-password" style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">App Password</label>
-                            <input type="password" id="bsky-app-password" name="app_password" required style="
-                                width: 100%; padding: 9px 12px;
-                                font-size: 0.875rem; font-family: var(--font-body);
-                                border: 1.5px solid var(--border);
-                                border-radius: var(--radius-lg);
-                                background: var(--surface-0);
-                                color: var(--text-primary);
-                                outline: none;
-                            ">
-                            <p style="font-size: 0.6875rem; color: var(--text-tertiary); margin-top: 4px;">Generate at Settings &rarr; App Passwords on Bluesky</p>
-                        </div>
-                        <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                            <button type="button" @click="showForm = false" style="
-                                padding: 8px 16px; font-size: 0.8125rem; font-weight: 600;
-                                background: var(--surface-0); color: var(--text-primary);
-                                border: 1px solid var(--border); border-radius: var(--radius-full);
-                                cursor: pointer;
-                            ">Cancel</button>
-                            <button type="submit" style="
-                                padding: 8px 16px; font-size: 0.8125rem; font-weight: 600;
-                                background: var(--primary-strong); color: white;
-                                border: none; border-radius: var(--radius-full);
-                                cursor: pointer; box-shadow: var(--shadow-primary);
-                            ">Connect</button>
+                        <div class="ui-modal-footer">
+                            <button type="button" @click="showForm = false" class="ui-btn ui-btn-secondary">Cancel</button>
+                            <button type="submit" class="ui-btn ui-btn-primary">Connect</button>
                         </div>
                     </form>
                 </div>
             </div>
             {% elif value == 'mastodon' %}
             <!-- Mastodon: instance URL form -->
-            <div x-data="{ showForm: false }" @keydown.escape.window="showForm = false" style="flex-shrink: 0;">
-                <button type="button" :aria-expanded="showForm" aria-controls="connection-mastodon-form" @click="showForm = !showForm"
-                        class="btn-primary-hover"
-                        style="
-                    display: inline-flex; align-items: center; gap: 6px;
-                    padding: 7px 16px;
-                    font-size: 0.75rem; font-weight: 600;
-                    color: white; background: var(--primary-strong);
-                    border: none; border-radius: var(--radius-full);
-                    cursor: pointer;
-                    box-shadow: var(--shadow-primary);
-                    transition: all 200ms ease;
-                ">
-                    Connect
-                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            <div x-data="{ showForm: false }" @keydown.escape.window="showForm = false" class="flex-shrink-0">
+                <button type="button" :aria-expanded="showForm" aria-controls="connection-mastodon-form" @click="showForm = !showForm" class="ui-btn ui-btn-sm ui-btn-tinted">
+                    Connect<span class="sr-only"> {{ label }}</span>
                 </button>
-                <div x-show="showForm" x-cloak style="
-                    position: fixed; inset: 0; z-index: 50;
-                    display: flex; align-items: center; justify-content: center;
-                    background: rgba(14, 17, 20,0.4); padding: 16px;
-                " @click.self="showForm = false">
-                    <form id="connection-mastodon-form" role="dialog" aria-modal="true" aria-labelledby="connection-mastodon-title" x-trap.noscroll="showForm" method="post" action="{% url 'onboarding:connection_mastodon' token=link.token %}" style="
-                        background: var(--surface-0);
-                        border-radius: var(--radius-xl);
-                        padding: 24px;
-                        width: 100%; max-width: 380px;
-                        box-shadow: var(--shadow-xl);
-                    ">
+                <div x-show="showForm" x-cloak class="ui-overlay z-50 flex items-center justify-center p-4" @click.self="showForm = false">
+                    <form id="connection-mastodon-form" role="dialog" aria-modal="true" aria-labelledby="connection-mastodon-title" x-trap.noscroll="showForm" method="post" action="{% url 'onboarding:connection_mastodon' token=link.token %}" class="ui-modal max-w-[400px]">
                         {% csrf_token %}
-                        <h3 id="connection-mastodon-title" style="font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Connect Mastodon</h3>
-                        <div style="margin-bottom: 16px;">
-                            <label for="mastodon-instance-url" style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">Instance URL</label>
-                            <input type="text" id="mastodon-instance-url" name="instance_url" placeholder="mastodon.social" required style="
-                                width: 100%; padding: 9px 12px;
-                                font-size: 0.875rem; font-family: var(--font-body);
-                                border: 1.5px solid var(--border);
-                                border-radius: var(--radius-lg);
-                                background: var(--surface-0);
-                                color: var(--text-primary);
-                                outline: none;
-                            ">
+                        <div class="ui-modal-header"><h2 id="connection-mastodon-title" class="ui-modal-title">Connect Mastodon</h2></div>
+                        <div class="ui-modal-body">
+                            <label for="mastodon-instance-url" class="ui-label">Instance address</label>
+                            <input type="text" id="mastodon-instance-url" name="instance_url" placeholder="mastodon.social" required class="ui-input">
                         </div>
-                        <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                            <button type="button" @click="showForm = false" style="
-                                padding: 8px 16px; font-size: 0.8125rem; font-weight: 600;
-                                background: var(--surface-0); color: var(--text-primary);
-                                border: 1px solid var(--border); border-radius: var(--radius-full);
-                                cursor: pointer;
-                            ">Cancel</button>
-                            <button type="submit" style="
-                                padding: 8px 16px; font-size: 0.8125rem; font-weight: 600;
-                                background: var(--primary-strong); color: white;
-                                border: none; border-radius: var(--radius-full);
-                                cursor: pointer; box-shadow: var(--shadow-primary);
-                            ">Connect</button>
+                        <div class="ui-modal-footer">
+                            <button type="button" @click="showForm = false" class="ui-btn ui-btn-secondary">Cancel</button>
+                            <button type="submit" class="ui-btn ui-btn-primary">Connect</button>
                         </div>
                     </form>
                 </div>
@@ -268,76 +109,39 @@
             {% include "onboarding/partials/_devto_connection_form.html" %}
             {% else %}
             <!-- Standard OAuth platforms -->
-            <form method="post" action="{% url 'onboarding:connection_oauth_start' token=link.token %}" style="flex-shrink: 0;">
+            <form method="post" action="{% url 'onboarding:connection_oauth_start' token=link.token %}" class="flex-shrink-0">
                 {% csrf_token %}
                 <input type="hidden" name="platform" value="{{ value }}">
-                <button type="submit"
-                        class="btn-primary-hover"
-                        style="
-                    display: inline-flex; align-items: center; gap: 6px;
-                    padding: 7px 16px;
-                    font-size: 0.75rem; font-weight: 600;
-                    color: white; background: var(--primary-strong);
-                    border: none; border-radius: var(--radius-full);
-                    cursor: pointer;
-                    box-shadow: var(--shadow-primary);
-                    transition: all 200ms ease;
-                ">
-                    Connect
-                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                <button type="submit" class="ui-btn ui-btn-sm ui-btn-tinted">
+                    Connect<span class="sr-only"> {{ label }}</span>
                 </button>
             </form>
             {% endif %}
             {% endif %}
-        </div>
+        </li>
         {% endif %}
         {% endfor %}
-    </div>
+    </ul>
 
     <!-- Connected count summary + Done button -->
     {% if connected_accounts %}
-    <div style="
-        background: var(--success-50);
-        border: 1px solid rgba(66, 158, 74,0.15);
-        border-radius: var(--radius-lg);
-        padding: 14px 18px;
-        margin-bottom: 20px;
-        display: flex; align-items: center; gap: 10px;
-        font-size: 0.8125rem; color: var(--success-700); font-weight: 500;
-    ">
-        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        {{ connected_accounts|length }} account{{ connected_accounts|length|pluralize }} connected
+    <div class="mb-5 ui-callout ui-callout-success text-sm font-medium">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+        <span class="tabular-nums">{{ connected_accounts|length }} account{{ connected_accounts|length|pluralize }} connected</span>
     </div>
     {% endif %}
 
     <form method="post" action="{% url 'onboarding:connection_done' token=link.token %}">
         {% csrf_token %}
-        <button type="submit"
-                class="btn-primary-lift"
-                style="
-            width: 100%;
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-            padding: 14px 28px;
-            font-size: 0.9375rem; font-weight: 600; font-family: var(--font-body);
-            color: white; background: var(--primary-strong);
-            border: none; border-radius: var(--radius-full);
-            cursor: pointer;
-            box-shadow: var(--shadow-primary);
-            transition: all 200ms ease;
-        ">
+        <button type="submit" class="ui-btn ui-btn-lg ui-btn-primary w-full">
             Done &mdash; Notify {{ org.name }}
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
         </button>
     </form>
 
     <!-- Footer help -->
-    <div style="text-align: center; margin-top: 28px;">
-        <p style="font-size: 0.75rem; color: var(--text-ghost); line-height: 1.6;">
-            Need help? Contact <strong style="color: var(--text-tertiary);">{{ org.name }}</strong>
-        </p>
-        <p style="font-size: 0.6875rem; color: var(--text-ghost); margin-top: 4px;">
-            This link expires {{ link.expires_at|date:"M j, Y" }}
-        </p>
+    <div class="mt-7 text-center">
+        <p class="text-xs text-ink-500">Need help? Contact <strong class="font-semibold text-ink-700">{{ org.name }}</strong></p>
+        <p class="mt-1 text-xs text-ink-500">This link expires {{ link.expires_at|date:"j M Y" }}</p>
     </div>
 </div>
 {% endblock %}

@@ -1,9 +1,10 @@
-{% comment %}The agency's peer views (Home / Routines / Team / Settings) as a segmented control: ink, never the accent. Context: tabs (from apps.studio.dashboard.tabs).{% endcomment %}
+{% comment %}The agency's peer views (Home / Routines / Team / Settings) as a segmented control: ink, never the accent. Context: tabs (from apps.studio.dashboard.tabs).
+Each segment is 44px tall below 1024px so it is an easy target on a phone.{% endcomment %}
 {% if tabs %}
 <nav aria-label="Agency" class="mb-6 max-w-full">
     <div class="ui-segmented">
         {% for tab in tabs %}
-        <a href="{{ tab.url }}" class="ui-segment"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
+        <a href="{{ tab.url }}" class="ui-segment max-lg:min-h-11"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
         {% endfor %}
     </div>
 </nav>

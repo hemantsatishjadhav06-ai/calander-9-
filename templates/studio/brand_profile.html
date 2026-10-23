@@ -4,38 +4,38 @@
 {% block page_title %}Agency{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl">
-    <nav aria-label="Breadcrumb" class="text-sm text-ink-600 mb-3">
-        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="underline hover:text-ink-900">Agency</a>
-        <span aria-hidden="true"> / </span><span>Brand profile</span>
+<div class="max-w-[880px] min-w-0">
+    <nav aria-label="Breadcrumb" class="mb-3 text-[13px] text-ink-600">
+        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="link-inline text-ink-600 hover:text-ink-900">Agency</a>
+        <span class="mx-1 text-ink-500" aria-hidden="true">/</span><span>Brand profile</span>
     </nav>
-    <div class="mb-6 max-w-2xl">
-        <h1 class="text-lg font-semibold text-ink-900">Brand profile</h1>
-        <p class="text-sm text-ink-600 mt-0.5">How {{ profile.brand_name }} sounds and looks. Saved background notes are unverified. Record source-backed commercial claims and project photos in <a href="{% url 'studio:trust' workspace_id=workspace.pk %}" class="underline">Verified facts</a>; each claim needs a verifier and review expiry.</p>
-    </div>
+    <header class="mb-6 max-w-2xl">
+        <h1 class="ui-page-title">Brand profile</h1>
+        <p class="ui-page-status">How {{ profile.brand_name }} sounds and looks. Saved background notes are unverified. Record source-backed commercial claims and project photos in <a href="{% url 'studio:trust' workspace_id=workspace.pk %}" class="link-inline">Verified facts</a>; each claim needs a verifier and review expiry.</p>
+    </header>
 
     <section aria-labelledby="samples-heading" class="mb-8">
-        <h2 id="samples-heading" class="text-sm font-semibold text-ink-900 mb-3">Your layouts, in your look</h2>
+        <h2 id="samples-heading" class="mb-3 text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Your layouts, in your look</h2>
         <ul class="grid grid-cols-2 md:grid-cols-4 gap-3">
             {% for template in templates %}
             <li>
                 <img src="{% url 'studio:brand_sample' workspace_id=workspace.id template=template %}?v={{ profile.updated_at|date:'U' }}"
-                     alt="Sample {{ template }} graphic" class="w-full h-auto rounded-xl border border-ink-200 bg-ink-100" loading="lazy">
-                <p class="mt-1 text-xs text-ink-600 capitalize">{{ template }}{% if template == profile.default_template %} · default{% endif %}</p>
+                     alt="Sample {{ template }} graphic" class="w-full h-auto rounded-[10px] bg-ink-50 shadow-[var(--shadow-creative)]" loading="lazy">
+                <p class="mt-1.5 text-xs text-ink-600 capitalize">{{ template }}{% if template == profile.default_template %} · default{% endif %}</p>
             </li>
             {% endfor %}
         </ul>
-        <p class="mt-2 text-xs text-ink-600">Samples use the brand background; real posts carry a picture. Once the team has made a post, the next ones follow its look.</p>
+        <p class="mt-2 text-[13px]/[18px] text-ink-600">Samples use the brand background; real posts carry a picture. Once the team has made a post, the next ones follow its look.</p>
     </section>
 
-    <form method="post" novalidate>
+    <form method="post" novalidate class="max-lg:[&_input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden])]:min-h-11 max-lg:[&_select]:min-h-11">
         {% csrf_token %}
-        <fieldset {% if not can_edit %}disabled{% endif %} class="space-y-8">
-            {% if form.non_field_errors %}<div class="text-sm text-danger-600 bg-danger-50 border border-danger-200 rounded-lg px-3 py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+        <fieldset {% if not can_edit %}disabled{% endif %} class="space-y-6">
+            {% if form.non_field_errors %}<div role="alert" class="ui-callout ui-callout-danger text-sm"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
 
-            <section aria-labelledby="voice-heading" class="bg-white border border-ink-200 rounded-2xl p-5 sm:p-6">
-                <h2 id="voice-heading" class="text-sm font-semibold text-ink-900 mb-4">How it sounds</h2>
-                <div class="grid md:grid-cols-2 gap-4">
+            <section aria-labelledby="voice-heading" class="ui-card sm:p-6">
+                <h2 id="voice-heading" class="ui-card-title mb-5">How it sounds</h2>
+                <div class="grid md:grid-cols-2 gap-x-4">
                     {% include "blog/partials/field.html" with field=form.brand_name %}
                     {% include "blog/partials/field.html" with field=form.website %}
                     <div class="md:col-span-2">{% include "blog/partials/field.html" with field=form.about %}</div>
@@ -46,9 +46,9 @@
                 </div>
             </section>
 
-            <section aria-labelledby="facts-heading" class="bg-white border border-ink-200 rounded-2xl p-5 sm:p-6">
-                <h2 id="facts-heading" class="text-sm font-semibold text-ink-900 mb-4">Background notes and rules</h2>
-                <div class="grid md:grid-cols-2 gap-4">
+            <section aria-labelledby="facts-heading" class="ui-card sm:p-6">
+                <h2 id="facts-heading" class="ui-card-title mb-5">Background notes and rules</h2>
+                <div class="grid md:grid-cols-2 gap-x-4">
                     <div class="md:col-span-2">{% include "blog/partials/field.html" with field=form.facts %}</div>
                     {% include "blog/partials/field.html" with field=form.dos %}
                     {% include "blog/partials/field.html" with field=form.donts %}
@@ -56,9 +56,9 @@
                 </div>
             </section>
 
-            <section aria-labelledby="look-heading" class="bg-white border border-ink-200 rounded-2xl p-5 sm:p-6">
-                <h2 id="look-heading" class="text-sm font-semibold text-ink-900 mb-4">How it looks</h2>
-                <div class="grid md:grid-cols-2 gap-4">
+            <section aria-labelledby="look-heading" class="ui-card sm:p-6">
+                <h2 id="look-heading" class="ui-card-title mb-5">How it looks</h2>
+                <div class="grid md:grid-cols-2 gap-x-4">
                     <div class="flex gap-6">
                         {% include "blog/partials/field.html" with field=form.primary_color %}
                         {% include "blog/partials/field.html" with field=form.accent_color %}
@@ -75,9 +75,9 @@
             </section>
 
             {% if can_edit %}
-            <div class="flex items-center gap-3">
-                <button type="submit" class="px-6 py-2.5 text-sm font-semibold text-white bg-brand-700 rounded-full hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">Save brand profile</button>
-                <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="text-sm text-ink-700 underline">Cancel</a>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="submit" class="ui-btn ui-btn-primary max-sm:w-full">Save brand profile</button>
+                <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="ui-btn ui-btn-ghost max-sm:w-full">Cancel</a>
             </div>
             {% endif %}
         </fieldset>

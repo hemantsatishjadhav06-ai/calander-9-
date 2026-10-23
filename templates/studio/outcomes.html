@@ -1,39 +1,44 @@
 {% extends "base.html" %}
 {% block title %}Campaign outcomes - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 {% block content %}
-<div class="max-w-5xl">
-    <h1 class="text-2xl text-ink-900" style="font-family:var(--font-display)">Campaign outcomes</h1>
-    <p class="mt-2 mb-5 text-sm text-ink-600">Record confirmed enquiries and completed site visits after checking your inbox or CRM. Keep lead names and contact details in that system. These are manually recorded events; a person can appear at several stages, so totals are not unique leads or automatic conversion rates.</p>
+<div class="max-w-[960px] min-w-0">
+    <header class="mb-5 max-w-3xl">
+        <h1 class="ui-page-title">Campaign outcomes</h1>
+        <p class="ui-page-status">Record confirmed enquiries and completed site visits after checking your inbox or CRM. Keep lead names and contact details in that system. These are manually recorded events; a person can appear at several stages, so totals are not unique leads or automatic conversion rates.</p>
+    </header>
     {% include "components/agency_tabs.html" %}
-    <dl class="grid grid-cols-3 gap-3 mb-5" aria-label="Confirmed events in the last 30 days">
-        <div class="rounded-xl border border-ink-200 bg-white p-4"><dt class="text-xs text-ink-600">Enquiries · 30 days</dt><dd class="text-2xl font-semibold">{{ totals.enquiry }}</dd></div>
-        <div class="rounded-xl border border-ink-200 bg-white p-4"><dt class="text-xs text-ink-600">Qualified enquiries</dt><dd class="text-2xl font-semibold">{{ totals.qualified_enquiry }}</dd></div>
-        <div class="rounded-xl border border-ink-200 bg-white p-4"><dt class="text-xs text-ink-600">Completed site visits</dt><dd class="text-2xl font-semibold">{{ totals.site_visit }}</dd></div>
+    <dl class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8" aria-label="Confirmed events in the last 30 days">
+        <div class="ui-card"><dt class="text-[13px] text-ink-600">Enquiries · 30 days</dt><dd class="mt-1 text-[28px]/[34px] font-bold tracking-[-0.02em] text-ink-950 tabular-nums">{{ totals.enquiry }}</dd></div>
+        <div class="ui-card"><dt class="text-[13px] text-ink-600">Qualified enquiries</dt><dd class="mt-1 text-[28px]/[34px] font-bold tracking-[-0.02em] text-ink-950 tabular-nums">{{ totals.qualified_enquiry }}</dd></div>
+        <div class="ui-card"><dt class="text-[13px] text-ink-600">Completed site visits</dt><dd class="mt-1 text-[28px]/[34px] font-bold tracking-[-0.02em] text-ink-950 tabular-nums">{{ totals.site_visit }}</dd></div>
     </dl>
     {% if can_record %}
-    <section class="rounded-xl border border-ink-200 bg-white p-5 mb-5" aria-labelledby="record-heading">
-        <h2 id="record-heading" class="text-lg font-semibold mb-3">Record an outcome</h2>
-        <form method="post" class="grid sm:grid-cols-2 gap-4">
+    <section class="ui-card mb-8" aria-labelledby="record-heading">
+        <h2 id="record-heading" class="ui-card-title mb-5">Record an outcome</h2>
+        <form method="post" class="grid sm:grid-cols-2 gap-x-4 gap-y-5 max-lg:[&_input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden])]:min-h-11 max-lg:[&_select]:min-h-11">
             {% csrf_token %}{{ form.submission_token }}
-            {% if form.non_field_errors %}<div role="alert" class="sm:col-span-2 text-sm text-danger-600">{{ form.non_field_errors }}</div>{% endif %}
-            {% for field in form.visible_fields %}<div>
-                <label for="{{ field.id_for_label }}" class="block text-sm font-medium mb-1">{{ field.label }}</label>{{ field }}
-                {% if field.help_text %}<p class="text-xs text-ink-600 mt-1">{{ field.help_text }}</p>{% endif %}
-                {% if field.errors %}<p role="alert" class="text-sm text-danger-600 mt-1">{{ field.errors|join:", " }}</p>{% endif %}
+            {% if form.non_field_errors %}<div role="alert" class="sm:col-span-2 ui-callout ui-callout-danger text-sm"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><div>{{ form.non_field_errors }}</div></div>{% endif %}
+            {% for field in form.visible_fields %}<div class="min-w-0">
+                <label for="{{ field.id_for_label }}" class="ui-label">{{ field.label }}</label>{{ field }}
+                {% if field.help_text %}<p class="ui-help">{{ field.help_text }}</p>{% endif %}
+                {% if field.errors %}<p role="alert" class="ui-error">{{ field.errors|join:", " }}</p>{% endif %}
             </div>{% endfor %}
-            <div class="sm:col-span-2"><button type="submit" class="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800">Record confirmed events</button></div>
+            <div class="sm:col-span-2 flex justify-end"><button type="submit" class="ui-btn ui-btn-primary max-sm:w-full">Record confirmed events</button></div>
         </form>
     </section>
     {% endif %}
     <section aria-labelledby="entries-heading">
-        <h2 id="entries-heading" class="text-lg font-semibold mb-3">Recent entries</h2>
-        <p class="text-xs text-ink-600 mb-3">Post attribution is supplied by your team; the app does not infer it from engagement or inbox activity.</p>
-        <ul class="divide-y divide-ink-200 rounded-xl border border-ink-200 bg-white">
-            {% for entry in outcomes %}<li class="p-4">
-                <p class="text-sm font-semibold">{{ entry.campaign_name }} · {{ entry.count }} {{ entry.get_kind_display|lower }} event{{ entry.count|pluralize }}</p>
-                <p class="text-xs text-ink-600 mt-1">{{ entry.occurred_on|date:"j M Y" }}{% if entry.recorded_by %} · recorded by {{ entry.recorded_by.display_name }}{% endif %}</p>
-                <p class="text-xs text-ink-600 mt-1">{% if entry.post %}Related post: {{ entry.post.caption_snippet }}{% else %}Campaign-level entry; no specific post attribution{% endif %}</p>
-            </li>{% empty %}<li class="p-5 text-sm text-ink-600">No confirmed outcomes recorded yet. Start with one enquiry checked by your team.</li>{% endfor %}
+        <h2 id="entries-heading" class="text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Recent entries</h2>
+        <p class="mt-1 mb-3 text-[13px]/[18px] text-ink-600">Post attribution is supplied by your team; the app does not infer it from engagement or inbox activity.</p>
+        <ul class="ui-card p-0 overflow-hidden divide-y divide-ink-200">
+            {% for entry in outcomes %}<li class="px-4 sm:px-5 py-3.5">
+                <p class="text-sm font-semibold text-ink-900 break-words">{{ entry.campaign_name }} · <span class="tabular-nums">{{ entry.count }}</span> {{ entry.get_kind_display|lower }} event{{ entry.count|pluralize }}</p>
+                <p class="text-xs text-ink-500 mt-0.5 tabular-nums">{{ entry.occurred_on|date:"j M Y" }}{% if entry.recorded_by %} · recorded by {{ entry.recorded_by.display_name }}{% endif %}</p>
+                <p class="text-[13px]/[18px] text-ink-600 mt-1 break-words">{% if entry.post %}Related post: {{ entry.post.caption_snippet }}{% else %}Campaign-level entry; no specific post attribution{% endif %}</p>
+            </li>{% empty %}<li class="ui-empty">
+                <p class="ui-empty-title mt-0">No confirmed outcomes recorded yet</p>
+                <p class="ui-empty-body">Start with one enquiry checked by your team.</p>
+            </li>{% endfor %}
         </ul>
     </section>
 </div>

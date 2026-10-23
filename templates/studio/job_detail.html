@@ -3,47 +3,47 @@
 {% block title %}{{ job.title|default:job.get_kind_display|truncatechars:60 }} - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl">
-    <nav aria-label="Breadcrumb" class="text-sm text-ink-600 mb-3">
-        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="underline hover:text-ink-900">Agency</a>
-        <span aria-hidden="true"> / </span><span>{{ job.get_kind_display }}</span>
+<div class="max-w-[880px] min-w-0">
+    <nav aria-label="Breadcrumb" class="mb-3 text-[13px] text-ink-600">
+        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="link-inline text-ink-600 hover:text-ink-900">Agency</a>
+        <span class="mx-1 text-ink-500" aria-hidden="true">/</span><span>{{ job.get_kind_display }}</span>
     </nav>
-    <div class="flex flex-wrap items-start justify-between gap-3 mb-6">
+    <div class="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div class="min-w-0">
-            <h1 class="text-2xl text-ink-900 break-words" style="font-family: var(--font-display)">{{ job.title|default:job.get_kind_display }}</h1>
-            <p class="text-sm text-ink-600 mt-1">{{ assistant_task.label }}{% if job.requested_by %} · asked by {{ job.requested_by.display_name }}{% endif %} · {{ job.created_at|date:"j M Y, H:i" }}</p>
+            <h1 class="ui-page-title break-words">{{ job.title|default:job.get_kind_display }}</h1>
+            <p class="ui-page-status">{{ assistant_task.label }}{% if job.requested_by %} · asked by {{ job.requested_by.display_name }}{% endif %} · <span class="tabular-nums">{{ job.created_at|date:"j M Y, H:i" }}</span></p>
         </div>
         {% if can_act %}
-        <div class="flex flex-wrap gap-2 max-w-lg">
+        <div class="flex flex-wrap items-start gap-2 max-w-lg">
             {% if assistant_task.can_retry or assistant_task.can_resume %}
             {% if assistant_task.can_resume %}
             <form method="post" action="{% url 'studio:coworker_job_control' workspace_id=workspace.id job_id=job.id %}" class="space-y-3">{% csrf_token %}
                 <input type="hidden" name="action" value="resume">
             {% else %}
-            <form method="post" action="{% url 'studio:job_retry' workspace_id=workspace.id job_id=job.id %}">{% csrf_token %}
+            <form method="post" action="{% url 'studio:job_retry' workspace_id=workspace.id job_id=job.id %}" class="space-y-3">{% csrf_token %}
             {% endif %}
                 <input type="hidden" name="revision" value="{{ assistant_task.revision }}">
                 {% if assistant_task.needs_effect_review %}
                 <input type="hidden" name="review_receipt" value="{{ assistant_task.review_receipt }}">
-                <label class="flex items-start gap-2 text-sm text-ink-800">
-                    <input type="checkbox" name="reviewed" value="1" required class="mt-1">
+                <label class="flex items-start gap-2 text-[13px]/[18px] text-ink-800 cursor-pointer">
+                    <input type="checkbox" name="reviewed" value="1" required class="ui-checkbox mt-px flex-shrink-0">
                     <span>I reviewed the saved work below. I understand that retrying an unfinished step may incur another AI charge.</span>
                 </label>
                 {% endif %}
-                <button type="submit" class="mt-2 px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-full hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">{% if assistant_task.can_resume %}Resume task{% else %}Retry after review{% endif %}</button>
+                <button type="submit" class="ui-btn ui-btn-primary">{% if assistant_task.can_resume %}Resume task{% else %}Retry after review{% endif %}</button>
             </form>
             {% endif %}
             {% if assistant_task.can_pause %}
             <form method="post" action="{% url 'studio:coworker_job_control' workspace_id=workspace.id job_id=job.id %}">{% csrf_token %}
                 <input type="hidden" name="action" value="pause">
                 <input type="hidden" name="revision" value="{{ assistant_task.revision }}">
-                <button type="submit" class="px-4 py-2 text-sm font-medium text-ink-800 border border-ink-300 rounded-full hover:bg-ink-25 focus-visible:outline-2 focus-visible:outline-brand-600">Pause task</button>
+                <button type="submit" class="ui-btn ui-btn-secondary">Pause task</button>
             </form>
             {% endif %}
             {% if assistant_task.can_cancel %}
             <form method="post" action="{% url 'studio:job_cancel' workspace_id=workspace.id job_id=job.id %}">{% csrf_token %}
                 <input type="hidden" name="revision" value="{{ assistant_task.revision }}">
-                <button type="submit" class="px-4 py-2 text-sm font-medium text-ink-800 border border-ink-300 rounded-full hover:bg-ink-25 focus-visible:outline-2 focus-visible:outline-brand-600">Stop this task</button>
+                <button type="submit" class="ui-btn ui-btn-danger-ghost">Stop this task</button>
             </form>
             {% endif %}
             {% if assistant_task.can_pause or assistant_task.can_cancel %}
@@ -54,28 +54,33 @@
     </div>
 
     {% if job.status == 'failed' %}
-    <div role="alert" class="mb-6 text-sm text-danger-700 bg-danger-50 border border-danger-200 rounded-xl px-4 py-3">
-        <p class="font-semibold mb-0.5">The team couldn't finish.</p>
-        <p class="break-words">{{ job.error }}</p>
+    <div role="alert" class="mb-6 ui-callout ui-callout-danger text-sm">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+        <div class="min-w-0">
+            <p class="font-semibold text-danger-700 mb-0.5">The team couldn't finish.</p>
+            <p class="break-words">{{ job.error }}</p>
+        </div>
     </div>
     {% endif %}
 
     {% if assistant_task.status == 'paused' %}
-    <div role="status" class="mb-6 text-sm text-warning-700 bg-warning-50 border border-warning-200 rounded-xl px-4 py-3">
-        This task is paused. Review its saved work, then choose Resume task when you are ready. Other tasks and weekly planning keep their own settings.
+    <div role="status" class="mb-6 ui-callout ui-callout-warning text-sm">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+        <p>This task is paused. Review its saved work, then choose Resume task when you are ready. Other tasks and weekly planning keep their own settings.</p>
     </div>
     {% elif assistant_task.status == 'waiting_policy' or assistant_task.status == 'waiting_setup' %}
-    <div role="status" data-task-waiting-policy class="mb-6 text-sm text-warning-700 bg-warning-50 border border-warning-200 rounded-xl px-4 py-3">
-        {{ assistant_task.label }}. {{ assistant_task.policy_note }}{% if assistant_task.policy_url %} — <a href="{{ assistant_task.policy_url }}" class="font-semibold underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">{{ assistant_task.policy_link }}</a>{% endif %}.
+    <div role="status" data-task-waiting-policy class="mb-6 ui-callout ui-callout-warning text-sm">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <p>{{ assistant_task.label }}. {{ assistant_task.policy_note }}{% if assistant_task.policy_url %} — <a href="{{ assistant_task.policy_url }}" class="font-semibold underline underline-offset-3">{{ assistant_task.policy_link }}</a>{% endif %}.</p>
     </div>
     {% endif %}
 
     {% include "studio/partials/job_progress.html" %}
 
     {% if job.result.summary %}
-    <section aria-labelledby="result-heading" class="mt-6 bg-white border border-ink-200 rounded-2xl p-5 shadow-sm">
-        <h2 id="result-heading" class="text-lg text-ink-900 mb-2" style="font-family: var(--font-display)">Result</h2>
-        <p class="text-sm text-ink-800 whitespace-pre-line break-words">{{ job.result.summary }}</p>
+    <section aria-labelledby="result-heading" class="mt-6 ui-card">
+        <h2 id="result-heading" class="ui-card-title mb-2">Result</h2>
+        <p class="text-body-lg text-ink-900 whitespace-pre-line break-words">{{ job.result.summary }}</p>
     </section>
     {% endif %}
 </div>
