@@ -4,13 +4,13 @@ calendar's list view). Each tab keeps its own content and empty state below —
 a channel-less workspace can still have drafts. Expects: workspace.
 {% endcomment %}
 <div x-data="{ open: true }" x-show="open" role="status"
-     class="flex items-center gap-3 mb-3 px-3 py-2 text-sm text-ink-600 bg-brand-50 border border-brand-200 rounded-lg">
-    <svg class="w-4 h-4 text-brand-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-    <span class="flex-1 min-w-0">No channels connected yet — connect one to schedule and publish posts.</span>
+     class="ui-callout items-center mb-4 py-2.5 pr-2">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" class="!mt-0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+    <span class="flex-1 min-w-0 text-sm text-ink-700">No channels connected yet. Connect one to schedule and publish posts.</span>
     <a href="{% url 'social_accounts:connect' workspace_id=workspace.id %}"
-       class="flex-shrink-0 text-sm font-semibold text-brand-700 hover:text-brand-800">Connect a channel</a>
+       class="ui-link flex-shrink-0">Connect a channel</a>
     <button type="button" @click="open = false" aria-label="Dismiss"
-            class="flex-shrink-0 p-0.5 rounded text-ink-500 hover:text-ink-600 cursor-pointer">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            class="ui-btn ui-btn-icon flex-shrink-0">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
     </button>
 </div>
