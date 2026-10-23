@@ -1567,6 +1567,8 @@ def thread_context(
         "can_post_internal": True,
         "internal_label": internal_label,
         "is_client_thread": is_client_thread,
+        "about_brief": about_brief,
+        "about_article": about_article,
         "guided_creation": guided_creation,
         "reference_choices": reference_choices,
         "draft_choices": draft_choices,

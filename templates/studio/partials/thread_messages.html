@@ -86,7 +86,7 @@ sit between hairlines.
     {% endif %}
     </div>
     {% empty %}
-    <p class="py-3 text-sm text-ink-600">{% if thread.is_client_thread %}No messages with the client yet.{% else %}Tell your manager what you want to post. You get the brief to check, and the finished post comes back here for your approval.{% endif %}</p>
+    <p class="py-3 text-sm text-ink-600" data-thread-empty>{% if thread.is_client_thread %}No messages with the client yet.{% elif thread.about_brief %}No messages about this post yet.{% elif thread.about_article %}No messages about this article yet.{% else %}Tell your manager what you want to post. You get the brief to check, and the finished post comes back here for your approval.{% endif %}</p>
     {% endfor %}
     {% if thread.polling %}
     <p class="flex items-center gap-2 text-xs text-ink-500">
