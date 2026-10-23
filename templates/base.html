@@ -1037,6 +1037,17 @@
                 labels = JSON.parse(canvas.dataset.labels || '[]');
             } catch (e) { return; }
             var color = '#1C1F24';
+            /* The labels are ISO dates (YYYY-MM-DD); people read dates in words: "24 Sep",
+               "Thu 24 Sep" in the tooltip. Anything else is shown as it came. */
+            var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            var weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            function dayInWords(iso, withWeekday) {
+                var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+                if (!m) return iso;
+                var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+                var text = d.getDate() + ' ' + months[d.getMonth()];
+                return withWeekday ? weekdays[d.getDay()] + ' ' + text : text;
+            }
             if (window._bbHeroChart) { window._bbHeroChart.destroy(); }
             var ctx = canvas.getContext('2d');
             var gradient = ctx.createLinearGradient(0, 0, 0, 260);
@@ -1068,10 +1079,23 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false },
-                        tooltip: { mode: 'index', intersect: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: { title: function (items) { return items.length ? dayInWords(items[0].label, true) : ''; } },
+                        },
                     },
                     scales: {
-                        x: { grid: { display: false }, ticks: { maxTicksLimit: 6, color: '#656B73' } },
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                maxTicksLimit: 6,
+                                maxRotation: 0,
+                                autoSkipPadding: 12,
+                                color: '#656B73',
+                                callback: function (value) { return dayInWords(this.getLabelForValue(value)); },
+                            },
+                        },
                         y: { beginAtZero: true, grid: { color: '#EDEFF2' }, ticks: { color: '#656B73' } },
                     },
                 },

@@ -201,3 +201,16 @@ class PhoneTouchTargetTests(TestCase):
         self.assertGreaterEqual(len(summaries), 3)
         for line in summaries:
             self.assertIn("max-lg:py-[13px]", line)
+
+
+class AnalyticsChartDateTests(TestCase):
+    """The hero chart's axis and tooltip show dates in words ("24 Sep", "Thu 24 Sep"), not ISO dates,
+    and never rotate them on a phone. The series data and labels stay ISO."""
+
+    def test_chart_formats_iso_labels_in_words(self):
+        html = _source("templates/base.html")
+        script = html[html.index("function bbInitHeroChart") : html.index("function bbNameAltInput")]
+        self.assertIn("function dayInWords(iso, withWeekday)", script)
+        self.assertIn("callback: function (value) { return dayInWords(this.getLabelForValue(value)); }", script)
+        self.assertIn("return items.length ? dayInWords(items[0].label, true) : '';", script)
+        self.assertIn("maxRotation: 0", script)
