@@ -3,85 +3,93 @@ The team thread panel (Figma: Agency HQ "Ask the team", Brief review "Ask for ch
 Context: thread — from apps.studio.chat.thread_context (dom_id, title, subtitle, messages, send_url,
 messages_url, polling, internal_label, placeholder, error, body, thread_url, full_page).
 Fits a ~360px column. The conversation may not exist yet: the first message creates it.
+One solid button per view: while a brief waits for "Go ahead" ([data-confirm-brief] in this panel),
+Send renders as a secondary button, and on a post or article page (whose decision is the primary) it always does.
 {% endcomment %}
 {% load static %}
 <script defer src="{% static 'js/agency-thread.js' %}"></script>
-<section id="{{ thread.dom_id }}" data-agency-thread data-thread-key="{{ thread.thread_key }}" aria-labelledby="{{ thread.dom_id }}-heading" class="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm">
-    <div class="flex items-start justify-between gap-3">
+<section id="{{ thread.dom_id }}" data-agency-thread data-thread-key="{{ thread.thread_key }}" aria-labelledby="{{ thread.dom_id }}-heading" class="group/thread ui-card">
+    <div class="ui-card-header">
         <div class="min-w-0">
-            <h2 id="{{ thread.dom_id }}-heading" class="text-lg text-ink-900" style="font-family: var(--font-display)">{{ thread.title }}</h2>
-            <p class="text-xs text-ink-600 mt-0.5 break-words">{{ thread.subtitle }}</p>
+            <h2 id="{{ thread.dom_id }}-heading" class="ui-card-title">{{ thread.title }}</h2>
+            <p class="ui-card-subtitle break-words">{{ thread.subtitle }}</p>
         </div>
         {% if not thread.full_page and thread.conversation %}
-        <a href="{{ thread.thread_url }}" class="flex-shrink-0 text-xs font-semibold text-brand-800 underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">All threads<span class="sr-only"> with the team</span></a>
+        <a href="{{ thread.thread_url }}" class="flex-shrink-0 ui-link max-lg:-my-[13px] max-lg:py-[13px]">All threads<span class="sr-only"> with the team</span></a>
         {% endif %}
     </div>
 
     {% include "studio/partials/thread_messages.html" %}
     <p data-thread-announcement role="status" aria-live="polite" aria-atomic="true" class="sr-only"></p>
-    <button type="button" data-thread-new-messages hidden class="mt-2 rounded-lg bg-info-50 px-3 py-2 text-sm font-semibold text-info-700">New messages</button>
+    <button type="button" data-thread-new-messages hidden class="mt-2 ui-btn ui-btn-sm ui-btn-secondary">New messages</button>
 
-    <form method="post" data-thread-composer action="{{ thread.send_url }}" class="mt-3" enctype="multipart/form-data"
+    <form method="post" data-thread-composer action="{{ thread.send_url }}" class="mt-4" enctype="multipart/form-data"
           hx-post="{{ thread.send_url }}" hx-sync="closest [data-agency-thread]:replace" hx-encoding="multipart/form-data" hx-target="#{{ thread.dom_id }}" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
         <input type="hidden" name="kind" value="question">
         {% csrf_token %}
         {% if thread.full_page %}<input type="hidden" name="full" value="1">{% endif %}
         {% if thread.draft_choices %}
-        <div class="mb-2">
-            <label for="{{ thread.dom_id }}-draft" class="block text-xs font-semibold text-ink-800 mb-1">Draft to discuss or revise</label>
-            <select id="{{ thread.dom_id }}-draft" name="target_brief_id" class="w-full min-w-0 rounded-lg border border-ink-400 bg-white px-2 py-2 text-sm">
+        <div class="mb-3">
+            <label for="{{ thread.dom_id }}-draft" class="ui-label">Draft to discuss or revise</label>
+            <select id="{{ thread.dom_id }}-draft" name="target_brief_id" class="ui-input min-w-0">
                 <option value="">New idea or general question</option>
                 {% for draft in thread.draft_choices %}<option value="{{ draft.pk }}"{% if thread.selected_draft_id == draft.pk|stringformat:'s' %} selected{% endif %}>{{ draft.title }} · revision {{ draft.revision }} · {{ draft.get_status_display }}</option>{% endfor %}
             </select>
         </div>
         {% endif %}
         {% if thread.error %}
-        <p data-thread-error class="mb-2 text-sm text-danger-600 bg-danger-50 border border-danger-200 rounded-lg px-3 py-2" role="alert">{{ thread.error }}</p>
+        <p data-thread-error class="ui-callout ui-callout-danger mb-3 text-sm" role="alert"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span>{{ thread.error }}</span></p>
         {% endif %}
-        <label for="{{ thread.dom_id }}-body" class="sr-only">Your message to the team</label>
-        <div class="flex items-end gap-2">
+        <div class="rounded-xl border border-ink-400 bg-white px-3 pt-3 pb-2.5 transition-[border-color,box-shadow] duration-150 focus-within:border-brand-600 focus-within:shadow-[0_0_0_1px_var(--focus-ring)]">
+            <label for="{{ thread.dom_id }}-body" class="sr-only">Your message to the team</label>
             <textarea id="{{ thread.dom_id }}-body" name="body" rows="2" maxlength="4000" required
                       placeholder="{{ thread.placeholder }}"
-                      class="flex-1 min-w-0 px-3 py-2 text-sm text-ink-900 bg-white border border-ink-400 rounded-xl resize-y focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600">{{ thread.body }}</textarea>
-            <button type="submit"
-                    class="flex-shrink-0 px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-xl hover:bg-brand-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">Send</button>
-        </div>
-        {% if thread.guided_creation %}
-        <details data-thread-details-key="creative-direction" class="mt-3 rounded-xl border border-ink-200 p-3">
-            <summary class="text-xs font-semibold text-ink-800 cursor-pointer">Photo and creative direction</summary>
-            <div class="mt-3 space-y-3">
-                <div>
-                    <label for="{{ thread.dom_id }}-reference" class="block text-xs font-semibold text-ink-800 mb-1">Photo to use in this post</label>
-                    <select id="{{ thread.dom_id }}-reference" name="reference_id" data-current-choice="{{ thread.selected_reference_id }}" class="w-full min-w-0 rounded-lg border border-ink-400 bg-white px-2 py-2 text-sm">
-                        <option value="">Keep the current choice</option>
-                        <option value="none"{% if thread.selected_reference_id == 'none' %} selected{% endif %}>Clear supplied photo — generate or use the brand background</option>
-                        {% for asset in thread.reference_choices %}<option value="{{ asset.pk }}"{% if thread.selected_reference_id == asset.pk|stringformat:'s' %} selected{% endif %}>{{ asset.title|default:asset.filename }} · {{ asset.provenance.label }}</option>{% endfor %}
-                    </select>
-                    {% if thread.selected_reference %}<figure class="mt-2 flex items-center gap-3"><img src="{% if thread.selected_reference.thumbnail %}{{ thread.selected_reference.thumbnail.url }}{% else %}{{ thread.selected_reference.file.url }}{% endif %}" alt="{{ thread.selected_reference.title|default:thread.selected_reference.filename }}" class="h-20 w-24 rounded-lg object-cover" loading="lazy"><figcaption class="text-xs text-ink-700">Selected: {{ thread.selected_reference.title|default:thread.selected_reference.filename }}.<br>{{ thread.selected_reference.provenance.label }}. <a class="underline text-brand-800" href="{% url 'studio:trust' workspace_id=thread.workspace.id %}">Review photo provenance and facts</a>.</figcaption></figure>{% endif %}
-                </div>
-                {% if thread.can_upload_reference %}
-                <div>
-                    <label for="{{ thread.dom_id }}-upload" class="block text-xs font-semibold text-ink-800 mb-1">Or attach a photo here</label>
-                    <input id="{{ thread.dom_id }}-upload" type="file" name="reference_upload" accept="image/jpeg,image/png,image/webp" class="block w-full text-xs text-ink-700">
-                </div>
+                      class="block w-full min-w-0 min-h-12 max-h-48 resize-none [field-sizing:content] border-0 bg-transparent p-0 text-body-lg text-ink-900 placeholder:text-ink-500 focus-visible:shadow-none">{{ thread.body }}</textarea>
+            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+                {% if thread.guided_creation %}
+                <details data-thread-details-key="creative-direction" class="group/dir min-w-0 open:basis-full">
+                    <summary class="ui-btn ui-btn-sm ui-btn-ghost -ml-2 px-2 list-none [&::-webkit-details-marker]:hidden">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                        Photo and creative direction
+                        <svg class="w-3.5 h-3.5 text-ink-500 transition-transform group-open/dir:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                    </summary>
+                    <div class="mt-2 mb-1 space-y-4 rounded-lg bg-ink-50 p-3 ring-1 ring-inset ring-ink-200">
+                        <div>
+                            <label for="{{ thread.dom_id }}-reference" class="ui-label">Photo to use in this post</label>
+                            <select id="{{ thread.dom_id }}-reference" name="reference_id" data-current-choice="{{ thread.selected_reference_id }}" class="ui-input min-w-0">
+                                <option value="">Keep the current choice</option>
+                                <option value="none"{% if thread.selected_reference_id == 'none' %} selected{% endif %}>Clear supplied photo — generate or use the brand background</option>
+                                {% for asset in thread.reference_choices %}<option value="{{ asset.pk }}"{% if thread.selected_reference_id == asset.pk|stringformat:'s' %} selected{% endif %}>{{ asset.title|default:asset.filename }} · {{ asset.provenance.label }}</option>{% endfor %}
+                            </select>
+                            {% if thread.selected_reference %}<figure class="mt-2 flex items-center gap-3"><img src="{% if thread.selected_reference.thumbnail %}{{ thread.selected_reference.thumbnail.url }}{% else %}{{ thread.selected_reference.file.url }}{% endif %}" alt="{{ thread.selected_reference.title|default:thread.selected_reference.filename }}" class="h-20 w-24 rounded-[10px] object-cover shadow-[var(--shadow-creative)]" loading="lazy"><figcaption class="text-xs text-ink-700">Selected: {{ thread.selected_reference.title|default:thread.selected_reference.filename }}.<br>{{ thread.selected_reference.provenance.label }}. <a class="link-inline" href="{% url 'studio:trust' workspace_id=thread.workspace.id %}">Review photo provenance and facts</a>.</figcaption></figure>{% endif %}
+                        </div>
+                        {% if thread.can_upload_reference %}
+                        <div>
+                            <label for="{{ thread.dom_id }}-upload" class="ui-label">Or attach a photo here</label>
+                            <input id="{{ thread.dom_id }}-upload" type="file" name="reference_upload" accept="image/jpeg,image/png,image/webp" class="block w-full text-[13px] text-ink-700 file:mr-3 file:h-8 max-lg:file:h-11 file:rounded-lg file:border-0 file:bg-white file:px-3 file:text-[13px] file:font-semibold file:text-ink-900 file:shadow-[inset_0_0_0_1px_var(--ink-300)] hover:file:bg-ink-25">
+                        </div>
+                        {% endif %}
+                        <div>
+                            <label for="{{ thread.dom_id }}-style" class="ui-label">Graphic style</label>
+                            <select id="{{ thread.dom_id }}-style" name="style_mode" data-current-choice="{{ thread.selected_style_mode }}" class="ui-input">
+                                <option value="">Keep the current direction</option>
+                                <option value="brand"{% if thread.selected_style_mode == 'brand' %} selected{% endif %}>Match the brand series and saved best work</option>
+                                <option value="fresh"{% if thread.selected_style_mode == 'fresh' %} selected{% endif %}>Try a fresh layout within the brand</option>
+                            </select>
+                        </div>
+                        <p class="text-[13px]/[18px] text-ink-600">Describe the look you want in your message. Your manager combines it with <a href="{% url 'studio:memory' workspace_id=thread.workspace.id %}" class="link-inline">Creative memory</a> and shows it in the brief for you to check.</p>
+                    </div>
+                </details>
                 {% endif %}
-                <div>
-                    <label for="{{ thread.dom_id }}-style" class="block text-xs font-semibold text-ink-800 mb-1">Graphic style</label>
-                    <select id="{{ thread.dom_id }}-style" name="style_mode" data-current-choice="{{ thread.selected_style_mode }}" class="w-full rounded-lg border border-ink-400 bg-white px-2 py-2 text-sm">
-                        <option value="">Keep the current direction</option>
-                        <option value="brand"{% if thread.selected_style_mode == 'brand' %} selected{% endif %}>Match the brand series and saved best work</option>
-                        <option value="fresh"{% if thread.selected_style_mode == 'fresh' %} selected{% endif %}>Try a fresh layout within the brand</option>
-                    </select>
-                </div>
-                <p class="text-xs text-ink-600">Describe the look you want in your message. Your manager combines it with <a href="{% url 'studio:memory' workspace_id=thread.workspace.id %}" class="underline text-brand-800">Creative memory</a> and shows it in the brief for you to check.</p>
+                {% if thread.can_post_internal %}
+                <label class="flex min-w-[9rem] flex-1 basis-0 items-center gap-2 min-h-8 text-[13px]/[18px] text-ink-700 cursor-pointer max-sm:order-last max-sm:basis-full max-sm:min-h-11">
+                    <input type="checkbox" name="is_internal" value="1" class="ui-checkbox flex-shrink-0">
+                    <span>{{ thread.internal_label }}</span>
+                </label>
+                {% endif %}
+                <button type="submit"
+                        class="ml-auto ui-btn ui-btn-sm {% if 'thread-brief-' in thread.dom_id or 'thread-blog-' in thread.dom_id %}ui-btn-secondary{% else %}ui-btn-primary group-has-[[data-confirm-brief]]/thread:bg-white group-has-[[data-confirm-brief]]/thread:text-ink-900 group-has-[[data-confirm-brief]]/thread:shadow-[inset_0_0_0_1px_var(--ink-300),var(--shadow-xs)] group-has-[[data-confirm-brief]]/thread:hover:bg-ink-25{% endif %}">Send</button>
             </div>
-        </details>
-        {% endif %}
-        {% if thread.can_post_internal %}
-        <label class="mt-2 flex items-start gap-2 text-xs text-ink-700 cursor-pointer">
-            <input type="checkbox" name="is_internal" value="1" class="mt-0.5 rounded border-ink-400 text-brand-700 focus:ring-brand-600">
-            <span>{{ thread.internal_label }}</span>
-        </label>
-        {% endif %}
+        </div>
     </form>
 </section>
