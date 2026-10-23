@@ -1,10 +1,10 @@
-{% comment %}A small state pill for an agent or a stage. Context: state ("working", "queued", "done", "failed", "skipped", "pending", "idle").{% endcomment %}
-<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap
-    {% if state == 'working' %}bg-indigo-50 text-indigo-800
-    {% elif state == 'queued' %}bg-amber-50 text-amber-800
-    {% elif state == 'done' %}bg-green-50 text-green-800
-    {% elif state == 'failed' %}bg-red-50 text-red-800
-    {% else %}bg-stone-100 text-stone-700{% endif %}">
-    <span class="w-1.5 h-1.5 rounded-full {% if state == 'working' %}bg-indigo-700 animate-pulse motion-reduce:animate-none{% elif state == 'queued' %}bg-amber-700{% elif state == 'done' %}bg-green-700{% elif state == 'failed' %}bg-red-700{% else %}bg-stone-500{% endif %}" aria-hidden="true"></span>
+{% comment %}A small state pill for an agent or a stage: a shape and a word, never colour alone. Busy is info (in the team's hands), done is success, stopped is danger, everything else neutral. Context: state ("working", "queued", "done", "failed", "skipped", "pending", "idle").{% endcomment %}
+<span class="ui-pill{% if state == 'working' or state == 'queued' %} ui-pill-info{% elif state == 'done' %} ui-pill-success{% elif state == 'failed' %} ui-pill-danger{% endif %}">
+    {% if state == 'working' %}<svg class="animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".3"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+    {% elif state == 'queued' %}<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/></svg>
+    {% elif state == 'done' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+    {% elif state == 'failed' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+    {% elif state == 'pending' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    {% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 12h12"/></svg>{% endif %}
     {% if state == 'working' %}Working{% elif state == 'queued' %}Up next{% elif state == 'done' %}Done{% elif state == 'failed' %}Failed{% elif state == 'skipped' %}Skipped{% elif state == 'pending' %}Waiting{% else %}Idle{% endif %}
 </span>
