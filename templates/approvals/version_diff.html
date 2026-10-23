@@ -13,8 +13,9 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6">
-        <!-- Version list -->
+    <div class="grid grid-cols-1 {% if versions %}lg:grid-cols-[240px_minmax(0,1fr)]{% endif %} gap-6">
+        {% if versions %}
+        <!-- Version list (only when there is one to pick from) -->
         <nav aria-label="Versions">
             <h2 class="ui-group-label mt-0 mb-2">Versions</h2>
             <ul class="ui-card p-1 space-y-0.5">
@@ -37,6 +38,7 @@
                 {% endfor %}
             </ul>
         </nav>
+        {% endif %}
 
         <!-- Diff view -->
         <section class="ui-card min-w-0">

@@ -34,7 +34,7 @@ Context: assets, workspace, post (optional).
             </div>
         </div>
         {% if asset.is_video %}
-        <div class="absolute bottom-1.5 left-1.5 px-1.5 rounded-md text-[11px] leading-[18px] font-semibold tabular-nums text-white bg-ink-950/65">
+        <div class="absolute bottom-1.5 left-1.5 px-1.5 rounded-md text-xs leading-[18px] font-semibold tabular-nums text-white bg-ink-950/65">
             {{ asset.duration|floatformat:0 }}s
         </div>
         {% endif %}

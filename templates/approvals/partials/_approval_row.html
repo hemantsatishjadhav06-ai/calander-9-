@@ -146,8 +146,9 @@ schedules the exact proposed time, and only a person can press either.
         </div>
         {% elif post.status == 'changes_requested' or post.status == 'rejected' or post.status == 'approved' %}
         <div class="flex items-center gap-1.5 flex-shrink-0 max-sm:w-full max-sm:justify-end">
+            {# The brand tint is kept for approving; editing is an ordinary act. #}
             <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=post.id %}"
-               class="ui-btn ui-btn-tinted ui-btn-sm">
+               class="ui-btn ui-btn-secondary ui-btn-sm">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit
             </a>
         </div>

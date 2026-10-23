@@ -11,7 +11,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
         <div class="px-3.5 py-2 border-b border-ink-200 flex items-center gap-2">
             {% include "partials/_platform_icon.html" with platform=p.account.platform size="sm" %}
             <span class="text-xs font-semibold text-ink-700 flex-1">{{ p.account.get_platform_display }} preview</span>
-            <span class="text-[11px] leading-[18px] font-semibold tabular-nums px-1.5 rounded-full
+            <span class="text-xs leading-[18px] font-semibold tabular-nums px-1.5 rounded-full
                          {% if p.is_over_limit %}bg-danger-500 text-white{% else %}bg-ink-200 text-ink-700{% endif %}">
                 {{ p.char_count }}/{{ p.char_limit }}
             </span>
