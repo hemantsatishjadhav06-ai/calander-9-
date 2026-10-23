@@ -230,8 +230,8 @@ class ProposedPublishAtSaveTests(TestCase):
         self.assertIn('title="Proposed publishing time"', body)
         self.assertIn("Proposed for", body)
         # Rendered in the workspace timezone (Europe/Berlin, UTC+2 on this date),
-        # not server/UTC time.
-        self.assertIn("Sep 1, 9:00", body)
+        # not server/UTC time, and in 24-hour time like the rest of the product.
+        self.assertIn("Wed 1 Sep, 09:00", body)
         self.assertNotIn("Sep 1, 7:00", body)
 
     def test_submit_for_approval_with_blank_panel_preserves_proposed(self):
