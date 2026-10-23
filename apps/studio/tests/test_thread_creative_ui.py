@@ -531,6 +531,29 @@ class TestCreativeConfirmationCards:
         assert ">Go ahead</button>" in html
         assert "You're confirming the brief and its facts. The finished post still waits for your approval." in html
 
+    def test_the_card_names_platforms_in_words_not_keys(self, client, world):
+        """The Channels and Destinations rows printed the stored machine labels
+        ("linkedin_company, instagram"); they read as the platforms' names."""
+        conversation = chat.general_conversation(world.workspace)
+        result = {
+            "creative_brief": _complete_intake(channels=["linkedin_company", "instagram"]),
+            "sources": {},
+            "awaiting_confirmation": True,
+            "selected_accounts": [
+                {"id": "a1", "platform": "linkedin_company", "name": "Neopolis Infra", "handle": ""},
+                {"id": "a2", "platform": "instagram", "name": "neopolisinfra", "handle": "neopolisinfra"},
+            ],
+        }
+        _reply(conversation, _job(conversation, world.editor, result=result))
+        client.force_login(world.editor)
+
+        html = client.get(_url("studio:thread_messages", world, conversation_id=conversation.pk)).content.decode()
+
+        assert "LinkedIn (Company Page), Instagram" in html
+        assert "Neopolis Infra (LinkedIn (Company Page))" in html
+        assert "@neopolisinfra (Instagram)" in html
+        assert "linkedin_company" not in html
+
     def test_only_latest_intake_for_this_person_can_be_confirmed(self, client, world):
         conversation = chat.general_conversation(world.workspace)
         stale = _intake_reply(conversation, world.editor)

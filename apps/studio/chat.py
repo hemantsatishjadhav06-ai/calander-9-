@@ -51,6 +51,8 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from apps.credentials.models import PlatformCredential
+
 from .models import AgencyJob, Conversation, Message, StudioBrief
 
 logger = logging.getLogger(__name__)
@@ -689,7 +691,20 @@ def _creative_message_context(conversation, messages, viewer, *, selected_draft_
             except (TypeError, ValueError):
                 message.website_source_url = ""
             accounts = result.get("selected_accounts")
-            message.creative_accounts = accounts if isinstance(accounts, list) else []
+            # The card shows words: a platform's name, never its key ("LinkedIn (Company Page)", not
+            # "linkedin_company"). The stored brief keeps the machine labels it matches on.
+            platform_names = dict(PlatformCredential.Platform.choices)
+            message.creative_accounts = [
+                {**account, "platform_label": platform_names.get(account.get("platform"), account.get("platform", ""))}
+                for account in (accounts if isinstance(accounts, list) else [])
+                if isinstance(account, dict)
+            ]
+            account_names = {str(account.get("id")): account.get("name") for account in message.creative_accounts}
+            message.creative_channel_labels = [
+                platform_names.get(channel) or account_names.get(channel) or channel
+                for channel in (intake.get("channels") or [])
+                if isinstance(channel, str) and channel.strip()
+            ]
             message.creative_defaults = [
                 creative_brief.LABELS[key]
                 for key in (result.get("creative_defaults") or [])
