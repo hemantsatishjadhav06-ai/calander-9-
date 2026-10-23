@@ -4,13 +4,13 @@
 {% block title %}Home - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl min-w-0">
+<div class="max-w-[1180px] min-w-0">
     {# ---- Greeting and one status line ---- #}
-    <header class="mb-4">
-        <h1 class="text-2xl sm:text-3xl text-ink-900" style="font-family: var(--font-display)">{{ greeting }}</h1>
+    <header class="mb-5">
+        <h1 class="ui-page-title">{{ greeting }}</h1>
         {# Each part may wrap (a bot name can be long); only a part's link stays on one line. #}
-        <p class="text-sm text-ink-600 mt-1 break-words" data-home-status>
-            {% for part in status_parts %}{% if not forloop.first %}<span aria-hidden="true"> · </span>{% endif %}<span>{{ part.text }}{% if part.url %} · <a href="{{ part.url }}" class="whitespace-nowrap font-semibold text-brand-800 underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">{{ part.link }}</a>{% endif %}</span>{% endfor %}
+        <p class="ui-page-status break-words" data-home-status>
+            {% for part in status_parts %}{% if not forloop.first %}<span class="mx-1.5 text-ink-400" aria-hidden="true">·</span>{% endif %}<span>{{ part.text }}{% if part.url %} · <a href="{{ part.url }}" class="whitespace-nowrap font-medium link-inline">{{ part.link }}</a>{% endif %}</span>{% endfor %}
         </p>
     </header>
 
@@ -18,94 +18,114 @@
 
     {% comment %}Order at every width: Today, first steps, the conversation, In progress, Routines, Recent work.
     On a wide screen the conversation is the main column and Today sits beside it.{% endcomment %}
-    <div class="lg:flex lg:items-start lg:gap-6">
-        <aside class="lg:order-2 lg:w-96 lg:flex-shrink-0 min-w-0 mb-5 lg:mb-0">
+    <div class="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_372px] lg:items-start">
+        <aside class="lg:col-start-2 lg:row-start-1 min-w-0 flex flex-col gap-6">
             {# ---- Today ---- #}
-            <section aria-labelledby="today-heading" class="bg-white border border-ink-200 rounded-2xl shadow-sm mb-5" data-home-today
-                     x-data="{ open: window.matchMedia('(min-width: 1024px)').matches }">
-                <div class="flex items-center justify-between gap-3 p-4 sm:p-5 {% if not today.quiet %}lg:pb-0{% endif %}">
-                    <div class="min-w-0">
-                        <h2 id="today-heading" class="text-lg text-ink-900" style="font-family: var(--font-display)">Today</h2>
-                        <p class="text-xs text-ink-600">{% timezone tzname %}{% now "l j F" %}{% endtimezone %}{% if today.waiting_count %} · <span class="font-semibold text-ink-800">{{ today.waiting_count }} waiting for you</span>{% endif %}{% if today.going_out %} · {{ today.going_out|length }} going out{% endif %}{% if today.needs_review %} · <span class="font-semibold text-warning-600">{{ today.needs_review|length }} to review</span>{% endif %}</p>
+            <section aria-labelledby="today-heading" class="ui-card" data-home-today
+                     x-data="{ open: {% if today.waiting_count %}true{% else %}window.matchMedia('(min-width: 1024px)').matches{% endif %} }">
+                <div class="flex items-start gap-2">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-baseline justify-between gap-3">
+                            <h2 id="today-heading" class="ui-card-title">Today</h2>
+                            <p class="text-[13px] text-ink-500 tabular-nums whitespace-nowrap">{% timezone tzname %}{% now "D j M" %}{% endtimezone %}</p>
+                        </div>
+                        {% if not today.quiet %}
+                        <p class="mt-0.5 text-[13px]/[18px] text-ink-600 tabular-nums">
+                            {% if today.waiting_count %}<span class="font-semibold text-ink-900">{{ today.waiting_count }}</span> waiting for you{% endif %}
+                            {% if today.going_out %}{% if today.waiting_count %}<span class="mx-1 text-ink-400" aria-hidden="true">·</span>{% endif %}<span class="font-semibold text-ink-900">{{ today.going_out|length }}</span> going out{% endif %}
+                            {% if today.needs_review %}{% if today.waiting_count or today.going_out %}<span class="mx-1 text-ink-400" aria-hidden="true">·</span>{% endif %}<span class="font-semibold text-ink-900">{{ today.needs_review|length }}</span> need{{ today.needs_review|length|pluralize:"s," }} a look{% endif %}
+                            {% if not today.waiting_count and not today.going_out and not today.needs_review %}Nothing waiting for you{% endif %}
+                        </p>
+                        {% endif %}
                     </div>
                     {% if not today.quiet %}
-                    <button type="button" class="lg:hidden flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100 focus-visible:outline-2 focus-visible:outline-brand-600" x-on:click="open = !open" x-bind:aria-expanded="open" aria-controls="today-body" aria-label="Show what's waiting today">
-                        <svg class="w-4 h-4 transition-transform" x-bind:class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                    <button type="button" class="lg:hidden ui-btn ui-btn-icon -mr-2 -mt-2" x-on:click="open = !open" x-bind:aria-expanded="open" aria-controls="today-body" aria-label="Show what's waiting today">
+                        <svg class="transition-transform" x-bind:class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
                     </button>
                     {% endif %}
                 </div>
 
                 {% if today.quiet %}
-                <p class="text-sm text-ink-600 px-4 sm:px-5 pb-4 sm:pb-5">Nothing needs you right now. Tell your team what you want, and it gets to work.</p>
+                <p class="mt-1 text-sm text-ink-600">Nothing needs you right now. Tell your team what you want, and it gets to work.</p>
                 {% else %}
-                <div id="today-body" class="px-4 sm:px-5 pb-4 sm:pb-5" x-show="open">
+                <div id="today-body" x-show="open">
                     {% if today.waiting %}
-                    <h3 class="mt-3 text-xs font-semibold uppercase tracking-wide text-ink-600">Waiting for you</h3>
-                    <ul class="mt-1 divide-y divide-ink-100">
+                    <h3 class="ui-group-label">Waiting for you</h3>
+                    <ul class="divide-y divide-ink-200">
                         {% for item in today.waiting %}
-                        <li class="py-2.5">
+                        <li class="flex gap-3 py-3">
                             {% if item.kind == 'post' %}
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-12 flex-shrink-0 rounded-md overflow-hidden bg-ink-100">{% if item.brief.graphic %}<img src="{% if item.brief.graphic.thumbnail %}{{ item.brief.graphic.thumbnail.url }}{% else %}{{ item.brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">{% endif %}</div>
-                                <div class="flex-1 min-w-0">
-                                    <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=item.brief.id %}" class="text-sm font-semibold text-ink-900 hover:underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">{{ item.title }}</a>
-                                    <p class="text-xs text-ink-600">{{ item.where|default:"No account yet" }}{% if item.proposed %} · proposed {{ item.proposed|timezone:tzname|date:"D j M, H:i" }}{% endif %}{% if item.flags %} · {{ item.flags }} thing{{ item.flags|pluralize }} to check{% endif %}</p>
+                            <div class="ui-thumb overflow-hidden">{% if item.brief.graphic %}<img src="{% if item.brief.graphic.thumbnail %}{{ item.brief.graphic.thumbnail.url }}{% else %}{{ item.brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">{% endif %}</div>
+                            <div class="flex-1 min-w-0">
+                                <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=item.brief.id %}" class="block text-sm font-semibold text-ink-900 line-clamp-2 hover:underline underline-offset-2 rounded-sm">{{ item.title }}</a>
+                                <p class="mt-0.5 text-xs text-ink-500">{{ item.where|default:"No account yet" }}{% if item.proposed %} · proposed <span class="tabular-nums">{{ item.proposed|timezone:tzname|date:"D j M, H:i" }}</span>{% endif %}{% if item.flags %} · {{ item.flags }} thing{{ item.flags|pluralize }} to check{% endif %}</p>
+                                <div class="mt-2.5 flex flex-wrap items-center gap-2">
+                                    {% if can_approve and item.proposed_in_future %}
+                                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=item.brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                                        {% csrf_token %}<input type="hidden" name="mode" value="proposed">
+                                        <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn ui-btn-sm ui-btn-tinted">Approve &amp; schedule<span class="sr-only"> {{ item.title }} for {{ item.proposed|timezone:tzname|date:"D j M, H:i" }}</span></button>
+                                    </form>
+                                    {% endif %}
+                                    <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=item.brief.id %}" class="ui-btn ui-btn-sm ui-btn-ghost">Review<span class="sr-only"> {{ item.title }}</span></a>
                                 </div>
-                            </div>
-                            <div class="flex items-center gap-2 mt-2">
-                                <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=item.brief.id %}" class="px-3 py-1.5 text-sm font-semibold text-ink-800 bg-white border border-ink-300 rounded-lg hover:bg-ink-25 focus-visible:outline-2 focus-visible:outline-brand-600">Review<span class="sr-only"> {{ item.title }}</span></a>
-                                {% if can_approve and item.proposed_in_future %}
-                                <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=item.brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
-                                    {% csrf_token %}<input type="hidden" name="mode" value="proposed">
-                                    <button type="submit" x-bind:disabled="busy" class="px-3 py-1.5 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">Approve &amp; schedule<span class="sr-only"> {{ item.title }} for {{ item.proposed|timezone:tzname|date:"D j M, H:i" }}</span></button>
-                                </form>
-                                {% endif %}
                             </div>
                             {% else %}
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-12 flex-shrink-0 rounded-md bg-success-50 flex items-center justify-center" aria-hidden="true"><svg class="w-5 h-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></div>
-                                <div class="flex-1 min-w-0">
-                                    <a href="{% url 'blog:detail' workspace_id=workspace.id post_id=item.blog_post.id %}" class="text-sm font-semibold text-ink-900 hover:underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">{{ item.title }}</a>
-                                    <p class="text-xs text-ink-600">Article · {{ item.where }} · {{ item.words }} words</p>
+                            <div class="ui-thumb grid place-items-center text-ink-500" aria-hidden="true"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></div>
+                            <div class="flex-1 min-w-0">
+                                <a href="{% url 'blog:detail' workspace_id=workspace.id post_id=item.blog_post.id %}" class="block text-sm font-semibold text-ink-900 line-clamp-2 hover:underline underline-offset-2 rounded-sm">{{ item.title }}</a>
+                                <p class="mt-0.5 text-xs text-ink-500">Article · {{ item.where }} · <span class="tabular-nums">{{ item.words }}</span> words</p>
+                                <div class="mt-2.5">
+                                    <a href="{% url 'blog:detail' workspace_id=workspace.id post_id=item.blog_post.id %}" class="ui-btn ui-btn-sm ui-btn-tinted">Review<span class="sr-only"> {{ item.title }}</span></a>
                                 </div>
                             </div>
-                            <a href="{% url 'blog:detail' workspace_id=workspace.id post_id=item.blog_post.id %}" class="inline-block mt-2 px-3 py-1.5 text-sm font-semibold text-ink-800 bg-white border border-ink-300 rounded-lg hover:bg-ink-25 focus-visible:outline-2 focus-visible:outline-brand-600">Review<span class="sr-only"> {{ item.title }}</span></a>
                             {% endif %}
                         </li>
                         {% endfor %}
                     </ul>
-                    {% if today.waiting_count > 3 %}<p class="text-xs text-ink-600 mt-1">and {{ today.waiting_count|add:"-3" }} more · <a class="font-semibold text-brand-800 underline" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=approvals">Open approvals</a></p>{% endif %}
+                    {% if today.waiting_count > 3 %}<p class="text-xs text-ink-600 pt-1">and {{ today.waiting_count|add:"-3" }} more · <a class="link-inline font-medium" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=approvals">Open approvals</a></p>{% endif %}
                     {% endif %}
 
                     {% if today.going_out %}
-                    <h3 class="mt-3 text-xs font-semibold uppercase tracking-wide text-ink-600">Going out today</h3>
-                    <ul class="mt-1 space-y-1">
+                    <h3 class="ui-group-label">Going out today</h3>
+                    <ul class="space-y-1.5">
                         {% for item in today.going_out %}
-                        <li class="text-sm text-ink-800"><span class="font-semibold">{{ item.time|date:"H:i" }}</span> {{ item.label }} <span class="text-ink-600">· {{ item.where }}</span></li>
+                        <li class="flex items-start gap-2 text-[13px]/[18px] text-ink-700">
+                            <svg class="mt-px w-4 h-4 flex-shrink-0 text-info-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                            <span class="min-w-0"><span class="font-semibold text-ink-900 tabular-nums">{{ item.time|date:"H:i" }}</span> {{ item.label }} <span class="text-ink-500">· {{ item.where }}</span></span>
+                        </li>
                         {% endfor %}
                     </ul>
                     {% endif %}
 
                     {% if today.done %}
-                    <h3 class="mt-3 text-xs font-semibold uppercase tracking-wide text-ink-600">Done since yesterday</h3>
-                    <ul class="mt-1 space-y-1">
+                    <h3 class="ui-group-label">Done since yesterday</h3>
+                    <ul class="space-y-1.5" x-data="{ more: false }">
                         {% for item in today.done %}
-                        <li class="text-sm text-ink-800">{% if item.url %}<a href="{{ item.url }}" class="hover:underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">{{ item.label }}</a>{% else %}{{ item.label }}{% endif %}{% if item.when %} <span class="text-ink-600">· {{ item.when|date:"D H:i" }}</span>{% endif %}</li>
+                        <li class="flex items-start gap-2 text-[13px]/[18px] text-ink-700"{% if forloop.counter > 3 %} x-show="more" x-cloak{% endif %}>
+                            <svg class="mt-px w-4 h-4 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+                            <span class="min-w-0">{% if item.url %}<a href="{{ item.url }}" class="hover:underline underline-offset-2 rounded-sm">{{ item.label }}</a>{% else %}{{ item.label }}{% endif %}{% if item.when %} <span class="text-ink-500 tabular-nums">· {{ item.when|date:"D H:i" }}</span>{% endif %}</span>
+                        </li>
                         {% endfor %}
+                        {% if today.done|length > 3 %}
+                        <li x-show="!more"><button type="button" x-on:click="more = true" class="ml-6 inline-flex min-h-8 max-lg:min-h-11 items-center text-[13px] font-medium text-brand-700 hover:underline underline-offset-3 rounded-sm">Show {{ today.done|length|add:"-3" }} more</button></li>
+                        {% endif %}
                     </ul>
                     {% endif %}
 
                     {% if today.needs_review %}
-                    <h3 class="mt-3 text-xs font-semibold uppercase tracking-wide text-warning-600">Needs your review</h3>
-                    <ul class="mt-1 space-y-1">
+                    <h3 class="ui-group-label">Needs a look</h3>
+                    <ul class="space-y-1.5">
                         {% for item in today.needs_review %}
-                        <li class="text-sm text-ink-800">{% if item.url %}<a href="{{ item.url }}" class="font-semibold hover:underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">{{ item.title }}</a>{% else %}<span class="font-semibold">{{ item.title }}</span>{% endif %} <span class="text-ink-600">· {{ item.label }}</span></li>
+                        <li class="flex items-start gap-2 text-[13px]/[18px] text-ink-700">
+                            <svg class="mt-px w-4 h-4 flex-shrink-0 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                            <span class="min-w-0">{% if item.url %}<a href="{{ item.url }}" class="font-semibold text-ink-900 hover:underline underline-offset-2 rounded-sm">{{ item.title }}</a>{% else %}<span class="font-semibold text-ink-900">{{ item.title }}</span>{% endif %} <span class="text-ink-600">· {{ item.label }}</span></span>
+                        </li>
                         {% endfor %}
                     </ul>
                     {% endif %}
 
                     {% if today.next_run %}
-                    <p class="mt-3 text-xs text-ink-600">Next planned run: your team plans next week on {{ today.next_run|date:"D j M, H:i" }}.</p>
+                    <p class="mt-4 pt-3 border-t border-ink-200 text-xs text-ink-500">Next planned run: your team plans next week on <span class="tabular-nums">{{ today.next_run|date:"D j M, H:i" }}</span>.</p>
                     {% endif %}
                 </div>
                 {% endif %}
@@ -114,25 +134,25 @@
             {% include "onboarding/partials/_checklist.html" %}
         </aside>
 
-        <div class="lg:order-1 flex-1 min-w-0">
+        <div class="lg:col-start-1 lg:row-start-1 min-w-0 flex flex-col gap-10">
             {# ---- The conversation ---- #}
-            <div class="agency-home-thread mb-5" data-home-thread>
+            <div class="agency-home-thread" data-home-thread>
                 {% if thread %}
                 {% include thread.template with thread=thread %}
                 {% else %}
-                <section aria-labelledby="ask-heading" class="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm">
-                    <h2 id="ask-heading" class="text-lg text-ink-900" style="font-family: var(--font-display)">Your team</h2>
-                    <p class="text-sm text-ink-600 mt-1">Tell your manager what you want. It gets the right people on it and comes back when it needs you.</p>
+                <section aria-labelledby="ask-heading" class="ui-card">
+                    <h2 id="ask-heading" class="ui-card-title">Your team</h2>
+                    <p class="ui-card-subtitle">Tell your manager what you want. It gets the right people on it and comes back when it needs you.</p>
                 </section>
                 {% endif %}
             </div>
 
             {# ---- In progress ---- #}
             {% if journeys or can_create %}
-            <section aria-labelledby="progress-heading" class="mb-5" data-home-progress>
-                <div class="flex items-baseline justify-between gap-3 mb-2">
-                    <h2 id="progress-heading" class="text-lg text-ink-900" style="font-family: var(--font-display)">In progress</h2>
-                    <a href="{% url 'studio:thread' workspace_id=workspace.id %}" class="text-xs font-semibold text-brand-800 underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">All conversations</a>
+            <section aria-labelledby="progress-heading" data-home-progress>
+                <div class="flex items-baseline justify-between gap-3 mb-3">
+                    <h2 id="progress-heading" class="text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">In progress</h2>
+                    <a href="{% url 'studio:thread' workspace_id=workspace.id %}" class="ui-link max-lg:-my-[13px] max-lg:py-[13px]">All conversations</a>
                 </div>
                 {% include "studio/partials/customer_workflow_journeys.html" %}
             </section>
@@ -140,24 +160,24 @@
 
             {# ---- Routines: the next three standing instructions (apps.studio.routines.rows) ---- #}
             {% if routine_rows is not None %}
-            <section aria-labelledby="routines-heading" class="mb-5" data-home-routines>
-                <div class="flex items-baseline justify-between gap-3 mb-2">
-                    <h2 id="routines-heading" class="text-lg text-ink-900" style="font-family: var(--font-display)">Routines</h2>
-                    <a href="{% url 'studio:routines' workspace_id=workspace.id %}" class="text-xs font-semibold text-brand-800 underline rounded focus-visible:outline-2 focus-visible:outline-brand-600">All routines</a>
+            <section aria-labelledby="routines-heading" data-home-routines>
+                <div class="flex items-baseline justify-between gap-3 mb-3">
+                    <h2 id="routines-heading" class="text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Routines</h2>
+                    <a href="{% url 'studio:routines' workspace_id=workspace.id %}" class="ui-link max-lg:-my-[13px] max-lg:py-[13px]">All routines</a>
                 </div>
                 {% if routine_rows %}
-                <div class="bg-white border border-ink-200 rounded-2xl px-4 shadow-sm">
+                <div class="ui-card p-0 overflow-hidden">
                     {% include "studio/partials/routine_rows.html" with routines=routine_rows can_manage=can_manage_settings %}
                 </div>
                 {% else %}
                 {# The example is a task the manager carries out itself; the briefing is code-built, so it is one tap here. #}
-                <div class="flex flex-col sm:flex-row sm:items-center gap-3" data-home-routines-empty>
-                    <p class="text-sm text-ink-600 sm:flex-1">Nothing runs on its own yet. Tell your manager “every Monday at 9 draft a market update”, or <a href="{% url 'studio:routines' workspace_id=workspace.id %}" class="underline font-semibold text-brand-800 rounded focus-visible:outline-2 focus-visible:outline-brand-600">pick a routine</a>.</p>
+                <div class="ui-card flex flex-col sm:flex-row sm:items-center gap-3" data-home-routines-empty>
+                    <p class="text-sm text-ink-600 sm:flex-1">Nothing runs on its own yet. Tell your manager “every Monday at 9 draft a market update”, or <a href="{% url 'studio:routines' workspace_id=workspace.id %}" class="link-inline font-medium">pick a routine</a>.</p>
                     <form method="post" action="{% url 'studio:routines_create' workspace_id=workspace.id %}" data-home-morning-briefing>
                         {% csrf_token %}
                         <input type="hidden" name="suggestion" value="morning">
                         <input type="hidden" name="next" value="{% url 'studio:index' workspace_id=workspace.id %}">
-                        <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-ink-800 bg-white border border-ink-300 rounded-lg hover:bg-ink-25 focus-visible:outline-2 focus-visible:outline-brand-600">Morning briefing in Telegram, weekdays 08:30</button>
+                        <button type="submit" class="ui-btn ui-btn-secondary ui-btn-sm whitespace-normal h-auto min-h-8 py-1.5 text-left">Morning briefing in Telegram, weekdays 08:30</button>
                     </form>
                 </div>
                 {% endif %}
@@ -167,36 +187,41 @@
     </div>
 
     {# ---- Recent work ---- #}
-    <section aria-labelledby="recent-heading" class="mt-1" data-home-recent>
-        <h2 id="recent-heading" class="text-lg text-ink-900 mb-2" style="font-family: var(--font-display)">Recent work</h2>
+    <section aria-labelledby="recent-heading" class="mt-10" data-home-recent>
+        <h2 id="recent-heading" class="mb-3 text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Recent work</h2>
         {% if briefs %}
         <ul class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {% for brief in briefs %}
-            <li>
+            <li class="min-w-0">
                 <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=brief.id %}"
-                   class="block bg-white border border-ink-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-transparent focus-visible:outline-2 focus-visible:outline-brand-600 transition-all duration-200 group">
-                    <div class="aspect-[4/5] bg-ink-100 flex items-center justify-center overflow-hidden">
+                   class="group flex h-full flex-col overflow-hidden rounded-[14px] border border-ink-200 bg-white shadow-xs ui-card-link">
+                    <div class="aspect-[4/5] bg-ink-50 flex items-center justify-center overflow-hidden shadow-[inset_0_-1px_0_var(--ink-200)]">
                         {% if brief.graphic %}
                         <img src="{% if brief.graphic.thumbnail %}{{ brief.graphic.thumbnail.url }}{% else %}{{ brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">
+                        {% elif brief.status == 'failed' %}
+                        <span class="flex flex-col items-center gap-2 px-3 text-center text-[13px] text-ink-600"><svg class="w-6 h-6 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Stopped before the picture</span>
+                        {% elif brief.status == 'working' or brief.status == 'queued' or brief.status == 'planned' %}
+                        <span class="flex flex-col items-center gap-2 px-3 text-center text-[13px] text-ink-600"><svg class="w-6 h-6 text-info-500 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" opacity=".3"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>{% if brief.status == 'working' %}Designing the picture{% else %}Waiting its turn{% endif %}</span>
                         {% else %}
-                        <svg class="w-8 h-8 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
+                        <span class="flex flex-col items-center gap-2 px-3 text-center text-[13px] text-ink-600"><svg class="w-6 h-6 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>No picture</span>
                         {% endif %}
                     </div>
-                    <div class="p-3">
-                        <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1">
+                    <div class="flex-1 p-3 sm:px-3.5">
+                        <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1.5">
                             {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
-                            <span class="text-xs text-ink-600 whitespace-nowrap">{{ brief.created_at|timesince }} ago</span>
+                            <span class="text-xs text-ink-500 whitespace-nowrap">{{ brief.created_at|timesince }} ago</span>
                         </div>
-                        <p class="text-sm font-semibold text-ink-900 line-clamp-2 group-hover:underline">{{ brief.title }}</p>
+                        <p class="text-sm font-semibold text-ink-900 line-clamp-2 group-hover:underline underline-offset-2">{{ brief.title }}</p>
                     </div>
                 </a>
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <div class="text-center py-10 border border-dashed border-ink-300 rounded-xl">
-            <p class="text-sm font-medium text-ink-700 mb-1">Nothing yet</p>
-            <p class="text-sm text-ink-600">Your first post appears here, with everything your team made for it.</p>
+        <div class="ui-card ui-empty">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            <p class="ui-empty-title">Nothing yet</p>
+            <p class="ui-empty-body">Your first post appears here, with everything your team made for it.</p>
         </div>
         {% endif %}
     </section>
