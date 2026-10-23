@@ -52,7 +52,7 @@ Context: account (with prefetched posting_slots), workspace_id.
                                 <!-- Display mode -->
                                 <div x-show="!editing" class="flex items-center gap-0.5">
                                     <button type="button" @click="editing = true"
-                                            class="h-7 max-lg:h-11 px-1.5 rounded-md text-[13px] tabular-nums cursor-pointer hover:bg-ink-100 transition-colors {% if not day.is_active %}text-ink-500 line-through{% else %}text-ink-900 font-medium{% endif %}"
+                                            class="h-7 max-lg:h-11 px-1.5 rounded-md text-[13px] tabular-nums whitespace-nowrap cursor-pointer hover:bg-ink-100 transition-colors {% if not day.is_active %}text-ink-500 line-through{% else %}text-ink-900 font-medium{% endif %}"
                                             title="Change this time">
                                         {{ slot.time|time:"g:i A" }}
                                     </button>
@@ -78,15 +78,15 @@ Context: account (with prefetched posting_slots), workspace_id.
                                     {% csrf_token %}
                                     <input type="hidden" name="social_account_id" value="{{ account.id }}">
                                     <input type="time" name="time" value="{{ slot.time|time:'H:i' }}" aria-label="Slot time"
-                                           class="ui-input !w-[92px] !h-8 !px-1.5 !text-[13px]"
+                                           class="ui-input !w-[120px] lg:!w-[92px] lg:!h-8 !px-1.5 lg:!text-[13px]"
                                            @keydown.escape="editing = false">
                                     <button aria-label="Save" type="submit"
-                                            class="w-7 h-7 rounded-md flex items-center justify-center text-brand-700 hover:bg-brand-100 cursor-pointer"
+                                            class="w-7 h-7 max-lg:w-11 max-lg:h-11 rounded-md flex items-center justify-center text-brand-700 hover:bg-brand-100 cursor-pointer"
                                             title="Save">
                                         <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                     </button>
                                     <button aria-label="Cancel" type="button" @click="editing = false"
-                                            class="w-7 h-7 rounded-md flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer"
+                                            class="w-7 h-7 max-lg:w-11 max-lg:h-11 rounded-md flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer"
                                             title="Cancel">
                                         <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                     </button>
@@ -98,7 +98,7 @@ Context: account (with prefetched posting_slots), workspace_id.
                         <!-- Add slot -->
                         <div x-data="{ adding: false, newTime: '09:00' }" class="mt-1.5">
                             <button type="button" aria-label="Add a time on {{ day.name }}" x-show="!adding" @click="adding = true; $nextTick(() => $refs.timeInput_{{ day.value }}.focus())"
-                                    class="inline-flex items-center justify-center w-7 h-7 max-lg:w-11 max-lg:h-11 rounded-full bg-brand-100 text-brand-700 hover:bg-brand-200 hover:text-brand-800 transition-colors cursor-pointer"
+                                    class="inline-flex items-center justify-center w-7 h-7 max-lg:w-11 max-lg:h-11 rounded-full border border-dashed border-ink-400 text-ink-600 hover:border-ink-600 hover:text-ink-900 hover:bg-ink-50 transition-colors cursor-pointer"
                                     title="Add time slot">
                                 <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                             </button>
@@ -113,14 +113,14 @@ Context: account (with prefetched posting_slots), workspace_id.
                                 <input type="time" name="time" x-model="newTime" aria-label="New slot time"
                                        x-ref="timeInput_{{ day.value }}"
                                        @keydown.escape="adding = false"
-                                       class="ui-input !w-[92px] !h-8 !px-1.5 !text-[13px]">
+                                       class="ui-input !w-[120px] lg:!w-[92px] lg:!h-8 !px-1.5 lg:!text-[13px]">
                                 <button aria-label="Add" type="submit"
-                                        class="w-7 h-7 rounded-md flex items-center justify-center text-brand-700 hover:bg-brand-100 cursor-pointer"
+                                        class="w-7 h-7 max-lg:w-11 max-lg:h-11 rounded-md flex items-center justify-center text-brand-700 hover:bg-brand-100 cursor-pointer"
                                         title="Add">
                                     <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                 </button>
                                 <button aria-label="Cancel" type="button" @click="adding = false"
-                                        class="w-7 h-7 rounded-md flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer"
+                                        class="w-7 h-7 max-lg:w-11 max-lg:h-11 rounded-md flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer"
                                         title="Cancel">
                                     <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>

@@ -8,57 +8,67 @@
 <link rel="stylesheet" href="{% static 'js/vendor/cropper.min.css' %}">
 {% endif %}
 <style>
+/* Page styles sit in the components layer so a utility on the same element still wins. */
+@layer components {
   .ml-edit-canvas {
-    background: var(--surface-1);
+    background: var(--ink-50);
     border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-2xl);
     overflow: hidden;
   }
   .ml-edit-toolbar {
     background: var(--surface-0);
     border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-sm);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-xs);
   }
+  /* Tool buttons: icon over a 12px label; the chosen tool is ink, never the accent */
   .ml-tool-btn {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 10px 14px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    min-width: 64px; min-height: 56px;
+    padding: 8px 12px;
     border-radius: var(--radius-lg);
-    font-size: 10px; font-weight: 600;
-    color: var(--text-secondary);
+    font-size: 0.75rem; line-height: 1rem; font-weight: 500;
+    color: var(--ink-700);
     cursor: pointer;
-    transition: all var(--dur-fast) ease;
+    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
   }
-  .ml-tool-btn:hover { background: var(--surface-1); color: var(--text-primary); }
-  .ml-tool-btn.active { background: var(--primary-soft); color: var(--brand-700); }
+  .ml-tool-btn:hover { background: var(--ink-50); color: var(--ink-900); }
+  .ml-tool-btn.active { background: var(--ink-100); color: var(--ink-950); font-weight: 600; }
   .ml-trim-track {
     height: 48px;
-    background: var(--surface-2);
+    background: var(--ink-100);
     border-radius: var(--radius-lg);
     position: relative;
     overflow: hidden;
   }
   .ml-trim-selection {
     position: absolute; top: 0; bottom: 0;
-    background: rgba(17, 86, 65, 0.15);
-    border-left: 3px solid var(--primary);
-    border-right: 3px solid var(--primary);
+    background: var(--brand-50);
+    border-left: 3px solid var(--brand-600);
+    border-right: 3px solid var(--brand-600);
   }
+}
 </style>
 {% endblock %}
 
 {% block page_header %}
-<div class="flex items-center gap-3">
-  <a aria-label="Back" href="{% if is_shared_library %}{% url 'media_library_org:shared_asset_detail' asset_id=asset.id %}{% else %}{% url 'media_library:index' workspace_id=workspace.id %}{% endif %}"
-     class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors btn-surface-2"
-     style="color: var(--text-tertiary);">
-    <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+<div class="w-full mb-6">
+  <a href="{% if is_shared_library %}{% url 'media_library_org:shared_asset_detail' asset_id=asset.id %}{% else %}{% url 'media_library:index' workspace_id=workspace.id %}{% endif %}"
+     class="inline-flex items-center gap-1 -ml-1 mb-2 min-h-8 px-1 rounded-md text-[13px] font-medium text-ink-600 hover:text-ink-900">
+    <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    Back
   </a>
-  <h1 class="text-lg font-semibold" style="color: var(--text-primary);">Edit - {{ asset.original_filename }}</h1>
-  {% if is_shared_library %}
-  <span class="text-xs font-bold px-2.5 py-0.5 rounded-full "
-        style="background: rgba(66, 158, 74,0.15); color: var(--success-600);">Shared</span>
-  {% endif %}
+  <div class="flex flex-wrap items-center gap-2 min-w-0">
+    <h1 class="ui-page-title break-all min-w-0">Edit {{ asset.original_filename }}</h1>
+    {% if is_shared_library %}
+    <span class="ui-pill ui-pill-info">
+      <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg>
+      Shared
+    </span>
+    {% endif %}
+  </div>
+  <p class="ui-page-status">Your changes save as a new version; the original stays in the version history.</p>
 </div>
 {% endblock %}
 
@@ -76,40 +86,40 @@
 
   <!-- Toolbar -->
   <div class="ml-edit-toolbar p-2">
-    <div class="flex items-center gap-1">
-      <button @click="setMode('crop')" :class="mode === 'crop' ? 'active' : ''" class="ml-tool-btn">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7h4m0 0V3m0 4v14h14m-4-4h4m0 0v4m0-4H7"/></svg>
+    <div class="flex flex-wrap items-center gap-1">
+      <button type="button" @click="setMode('crop')" :class="mode === 'crop' ? 'active' : ''" class="ml-tool-btn">
+        <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7h4m0 0V3m0 4v14h14m-4-4h4m0 0v4m0-4H7"/></svg>
         Crop
       </button>
-      <button @click="rotate(-90)" class="ml-tool-btn">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h1l1-2 2-2h4V2l5 5-5 5V8H7l-1 1-1 2H3v-1z"/></svg>
-        Rotate Left
+      <button type="button" @click="rotate(-90)" class="ml-tool-btn">
+        <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h1l1-2 2-2h4V2l5 5-5 5V8H7l-1 1-1 2H3v-1z"/></svg>
+        Rotate left
       </button>
-      <button @click="rotate(90)" class="ml-tool-btn">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="transform: scaleX(-1)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h1l1-2 2-2h4V2l5 5-5 5V8H7l-1 1-1 2H3v-1z"/></svg>
-        Rotate Right
+      <button type="button" @click="rotate(90)" class="ml-tool-btn">
+        <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="transform: scaleX(-1)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h1l1-2 2-2h4V2l5 5-5 5V8H7l-1 1-1 2H3v-1z"/></svg>
+        Rotate right
       </button>
-      <button @click="flip('horizontal')" class="ml-tool-btn">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
-        Flip H
+      <button type="button" @click="flip('horizontal')" class="ml-tool-btn">
+        <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+        Flip sideways
       </button>
-      <button @click="flip('vertical')" class="ml-tool-btn">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="transform: rotate(90deg)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
-        Flip V
+      <button type="button" @click="flip('vertical')" class="ml-tool-btn">
+        <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="transform: rotate(90deg)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+        Flip upside down
       </button>
 
       <div class="flex-1"></div>
 
+      <div class="flex items-center gap-2 max-sm:w-full max-sm:mt-2 max-sm:justify-end">
       <a href="{% if is_shared_library %}{% url 'media_library_org:shared_asset_detail' asset_id=asset.id %}{% else %}{% url 'media_library:asset_detail' workspace_id=workspace.id asset_id=asset.id %}{% endif %}"
-         class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full border transition-colors btn-surface-1"
-         style="border-color: var(--border); color: var(--text-secondary);">
+         class="ui-btn ui-btn-secondary">
         Cancel
       </a>
-      <button @click="save()" class="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-full transition-all btn-primary-hover"
-              style="background: var(--primary); box-shadow: var(--shadow-primary);">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+      <button type="button" @click="save()" class="ui-btn ui-btn-primary">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
         Save as new version
       </button>
+      </div>
     </div>
   </div>
 
@@ -139,24 +149,21 @@
 
   <!-- Trim controls -->
   <div class="ml-edit-toolbar p-4">
-    <div class="flex items-center gap-6 mb-3">
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-3 mb-3">
       <div class="flex items-center gap-2">
-        <label for="trim-start" class="text-xs font-semibold" style="color: var(--text-tertiary);">Start</label>
+        <label for="trim-start" class="text-[13px] font-medium text-ink-900">Start</label>
         <input type="number" id="trim-start" x-model.number="trimStart" step="0.1" min="0" :max="trimEnd"
-               class="input-focus w-24 text-xs px-2.5 py-1.5 border rounded-lg text-center outline-none"
-               style="font-variant-numeric: tabular-nums;">
-        <span class="text-xs" style="color: var(--text-ghost);">sec</span>
+               class="ui-input !w-24 text-center tabular-nums">
+        <span class="text-xs text-ink-600">sec</span>
       </div>
       <div class="flex items-center gap-2">
-        <label for="trim-end" class="text-xs font-semibold" style="color: var(--text-tertiary);">End</label>
+        <label for="trim-end" class="text-[13px] font-medium text-ink-900">End</label>
         <input type="number" id="trim-end" x-model.number="trimEnd" step="0.1" :min="trimStart" :max="duration"
-               class="input-focus w-24 text-xs px-2.5 py-1.5 border rounded-lg text-center outline-none"
-               style="font-variant-numeric: tabular-nums;">
-        <span class="text-xs" style="color: var(--text-ghost);">sec</span>
+               class="ui-input !w-24 text-center tabular-nums">
+        <span class="text-xs text-ink-600">sec</span>
       </div>
-      <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
-            style="background: var(--primary-soft); color: var(--brand-700);"
-            x-text="'Duration: ' + (trimEnd - trimStart).toFixed(1) + 's'"></span>
+      <span class="ui-badge tabular-nums"
+            x-text="'Length ' + (trimEnd - trimStart).toFixed(1) + 's'"></span>
     </div>
 
     <!-- Visual timeline -->
@@ -164,20 +171,19 @@
       <div class="ml-trim-selection"
            :style="'left: ' + (trimStart / duration * 100) + '%; right: ' + (100 - trimEnd / duration * 100) + '%'">
       </div>
-      <div class="absolute top-0 bottom-0 w-0.5" style="background: var(--error-500);"
+      <div class="absolute top-0 bottom-0 w-0.5 bg-ink-900" aria-hidden="true"
            :style="'left: ' + (currentTime / duration * 100) + '%'"></div>
     </div>
 
-    <div class="flex items-center justify-between mt-3">
-      <button @click="preview()" class="ml-tool-btn flex-row gap-1.5">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+    <div class="flex flex-wrap items-center justify-between gap-2 mt-3">
+      <button type="button" @click="preview()" class="ui-btn ui-btn-ghost">
+        <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
         Preview trim
       </button>
 
       <div class="flex items-center gap-2">
         <a href="{% if is_shared_library %}{% url 'media_library_org:shared_asset_detail' asset_id=asset.id %}{% else %}{% url 'media_library:asset_detail' workspace_id=workspace.id asset_id=asset.id %}{% endif %}"
-           class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full border transition-colors"
-           style="border-color: var(--border); color: var(--text-secondary);">
+           class="ui-btn ui-btn-secondary">
           Cancel
         </a>
         <form method="POST" action="{% if is_shared_library %}{% url 'media_library_org:shared_asset_edit' asset_id=asset.id %}{% else %}{% url 'media_library:asset_edit' workspace_id=workspace.id asset_id=asset.id %}{% endif %}">
@@ -185,9 +191,8 @@
           <input type="hidden" name="trim_start" :value="trimStart">
           <input type="hidden" name="trim_end" :value="trimEnd">
           <button type="submit"
-                  class="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-full transition-all"
-                  style="background: var(--primary-strong); box-shadow: var(--shadow-primary);">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  class="ui-btn ui-btn-primary">
+            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
             Trim &amp; save
           </button>
         </form>
@@ -197,11 +202,10 @@
 </div>
 
 {% else %}
-<div class="text-center py-20">
-  <p class="text-sm" style="color: var(--text-secondary);">Editing is not available for this file type.</p>
+<div class="ui-card ui-empty">
+  <p class="ui-empty-title">This file type can't be edited here.</p>
   <a href="{% if is_shared_library %}{% url 'media_library_org:shared_index' %}{% else %}{% url 'media_library:index' workspace_id=workspace.id %}{% endif %}"
-     class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-sm font-semibold rounded-full border"
-     style="border-color: var(--border); color: var(--text-secondary);">
+     class="ui-btn ui-btn-secondary mt-4">
     Back to library
   </a>
 </div>

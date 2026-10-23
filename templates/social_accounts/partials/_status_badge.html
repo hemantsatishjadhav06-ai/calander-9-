@@ -1,25 +1,25 @@
 {% comment %}
-Status badge for social account connection state.
+Status badge for social account connection state: always a shape and a word.
 Usage: {% include "social_accounts/partials/_status_badge.html" with status=account.connection_status %}
 {% endcomment %}
 {% if status == "connected" %}
-<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-50 text-success-600 ring-1 ring-inset ring-success-200">
-    <span class="w-1.5 h-1.5 rounded-full bg-success-500"></span>
+<span class="ui-pill ui-pill-success">
+    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
     Connected
 </span>
 {% elif status == "token_expiring" %}
-<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-warning-50 text-warning-600 ring-1 ring-inset ring-warning-200">
-    <span class="w-1.5 h-1.5 rounded-full bg-warning-500"></span>
-    Token Expiring
+<span class="ui-pill ui-pill-warning">
+    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linejoin="round"><path d="M12 3 21 12 12 21 3 12z"/></svg>
+    Expires soon
 </span>
 {% elif status == "disconnected" %}
-<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-ink-100 text-ink-600 ring-1 ring-inset ring-ink-200">
-    <span class="w-1.5 h-1.5 rounded-full bg-ink-400"></span>
+<span class="ui-pill ui-pill-danger">
+    <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
     Disconnected
 </span>
 {% elif status == "error" %}
-<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-danger-50 text-danger-600 ring-1 ring-inset ring-danger-200" {% if error %}title="{{ error }}"{% endif %}>
-    <span class="w-1.5 h-1.5 rounded-full bg-danger-500"></span>
-    Error
+<span class="ui-pill ui-pill-danger" {% if error %}title="{{ error }}"{% endif %}>
+    <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+    Connection error
 </span>
 {% endif %}

@@ -15,21 +15,19 @@
 <div class="flex items-center justify-center gap-2 mt-6 pb-4">
   {% if page.has_previous %}
   <a href="?page={{ page.previous_page_number }}&q={{ query|urlencode }}"
-     class="px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors"
-     style="border-color: var(--border); color: var(--text-secondary);"
+     class="ui-btn ui-btn-secondary ui-btn-sm"
      hx-get="{% url 'media_library_org:shared_index' %}?page={{ page.previous_page_number }}&q={{ query|urlencode }}"
      hx-target="#shared-grid"
      hx-swap="innerHTML">
     Previous
   </a>
   {% endif %}
-  <span class="text-xs px-3" style="color: var(--text-tertiary);">
+  <span class="text-xs px-3 text-ink-600 tabular-nums">
     Page {{ page.number }} of {{ page.paginator.num_pages }}
   </span>
   {% if page.has_next %}
   <a href="?page={{ page.next_page_number }}&q={{ query|urlencode }}"
-     class="px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors"
-     style="border-color: var(--border); color: var(--text-secondary);"
+     class="ui-btn ui-btn-secondary ui-btn-sm"
      hx-get="{% url 'media_library_org:shared_index' %}?page={{ page.next_page_number }}&q={{ query|urlencode }}"
      hx-target="#shared-grid"
      hx-swap="innerHTML">
@@ -40,19 +38,16 @@
 {% endif %}
 
 {% else %}
-<div class="flex flex-col items-center justify-center py-20 text-center">
-  <div class="w-20 h-20 rounded-2xl flex items-center justify-center mb-5"
-       style="background: var(--primary-soft);">
-    <svg class="w-10 h-10" style="color: var(--primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-    </svg>
-  </div>
+<div class="ui-card ui-empty py-16">
+  <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+  </svg>
   {% if query %}
-    <h3 class="text-base font-semibold mb-1" style="color: var(--text-primary);">No media matches your search</h3>
-    <p class="text-sm mb-4" style="color: var(--text-secondary);">Try adjusting your search terms.</p>
+    <h3 class="ui-empty-title">No media matches your search</h3>
+    <p class="ui-empty-body">Try other words or another file type.</p>
   {% else %}
-    <h3 class="text-base font-semibold mb-1" style="color: var(--text-primary);">No shared media yet</h3>
-    <p class="text-sm" style="color: var(--text-secondary);">Organization admins can upload assets here for use across all workspaces.</p>
+    <h3 class="ui-empty-title">No shared media yet</h3>
+    <p class="ui-empty-body">Organization admins can upload pictures and videos here for every workspace to use.</p>
   {% endif %}
 </div>
 {% endif %}

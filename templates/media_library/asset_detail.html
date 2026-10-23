@@ -3,42 +3,48 @@
 {% block title %}{{ asset.original_filename }} - Media Library{% endblock %}
 
 {% block page_header %}
-<div class="flex items-center gap-3">
-  <a aria-label="Back to media library" href="{% if is_shared_library %}{% url 'media_library_org:shared_index' %}{% else %}{% url 'media_library:index' workspace_id=workspace.id %}{% endif %}"
-     class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors btn-surface-2"
-     style="color: var(--text-tertiary);">
-    <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+<div class="w-full mb-6">
+  <a href="{% if is_shared_library %}{% url 'media_library_org:shared_index' %}{% else %}{% url 'media_library:index' workspace_id=workspace.id %}{% endif %}"
+     class="inline-flex items-center gap-1 -ml-1 mb-2 min-h-8 px-1 rounded-md text-[13px] font-medium text-ink-600 hover:text-ink-900">
+    <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    Back to media library
   </a>
-  <h1 class="text-lg font-semibold" style="color: var(--text-primary);">{{ asset.original_filename }}</h1>
-  {% if asset.is_shared %}
-  <span class="text-xs font-bold px-2.5 py-1 rounded-full "
-        style="background: var(--accent-teal-soft); color: var(--success-600);">Shared</span>
-  {% endif %}
+  <div class="flex flex-wrap items-center gap-2 min-w-0">
+    <h1 class="ui-page-title break-all min-w-0">{{ asset.original_filename }}</h1>
+    {% if asset.is_shared %}
+    <span class="ui-pill ui-pill-info">
+      <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg>
+      Shared
+    </span>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-3 gap-6">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
   <!-- Preview (2 cols) -->
-  <div class="col-span-2">
-    <div class="rounded-xl overflow-hidden border" style="border-color: var(--border); background: var(--surface-1);">
+  <div class="lg:col-span-2 min-w-0">
+    <div class="rounded-2xl overflow-hidden border border-ink-200 bg-ink-50">
       {% if asset.file_type == 'image' or asset.file_type == 'gif' %}
         <img src="{{ asset.file.url }}" alt="{{ asset.original_filename }}" class="w-full max-h-[600px] object-contain">
       {% elif asset.file_type == 'video' %}
-        <video controls class="w-full max-h-[600px]" preload="metadata">
-          <source src="{{ asset.file.url }}" type="{{ asset.mime_type }}">
+        {% comment %}The workspace page plays through the auth-checked stream view (it answers Range requests, so the player can seek); the shared library has no workspace and keeps the file URL.{% endcomment %}
+        <video controls playsinline class="w-full max-h-[600px]" preload="metadata"
+               {% if asset.thumbnail %}poster="{{ asset.thumbnail.url }}"{% endif %}>
+          <source src="{% if workspace %}{% url 'composer:media_stream' workspace_id=workspace.id asset_id=asset.id %}{% else %}{{ asset.file.url }}{% endif %}" type="{{ asset.mime_type }}">
         </video>
       {% else %}
         <div class="flex items-center justify-center py-24">
-          <svg class="w-16 h-16" style="color: var(--text-ghost);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          <svg aria-hidden="true" class="w-12 h-12 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
         </div>
       {% endif %}
     </div>
   </div>
 
-  <!-- Sidebar (1 col) -->
-  <div class="space-y-5">
-    {% include "media_library/_asset_detail_panel.html" %}
+  <!-- Sidebar (1 col): actions, details, tags and versions; the preview sits on the left -->
+  <div class="ui-card !p-0 overflow-hidden min-w-0 self-start">
+    {% include "media_library/_asset_detail_panel.html" with standalone=True %}
   </div>
 </div>
 {% endblock %}

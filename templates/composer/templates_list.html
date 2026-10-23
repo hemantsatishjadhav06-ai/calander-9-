@@ -40,7 +40,7 @@
             <p class="text-[13px] leading-[18px] text-ink-600 mb-3 line-clamp-2">{{ tpl.description }}</p>
             {% endif %}
             {% if tpl.template_data.caption %}
-            <p class="text-[13px] leading-[18px] text-ink-700 bg-ink-50 rounded-lg px-3 py-2 mb-3 line-clamp-3 whitespace-pre-line">{{ tpl.template_data.caption|truncatechars:120 }}</p>
+            <div class="bg-ink-50 rounded-lg px-3 py-2 mb-3"><p class="text-[13px] leading-[18px] text-ink-700 line-clamp-3 whitespace-pre-line">{{ tpl.template_data.caption|truncatechars:120 }}</p></div>
             {% endif %}
             <div class="mt-auto flex items-center justify-between gap-3">
                 <span class="text-xs text-ink-500 truncate">

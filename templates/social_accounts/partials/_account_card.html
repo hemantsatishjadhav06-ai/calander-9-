@@ -3,14 +3,14 @@ Single connected account card - HTMX-swappable.
 Usage: {% include "social_accounts/partials/_account_card.html" with account=account workspace_id=workspace_id %}
 {% endcomment %}
 {% load social_accounts_tags %}
-<div id="account-{{ account.id }}" class="group relative bg-white rounded-xl border border-ink-200 p-5 transition-all duration-200 hover:shadow">
+<div id="account-{{ account.id }}" class="ui-card group relative">
     <div class="flex items-start gap-4">
         <!-- Avatar -->
         <div class="flex-shrink-0">
             {% if account.avatar_url %}
-            <img src="{{ account.avatar_url }}" alt="{{ account.account_name|default:account.account_handle }}" class="w-11 h-11 rounded-full object-cover ring-2 ring-ink-100">
+            <img src="{{ account.avatar_url }}" alt="{{ account.account_name|default:account.account_handle }}" class="w-11 h-11 rounded-full object-cover ring-1 ring-ink-950/10">
             {% else %}
-            <div class="w-11 h-11 rounded-full bg-ink-100 flex items-center justify-center text-ink-500">
+            <div class="w-11 h-11 rounded-full bg-ink-50 ring-1 ring-inset ring-ink-200 flex items-center justify-center text-ink-700" aria-hidden="true">
                 {% include "social_accounts/partials/_platform_icon.html" with platform=account.platform size="5" %}
             </div>
             {% endif %}
@@ -18,47 +18,47 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
 
         <!-- Info -->
         <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-                <h3 class="text-sm font-semibold text-ink-900 truncate">{{ account.account_name|default:account.account_handle }}</h3>
-                <span class="flex-shrink-0 text-ink-500">
+            <div class="flex items-center gap-2 mb-0.5 min-w-0">
+                <h3 class="text-[15px] leading-[22px] font-semibold text-ink-900 truncate">{{ account.account_name|default:account.account_handle }}</h3>
+                <span class="flex-shrink-0 text-ink-500" title="{{ account.get_platform_display }}">
                     {% include "social_accounts/partials/_platform_icon.html" with platform=account.platform size="4" %}
                 </span>
             </div>
             {% if account.account_handle %}
-            <p class="text-xs text-ink-500 truncate">@{{ account.account_handle|cut:"@" }}</p>
+            <p class="text-[13px] text-ink-600 truncate">@{{ account.account_handle|cut:"@" }}</p>
             {% endif %}
-            <div class="flex items-center gap-3 mt-2">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
                 {% include "social_accounts/partials/_status_badge.html" with status=account.connection_status error=account.last_error %}
                 {% if account.follower_count %}
-                <span class="text-xs text-ink-500">{{ account.follower_count|format_number }} followers</span>
+                <span class="text-xs text-ink-600 tabular-nums">{{ account.follower_count|format_number }} followers</span>
                 {% endif %}
             </div>
         </div>
 
         <!-- Actions -->
-        <div class="flex items-center gap-2" x-data="{ confirmDisconnect: false }">
+        <div class="flex items-center gap-1 flex-shrink-0" x-data="{ confirmDisconnect: false }">
             {% if account.needs_reconnect %}
             <form method="post" action="{% url 'social_accounts:reconnect' workspace_id=workspace_id account_id=account.id %}">
                 {% csrf_token %}
-                <button type="submit" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 rounded-full hover:bg-brand-100 transition-colors">
+                <button type="submit" class="ui-btn ui-btn-secondary ui-btn-sm">
                     Reconnect
                 </button>
             </form>
             {% endif %}
 
             <!-- Disconnect -->
-            <button aria-label="Disconnect" @click="confirmDisconnect = true" class="inline-flex items-center p-1.5 text-ink-500 hover:text-danger-500 rounded-lg hover:bg-danger-50 transition-colors cursor-pointer" title="Disconnect">
-                <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <button type="button" aria-label="{% if account.connection_status == "disconnected" %}Remove{% else %}Disconnect{% endif %} {{ account.account_name|default:account.account_handle }}" @click="confirmDisconnect = true" class="ui-btn ui-btn-icon hover:!text-danger-500 hover:!bg-danger-50" title="{% if account.connection_status == "disconnected" %}Remove{% else %}Disconnect{% endif %}">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
 
             <!-- Disconnect confirmation -->
             <div x-show="confirmDisconnect" x-cloak @click.away="confirmDisconnect = false"
-                 class="absolute right-4 top-12 z-10 w-64 bg-white rounded-xl shadow-xl border border-ink-200 p-4">
+                 class="ui-menu absolute right-4 top-14 z-10 w-72 max-w-[calc(100%-2rem)] !p-4" role="dialog" aria-label="Confirm">
                 {% if account.connection_status == "disconnected" %}
-                <p class="text-sm text-ink-700 mb-2">Remove <strong>{{ account.account_name|default:account.account_handle }}</strong> permanently?</p>
-                <p class="text-xs text-ink-500 mb-3">Its published-post history, analytics, queues and posting schedule are deleted. Posts that only targeted this account are deleted too.</p>
+                <p class="text-sm text-ink-900 mb-2">Remove <strong class="font-semibold">{{ account.account_name|default:account.account_handle }}</strong> permanently?</p>
+                <p class="text-xs text-ink-600 mb-3">Its published-post history, analytics, queues and posting schedule are deleted. Posts that only targeted this account are deleted too.</p>
                 <div class="flex gap-2 justify-end">
-                    <button type="button" @click="confirmDisconnect = false" class="px-3 py-1.5 text-xs font-semibold text-ink-600 bg-ink-100 rounded-full hover:bg-ink-200 transition-colors cursor-pointer">Cancel</button>
+                    <button type="button" @click="confirmDisconnect = false" class="ui-btn ui-btn-secondary ui-btn-sm">Cancel</button>
                     <form method="post"
                           action="{% url 'social_accounts:remove' workspace_id=workspace_id account_id=account.id %}"
                           hx-post="{% url 'social_accounts:remove' workspace_id=workspace_id account_id=account.id %}"
@@ -66,11 +66,11 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
                           hx-swap="outerHTML"
                           hx-disabled-elt="find button[type=submit]">
                         {% csrf_token %}
-                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-white bg-danger-500 rounded-full hover:bg-danger-600 transition-colors cursor-pointer">Remove</button>
+                        <button type="submit" class="ui-btn ui-btn-danger ui-btn-sm">Remove</button>
                     </form>
                 </div>
                 {% else %}
-                <p class="text-sm text-ink-700 mb-2">Disconnect <strong>{{ account.account_name|default:account.account_handle }}</strong>? Historical data will be preserved, and scheduled posts on it go back to drafts.</p>
+                <p class="text-sm text-ink-900 mb-2">Disconnect <strong class="font-semibold">{{ account.account_name|default:account.account_handle }}</strong>? Historical data will be preserved, and scheduled posts on it go back to drafts.</p>
                 {% comment %}
                 Disconnecting drops our copy of the credentials; it cannot
                 revoke the grant, because the only endpoint that would do so
@@ -79,13 +79,13 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
                 imply a revocation it never performs.
                 {% endcomment %}
                 {% if account.keeps_platform_grant_on_disconnect %}
-                <p class="text-xs text-ink-500 mb-3">
+                <p class="text-xs text-ink-600 mb-3">
                     This removes the account from {{ SITE_NAME }} only. To revoke our access entirely,
                     remove {{ SITE_NAME }} in Facebook &rsaquo; Settings &rsaquo; Apps and Websites.
                 </p>
                 {% endif %}
                 <div class="flex gap-2 justify-end">
-                    <button @click="confirmDisconnect = false" class="px-3 py-1.5 text-xs font-semibold text-ink-600 bg-ink-100 rounded-full hover:bg-ink-200 transition-colors cursor-pointer">Cancel</button>
+                    <button type="button" @click="confirmDisconnect = false" class="ui-btn ui-btn-secondary ui-btn-sm">Cancel</button>
                     <form method="post"
                           action="{% url 'social_accounts:disconnect' workspace_id=workspace_id account_id=account.id %}"
                           hx-post="{% url 'social_accounts:disconnect' workspace_id=workspace_id account_id=account.id %}"
@@ -95,8 +95,8 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
                           @submit="disconnecting = true"
                           @htmx:after-request.camel="disconnecting = false">
                         {% csrf_token %}
-                        <button type="submit" :disabled="disconnecting" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-danger-500 rounded-full hover:bg-danger-500 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg x-show="disconnecting" class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <button type="submit" :disabled="disconnecting" class="ui-btn ui-btn-danger ui-btn-sm disabled:opacity-60 disabled:cursor-not-allowed">
+                            <span x-show="disconnecting" x-cloak class="ui-spinner !border-white/40 !border-t-white" aria-hidden="true"></span>
                             <span x-text="disconnecting ? 'Disconnecting…' : 'Disconnect'">Disconnect</span>
                         </button>
                     </form>
@@ -113,8 +113,9 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
     Naming them here turns that into something the user can act on.
     {% endcomment %}
     {% if account.missing_scopes %}
-    <div class="mt-3 px-3 py-2 bg-warning-50 border border-warning-200 rounded-lg">
-        <p class="text-xs text-warning-600">
+    <div class="ui-callout ui-callout-warning mt-4">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/><path d="M12 8v4M12 16h.01" stroke-linecap="round"/></svg>
+        <p>
             <span class="font-semibold">Some features are unavailable.</span>
             This account was connected without {{ account.missing_scopes|join:", " }}.
             Anything relying on them will fail until the permission is granted — reconnect to try again.
@@ -123,8 +124,9 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
     {% endif %}
 
     {% if account.last_error and account.connection_status == "error" %}
-    <div class="mt-3 px-3 py-2 bg-danger-50 rounded-lg">
-        <p class="text-xs text-danger-600 truncate">{{ account.last_error }}</p>
+    <div class="ui-callout ui-callout-danger mt-4">
+        <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+        <p class="min-w-0 break-words line-clamp-3">{{ account.last_error }}</p>
     </div>
     {% endif %}
 
@@ -143,9 +145,10 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
     the same accounts, so the two never disagree about what is on offer.
     {% endcomment %}
     {% if account.webhooks_active is False and not account.needs_reconnect %}
-    <div class="mt-3 px-3 py-2 bg-warning-50 border border-warning-200 rounded-lg">
-        <div class="flex items-start justify-between gap-3">
-            <p class="text-xs text-warning-600">
+    <div class="ui-callout ui-callout-warning mt-4">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/><path d="M12 8v4M12 16h.01" stroke-linecap="round"/></svg>
+        <div class="flex flex-1 min-w-0 flex-wrap sm:flex-nowrap items-start justify-between gap-3">
+            <p class="min-w-0">
                 <span class="font-semibold">Real-time comments are off.</span>
                 {{ account.webhook_error|default:"We couldn't set up real-time updates for this account." }}
                 New comments still reach the inbox, but can take a few minutes to appear.
@@ -153,7 +156,7 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
             {% if account.webhook_needs_reconnect %}
             <form method="post" action="{% url 'social_accounts:reconnect' workspace_id=workspace_id account_id=account.id %}">
                 {% csrf_token %}
-                <button type="submit" class="inline-flex flex-shrink-0 items-center whitespace-nowrap px-3 py-1.5 text-xs font-semibold text-warning-600 bg-warning-100 rounded-full hover:bg-warning-200 transition-colors cursor-pointer">
+                <button type="submit" class="ui-btn ui-btn-secondary ui-btn-sm flex-shrink-0 whitespace-nowrap">
                     Reconnect
                 </button>
             </form>
@@ -174,8 +177,8 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
                   @submit="retrying = true"
                   @htmx:after-request.camel="retrying = false">
                 {% csrf_token %}
-                <button type="submit" :disabled="retrying" class="inline-flex flex-shrink-0 items-center whitespace-nowrap gap-1.5 px-3 py-1.5 text-xs font-semibold text-warning-600 bg-warning-100 rounded-full hover:bg-warning-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                    <svg x-show="retrying" x-cloak class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                <button type="submit" :disabled="retrying" class="ui-btn ui-btn-secondary ui-btn-sm flex-shrink-0 whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed">
+                    <span x-show="retrying" x-cloak class="ui-spinner" aria-hidden="true"></span>
                     <span x-text="retrying ? 'Trying…' : 'Try again'">Try again</span>
                 </button>
             </form>
@@ -186,10 +189,10 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
 
     <!-- Posting Schedule -->
     {% if account.connection_status == "connected" %}
-    <div class="border-t border-ink-100 mt-4 pt-4">
+    <div class="border-t border-ink-100 mt-5 pt-4">
         <div class="mb-3">
-            <h4 class="text-xs font-semibold text-ink-700 ">Posting Schedule</h4>
-            <p class="text-xs text-ink-500 mt-0.5">Set recurring time slots for when queued posts are automatically published.</p>
+            <h4 class="text-[13px] font-semibold text-ink-900">Posting schedule</h4>
+            <p class="text-xs text-ink-600 mt-0.5">The weekly times queued posts go out on this account.</p>
         </div>
         {% include "social_accounts/partials/_posting_slots_grid.html" with account=account workspace_id=workspace_id %}
     </div>
