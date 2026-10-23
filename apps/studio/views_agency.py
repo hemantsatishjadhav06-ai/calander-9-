@@ -1,4 +1,4 @@
-"""The agency's own pages: the team roster and one job's timeline.
+"""The agency's own pages: the Team tab (drawn live by ``views_live``) and one job's timeline.
 
 Under ``/workspace/<id>/studio/`` like the rest of the Studio, and for the
 agency's staff only (see ``views._workspace``). Retrying or cancelling a job
@@ -8,7 +8,6 @@ needs ``create_posts``.
 from __future__ import annotations
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Max, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
@@ -19,49 +18,14 @@ from apps.members.decorators import require_permission
 from . import chat, dashboard, engine, opendots, team
 from .models import AgencyJob, AgentRun
 from .views import _perms, _workspace
+from .views_live import team_page
 
 
 @login_required
 @require_GET
 def team_roster(request, workspace_id):
-    workspace = _workspace(request, workspace_id)
-    visible_runs = chat.web_agent_runs(AgentRun.objects.filter(workspace=workspace))
-    runs = visible_runs.values("agent").annotate(
-        total=Count("id"),
-        working=Count("id", filter=Q(status=AgentRun.Status.RUNNING)),
-        last=Max("started_at"),
-    )
-    by_agent = {row["agent"]: row for row in runs}
-    latest = {}
-    for run in visible_runs.exclude(summary="").order_by("-started_at")[:300]:
-        latest.setdefault(run.agent, run)
-    departments = []
-    for department, agents in team.by_department():
-        rows = []
-        for agent in agents:
-            stats = by_agent.get(agent.slug, {})
-            rows.append(
-                {
-                    "agent": agent,
-                    "working": bool(stats.get("working")),
-                    "total": stats.get("total", 0),
-                    "last": stats.get("last"),
-                    "latest": latest.get(agent.slug),
-                }
-            )
-        departments.append({"department": department, "agents": rows})
-    working_now = sum(1 for d in departments for row in d["agents"] if row["working"])
-    return render(
-        request,
-        "studio/team.html",
-        {
-            "workspace": workspace,
-            "departments": departments,
-            "agent_count": len(team.AGENTS),
-            "working_now": working_now,
-            "tabs": dashboard.tabs(workspace, "team", perms=_perms(request)),
-        },
-    )
+    """The Team tab: the team at work, live (``views_live``); every agent of the roster stays on it."""
+    return team_page(request, workspace_id)
 
 
 def _get_job(request, workspace_id, job_id):
