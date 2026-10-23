@@ -3,19 +3,19 @@
     {% for check in report.to_fix %}
     <li class="flex items-start gap-2 text-sm">
         {% if check.level == 'fail' %}
-        <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-danger-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M15 9l-6 6M9 9l6 6"/></svg>
+        <svg class="mt-0.5 size-4 flex-shrink-0 text-danger-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M15 9l-6 6M9 9l6 6"/></svg>
         <span class="sr-only">Needs fixing:</span>
         {% else %}
-        <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-warning-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 7.5v5.5M12 16.5h.01"/></svg>
+        <svg class="mt-0.5 size-4 flex-shrink-0 text-warning-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 7.5v5.5M12 16.5h.01"/></svg>
         <span class="sr-only">Worth improving:</span>
         {% endif %}
-        <span class="min-w-0 text-ink-800"><span class="font-medium text-ink-900">{{ check.label }}</span> — {{ check.detail }}</span>
+        <span class="min-w-0 text-ink-700"><span class="font-medium text-ink-900">{{ check.label }}</span> — {{ check.detail }}</span>
     </li>
     {% endfor %}
     {% if not limit_passing %}
     {% for check in report.passing %}
     <li class="flex items-start gap-2 text-sm">
-        <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-success-600" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        <svg class="mt-0.5 size-4 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         <span class="sr-only">Passed:</span>
         <span class="min-w-0 text-ink-700">{{ check.label }} <span class="text-ink-600">— {{ check.detail }}</span></span>
     </li>

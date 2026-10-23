@@ -1,31 +1,85 @@
-{% extends "legal/base_legal.html" %}
-{% block legal_title %}Outbound email · {{ SITE_NAME }}{% endblock %}
-{% block legal_body %}
-<h1>Outbound email</h1>
-{% if messages %}{% for m in messages %}<p class="placeholder">{{ m }}</p>{% endfor %}{% endif %}
-<p class="muted">Backend: <strong>{{ backend_type }}</strong> · From: <strong>{{ from_email }}</strong></p>
+{% extends "base.html" %}
+{% block title %}Outbound email · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Outbound email{% endblock %}
+{% block content %}
+<div class="w-full max-w-2xl">
+    <header class="mb-6">
+        <h1 class="text-h1 text-ink-950">Outbound email</h1>
+        <p class="ui-page-status">The address invitations, approvals and digests are sent from. Only the instance owner sees this page.</p>
+    </header>
 
-{% if backend_type == "gmail_api" %}
-<h2>Gmail account</h2>
-{% if env_token %}
-  <p>Using the refresh token from <code>GMAIL_REFRESH_TOKEN</code>.</p>
-{% elif mailbox %}
-  <p>Sending as <strong>{{ mailbox.email }}</strong>, connected {{ mailbox.connected_at|date:"j M Y H:i" }}.</p>
-  <p><a href="{% url 'ops_email_connect' %}">Reconnect</a></p>
-{% else %}
-  <p>No Gmail account connected yet, so no email can be sent.</p>
-  {% if client_configured %}<p><a href="{% url 'ops_email_connect' %}"><strong>Connect Gmail</strong></a></p>
-  {% else %}<p>Set <code>GOOGLE_AUTH_CLIENT_ID</code> / <code>GOOGLE_AUTH_CLIENT_SECRET</code> (or <code>GMAIL_CLIENT_ID</code> / <code>GMAIL_CLIENT_SECRET</code>) first.</p>{% endif %}
-{% endif %}
-<h2>One-time Google Cloud setup</h2>
-<ol>
-  <li>In the Google Cloud project that owns the OAuth client, enable the <strong>Gmail API</strong>.</li>
-  <li>Add this authorized redirect URI to the OAuth client: <code>{{ redirect_uri }}</code></li>
-  <li>On the OAuth consent screen, add the scope <code>gmail.send</code> and set publishing status to <strong>In production</strong> (in "Testing" Google expires the connection after 7 days).</li>
-  <li>Sign in here as the mailbox owner and click Connect Gmail.</li>
-</ol>
-{% endif %}
+    <section class="ui-card" aria-labelledby="mail-sender-title">
+        <h2 id="mail-sender-title" class="ui-card-title">Sender</h2>
+        <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            <div>
+                <dt class="text-caption font-semibold text-ink-500">Sends from</dt>
+                <dd class="mt-1 break-all text-sm font-medium text-ink-900">{{ from_email }}</dd>
+            </div>
+            <div>
+                <dt class="text-caption font-semibold text-ink-500">Method</dt>
+                <dd class="mt-1 text-sm font-medium text-ink-900">{% if backend_type == "gmail_api" %}Gmail{% elif backend_type == "smtp" %}SMTP server{% else %}{{ backend_type }}{% endif %}</dd>
+            </div>
+        </dl>
 
-<h2>Test</h2>
-<form method="post">{% csrf_token %}<input type="hidden" name="action" value="test"><button type="submit">Send a test email to {{ request.user.email }}</button></form>
+        {% if backend_type == "gmail_api" %}
+        <div class="mt-5 border-t border-ink-200 pt-5">
+            <h3 class="text-h3 text-ink-950">Gmail account</h3>
+            {% if env_token %}
+            <div class="ui-callout ui-callout-success mt-3">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                <p>Connected with the refresh token from <code class="font-mono">GMAIL_REFRESH_TOKEN</code>.</p>
+            </div>
+            {% elif mailbox %}
+            <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm text-ink-700">
+                    Sending as <span class="font-semibold text-ink-900">{{ mailbox.email }}</span>, connected {{ mailbox.connected_at|date:"j M Y, H:i" }}.
+                </p>
+                <a href="{% url 'ops_email_connect' %}" class="ui-btn ui-btn-secondary shrink-0 no-underline">Reconnect</a>
+            </div>
+            {% else %}
+            <div class="ui-callout ui-callout-warning mt-3">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                <p>No Gmail account is connected yet, so no email can be sent.</p>
+            </div>
+            {% if client_configured %}
+            <a href="{% url 'ops_email_connect' %}" class="ui-btn ui-btn-primary mt-4 no-underline">Connect Gmail</a>
+            {% else %}
+            <div class="ui-owner-box mt-3">
+                <span class="font-semibold text-ink-900">For the owner:</span>
+                set <code>GOOGLE_AUTH_CLIENT_ID</code> and <code>GOOGLE_AUTH_CLIENT_SECRET</code>
+                (or <code>GMAIL_CLIENT_ID</code> and <code>GMAIL_CLIENT_SECRET</code>) first.
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+
+    {% if backend_type == "gmail_api" %}
+    <details class="ui-card group mt-6">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <span class="text-h3 text-ink-950">One-time Google Cloud setup</span>
+            <svg class="size-4 shrink-0 text-ink-500 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <ol class="mt-4 list-decimal space-y-2.5 pl-5 text-sm text-ink-700 marker:font-semibold marker:text-ink-500">
+            <li>In the Google Cloud project that owns the sign-in client, turn on the <span class="font-semibold text-ink-900">Gmail API</span>.</li>
+            <li>Add this redirect address to that client: <code class="break-all rounded bg-ink-50 px-1 py-0.5 font-mono text-[13px] text-ink-900 ring-1 ring-inset ring-ink-200">{{ redirect_uri }}</code></li>
+            <li>On the consent screen, add the scope <code class="rounded bg-ink-50 px-1 py-0.5 font-mono text-[13px] text-ink-900 ring-1 ring-inset ring-ink-200">gmail.send</code> and set the publishing status to <span class="font-semibold text-ink-900">In production</span> (while it says "Testing", Google ends the connection after 7 days).</li>
+            <li>Sign in here as the mailbox owner and choose Connect Gmail.</li>
+        </ol>
+    </details>
+    {% endif %}
+
+    <section class="ui-card mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6" aria-labelledby="mail-test-title">
+        <div class="min-w-0">
+            <h2 id="mail-test-title" class="text-h3 text-ink-950">Send a test</h2>
+            <p class="mt-1 text-sm text-ink-600">A short message to <span class="font-medium text-ink-900">{{ request.user.email }}</span>.</p>
+        </div>
+        <form method="post" class="shrink-0">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="test">
+            <button type="submit" class="ui-btn ui-btn-secondary">Send test email</button>
+        </form>
+    </section>
+</div>
 {% endblock %}

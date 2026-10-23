@@ -2,10 +2,10 @@
 {% block title %}Finalizing… · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Finalizing…{% endblock %}
 {% block content %}
-<div class="max-w-xl mx-auto py-16 px-4 text-center">
-  <div class="mx-auto mb-6 w-12 h-12 rounded-full border-4 border-brand-200 border-t-info-500 animate-spin"></div>
-  <h1 class="text-xl font-semibold text-ink-900 mb-2">Setting up your Intelligence access…</h1>
-  <p class="text-sm text-ink-600 mb-6">
+<div class="mx-auto w-full max-w-xl py-12 text-center sm:py-16">
+  <span class="ui-spinner mx-auto mb-6 block !size-10 !border-[3px]" aria-hidden="true"></span>
+  <h1 class="text-h2 text-ink-950">Setting up your Intelligence access…</h1>
+  <p class="mt-2 text-sm text-ink-700">
     Stripe confirmed your payment. We're finishing the handshake with the
     billing service, this usually takes a few seconds.
   </p>
@@ -14,7 +14,7 @@
        hx-get="{% url 'intelligence_global:finalizing-status' %}"
        hx-trigger="load, every 2s"
        hx-swap="outerHTML"
-       class="text-xs text-ink-500">
+       class="mt-6 text-small text-ink-600">
     Checking…
   </div>
 </div>

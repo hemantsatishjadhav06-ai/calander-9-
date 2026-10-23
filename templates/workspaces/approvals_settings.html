@@ -1,83 +1,86 @@
 {% extends "layouts/workspace_settings.html" %}
 {% block title %}Approvals - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 {% block content %}
-<div class="max-w-2xl">
-    <h2 class="text-xl font-semibold mb-2" style="color: var(--text-primary);">Approvals</h2>
-    <p class="text-sm mb-8" style="color: var(--text-secondary);">
-        Control whether posts need to be reviewed before they can be scheduled or published.
-    </p>
+<div class="w-full max-w-2xl">
+    <header class="mb-6">
+        <h1 class="text-h1 text-ink-950">Approvals</h1>
+        <p class="ui-page-status">Choose who has to say yes before a post is scheduled or published.</p>
+    </header>
 
     <form method="POST" x-data="{ mode: '{{ workspace.approval_workflow_mode }}' }">
         {% csrf_token %}
 
-        <div class="flex flex-col gap-3 mb-8">
-            {% for value, label in approval_modes.choices %}
-            <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer transition-colors"
-                   :style="mode === '{{ value }}'
-                        ? 'border: 1px solid var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 3px var(--primary-ring);'
-                        : 'border: 1px solid var(--border); background: var(--surface-0);'"
-                   {% if not is_owner_or_manager %}style="cursor: not-allowed; opacity: 0.7;"{% endif %}>
-                <input type="radio"
-                       name="approval_workflow_mode"
-                       value="{{ value }}"
-                       x-model="mode"
-                       class="mt-1"
-                       {% if not is_owner_or_manager %}disabled{% endif %}
-                       {% if workspace.approval_workflow_mode == value %}checked{% endif %}>
-                <div class="flex-1">
-                    <div class="text-sm font-semibold mb-0.5" style="color: var(--text-primary);">
-                        {% if value == 'none' %}No approvals
-                        {% elif value == 'optional' %}Optional approvals
-                        {% elif value == 'required_internal' %}Internal review required
-                        {% elif value == 'required_internal_and_client' %}Internal review + client approval
-                        {% else %}{{ label }}
-                        {% endif %}
-                    </div>
-                    <div class="text-xs" style="color: var(--text-secondary);">
-                        {% if value == 'none' %}
-                            Anyone with publishing rights can schedule or publish directly.
-                        {% elif value == 'optional' %}
-                            Creators can choose to submit a post for review, but it's not required.
-                        {% elif value == 'required_internal' %}
-                            Every post must be approved by a team member with review rights before it can go out.
-                        {% elif value == 'required_internal_and_client' %}
-                            Posts go through internal review, then are sent to the client portal for final sign-off.
-                        {% endif %}
-                    </div>
+        <section class="ui-card" aria-labelledby="approval-mode-title">
+            <h2 id="approval-mode-title" class="ui-card-title">Review before posting</h2>
+            <fieldset class="mt-4">
+                <legend class="sr-only">Approval workflow</legend>
+                <div class="flex flex-col gap-2.5">
+                    {% for value, label in approval_modes.choices %}
+                    <label class="flex items-start gap-3 rounded-xl p-4 ring-1 ring-inset ring-ink-200 transition-[box-shadow,background-color] duration-150 has-[:checked]:bg-brand-50 has-[:checked]:ring-2 has-[:checked]:ring-brand-700 {% if is_owner_or_manager %}cursor-pointer hover:ring-ink-300{% else %}cursor-not-allowed bg-ink-50{% endif %}">
+                        <input type="radio"
+                               name="approval_workflow_mode"
+                               value="{{ value }}"
+                               x-model="mode"
+                               class="mt-0.5 size-4 shrink-0 accent-brand-700"
+                               {% if not is_owner_or_manager %}disabled{% endif %}
+                               {% if workspace.approval_workflow_mode == value %}checked{% endif %}>
+                        <span class="flex-1">
+                            <span class="block text-sm font-semibold text-ink-900">
+                                {% if value == 'none' %}No approvals
+                                {% elif value == 'optional' %}Optional approvals
+                                {% elif value == 'required_internal' %}Internal review required
+                                {% elif value == 'required_internal_and_client' %}Internal review, then client approval
+                                {% else %}{{ label }}
+                                {% endif %}
+                            </span>
+                            <span class="mt-0.5 block text-small text-ink-600">
+                                {% if value == 'none' %}
+                                    Anyone who can publish can schedule or publish straight away.
+                                {% elif value == 'optional' %}
+                                    People can ask for a review, but they don't have to.
+                                {% elif value == 'required_internal' %}
+                                    Someone on the team who can review approves every post before it goes out.
+                                {% elif value == 'required_internal_and_client' %}
+                                    After the team's review, the client signs off in their portal.
+                                {% endif %}
+                            </span>
+                        </span>
+                    </label>
+                    {% endfor %}
                 </div>
-            </label>
-            {% endfor %}
-        </div>
+            </fieldset>
+        </section>
 
-        <label class="flex items-start gap-3 p-4 rounded-lg mb-8" style="border: 1px solid var(--border); background: var(--surface-0);{% if not is_owner %} opacity: 0.85;{% endif %}">
-            {% if not is_owner and workspace.require_dashboard_approval %}<input type="hidden" name="require_dashboard_approval" value="on">{% endif %}
-            <input type="checkbox" name="require_dashboard_approval" id="require_dashboard_approval" class="mt-1"
-                   {% if workspace.require_dashboard_approval %}checked{% endif %}
-                   {% if not is_owner %}disabled aria-describedby="require-approval-owner-only"{% endif %}>
-            <span class="flex-1">
-                <span class="block text-sm font-semibold mb-0.5" style="color: var(--text-primary);">Require dashboard approval of the exact version</span>
-                <span class="block text-xs" style="color: var(--text-secondary);">
-                    Nothing is scheduled or published until an owner or manager approves it here, in the dashboard.
-                    The approval covers the exact text, media, channels, format and time. Any change sends the post back
-                    for approval, the API, MCP clients and automations can only submit for review, and the publisher
-                    re-checks the approval immediately before posting.
+        <section class="ui-card mt-6" aria-labelledby="exact-version-title">
+            <h2 id="exact-version-title" class="sr-only">Exact-version approval</h2>
+            <label class="flex items-start gap-3 {% if is_owner %}cursor-pointer{% else %}cursor-not-allowed{% endif %}">
+                {% if not is_owner and workspace.require_dashboard_approval %}<input type="hidden" name="require_dashboard_approval" value="on">{% endif %}
+                <input type="checkbox" name="require_dashboard_approval" id="require_dashboard_approval" class="ui-checkbox mt-0.5 shrink-0"
+                       {% if workspace.require_dashboard_approval %}checked{% endif %}
+                       {% if not is_owner %}disabled aria-describedby="require-approval-owner-only"{% endif %}>
+                <span class="flex-1">
+                    <span class="block text-sm font-semibold text-ink-900">Require dashboard approval of the exact version</span>
+                    <span class="mt-0.5 block text-small text-ink-600">
+                        Nothing is scheduled or published until an owner or manager approves it here, in the dashboard.
+                        The approval covers the exact text, media, channels, format and time. Any change sends the post back
+                        for approval, the API, MCP clients and automations can only submit for review, and the publisher
+                        re-checks the approval immediately before posting.
+                    </span>
+                    {% if not is_owner %}<span id="require-approval-owner-only" class="mt-1.5 block text-small text-ink-600">Only a workspace owner can change this.</span>{% endif %}
                 </span>
-                {% if not is_owner %}<span id="require-approval-owner-only" class="block text-xs mt-1" style="color: var(--text-secondary);">Only a workspace owner can change this.</span>{% endif %}
-            </span>
-        </label>
+            </label>
+        </section>
 
         {% if is_owner_or_manager %}
-        <button type="submit"
-                class="btn-neutral px-5 py-2 text-sm font-medium rounded-full cursor-pointer whitespace-nowrap"
-                style="background: var(--neutral-100); color: var(--text-primary);">
-            Save Changes
-        </button>
+        <div class="mt-6 flex justify-end">
+            <button type="submit" class="ui-btn ui-btn-primary">Save changes</button>
+        </div>
         {% endif %}
     </form>
 
-    <p class="text-xs mt-6" style="color: var(--text-tertiary);">
-        Reviewers are workspace members with the "Approve posts" permission.
-        Manage them on the <a href="{% url 'members:list' %}" class="underline" style="color: var(--text-secondary);">Members</a> page.
+    <p class="mt-6 text-small text-ink-600">
+        Reviewers are workspace members who can approve posts.
+        Manage them on the <a href="{% url 'members:list' %}" class="link-inline">Members</a> page.
     </p>
 </div>
 {% endblock %}

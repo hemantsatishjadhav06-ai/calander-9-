@@ -3,51 +3,55 @@ Publish result panel. While a publish runs it polls itself every 10 s; the
 status view answers with HX-Refresh once publishing finishes.
 Context: workspace, post, commit_url.
 {% endcomment %}
-<section id="publish-status" aria-labelledby="publish-status-heading" class="bg-white border border-ink-200 rounded-xl p-5"
+<section id="publish-status" aria-labelledby="publish-status-heading" class="ui-card"
          {% if post.status == 'publishing' %}hx-get="{% url 'blog:status' workspace_id=workspace.id post_id=post.id %}" hx-trigger="every 10s" hx-swap="outerHTML"{% endif %}>
-    <h2 id="publish-status-heading" class="text-sm font-semibold text-ink-900 mb-3">Website</h2>
+    <h2 id="publish-status-heading" class="text-h3 text-ink-950">Website</h2>
 
     {% if post.status == 'publishing' %}
-    <p role="status" class="flex items-center gap-2 text-sm text-info-700 bg-info-50 rounded-lg px-3 py-2 mb-3">
-        <svg class="w-4 h-4 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
-        {% if not post.commit_sha %}Writing the post to {{ post.site.repo }}…{% elif not post.deploy_run_url %}Committed. Starting the deploy…{% else %}Deploying ({{ post.deploy_status|default:"queued" }})…{% endif %}
+    <p role="status" class="ui-callout ui-callout-info mt-3 !p-3">
+        <span class="ui-spinner mt-0.5 flex-shrink-0 motion-reduce:animate-none" aria-hidden="true"></span>
+        <span>{% if not post.commit_sha %}Writing the post to {{ post.site.repo }}…{% elif not post.deploy_run_url %}Committed. Starting the deploy…{% else %}Deploying ({{ post.deploy_status|default:"queued" }})…{% endif %}</span>
     </p>
     {% endif %}
 
     {% if post.status == 'failed' and post.last_error %}
-    <div role="alert" class="text-sm text-danger-600 bg-danger-50 border border-danger-200 rounded-lg px-3 py-2 mb-3">
-        <p class="font-semibold">Publishing failed</p>
-        <p class="mt-0.5 break-words">{{ post.last_error }}</p>
+    <div role="alert" class="ui-callout ui-callout-danger mt-3 !p-3">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>
+        <div class="min-w-0">
+            <p class="ui-callout-title">Publishing failed</p>
+            <p class="mt-0.5 break-words">{{ post.last_error }}</p>
+        </div>
     </div>
     {% elif post.last_error and post.status != 'publishing' %}
-    <div role="alert" class="text-sm text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-3 py-2 mb-3">
+    <div role="alert" class="ui-callout ui-callout-warning mt-3 !p-3">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
         <p class="break-words">{{ post.last_error }}</p>
     </div>
     {% endif %}
 
-    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+    <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
         <dt class="text-ink-600">Site</dt>
-        <dd class="text-ink-900 min-w-0"><a href="{{ post.site.site_url }}" class="underline break-all" target="_blank" rel="noopener">{{ post.site.name }}</a></dd>
+        <dd class="min-w-0 text-ink-900"><a href="{{ post.site.site_url }}" class="link-inline break-all" target="_blank" rel="noopener">{{ post.site.name }}</a></dd>
         <dt class="text-ink-600">{% if post.published_url %}Live at{% else %}Will be at{% endif %}</dt>
-        <dd class="text-ink-900 min-w-0">
-            {% if post.published_url %}<a href="{{ post.published_url }}" class="underline break-all" target="_blank" rel="noopener">{{ post.published_url }}</a>
-            {% else %}<span class="font-mono text-xs break-all">{{ post.expected_url }}</span>{% endif %}
+        <dd class="min-w-0 text-ink-900">
+            {% if post.published_url %}<a href="{{ post.published_url }}" class="link-inline break-all" target="_blank" rel="noopener">{{ post.published_url }}</a>
+            {% else %}<span class="break-all font-mono text-caption">{{ post.expected_url }}</span>{% endif %}
         </dd>
         {% if post.published_at %}
         <dt class="text-ink-600">First published</dt>
-        <dd class="text-ink-900">{{ post.published_at|date:"j M Y, H:i" }}</dd>
+        <dd class="tabular-nums text-ink-900">{{ post.published_at|date:"j M Y, H:i" }}</dd>
         {% endif %}
         {% if post.commit_sha %}
         <dt class="text-ink-600">Commit</dt>
-        <dd class="min-w-0"><a href="{{ commit_url }}" class="font-mono text-xs underline text-ink-900" target="_blank" rel="noopener">{{ post.commit_sha|slice:":7" }}</a> <span class="text-ink-600 text-xs">in {{ post.site.repo }}</span></dd>
+        <dd class="min-w-0"><a href="{{ commit_url }}" class="link-inline font-mono text-caption" target="_blank" rel="noopener">{{ post.commit_sha|slice:":7" }}</a> <span class="text-caption text-ink-600">in {{ post.site.repo }}</span></dd>
         {% endif %}
         {% if post.deploy_run_url %}
         <dt class="text-ink-600">Deploy run</dt>
-        <dd class="min-w-0"><a href="{{ post.deploy_run_url }}" class="underline text-ink-900" target="_blank" rel="noopener">{{ post.site.workflow_file }}</a>{% if post.deploy_status %} <span class="text-ink-600 text-xs">({{ post.deploy_status }})</span>{% endif %}</dd>
+        <dd class="min-w-0"><a href="{{ post.deploy_run_url }}" class="link-inline" target="_blank" rel="noopener">{{ post.site.workflow_file }}</a>{% if post.deploy_status %} <span class="text-caption text-ink-600">({{ post.deploy_status }})</span>{% endif %}</dd>
         {% endif %}
         {% if post.publish_attempts %}
         <dt class="text-ink-600">Attempts</dt>
-        <dd class="text-ink-900">{{ post.publish_attempts }}</dd>
+        <dd class="tabular-nums text-ink-900">{{ post.publish_attempts }}</dd>
         {% endif %}
     </dl>
 </section>

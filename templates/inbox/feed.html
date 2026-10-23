@@ -5,24 +5,18 @@
 
 {% block extra_head %}
 <style>
-    /* Inbox-specific layout: remove parent padding, fill height */
-    .inbox-shell { margin: -0.75rem; display: flex; flex-direction: column; height: calc(100% + 1.5rem); }
-    .inbox-shell { overflow: hidden; }
+    /* Inbox: the page header, then one white card holding the list and the open message. */
+    .inbox-shell { display: flex; flex-direction: column; flex: 1; min-height: 0; margin-bottom: -1.5rem; }
     :has(> .inbox-shell) { overflow: visible !important; }
-    @media (min-width: 640px) {
-        .inbox-shell { margin: -1rem; height: calc(100% + 2rem); }
-    }
-    @media (min-width: 1024px) {
-        .inbox-shell { margin: -1.5rem; height: calc(100% + 3rem); }
-    }
+    @media (min-width: 1024px) { .inbox-shell { margin-bottom: -2rem; } }
 
     /* Split panel */
     .inbox-split { display: flex; flex: 1; min-height: 0; }
-    .inbox-list-pane { width: 100%; border-right: none; display: flex; flex-direction: column; }
-    .inbox-detail-pane { display: none; flex-direction: column; overflow: hidden; }
+    .inbox-list-pane { width: 100%; border-right: none; display: flex; flex-direction: column; min-height: 0; }
+    .inbox-detail-pane { display: none; flex-direction: column; overflow: hidden; min-width: 0; }
 
     @media (min-width: 768px) {
-        .inbox-list-pane { width: 40%; min-width: 320px; border-right: 1px solid var(--border); }
+        .inbox-list-pane { width: 40%; min-width: 320px; max-width: 460px; border-right: 1px solid var(--border); }
         .inbox-detail-pane { display: flex; flex: 1; }
         /* On desktop, always show both panels regardless of Alpine state */
         .inbox-list-pane[data-mobile-hidden] { display: flex; }
@@ -37,87 +31,81 @@
 
     /* Message rows */
     .inbox-row {
-        display: flex; gap: 10px; padding: 12px 16px;
-        border-bottom: 1px solid var(--surface-2);
-        cursor: pointer; transition: background var(--dur-fast) ease;
+        display: flex; gap: 10px; padding: 12px 16px 12px 20px;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer; transition: background-color var(--dur-fast) var(--ease-out);
         position: relative;
     }
-    .inbox-row:hover { background: var(--surface-1); }
-    .inbox-row.is-active { background: var(--primary-soft); border-left: 3px solid var(--primary); padding-left: 13px; }
-    .inbox-row.is-unread .inbox-row-sender { font-weight: 700; color: var(--text-primary); }
-    .inbox-row.is-unread .inbox-row-preview { color: var(--text-primary); }
+    .inbox-row:hover { background: var(--ink-25); }
+    .inbox-row.is-active { background: var(--brand-50); }
+    .inbox-row.is-unread .inbox-row-sender { font-weight: 700; color: var(--ink-950); }
+    .inbox-row.is-unread .inbox-row-preview { color: var(--ink-900); }
     .inbox-row.is-unread::before {
-        content: ''; position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
-        width: 6px; height: 6px; border-radius: 50%; background: var(--primary-strong);
+        content: ''; position: absolute; left: 7px; top: 22px;
+        width: 7px; height: 7px; border-radius: 9999px; background: var(--brand-700);
     }
 
-    /* Badges */
+    /* Small status pills (same recipe as ui-pill) */
     .badge-pill {
-        display: inline-flex; align-items: center; gap: 3px;
-        font-size: 10px; font-weight: 600; padding: 2px 7px;
-        border-radius: var(--radius-full); letter-spacing: 0.01em;
-        white-space: nowrap;
+        display: inline-flex; align-items: center; gap: 4px; height: 20px;
+        font-size: 12px; line-height: 16px; font-weight: 600; padding: 0 7px;
+        border-radius: 9999px; white-space: nowrap;
+        background: var(--ink-100); color: var(--ink-700); box-shadow: inset 0 0 0 1px var(--ink-200);
     }
-    .badge-sentiment-positive { background: var(--success-50); color: var(--success-700); }
-    .badge-sentiment-neutral  { background: var(--surface-2); color: var(--text-tertiary); }
-    .badge-sentiment-negative { background: var(--error-50); color: var(--error-700); }
-    .badge-type { background: var(--surface-2); color: var(--text-secondary); }
-    .badge-status-unread  { background: var(--info-50); color: var(--info-700); }
-    .badge-status-open    { background: var(--warning-50); color: var(--warning-700); }
-    .badge-status-resolved { background: var(--success-50); color: var(--success-700); }
-    .badge-status-archived { background: var(--surface-2); color: var(--text-ghost); }
-    .badge-sla-overdue { background: var(--error-50); color: var(--error-700); animation: pulse-badge 2s ease infinite; }
-    @keyframes pulse-badge { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
-
-    /* View tabs */
-    .inbox-tab {
-        font-size: 13px; font-weight: 500; padding: 6px 14px;
-        border-radius: var(--radius-full); color: var(--text-secondary);
-        transition: all var(--dur-fast) ease; cursor: pointer;
-        text-decoration: none; white-space: nowrap;
-    }
-    .inbox-tab:hover { background: var(--surface-1); color: var(--text-primary); }
-    .inbox-tab.active { background: var(--primary-soft); color: var(--brand-700); font-weight: 600; }
+    .badge-pill svg { width: 11px; height: 11px; flex: none; }
+    .badge-sentiment-positive { background: var(--success-50); color: var(--success-600); box-shadow: inset 0 0 0 1px var(--success-200); }
+    .badge-sentiment-positive svg { color: var(--success-500); }
+    .badge-sentiment-neutral  { background: var(--ink-100); color: var(--ink-700); }
+    .badge-sentiment-negative { background: var(--danger-50); color: var(--danger-600); box-shadow: inset 0 0 0 1px var(--danger-200); }
+    .badge-sentiment-negative svg { color: var(--danger-500); }
+    .badge-type { background: transparent; box-shadow: none; padding: 0; color: var(--ink-600); font-weight: 500; }
+    .badge-status-unread, .badge-status-open { background: var(--warning-50); color: var(--warning-600); box-shadow: inset 0 0 0 1px var(--warning-200); }
+    .badge-status-resolved { background: var(--success-50); color: var(--success-600); box-shadow: inset 0 0 0 1px var(--success-200); }
+    .badge-status-archived { background: var(--ink-100); color: var(--ink-700); }
 
     /* Filter controls */
     .filter-select {
-        font-size: 12px; font-weight: 500; color: var(--text-secondary);
-        background: var(--surface-1); border: 1px solid var(--border);
-        border-radius: var(--radius-md); padding: 4px 24px 4px 8px;
-        transition: all var(--dur-fast) ease; cursor: pointer;
-        appearance: none;
+        height: 32px; font-size: 13px; font-weight: 500; color: var(--ink-900);
+        background: var(--surface-0); border: 1px solid var(--border-control);
+        border-radius: var(--radius-lg); padding: 0 28px 0 10px;
+        transition: border-color var(--dur-fast) var(--ease-out); cursor: pointer;
+        appearance: none; -webkit-appearance: none;
         background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23656B73' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
-        background-position: right 8px center;
+        background-position: right 10px center;
     }
-    .filter-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-ring); }
+    .filter-select:hover { border-color: var(--ink-500); }
+    @media (max-width: 1023px) { .filter-select { height: 44px; font-size: 16px; } }
 
     /* Bulk action bar */
     .bulk-bar {
-        background: var(--neutral-900); color: white; padding: 8px 16px;
-        display: flex; align-items: center; gap: 12px;
+        background: var(--ink-900); color: #fff; padding: 8px 12px 8px 16px;
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
         font-size: 13px; font-weight: 500;
         animation: slideUp 200ms var(--ease-out);
     }
     .bulk-bar button {
-        font-size: 12px; font-weight: 600; padding: 4px 12px;
-        border-radius: var(--radius-full); border: 1px solid rgba(255,255,255,0.2);
-        background: transparent; color: white; cursor: pointer;
-        transition: all var(--dur-fast) ease;
+        min-height: 32px; font-size: 13px; font-weight: 600; padding: 0 12px;
+        border-radius: var(--radius-lg); border: 0; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .24);
+        background: transparent; color: #fff; cursor: pointer;
+        transition: background-color var(--dur-instant) var(--ease-out);
     }
-    .bulk-bar button:hover { background: rgba(255,255,255,0.1); }
+    .bulk-bar button:hover { background: rgb(255 255 255 / .12); }
+    .bulk-bar button:focus-visible { outline-color: #fff; }
+    @media (max-width: 1023px) { .bulk-bar button { min-height: 44px; } }
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .bulk-bar { animation: none; } }
 
-    /* SLA countdown */
-    .sla-countdown { font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
-    .sla-ok { color: var(--text-tertiary); }
-    .sla-warn { color: var(--warning-700); }
-    .sla-overdue { color: var(--error-700); }
+    /* SLA countdown (classes set by inboxController) */
+    .sla-countdown { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sla-ok { color: var(--ink-600); }
+    .sla-warn { color: var(--warning-600); }
+    .sla-overdue { color: var(--danger-600); }
 
     /* Empty detail placeholder */
     .inbox-empty-detail {
         flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-        color: var(--text-ghost); gap: 12px;
+        gap: 10px; padding: 24px; text-align: center;
     }
 </style>
 {% endblock %}
@@ -126,65 +114,64 @@
 <div class="inbox-shell" x-data="inboxController()">
 
     <!-- Header -->
-    <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-3 border-b border-ink-200 flex-shrink-0">
-        <div class="flex items-center gap-3 sm:gap-4">
-            <h1 class="text-base font-semibold text-ink-900" style="letter-spacing: -0.01em;">Inbox</h1>
-            <div class="flex items-center gap-1 bg-ink-50 rounded-full p-0.5">
+    <header class="mb-4 flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-x-5 gap-y-3">
+            <h1 class="text-h1 text-ink-950">Inbox</h1>
+            <nav class="ui-segmented" aria-label="Inbox views" x-data="{ view: '{{ current_view }}' }">
                 <a href="{% url 'inbox:feed' workspace_id=workspace.id %}"
-                   class="inbox-tab {% if current_view == 'all' %}active{% endif %}"
+                   class="ui-segment no-underline" {% if current_view == 'all' %}aria-current="page"{% endif %}
+                   :aria-current="view === 'all' ? 'page' : false" @click="view = 'all'"
                    hx-get="{% url 'inbox:feed' workspace_id=workspace.id %}?view=all"
                    hx-target="#inbox-message-list"
                    hx-swap="innerHTML"
                    hx-push-url="true">All</a>
                 <a href="{% url 'inbox:feed' workspace_id=workspace.id %}?view=mine"
-                   class="inbox-tab {% if current_view == 'mine' %}active{% endif %}"
+                   class="ui-segment no-underline" {% if current_view == 'mine' %}aria-current="page"{% endif %}
+                   :aria-current="view === 'mine' ? 'page' : false" @click="view = 'mine'"
                    hx-get="{% url 'inbox:feed' workspace_id=workspace.id %}?view=mine"
                    hx-target="#inbox-message-list"
                    hx-swap="innerHTML"
-                   hx-push-url="true">My Queue</a>
+                   hx-push-url="true">My queue</a>
                 <a href="{% url 'inbox:feed' workspace_id=workspace.id %}?view=unassigned"
-                   class="inbox-tab {% if current_view == 'unassigned' %}active{% endif %}"
+                   class="ui-segment no-underline" {% if current_view == 'unassigned' %}aria-current="page"{% endif %}
+                   :aria-current="view === 'unassigned' ? 'page' : false" @click="view = 'unassigned'"
                    hx-get="{% url 'inbox:feed' workspace_id=workspace.id %}?view=unassigned"
                    hx-target="#inbox-message-list"
                    hx-swap="innerHTML"
                    hx-push-url="true">Unassigned</a>
-            </div>
+            </nav>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             {% if can_draft_with_team %}
             {# The agency's community and reviews managers draft replies; a person still reads and sends each one. #}
             <form method="post" action="{% url 'studio:inbox_draft' workspace_id=workspace.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
                 {% csrf_token %}
                 <input type="hidden" name="message_ids" x-bind:value="Array.from(selected).join(',')">
-                <button type="submit" x-bind:disabled="busy"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-white rounded-full disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-                        style="background: var(--primary-strong);">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
+                <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn ui-btn-secondary">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
                     <span x-text="selectedCount > 0 ? 'Draft replies to ' + selectedCount + ' selected' : 'Draft replies with the team'">Draft replies with the team</span>
                 </button>
             </form>
             {% endif %}
             <a href="{% url 'inbox:saved_replies' workspace_id=workspace.id %}"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-ink-600 bg-white border border-ink-200 rounded-full hover:border-ink-300 hover:bg-ink-25 transition-all duration-150"
-               title="Saved Replies">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-                <span class="hidden sm:inline">Saved Replies</span>
+               class="ui-btn ui-btn-ghost no-underline" aria-label="Saved replies" title="Saved replies">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+                <span class="hidden sm:inline" aria-hidden="true">Saved replies</span>
             </a>
             {% if sla_config %}
             <a href="{% url 'inbox:sla_config' workspace_id=workspace.id %}"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-ink-600 bg-white border border-ink-200 rounded-full hover:border-ink-300 hover:bg-ink-25 transition-all duration-150"
-               title="SLA Settings">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span class="hidden sm:inline">SLA</span>
+               class="ui-btn ui-btn-ghost no-underline" aria-label="Response time target" title="Response time target">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="hidden sm:inline" aria-hidden="true">Response time</span>
             </a>
             {% endif %}
         </div>
-    </div>
+    </header>
 
-    <!-- Split Layout -->
-    <div class="inbox-split">
+    <!-- Split layout -->
+    <div class="inbox-split overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs">
 
-        <!-- Left: Message List -->
+        <!-- Left: message list -->
         <div class="inbox-list-pane" :data-mobile-hidden="activePanel === 'detail' ? '' : undefined">
 
             <!-- Filters -->
@@ -196,32 +183,32 @@
             </div>
 
             <!-- Bulk action bar -->
-            <div x-show="selectedCount > 0" x-cloak class="bulk-bar">
-                <span x-text="selectedCount + ' selected'"></span>
-                <button @click="bulkAction('mark_read')">Mark Read</button>
-                <button @click="bulkAction('resolve')">Resolve</button>
-                <button @click="bulkAction('archive')">Archive</button>
-                <button aria-label="Clear selection" @click="closeBulk()" class="ml-auto" style="border: none;">
-                    <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            <div x-show="selectedCount > 0" x-cloak class="bulk-bar" role="toolbar" aria-label="Selected messages">
+                <span class="mr-1 tabular-nums" x-text="selectedCount + ' selected'"></span>
+                <button type="button" @click="bulkAction('mark_read')">Mark read</button>
+                <button type="button" @click="bulkAction('resolve')">Resolve</button>
+                <button type="button" @click="bulkAction('archive')">Archive</button>
+                <button type="button" aria-label="Clear selection" @click="closeBulk()" class="ml-auto grid place-items-center !px-2" style="box-shadow: none;">
+                    <svg aria-hidden="true" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
         </div>
 
-        <!-- Right: Detail Panel -->
+        <!-- Right: detail panel -->
         <div class="inbox-detail-pane" id="inbox-detail-panel"
              :data-mobile-visible="activePanel === 'detail' ? '' : undefined">
             <!-- Mobile back button -->
-            <div class="flex md:hidden items-center gap-2 px-3 py-2.5 border-b border-ink-200 flex-shrink-0">
-                <button @click="activePanel = 'list'"
-                        class="flex items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            <div class="flex flex-shrink-0 items-center gap-2 border-b border-ink-200 px-2 py-1.5 md:hidden">
+                <button type="button" @click="activePanel = 'list'" class="ui-btn ui-btn-ghost">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                     Back
                 </button>
             </div>
-            <!-- Empty state shown when no message is selected -->
+            <!-- Shown until a message is picked -->
             <div class="inbox-empty-detail">
-                <svg class="w-12 h-12" style="color: var(--neutral-300);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                <p class="text-sm font-medium" style="color: var(--text-tertiary);">Select a message to view details</p>
+                <svg class="h-8 w-8 text-ink-400" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                <p class="text-[15px] font-semibold text-ink-900">No message open</p>
+                <p class="max-w-[36ch] text-sm text-ink-600">Pick a message on the left to read it and reply.</p>
             </div>
         </div>
 

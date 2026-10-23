@@ -145,7 +145,7 @@ class TestListPage:
     def test_admin_can_view_list(self, admin_client):
         r = admin_client.get(reverse("api_keys:list"))
         assert r.status_code == 200
-        assert b"API Keys" in r.content
+        assert b"API keys" in r.content
         # Empty state — no rows yet.
         assert b"No API keys issued yet." in r.content
 

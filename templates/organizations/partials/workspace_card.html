@@ -1,56 +1,49 @@
 <!-- Workspace header -->
 <div class="flex items-center gap-3">
-    <!-- Workspace icon -->
     {% if item.workspace.icon %}
-    <img src="{{ item.workspace.icon.url }}" alt="" class="w-10 h-10 rounded-full object-cover flex-shrink-0">
+    <img src="{{ item.workspace.icon.url }}" alt="" class="size-9 shrink-0 rounded-[7px] object-cover shadow-[var(--shadow-creative)]">
     {% else %}
-    <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold"
-         style="background: var(--neutral-200); color: var(--text-secondary);">
+    <div class="grid size-9 shrink-0 place-items-center rounded-[7px] bg-ink-900 text-[13px] font-semibold text-white" aria-hidden="true">
         {{ item.workspace.name|first|upper }}
     </div>
     {% endif %}
 
-    <!-- Name & member count -->
-    <div class="flex-1 min-w-0">
+    <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
-            <span class="text-sm font-medium truncate" style="color: var(--text-primary);">
-                {{ item.workspace.name }}
-            </span>
+            <span class="truncate text-sm font-semibold text-ink-900">{{ item.workspace.name }}</span>
             {% if item.workspace.is_archived %}
-            <span class="text-xs px-2 py-0.5 rounded-full" style="background: var(--warning-100); color: var(--warning-700);">Archived</span>
+            <span class="ui-pill">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>
+                Archived
+            </span>
             {% endif %}
         </div>
-        <div class="text-xs" style="color: var(--text-tertiary);">
+        <div class="text-small tabular-nums text-ink-600">
             {{ item.member_count }} member{{ item.member_count|pluralize }}
         </div>
     </div>
 
-    <!-- Settings link for owner/manager -->
     {% if item.can_manage %}
     <a href="{% url 'workspaces:settings' workspace_id=item.workspace.id %}"
-       class="btn-neutral inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
-       style="background: var(--neutral-100); color: var(--text-secondary);">
-        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-        Settings
+       class="ui-btn ui-btn-ghost ui-btn-sm shrink-0" aria-label="Settings for {{ item.workspace.name }}">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        <span aria-hidden="true">Settings</span>
     </a>
     {% endif %}
 </div>
 
-<!-- Members list -->
+<!-- Members -->
 {% if item.members %}
-<div class="flex items-center flex-wrap gap-2 mt-3">
+<ul class="mt-3 flex flex-wrap items-center gap-1.5" role="list" aria-label="Members of {{ item.workspace.name }}">
     {% for membership in item.members %}
-    <span class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full"
-          style="background: var(--neutral-100); color: var(--text-secondary);"
-          title="{{ membership.user.display_name }} ({{ membership.get_workspace_role_display }})">
-        <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0"
-              style="background: var(--neutral-200); color: var(--text-tertiary);">
+    <li class="ui-chip !gap-1.5 !pl-0.5" title="{{ membership.user.display_name }} ({{ membership.get_workspace_role_display }})">
+        <span class="grid size-5 shrink-0 place-items-center rounded-full bg-white text-[11px] font-semibold text-ink-700" aria-hidden="true">
             {{ membership.user.display_name|first|upper }}
         </span>
         {{ membership.user.display_name }}
-    </span>
+    </li>
     {% endfor %}
-</div>
+</ul>
 {% else %}
-<div class="mt-3 text-xs" style="color: var(--text-tertiary);">No members assigned</div>
+<p class="mt-3 text-small text-ink-600">No members yet</p>
 {% endif %}

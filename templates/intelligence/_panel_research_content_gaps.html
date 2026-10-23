@@ -1,11 +1,11 @@
-<div id="intel-panel-content-gaps" class="intel-panel mt-6 grid-cols-1 gap-6 lg:grid-cols-2">
-    <div class="rounded-xl border border-ink-200 bg-white shadow-sm">
-        <div class="flex items-center justify-between border-b border-ink-100 px-5 py-3.5">
-            <h2 class="text-sm font-semibold text-ink-900">Research content gaps</h2>
-            <span class="inline-flex items-center rounded-md bg-ink-100 px-2 py-0.5 text-[11px] font-mono text-ink-600">5 credits</span>
+<div id="intel-panel-content-gaps" role="tabpanel" aria-labelledby="intel-tab-content-gaps" class="intel-panel mt-5 grid-cols-1 gap-5 lg:grid-cols-2">
+    <div class="min-w-0 rounded-2xl border border-ink-200 bg-white shadow-xs">
+        <div class="flex items-center justify-between gap-3 border-b border-ink-200 px-5 py-3.5 max-sm:px-4">
+            <h2 class="text-h3 text-ink-950">Research content gaps</h2>
+            <span class="ui-pill flex-shrink-0 tabular-nums">5 credits</span>
         </div>
-        <div class="p-5">
-            <p class="text-xs text-ink-500 mb-5 leading-relaxed">
+        <div class="p-5 max-sm:p-4">
+            <p class="mb-5 text-small text-ink-600">
                 Find ranked content opportunities in a niche. Returns gaps that are <em>underserved</em> (no quality coverage) or <em>stale</em> (existing top videos are over a year old).
             </p>
 
@@ -43,25 +43,24 @@
                             {% else %}
                             <span class="cg-niche-label truncate text-ink-500">Choose a niche…</span>
                             {% endif %}
-                            <svg class="cg-niche-chevron h-4 w-4 flex-shrink-0 text-ink-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <svg aria-hidden="true" class="cg-niche-chevron h-4 w-4 flex-shrink-0 text-ink-500 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
                             </svg>
                         </button>
                         <div id="cg-niche-panel"
-                             class="absolute left-0 right-0 top-full z-50 mt-1.5 hidden overflow-hidden rounded-lg border border-ink-200 bg-white shadow-lg">
-                            <div class="border-b border-ink-100 p-2">
+                             class="absolute left-0 right-0 top-full z-50 mt-1.5 hidden overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
+                            <div class="border-b border-ink-200 p-2">
                                 <div class="relative">
-                                    <svg class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <svg aria-hidden="true" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
                                     </svg>
                                     <input type="text" id="cg-niche-search" placeholder="Search niches…" aria-label="Search niches" autocomplete="off"
-                                           class="block w-full rounded-md border-0 bg-ink-50 py-1.5 pl-8 pr-2.5 text-sm text-ink-900 placeholder:text-ink-500 focus:bg-white focus:outline-none focus:ring-2"
-                                           style="--tw-ring-color: var(--primary-ring);">
+                                           class="ui-input !pl-9 lg:h-8 lg:text-[13px]">
                                 </div>
                             </div>
                             <ul id="cg-niche-listbox" role="listbox" aria-label="Niches" class="max-h-72 overflow-y-auto py-1"></ul>
-                            <div id="cg-niche-empty" class="hidden px-4 py-6 text-center text-sm text-ink-500">No niches match.</div>
-                            <div id="cg-niche-status" class="border-t border-ink-100 bg-ink-50 px-3 py-1.5 text-[11px] text-ink-500"></div>
+                            <div id="cg-niche-empty" class="hidden px-4 py-6 text-center text-sm text-ink-600">No niches match.</div>
+                            <div id="cg-niche-status" class="border-t border-ink-200 bg-ink-50 px-3 py-1.5 text-caption text-ink-600"></div>
                         </div>
                     </div>
                     <p class="intel-helper">
@@ -83,33 +82,33 @@
                     {% endif %}
                 </div>
 
-                <div>
-                    <span class="intel-label">Gap types</span>
-                    <div class="mt-1 flex flex-wrap gap-2">
+                <fieldset>
+                    <legend class="intel-label">Gap types</legend>
+                    <div class="flex flex-wrap gap-2">
                         <label class="cursor-pointer">
                             <input type="checkbox" name="gap_type" value="underserved" checked class="peer sr-only">
-                            <span class="cg-gap-pill inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-xs font-medium shadow-sm transition">
-                                <svg class="cg-gap-pill-check h-3 w-3 opacity-0 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                underserved
+                            <span class="cg-gap-pill">
+                                <svg aria-hidden="true" class="cg-gap-pill-check h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                Underserved
                             </span>
                         </label>
                         <label class="cursor-pointer">
                             <input type="checkbox" name="gap_type" value="stale" checked class="peer sr-only">
-                            <span class="cg-gap-pill inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-xs font-medium shadow-sm transition">
-                                <svg class="cg-gap-pill-check h-3 w-3 opacity-0 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                stale
+                            <span class="cg-gap-pill">
+                                <svg aria-hidden="true" class="cg-gap-pill-check h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                Stale
                             </span>
                         </label>
                         <label class="cursor-pointer">
                             <input type="checkbox" name="gap_type" value="competitive" class="peer sr-only">
-                            <span class="cg-gap-pill inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-xs font-medium shadow-sm transition">
-                                <svg class="cg-gap-pill-check h-3 w-3 opacity-0 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                competitive
+                            <span class="cg-gap-pill">
+                                <svg aria-hidden="true" class="cg-gap-pill-check h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                Competitive
                             </span>
                         </label>
                     </div>
                     <p class="intel-helper">Competitive is opt-in, usually means the topic already has plenty of strong recent videos.</p>
-                </div>
+                </fieldset>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -127,7 +126,7 @@
                 </div>
 
                 <div>
-                    <button type="submit" class="intel-submit"{% if is_preview %} disabled aria-disabled="true"{% endif %}>
+                    <button type="submit" class="intel-submit ui-btn ui-btn-primary"{% if is_preview %} disabled aria-disabled="true"{% endif %}>
                         <svg class="intel-submit-icon h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
                         <svg class="intel-submit-spinner hidden h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                         <span class="intel-submit-label">Find gaps</span>
@@ -143,11 +142,11 @@
         </div>
     </div>
 
-    <div class="rounded-xl border border-ink-200 bg-white shadow-sm">
-        <div class="border-b border-ink-100 px-5 py-3.5">
-            <h2 class="text-sm font-semibold text-ink-900">Result</h2>
+    <div class="min-w-0 rounded-2xl border border-ink-200 bg-white shadow-xs">
+        <div class="border-b border-ink-200 px-5 py-3.5 max-sm:px-4">
+            <h2 class="text-h3 text-ink-950">Result</h2>
         </div>
-        <div id="content-gaps-result" class="p-5 min-h-[220px]">
+        <div id="content-gaps-result" class="min-h-[220px] p-5 max-sm:p-4">
             {% if is_preview %}
                 {% include "intelligence/_preview_badge.html" %}
                 {% include "intelligence/_research_content_gaps_result.html" with result=preview_results.research_content_gaps %}
@@ -158,29 +157,37 @@
     </div>
 </div>
 
-{% if content_gap_niches %}
 <style>
-    /* Gap-type pill: hand-CSS so we don't depend on Tailwind's
-       ``peer-checked:`` variants being in the pre-built bundle. */
+    /* Gap-type toggle chips follow the filter-chip recipe: outlined when
+       off, ink-900 when on (never the accent), a check for non-colour cue. */
     .cg-gap-pill {
-        border-color: var(--border);
-        color: var(--text-secondary);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: 9999px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--ink-700);
+        background: var(--surface-0);
+        box-shadow: inset 0 0 0 1px var(--ink-300);
+        transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
     }
-    .cg-gap-pill:hover {
-        border-color: var(--ink-300);
-        background: var(--surface-1);
-    }
+    .cg-gap-pill .cg-gap-pill-check { display: none; }
+    .cg-gap-pill:hover { background: var(--ink-50); box-shadow: inset 0 0 0 1px var(--ink-400); }
     label > input[type="checkbox"]:checked + .cg-gap-pill {
-        border-color: var(--primary);
-        background: var(--primary-soft);
-        color: var(--primary);
+        background: var(--ink-900);
+        color: #fff;
+        font-weight: 600;
+        box-shadow: none;
     }
-    label > input[type="checkbox"]:checked + .cg-gap-pill .cg-gap-pill-check {
-        opacity: 1;
+    label > input[type="checkbox"]:checked + .cg-gap-pill .cg-gap-pill-check { display: block; }
+    label > input[type="checkbox"]:focus-visible + .cg-gap-pill {
+        outline: var(--focus-ring-width) solid var(--focus-ring);
+        outline-offset: var(--focus-ring-offset);
     }
-    label > input[type="checkbox"]:focus + .cg-gap-pill {
-        box-shadow: 0 0 0 3px rgba(17, 86, 65, 0.15);
-    }
+    @media (max-width: 1023px) { .cg-gap-pill { height: 44px; padding: 0 16px; } }
     /* Combobox row hover/selection. */
     .cg-niche-row {
         cursor: pointer;
@@ -191,11 +198,11 @@
         gap: 0.75rem;
         font-size: 0.875rem;
     }
-    .cg-niche-row:hover,
-    .cg-niche-row.cg-niche-row-active {
-        background: var(--primary-soft);
-    }
+    .cg-niche-row:hover { background: var(--ink-50); }
+    .cg-niche-row[aria-selected="true"] { background: var(--brand-50); }
+    .cg-niche-row.cg-niche-row-active { background: var(--ink-100); }
 </style>
+{% if content_gap_niches %}
 <script nonce="{{ request.csp_nonce }}">
 (function () {
     var data = [];
@@ -239,9 +246,9 @@
                     + ' class="cg-niche-row">'
                     +   '<span class="min-w-0 flex-1">'
                     +     '<span class="block truncate font-medium text-ink-900">' + esc(n.name) + '</span>'
-                    +     '<span class="block truncate font-mono text-[11px] text-ink-500">' + esc(n.slug) + '</span>'
+                    +     '<span class="block truncate font-mono text-[12px] text-ink-600">' + esc(n.slug) + '</span>'
                     +   '</span>'
-                    +   '<span class="ml-2 inline-flex flex-shrink-0 items-center rounded-md bg-ink-100 px-1.5 py-0.5 text-[11px] font-medium text-ink-600">' + esc(n.gap_count) + ' gaps</span>'
+                    +   '<span class="ui-pill ml-2 flex-shrink-0 tabular-nums">' + esc(n.gap_count) + ' gaps</span>'
                     + '</li>';
             }).join("");
         }

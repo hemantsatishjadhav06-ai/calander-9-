@@ -1,32 +1,36 @@
 {% extends "layouts/settings.html" %}
 {% block title %}Workspaces - Settings - {{ SITE_NAME }}{% endblock %}
 {% block content %}
-<div class="">
-    <h2 class="text-xl font-semibold mb-8" style="color: var(--text-primary);">Workspaces</h2>
+<div class="w-full max-w-3xl">
+    <header class="mb-6">
+        <h1 class="text-h1 text-ink-950">Workspaces</h1>
+        <p class="ui-page-status">Every brand in your organization and who works on it.</p>
+    </header>
 
     {% if workspace_data %}
-    <div style="background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-xl);">
+    <ul class="ui-list overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xs" role="list">
         {% for item in workspace_data %}
-        <div class="px-6 py-4{% if not forloop.last %}" style="border-bottom: 1px solid var(--border);"{% else %}"{% endif %}>
+        <li class="px-4 py-4 sm:px-5">
             {% include "organizations/partials/workspace_card.html" with item=item %}
-        </div>
+        </li>
         {% endfor %}
-    </div>
+    </ul>
     {% else %}
-    <div class="px-6 py-12 text-center rounded-xl" style="background: var(--surface-0); border: 1px solid var(--border);">
-        <p class="text-sm" style="color: var(--text-tertiary);">No workspaces yet.</p>
+    <div class="ui-card ui-empty">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <p class="ui-empty-title">No workspaces yet</p>
     </div>
     {% endif %}
 
     {% if archived_data %}
-    <h3 class="text-sm font-semibold mt-10 mb-3" style="color: var(--text-secondary);">Archived</h3>
-    <div style="background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-xl); opacity: 0.75;">
+    <h2 class="ui-group-label !mt-8 !mb-2">Archived</h2>
+    <ul class="ui-list overflow-hidden rounded-xl border border-ink-200 bg-ink-25" role="list">
         {% for item in archived_data %}
-        <div class="px-6 py-4{% if not forloop.last %}" style="border-bottom: 1px solid var(--border);"{% else %}"{% endif %}>
+        <li class="px-4 py-4 sm:px-5">
             {% include "organizations/partials/workspace_card.html" with item=item %}
-        </div>
+        </li>
         {% endfor %}
-    </div>
+    </ul>
     {% endif %}
 </div>
 {% endblock %}
