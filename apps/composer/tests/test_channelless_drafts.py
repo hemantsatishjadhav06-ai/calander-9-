@@ -68,7 +68,8 @@ class SaveDraftResponseTests(ChannellessDraftBase):
         always the publish mode, so a successful Save Draft redirected away."""
         html = self.client.get(reverse("composer:compose", kwargs=self.kw)).content.decode()
         start = html.index("onFormSaved(event) {")
-        body = html[start : start + 2500]
+        # The whole method: it ends at the first close of an Alpine property.
+        body = html[start : html.index("\n        },\n", start)]
         self.assertNotIn("getElementById('publish-action-btn')", body)
         self.assertIn("requestConfig", body)
         self.assertIn("Draft saved", body)
