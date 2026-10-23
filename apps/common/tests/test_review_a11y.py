@@ -168,3 +168,36 @@ class PublishingPagesAlignTests(PageTests):
             html = response.content.decode()
             self.assertNotIn("max-w-[880px] mx-auto", html, name)
             self.assertIn("w-full max-w-[880px] min-w-0", html, name)
+
+
+class PhoneTouchTargetTests(TestCase):
+    """Controls the final 390px sweep measured under 44px get a phone-size target: the composer's two
+    Media library buttons, its media remove button (as on the create page) and its first-comment field
+    (also 16px, so iOS does not zoom), the blog editor's Suggest from title and every "Details for the
+    owner" disclosure."""
+
+    def test_composer_controls_are_44px_on_phones(self):
+        html = _source("templates/composer/compose.html")
+        self.assertEqual(html.count("min-h-8 max-lg:min-h-11 text-xs font-medium text-ink-600"), 2)
+        self.assertIn("@media (max-width: 1023px) { .media-thumb .remove-btn { width: 44px; height: 44px; } }", html)
+        self.assertIn(
+            "@media (max-width: 1023px) { .comment-editor { font-size: 16px; line-height: 22px; min-height: 44px; } }",
+            html,
+        )
+
+    def test_blog_editor_small_controls_reach_44px_on_phones(self):
+        form = _source("templates/blog/post_form.html")
+        suggest = next(line for line in form.splitlines() if "Suggest from title" in line)
+        # 18px tall: 20px up into the gap above, 6px down to the slug field (never over it).
+        self.assertIn(
+            "max-lg:before:absolute max-lg:before:inset-x-0 max-lg:before:-top-5 max-lg:before:-bottom-1.5", suggest
+        )
+        summaries = [
+            line
+            for path in sorted((ROOT / "templates").rglob("*.html"))
+            for line in path.read_text().splitlines()
+            if "Details for the owner</summary>" in line
+        ]
+        self.assertGreaterEqual(len(summaries), 3)
+        for line in summaries:
+            self.assertIn("max-lg:py-[13px]", line)

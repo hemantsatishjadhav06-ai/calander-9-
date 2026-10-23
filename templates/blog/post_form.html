@@ -51,7 +51,7 @@
                 <div class="mb-1.5 flex items-baseline justify-between gap-3">
                     <label for="{{ form.slug.auto_id }}" class="ui-label !mb-0">{{ form.slug.label }} <span class="text-danger-500" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
                     {% if not slug_locked %}
-                    <button type="button" class="ui-link" x-on:click="slug = slugify(title); slugTouched = false">Suggest from title</button>
+                    <button type="button" class="ui-link relative max-lg:before:absolute max-lg:before:inset-x-0 max-lg:before:-top-5 max-lg:before:-bottom-1.5" x-on:click="slug = slugify(title); slugTouched = false">Suggest from title</button>
                     {% endif %}
                 </div>
                 {{ form.slug }}
@@ -112,7 +112,7 @@
                 <div id="ai-not-configured" class="mt-2 text-small text-warning-600">
                     <p>Pictures aren't switched on for this server yet.</p>
                     <details class="mt-1 text-ink-700">
-                        <summary class="cursor-pointer font-medium text-ink-900 underline underline-offset-2">Details for the owner</summary>
+                        <summary class="cursor-pointer font-medium text-ink-900 underline underline-offset-2 max-lg:py-[13px]">Details for the owner</summary>
                         <p class="mt-1">Add <code class="font-mono text-[12px]">FAL_KEY</code> (the picture service's key) to the SM Bean services to switch this on.</p>
                     </details>
                 </div>
