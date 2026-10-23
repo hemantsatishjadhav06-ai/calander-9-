@@ -1,0 +1,109 @@
+{% comment %}
+Next 24 hours (DESIGN_SYSTEM.md 14.5): routines and autopilot planning, posts going out, approvals due and queued
+work, from now to 24 hours ahead. From 768px a horizontal timeline: each caption is at most 16% of the line wide
+and apps.studio.live._lay_out puts it below or above the line so none overlap; events too close to show apart
+share a numbered marker that opens a list. Below 768px the same events are a plain list. Every marker is a shape
+plus words, every event a link; quiet hours are a hatched band explained in the legend. Context: live.
+{% endcomment %}
+{% with upcoming=live.upcoming %}
+<section aria-labelledby="team-upcoming-heading" class="ui-card">
+    <div class="ui-card-header flex-wrap">
+        <h2 id="team-upcoming-heading" class="ui-card-title">Next 24 hours</h2>
+        <span class="text-[13px] text-ink-600">Nothing goes out without your approval</span>
+    </div>
+
+    {% if upcoming.events %}
+    {# ---- From 768px: the timeline ---- #}
+    <div class="timeline mt-4 max-md:hidden" role="list" aria-label="Next 24 hours, times in {{ live.tzname }}">
+        <div class="timeline-axis" aria-hidden="true"></div>
+        {% for band in upcoming.quiet %}
+        <div class="timeline-quiet" style="left: {{ band.left }}%; width: {{ band.width }}%" aria-hidden="true"></div>
+        {% endfor %}
+        <div class="timeline-now" style="left: 0" aria-hidden="true"><span class="absolute -top-[18px] left-1 text-xs font-semibold text-ink-900">Now</span></div>
+        {% for cluster in upcoming.clusters %}
+        <div class="timeline-event w-[16%]{% if cluster.up %} is-up{% endif %}{% if cluster.end %} -translate-x-[calc(100%-16px)]{% endif %}" style="left: {{ cluster.left }}%" role="listitem">
+            {% if cluster.single %}
+            {% with event=cluster.first %}
+            <a href="{{ event.url }}" class="group flex w-full flex-col gap-1.5 rounded-md{% if cluster.up %} flex-col-reverse{% endif %}{% if cluster.end %} items-end text-right{% else %} items-start{% endif %}">
+                {% if event.kind == 'post' %}<span class="grid size-4 flex-none place-items-center rounded-full bg-info-500 text-white" aria-hidden="true"><svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M4 11h16"/></svg></span>
+                {% elif event.kind == 'approve' %}<span class="grid size-4 flex-none place-items-center rounded-full bg-white text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]" aria-hidden="true"><svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v5l3 2"/></svg></span>
+                {% elif event.kind == 'queued' %}<span class="grid size-4 flex-none place-items-center rounded-full bg-white text-info-500 shadow-[inset_0_0_0_2px_var(--info-500)]" aria-hidden="true"><svg class="size-2.5" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="3"/><circle cx="12" cy="12" r="3"/><circle cx="19" cy="12" r="3"/></svg></span>
+                {% else %}<span class="m-0.5 block size-3 flex-none rotate-45 rounded-[3px] bg-ink-700" aria-hidden="true"></span>{% endif %}
+                <span class="block w-full min-w-0">
+                    <span class="block truncate text-xs font-semibold text-ink-900 group-hover:underline underline-offset-3">{{ event.title }}</span>
+                    <span class="block truncate text-xs text-ink-500 tabular-nums">{{ event.short_time }}{% if event.caption and event.short_time %} · {% endif %}{{ event.caption }}</span>
+                </span>
+            </a>
+            {% endwith %}
+            {% else %}
+            <details id="{{ cluster.id }}" class="relative w-full">
+                <summary class="flex w-full cursor-pointer list-none flex-col gap-1.5 rounded-md{% if cluster.up %} flex-col-reverse{% endif %}{% if cluster.end %} items-end text-right{% else %} items-start{% endif %} [&::-webkit-details-marker]:hidden">
+                    <span class="inline-flex h-4 min-w-4 flex-none items-center justify-center rounded-full bg-ink-900 px-1 text-[11px] font-semibold leading-none text-white tabular-nums" aria-hidden="true">{{ cluster.count }}</span>
+                    <span class="block w-full min-w-0">
+                        <span class="block truncate text-xs font-semibold text-ink-900">{{ cluster.count }} things</span>
+                        <span class="block truncate text-xs text-ink-500 tabular-nums">From {{ cluster.first.time_text }} · show</span>
+                    </span>
+                </summary>
+                <ul class="absolute z-20 w-64 rounded-xl bg-white p-1 shadow-lg ring-1 ring-ink-200{% if cluster.up %} bottom-full mb-2{% else %} top-full mt-2{% endif %}{% if cluster.end %} right-0{% else %} left-0{% endif %}">
+                    {% for event in cluster.events %}
+                    <li>
+                        <a href="{{ event.url }}" class="flex min-h-[34px] items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-ink-50">
+                            {% if event.kind == 'post' %}<span class="grid size-4 flex-none place-items-center rounded-full bg-info-500 text-white" aria-hidden="true"><svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M4 11h16"/></svg></span>
+                            {% elif event.kind == 'approve' %}<span class="grid size-4 flex-none place-items-center rounded-full bg-white text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]" aria-hidden="true"><svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v5l3 2"/></svg></span>
+                            {% elif event.kind == 'queued' %}<span class="grid size-4 flex-none place-items-center rounded-full bg-white text-info-500 shadow-[inset_0_0_0_2px_var(--info-500)]" aria-hidden="true"><svg class="size-2.5" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="3"/><circle cx="12" cy="12" r="3"/><circle cx="19" cy="12" r="3"/></svg></span>
+                            {% else %}<span class="m-0.5 block size-3 flex-none rotate-45 rounded-[3px] bg-ink-700" aria-hidden="true"></span>{% endif %}
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-[13px] font-semibold text-ink-900">{{ event.title }}</span>
+                                {% if event.caption %}<span class="block truncate text-xs text-ink-500">{{ event.caption }}</span>{% endif %}
+                            </span>
+                            <span class="text-xs text-ink-500 tabular-nums whitespace-nowrap">{{ event.time_text }}</span>
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </details>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <div class="timeline-ticks" aria-hidden="true">
+            {% for tick in upcoming.ticks %}
+            <span class="absolute bottom-0 whitespace-nowrap{% if tick.align == 'center' %} -translate-x-1/2{% elif tick.align == 'end' %} -translate-x-full{% endif %}" style="left: {{ tick.pct }}%">{{ tick.label }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ---- Below 768px: the same events as a list ---- #}
+    <ol class="mt-3 divide-y divide-ink-200 md:hidden" aria-label="Next 24 hours, times in {{ live.tzname }}">
+        {% for event in upcoming.events %}
+        {% if event.quiet_before %}
+        <li class="flex items-center gap-2 py-2 text-xs font-medium text-ink-600" aria-hidden="true"><span class="h-2.5 w-6 rounded-sm bg-[repeating-linear-gradient(135deg,var(--ink-200)_0_3px,var(--ink-50)_3px_6px)]"></span>{{ upcoming.quiet_label }}</li>
+        {% endif %}
+        <li>
+            <a href="{{ event.url }}" class="flex min-h-11 items-center gap-3 py-2.5">
+                {% if event.kind == 'post' %}<span class="grid size-4 flex-none place-items-center rounded-full bg-info-500 text-white" aria-hidden="true"><svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M4 11h16"/></svg></span>
+                {% elif event.kind == 'approve' %}<span class="grid size-4 flex-none place-items-center rounded-full bg-white text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]" aria-hidden="true"><svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v5l3 2"/></svg></span>
+                {% elif event.kind == 'queued' %}<span class="grid size-4 flex-none place-items-center rounded-full bg-white text-info-500 shadow-[inset_0_0_0_2px_var(--info-500)]" aria-hidden="true"><svg class="size-2.5" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="3"/><circle cx="12" cy="12" r="3"/><circle cx="19" cy="12" r="3"/></svg></span>
+                {% else %}<span class="m-0.5 block size-3 flex-none rotate-45 rounded-[3px] bg-ink-700" aria-hidden="true"></span>{% endif %}
+                <span class="min-w-0 flex-1">
+                    <span class="block truncate text-[13px] font-semibold text-ink-900">{{ event.title }}</span>
+                    {% if event.caption %}<span class="block truncate text-xs text-ink-500">{{ event.caption }}</span>{% endif %}
+                </span>
+                <span class="text-xs text-ink-500 tabular-nums whitespace-nowrap">{{ event.time_text }}</span>
+            </a>
+        </li>
+        {% endfor %}
+    </ol>
+
+    {# ---- Legend: only what is on screen ---- #}
+    <ul class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-600" aria-label="What the markers mean">
+        {% if 'post' in upcoming.kinds %}<li class="inline-flex items-center gap-1.5"><span class="size-3 rounded-full bg-info-500" aria-hidden="true"></span>Scheduled post</li>{% endif %}
+        {% if 'routine' in upcoming.kinds %}<li class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] bg-ink-700" aria-hidden="true"></span>Routine or plan</li>{% endif %}
+        {% if 'approve' in upcoming.kinds %}<li class="inline-flex items-center gap-1.5"><span class="size-3 rounded-full bg-white shadow-[inset_0_0_0_2px_var(--warning-500)]" aria-hidden="true"></span>Waiting for you</li>{% endif %}
+        {% if 'queued' in upcoming.kinds %}<li class="inline-flex items-center gap-1.5"><span class="size-3 rounded-full bg-white shadow-[inset_0_0_0_2px_var(--info-500)]" aria-hidden="true"></span>Queued work</li>{% endif %}
+        {% if upcoming.quiet %}<li class="inline-flex items-center gap-1.5 max-md:hidden"><span class="h-2.5 w-5 rounded-sm bg-[repeating-linear-gradient(135deg,var(--ink-200)_0_3px,var(--ink-50)_3px_6px)]" aria-hidden="true"></span>{{ upcoming.quiet_label }}: your manager holds messages unless they are urgent</li>{% endif %}
+    </ul>
+    {% else %}
+    <p class="mt-3 text-sm text-ink-600">Nothing is planned for the next 24 hours. Routines, autopilot planning and scheduled posts show up here.</p>
+    {% endif %}
+</section>
+{% endwith %}

@@ -1,45 +1,38 @@
 {% extends "base.html" %}
+{% load static %}
+{% comment %}
+The Team tab: the team at work, live (DESIGN_SYSTEM.md section 14, final-team-1440.png / final-team-390.png).
+Context: workspace, live (apps.studio.live.snapshot), tabs, can_create, can_approve.
+The board refreshes every 5 s while the tab is visible (studio:team_board); a refresh that changes
+nothing swaps nothing, and only meaningful changes are announced in #team-live-announce
+(static/js/live_board.js).
+{% endcomment %}
 
 {% block title %}Your team - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl">
-    <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
-        <div class="max-w-3xl">
-            <h1 class="text-2xl sm:text-3xl text-ink-900" style="font-family: var(--font-display)">Your team — {{ agent_count }} agents</h1>
-            <p class="text-sm text-ink-600 mt-1">Seven departments, one goal: posts and articles you're happy to approve. Every agent works from your brand profile and never publishes on its own.</p>
+<div class="w-full max-w-[1180px] mx-auto" data-team-live>
+    <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+        <div class="min-w-0">
+            <h1 class="ui-page-title">Your team</h1>
         </div>
-        {% include "components/agent_state.html" with state=working_now|yesno:"working,idle" %}
+    </div>
+    {% include "studio/partials/team_status.html" %}
+
+    <div class="mt-5">
+        {% include "components/agency_tabs.html" %}
     </div>
 
-    {% include "components/agency_tabs.html" %}
-
-    <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-        {% for group in departments %}
-        <section aria-labelledby="dept-{{ group.department.slug }}" class="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm">
-            <h2 id="dept-{{ group.department.slug }}" class="text-lg text-ink-900" style="font-family: var(--font-display)">{{ group.department.name }}</h2>
-            <p class="text-xs text-ink-600 mb-3">{{ group.department.does }}</p>
-            <ul class="space-y-3">
-                {% for row in group.agents %}
-                <li class="flex items-start gap-3">
-                    {% include "components/agent_avatar.html" with agent=row.agent %}
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-start justify-between gap-2">
-                            <p class="text-sm font-semibold text-ink-900">{{ row.agent.name }}</p>
-                            {% if row.working %}{% include "components/agent_state.html" with state="working" %}{% endif %}
-                        </div>
-                        <p class="text-xs text-ink-600">{{ row.agent.does }}</p>
-                        {% if row.latest %}
-                        <p class="text-xs text-ink-700 mt-1 break-words"><span class="font-medium">Last:</span> {{ row.latest.summary|truncatechars:140 }} <span class="text-ink-600">· {{ row.latest.started_at|timesince }} ago</span></p>
-                        {% elif row.agent.kind == 'code' %}
-                        <p class="text-xs text-ink-600 mt-1">Works by rules, so it costs nothing.</p>
-                        {% endif %}
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
-        </section>
-        {% endfor %}
+    <div id="team-board" data-live-board
+         hx-get="{% url 'studio:team_board' workspace_id=workspace.id %}"
+         hx-trigger="every 5s [document.visibilityState === 'visible']"
+         hx-swap="innerHTML">
+        {% include "studio/partials/team_board.html" %}
     </div>
+    <p id="team-live-announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ request.csp_nonce }}" src="{% static 'js/live_board.js' %}" defer></script>
 {% endblock %}

@@ -59,15 +59,21 @@ def test_a_passed_proposed_time_is_not_used(client, world, fake_team):
     assert brief.post.platform_posts.get().status == "pending_review"
 
 
-def test_the_team_roster_lists_every_agent_by_department(client, world):
+def test_the_team_tab_is_live_and_still_lists_every_agent_by_department(client, world):
+    # The Team tab became the live view (apps/studio/live.py, test_live.py): what runs now, the last and
+    # next 24 hours, then the roster. Every agent and department of the old roster page is still on it.
     client.force_login(world.viewer)
     html = client.get(_url("studio:team", world)).content.decode()
 
+    for heading in ("Working now", "Last 24 hours", "Next 24 hours"):
+        assert heading in html
     for agent in team.AGENTS:
         assert agent.name in html
     for department in team.DEPARTMENTS:
         assert department.name.replace("&", "&amp;") in html
+        assert department.does in html
     assert len(team.AGENTS) >= 25
+    assert "Works by rules, so it costs nothing." in html  # code agents with no turns yet, as before
 
 
 def test_a_client_is_sent_to_the_portal_not_the_agency(client, world, fake_team):

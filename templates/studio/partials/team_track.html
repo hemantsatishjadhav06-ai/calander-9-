@@ -1,0 +1,37 @@
+{% comment %}
+One task in progress: its title, who is on it and what they are doing, and its stage track (done nodes filled,
+the working node pulsing, waiting nodes hollow; DESIGN_SYSTEM.md 14.2). On a phone a track with more than five
+steps hides the step names and says "Step 3 of 8 · Writing" under it; screen readers still hear every step.
+Context: track (one item of live.tracks), compact (optional: Home's card, without the meta lines).
+{% endcomment %}
+<li class="{% if not compact %}border-t border-ink-200 py-4 first:border-t-0 first:pt-1 last:pb-1{% endif %}" data-track="{{ track.key }}">
+    {% if not compact %}
+    <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <a href="{{ track.url }}" class="min-w-0 text-sm font-semibold text-ink-900 break-words hover:underline underline-offset-3">{{ track.title }}</a>
+        {% if track.started_text %}<span class="text-xs text-ink-500 tabular-nums whitespace-nowrap">{% if track.status == 'working' %}Started {{ track.started_text }} · <span data-live-elapsed="{{ track.started_at|date:'U' }}">{{ track.elapsed_text }}</span>{% else %}Waiting since {{ track.started_text }}{% endif %}</span>{% endif %}
+    </div>
+    <div class="mt-1.5 flex items-start gap-2 text-[13px]/[18px] text-ink-600">
+        <span class="inline-flex size-[22px] flex-none items-center justify-center rounded-full text-[10px] font-semibold {% if track.agent.slug == 'account_manager' %}bg-ink-900 text-white{% else %}bg-ink-100 text-ink-700{% endif %}" aria-hidden="true">{{ track.agent.initials }}</span>
+        <p class="min-w-0 pt-0.5">
+            {{ track.doing }}{% if track.policy_url %} <a href="{{ track.policy_url }}" class="link-inline">{{ track.policy_link|default:"Open the setting" }}</a>{% endif %}{% if track.platforms %}<span class="text-ink-500"> · {{ track.platforms|join:", " }}</span>{% endif %}
+            {% if track.status == 'queued' %}
+            <span class="ui-pill ui-pill-info ml-1 align-[1px]"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2.4"/><circle cx="12" cy="12" r="2.4"/><circle cx="19" cy="12" r="2.4"/></svg>{{ track.status_word }}</span>
+            {% elif track.status == 'paused' %}
+            <span class="ui-pill ml-1 align-[1px]"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>{{ track.status_word }}</span>
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+    <ol class="stage-track mt-3" aria-label="{{ track.title }}. {{ track.step_text }}">
+        {% for stage in track.stages %}
+        <li class="stage" data-state="{{ stage.state }}"{% if stage.state == 'working' %} aria-current="step"{% endif %}>
+            <span class="stage-node" aria-hidden="true">{% if stage.state == 'done' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>{% elif stage.state == 'failed' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M17 7L7 17M7 7l10 10"/></svg>{% endif %}</span>
+            <span class="max-w-full truncate px-0.5{% if track.long %} max-sm:sr-only{% endif %}">{{ stage.label }}</span>
+            <span class="sr-only">, {% if stage.state == 'done' %}done{% elif stage.state == 'working' %}working now{% elif stage.state == 'failed' %}stopped{% else %}not started{% endif %}</span>
+        </li>
+        {% endfor %}
+    </ol>
+    {% if track.long %}
+    <p class="mt-2 text-xs font-semibold text-ink-900 sm:hidden" aria-hidden="true">Step {{ track.current_index|add:1 }} of {{ track.stages|length }} · {{ track.current_label }}</p>
+    {% endif %}
+</li>

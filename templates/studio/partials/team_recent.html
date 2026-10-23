@@ -1,0 +1,31 @@
+{% comment %}
+Recently finished: the last ten posts and tasks with how they ended (a pill with an icon and a word) and a link.
+Context: live.
+{% endcomment %}
+<section aria-labelledby="team-recent-heading" class="ui-card min-w-0">
+    <div class="ui-card-header">
+        <h2 id="team-recent-heading" class="ui-card-title">Recently finished</h2>
+        <span class="text-[13px] text-ink-500 whitespace-nowrap">Times in {{ live.tzname }}</span>
+    </div>
+    {% if live.recent %}
+    <ul class="mt-2 divide-y divide-ink-200">
+        {% for row in live.recent %}
+        <li class="flex items-center gap-3 py-2.5">
+            <div class="min-w-0 flex-1">
+                {% if row.url %}<a href="{{ row.url }}" class="block text-sm font-medium text-ink-900 truncate hover:underline underline-offset-3">{{ row.title }}</a>{% else %}<p class="text-sm font-medium text-ink-900 truncate">{{ row.title }}</p>{% endif %}
+                <p class="text-xs text-ink-500 tabular-nums">{{ row.kind_label }} · <time datetime="{{ row.at|date:'c' }}">{{ row.time_text }}</time></p>
+            </div>
+            <span class="ui-pill flex-none{% if row.tone == 'success' %} ui-pill-success{% elif row.tone == 'danger' %} ui-pill-danger{% elif row.tone == 'warning' %} ui-pill-warning{% endif %}">
+                {% if row.tone == 'success' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+                {% elif row.tone == 'danger' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+                {% elif row.tone == 'warning' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                {% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>{% endif %}
+                {{ row.word }}
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-3 text-sm text-ink-600">Nothing finished yet. Finished work shows up here with how it ended.</p>
+    {% endif %}
+</section>
