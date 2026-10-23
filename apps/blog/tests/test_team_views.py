@@ -132,6 +132,20 @@ def test_without_claude_nothing_is_queued(client, world, queued, settings):
     assert not AgencyJob.objects.exists()
 
 
+def test_the_not_ready_notice_names_the_configured_providers_key_and_no_vendor(client, world, settings):
+    settings.STUDIO_PROVIDER = "openrouter"
+    settings.OPENROUTER_API_KEY = ""
+    settings.ANTHROPIC_API_KEY = ""
+    client.force_login(world.editor)
+
+    page = client.get(_url("write", world)).content.decode()
+    refusal = client.post(_url("write", world), {"topic": "Hello", "site": str(world.neopolis.pk)}).content.decode()
+
+    for html in (page, refusal):
+        assert "OPENROUTER_API_KEY" in html
+        assert "ANTHROPIC_API_KEY" not in html and "Claude API key" not in html
+
+
 def test_the_team_writes_at_most_three_articles_at_once(client, world, queued):
     for n in range(views_team.MAX_ACTIVE_ARTICLES):
         blog_job.start_article(world.workspace, topic=f"Topic {n}", site=world.neopolis, requested_by=world.editor)
