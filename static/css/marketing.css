@@ -586,7 +586,20 @@ main p a:not([class]):hover, main li a:not([class]):hover, main td a:not([class]
    Tables, code, callouts
    -------------------------------------------------------------------------- */
 .mk-table-wrap { overflow-x: auto; border: 1px solid var(--mk-line); border-radius: var(--mk-r-md); background: var(--mk-surface); box-shadow: var(--mk-shadow-xs); }
-.mk-table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; min-width: 560px; }
+.mk-table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; min-width: 720px; }
+.mk-table td code { white-space: nowrap; }
+/* A reference table that becomes stacked rows on a phone instead of scrolling sideways */
+@media (max-width: 640px) {
+  .mk-table.mk-table--stack { min-width: 0; }
+  .mk-table.mk-table--stack thead { display: none; }
+  .mk-table.mk-table--stack tr { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 10px; padding: 14px 16px; border-bottom: 1px solid var(--mk-line); }
+  .mk-table.mk-table--stack tr:last-child { border-bottom: 0; }
+  .mk-table.mk-table--stack td { padding: 0; border: 0; }
+  .mk-table.mk-table--stack td:nth-child(3), .mk-table.mk-table--stack td:nth-child(4) { grid-column: 1 / -1; }
+  .mk-table.mk-table--stack td:nth-child(4) { font-size: 0.8125rem; color: var(--mk-ink-2); }
+  .mk-table.mk-table--stack td:nth-child(4).mk-dash { display: none; }
+  .mk-table.mk-table--stack td code { white-space: normal; overflow-wrap: anywhere; }
+}
 .mk-table th, .mk-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--mk-line); vertical-align: middle; }
 .mk-table th { height: 40px; padding-top: 0; padding-bottom: 0; font-size: 0.8125rem; text-transform: none; letter-spacing: 0; color: var(--mk-ink-2); background: var(--mk-sheet); font-weight: 600; border-bottom-color: var(--mk-line-2); white-space: nowrap; }
 .mk-table tr:last-child td { border-bottom: 0; }
