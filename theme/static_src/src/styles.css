@@ -318,6 +318,11 @@
   }
   ::selection { background: var(--brand-100); color: var(--ink-900); }
 
+  /* Transitional: headings that still set style="font-family: var(--font-display)" were Georgia at
+     400. The display font is the system sans now, so give them heading weight and tracking until
+     each one moves to text-h1 / text-h2 / text-h3 (a weight utility on the element still wins). */
+  [style*="--font-display"] { font-weight: 600; letter-spacing: -0.015em; color: var(--text-strong); }
+
   /* Focus: a real 2px outline with a 2px offset, so it survives Windows
      forced-colours mode. Never write outline:none without a replacement. */
   :focus-visible {
@@ -576,12 +581,17 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
   max-width: 400px;
 }
 @media (max-width: 480px) {
+  /* Full-bleed sheet: edge to edge across the auth layout's 16px gutter, hairlines top and bottom. */
   .auth-card {
-    border: none;
+    border-left: 0;
+    border-right: 0;
     border-radius: 0;
     box-shadow: none;
-    padding: 2rem 1rem;
-    max-width: 100%;
+    padding: 1.75rem 1rem;
+    width: calc(100% + 2rem);
+    max-width: none;
+    margin-left: -1rem;
+    margin-right: -1rem;
   }
 }
 
