@@ -7,9 +7,11 @@ Shapes (DESIGN_SYSTEM.md 12): your own message is a quiet ink-100 bubble on the 
 and specialists write without a bubble beside a neutral avatar; a client is a white bubble with a
 "Client" tag; a teammate an ink-50 bubble; a note for the team is dashed with a lock; system lines
 sit between hairlines.
+The log is a keyboard stop (tabindex="0"): on a phone it scrolls inside its own box, and a person
+without a pointer must be able to reach it to scroll it.
 {% endcomment %}
 {% load tz %}
-<div id="{{ thread.dom_id }}-messages" data-thread-log role="log" aria-live="off" tabindex="-1" aria-label="Messages in {{ thread.title|lower }}"
+<div id="{{ thread.dom_id }}-messages" data-thread-log role="log" aria-live="off" tabindex="0" aria-label="Messages in {{ thread.title|lower }}"
      class="mt-4 space-y-4 {% if thread.full_page %}max-h-[60vh]{% else %}max-h-96{% endif %} overflow-y-auto pr-1 -mr-1 rounded-lg"
      {% if thread.polling and thread.messages_url %}hx-get="{{ thread.messages_url }}" hx-trigger="{{ thread.poll_interval }}" hx-sync="closest [data-agency-thread]:drop" hx-target="this" hx-select="unset" hx-swap="outerHTML"{% endif %}>
     {% for m in thread.messages %}

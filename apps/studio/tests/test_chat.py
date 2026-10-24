@@ -568,6 +568,16 @@ class TestStaffPages:
         assert "Send to the team" in detail  # the brief page keeps its own change form below the thread
         assert not Conversation.objects.exists()
 
+    def test_the_message_log_is_a_keyboard_stop_so_it_can_be_scrolled(self, client, world, jobs, manager_agent):
+        client.force_login(world.editor)
+        client.post(_url("studio:thread_start", world), {"body": "What's next week?"}, HTTP_HX_REQUEST="true")
+        drive(AgencyJob.objects.get(kind=AgencyJob.Kind.CHAT))
+
+        home = client.get(_url("studio:index", world)).content.decode()
+
+        # It scrolls inside its own box on phones (axe: scrollable-region-focusable).
+        assert 'id="thread-home-messages" data-thread-log role="log" aria-live="off" tabindex="0"' in home
+
     def test_an_empty_post_or_article_thread_does_not_invite_a_new_post(self, client, world, fake_team, rf):
         from django.template.loader import render_to_string
 
