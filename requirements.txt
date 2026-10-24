@@ -24,7 +24,8 @@ django-htmx>=1.19,<2.0
 
 # Storage
 django-storages[s3]>=1.14,<2.0
-Pillow>=12.3,<13.0
+# 13.0 fixes 37 known vulnerabilities in its image parsers (12.3.0 has them all).
+Pillow>=13.0,<14.0
 
 # Security
 django-csp>=3.8,<4.0
