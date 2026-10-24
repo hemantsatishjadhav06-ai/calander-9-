@@ -155,8 +155,8 @@ and the tuple `FEATURE_KEYS = ("blog", "queues", "templates", "extra_providers",
 - Given the workspace has no `AgencySettings` row, then the defaults apply and no row is created.
 - The helper is read-only, scoped to the one workspace, and costs at most two small queries.
 
-**R3. Owners can set flags before there is a screen for it.** The `features` field is editable on
-the existing `AgencySettings` admin page (staff only).
+**R3. Owners can set flags before there is a screen for it.** `AgencySettings` is registered in the
+Django admin (it is not today) with `features` editable (staff only).
 
 - [ ] Saving `{"queues": true}` for one workspace turns `feature_enabled(ws, "queues")` on for that
       workspace only.
