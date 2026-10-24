@@ -3,6 +3,9 @@
 - A new row starts with no switches set.
 - The previous release's INSERTs don't name the new column (invariant 8).
 - Until Settings has a screen for them, staff set switches in the Django admin.
+- The admin saves an empty box as no switches and refuses anything but known
+  keys with true or false, as a form error.
+- The admin page lists no other organisation's accounts.
 """
 
 from django.db import connection
@@ -11,9 +14,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.common.features import feature_enabled
+from apps.common.features import FEATURE_KEYS, feature_enabled
 from apps.members.models import OrgMembership, WorkspaceMembership
 from apps.organizations.models import Organization
+from apps.social_accounts.models import SocialAccount
 from apps.studio.models import AgencySettings
 from apps.workspaces.models import Workspace
 
@@ -76,8 +80,8 @@ class FeaturesAdminTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="features"')
 
-    def test_saving_a_switch_turns_it_on_for_that_workspace_only(self):
-        response = self.client.post(
+    def _save(self, features):
+        return self.client.post(
             self.url,
             {
                 "workspace": self.ws.pk,
@@ -88,11 +92,44 @@ class FeaturesAdminTests(TestCase):
                 "plan_hour": 16,
                 "blog_posts_per_month": 0,
                 "monthly_budget_usd": "150.00",
-                "features": '{"queues": true}',
+                "features": features,
             },
         )
+
+    def test_saving_a_switch_turns_it_on_for_that_workspace_only(self):
+        response = self._save('{"queues": true}')
         self.assertEqual(response.status_code, 302)
         self.settings.refresh_from_db()
         self.assertEqual(self.settings.features, {"queues": True})
         self.assertIs(feature_enabled(self.ws, "queues"), True)
         self.assertIs(feature_enabled(self.other, "queues"), False)
+
+    def test_an_empty_box_or_null_saves_no_switches(self):
+        for features in ("", "null"):
+            with self.subTest(features=features):
+                AgencySettings.objects.filter(pk=self.settings.pk).update(features={"queues": True})
+                response = self._save(features)
+                self.assertEqual(response.status_code, 302)
+                self.settings.refresh_from_db()
+                self.assertEqual(self.settings.features, {})
+
+    def test_anything_but_known_keys_with_booleans_is_a_form_error(self):
+        AgencySettings.objects.filter(pk=self.settings.pk).update(features={"queues": True})
+        for features in ("[]", '{"blgo": true}', '{"queues": "yes"}'):
+            with self.subTest(features=features):
+                response = self._save(features)
+                self.assertEqual(response.status_code, 200)
+                errors = response.context["adminform"].form.errors["features"]
+                self.assertIn(", ".join(FEATURE_KEYS), errors[0])
+                self.settings.refresh_from_db()
+                self.assertEqual(self.settings.features, {"queues": True})
+
+    def test_the_change_page_lists_no_other_organisations_accounts(self):
+        foreign_org = Organization.objects.create(name="Foreign")
+        foreign_ws = Workspace.objects.create(organization=foreign_org, name="Foreign WS")
+        SocialAccount.objects.create(
+            workspace=foreign_ws, platform="linkedin_company", account_platform_id="9", account_name="Foreign Page"
+        )
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Foreign Page")

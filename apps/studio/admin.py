@@ -1,4 +1,7 @@
+from django import forms
 from django.contrib import admin
+
+from apps.common.features import FEATURE_KEYS
 
 from .models import AgencySettings, AgentRun, BrandProfile, StudioBrief, StudioConcept
 
@@ -10,12 +13,32 @@ class BrandProfileAdmin(admin.ModelAdmin):
     raw_id_fields = ("workspace", "logo")
 
 
+class AgencySettingsAdminForm(forms.ModelForm):
+    class Meta:
+        model = AgencySettings
+        fields = "__all__"
+
+    def clean_features(self):
+        """An empty box or ``null`` is no switches; anything else is known keys with true or false."""
+        features = self.cleaned_data.get("features")
+        if features is None:
+            return {}
+        if not isinstance(features, dict) or any(
+            key not in FEATURE_KEYS or not isinstance(value, bool) for key, value in features.items()
+        ):
+            raise forms.ValidationError(
+                'Enter an object like {"queues": true}: the keys are %(keys)s, the values true or false.',
+                params={"keys": ", ".join(FEATURE_KEYS)},
+            )
+        return features
+
+
 @admin.register(AgencySettings)
 class AgencySettingsAdmin(admin.ModelAdmin):
+    form = AgencySettingsAdminForm
     list_display = ("workspace", "autopilot_enabled", "creation_mode")
     search_fields = ("workspace__name",)
-    raw_id_fields = ("workspace", "lead", "backup", "blog_site")
-    filter_horizontal = ("accounts",)
+    raw_id_fields = ("workspace", "lead", "backup", "blog_site", "accounts")
 
 
 class StudioConceptInline(admin.TabularInline):
