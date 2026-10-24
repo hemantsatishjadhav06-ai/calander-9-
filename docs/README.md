@@ -15,6 +15,8 @@ contribute in [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 | [TELEGRAM_CLIENT_HUB.md](TELEGRAM_CLIENT_HUB.md) | Telegram end to end: setting it up, the manager inbox, alerts and the morning briefing, everyday commands, weekly preparation, the boundaries that keep client and private chats separate. |
 | [TELEGRAM_CHANNELS.md](TELEGRAM_CHANNELS.md) | Status channels: a broadcast channel that receives fixed status messages for permitted posts and nothing else. |
 | [OPENDOTS_INTEGRATION.md](OPENDOTS_INTEGRATION.md) | The task controls (pause, resume, retry after review) adapted from OpenDots, what was deliberately not adopted, and how the adaptation is verified. |
+| [BETA_PLAN.md](BETA_PLAN.md) | The closed-beta plan for 5–10 agencies: what is kept, merged, hidden or cut, the nine target screens, the interface direction, the standards each gate checks, the seven phases and the definition of done. |
+| [specs/](specs/) | One spec and one plan per beta phase (`00-cut.md`, `phase-0.md`, …) and `CHANGELOG.md`, the running record of what each phase changed and what its gate said. |
 
 ## Archive
 
