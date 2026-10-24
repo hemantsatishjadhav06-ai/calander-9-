@@ -368,6 +368,81 @@ def test_upcoming_routines_autopilot_posts_approvals_and_queued_work(world, monk
 
 
 # ---------------------------------------------------------------------------
+# The latest post's receipt
+# ---------------------------------------------------------------------------
+
+
+def _team_post(world, brief_status, *rows, post_at=None):
+    """A team brief whose post has one channel per (account, status, fields) row."""
+    post = Post.objects.create(workspace=world.workspace, title="Clubhouse reel", scheduled_at=post_at)
+    for account, status, fields in rows:
+        PlatformPost.objects.create(post=post, social_account=account, status=status, **fields)
+    _brief(world.workspace, status=brief_status, post=post, finished_at=timezone.now() - timedelta(hours=1))
+    return post
+
+
+def _label(world, when, now):
+    zone = live._zone(world.workspace)
+    return live._day_label(when.astimezone(zone), now.astimezone(zone))
+
+
+def test_the_receipt_counts_an_approval_the_gate_did_not_stamp(world):
+    # Without dashboard approval (the default) the gate records no approver, yet the post was approved.
+    assert not world.workspace.require_dashboard_approval
+    now = timezone.now()
+    at = now + timedelta(hours=20)
+    post = _team_post(world, StudioBrief.Status.APPROVED, (world.linkedin, "scheduled", {"scheduled_at": at}))
+
+    steps = live.snapshot(world.workspace, now=now)["receipt"]["steps"]
+
+    assert steps[1] == {"state": "done", "text": "Approved", "meta": ""}
+    assert steps[2] == {
+        "state": "current",
+        "text": f"Scheduled for {world.linkedin.get_platform_display()}",
+        "meta": _label(world, at, now),
+    }
+    assert steps[3] == {"state": "pending", "text": "Published", "meta": "Pending"}
+
+    PlatformPost.objects.filter(post=post).update(status="published", published_at=at)
+    steps = live.snapshot(world.workspace, now=now)["receipt"]["steps"]
+    assert steps[1]["text"] == "Approved" and steps[3]["state"] == "done"
+    assert not any(step["state"] == "needs-you" for step in steps)
+
+
+def test_the_receipt_waits_for_the_client_after_the_internal_approval(world):
+    Workspace.objects.filter(pk=world.workspace.pk).update(
+        require_dashboard_approval=True,
+        approval_workflow_mode=Workspace.ApprovalWorkflowMode.REQUIRED_INTERNAL_AND_CLIENT,
+    )
+    now = timezone.now()
+    approved = {"approved_by": world.manager, "approved_at": now - timedelta(minutes=30)}
+    post = _team_post(world, StudioBrief.Status.APPROVED, (world.linkedin, "pending_client", approved))
+
+    steps = live.snapshot(world.workspace, now=now)["receipt"]["steps"]
+
+    assert steps[1] == {"state": "needs-you", "text": "Waiting for the client", "meta": ""}
+    assert steps[2]["state"] == "pending"
+
+    # The client signs off and the team schedules it: the approver's name and time come back.
+    at = now + timedelta(hours=3)
+    PlatformPost.objects.filter(post=post).update(status="scheduled", scheduled_at=at)
+    steps = live.snapshot(world.workspace, now=now)["receipt"]["steps"]
+    assert steps[1] == {
+        "state": "done",
+        "text": "Approved by Manager",
+        "meta": _label(world, approved["approved_at"], now),
+    }
+
+
+def test_the_receipt_waits_for_you_while_the_post_is_in_review(world):
+    _team_post(world, StudioBrief.Status.READY, (world.linkedin, "pending_review", {}))
+
+    steps = live.snapshot(world.workspace, now=timezone.now())["receipt"]["steps"]
+
+    assert steps[1] == {"state": "needs-you", "text": "Waiting for your approval", "meta": ""}
+
+
+# ---------------------------------------------------------------------------
 # Isolation and privacy
 # ---------------------------------------------------------------------------
 

@@ -855,6 +855,10 @@ def _recent(workspace, jobs, zone, local_now) -> list[dict[str, Any]]:
     return rows
 
 
+#: A channel in any of these was approved, whether or not the gate stamped an approver.
+_APPROVED_ROWS = frozenset({"approved", "scheduled", "publishing", "published", "failed"})
+
+
 def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
     """The team's latest post, from draft to published: the delivery receipt (DESIGN_SYSTEM.md 14.3)."""
     from apps.composer.models import PlatformPost
@@ -883,16 +887,24 @@ def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
         return _day_label(value.astimezone(zone), local_now) if value else ""
 
     platforms = " and ".join(sorted({row.social_account.get_platform_display() for row in rows}))
-    approved = next((row for row in rows if row.approved_at), None)
     statuses = {row.status for row in rows}
     steps = [{"state": "done", "text": "Draft ready", "meta": when(brief.finished_at)}]
-    if approved is not None:
-        who = (getattr(approved.approved_by, "name", "") or "").split(" ")[0] if approved.approved_by else ""
-        steps.append(
-            {"state": "done", "text": f"Approved by {who}" if who else "Approved", "meta": when(approved.approved_at)}
-        )
-    elif "pending_client" in statuses:
+    # Whether it was approved comes from what happened to the post: the gate stamps who approved
+    # and when only where dashboard approval is enforced, and keeps the stamp while the client decides.
+    if "pending_client" in statuses:
         steps.append({"state": "needs-you", "text": "Waiting for the client", "meta": ""})
+    elif brief.status == StudioBrief.Status.APPROVED or statuses & _APPROVED_ROWS:
+        stamped = next((row for row in rows if row.approved_at), None)
+        who = ""
+        if stamped is not None and stamped.approved_by is not None:
+            who = (getattr(stamped.approved_by, "name", "") or "").split(" ")[0]
+        steps.append(
+            {
+                "state": "done",
+                "text": f"Approved by {who}" if who else "Approved",
+                "meta": when(stamped.approved_at) if stamped is not None else "",
+            }
+        )
     else:
         steps.append({"state": "needs-you", "text": "Waiting for your approval", "meta": ""})
     scheduled = next(
