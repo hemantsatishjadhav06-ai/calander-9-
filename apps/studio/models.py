@@ -18,6 +18,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Value
 from django.utils import timezone
 
 from apps.common.managers import WorkspaceScopedManager
@@ -558,6 +559,14 @@ class AgencySettings(models.Model):
     )
     inbox_drafts_enabled = models.BooleanField(
         default=False, help_text="Draft replies to new comments, messages and reviews for a person to send."
+    )
+    # Read only through apps.common.features.feature_enabled, which knows the
+    # keys and the default for a key left out.
+    features = models.JSONField(
+        default=dict,
+        db_default=Value({}, output_field=models.JSONField()),
+        blank=True,
+        help_text='Features switched on or off for this workspace, e.g. {"queues": true}. A key left out uses its default.',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
