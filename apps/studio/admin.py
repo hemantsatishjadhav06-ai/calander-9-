@@ -23,12 +23,17 @@ class AgencySettingsAdminForm(forms.ModelForm):
         features = self.cleaned_data.get("features")
         if features is None:
             return {}
-        if not isinstance(features, dict) or any(
-            key not in FEATURE_KEYS or not isinstance(value, bool) for key, value in features.items()
-        ):
+        keys = ", ".join(FEATURE_KEYS)
+        if not isinstance(features, dict):
             raise forms.ValidationError(
                 'Enter an object like {"queues": true}: the keys are %(keys)s, the values true or false.',
-                params={"keys": ", ".join(FEATURE_KEYS)},
+                params={"keys": keys},
+            )
+        wrong = [key for key, value in features.items() if key not in FEATURE_KEYS or not isinstance(value, bool)]
+        if wrong:
+            raise forms.ValidationError(
+                "Not a known switch set to true or false: %(wrong)s. The keys are %(keys)s.",
+                params={"wrong": ", ".join(wrong), "keys": keys},
             )
         return features
 
@@ -44,6 +49,10 @@ class AgencySettingsAdmin(admin.ModelAdmin):
     list_display = ("workspace", "autopilot_enabled", "creation_mode")
     search_fields = ("workspace__name",)
     raw_id_fields = ("workspace", "lead", "backup", "blog_site", "accounts")
+
+    def get_readonly_fields(self, request, obj=None):
+        # Moving a row would carry one workspace's settings to another.
+        return ("workspace",) if obj else ()
 
 
 class StudioConceptInline(admin.TabularInline):

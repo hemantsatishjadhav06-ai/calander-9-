@@ -101,9 +101,21 @@ def test_blog_defaults_to_off_without_a_site(workspace, other_workspace):
 
 @pytest.mark.django_db
 def test_a_value_that_is_not_a_boolean_takes_the_default(workspace):
-    _switches(workspace, queues="yes")
+    _switches(workspace, queues="yes", blog="no")
+    _blog_site(workspace)
 
     assert feature_enabled(workspace, "queues") is False
+    assert feature_enabled(workspace, "blog") is True  # the default, not "anything else is off"
+
+
+@pytest.mark.django_db
+def test_a_stored_value_that_is_not_an_object_takes_the_defaults(workspace):
+    settings = _switches(workspace)
+    AgencySettings.objects.filter(pk=settings.pk).update(features=["queues"])
+    _blog_site(workspace)
+
+    assert feature_enabled(workspace, "queues") is False
+    assert feature_enabled(workspace, "blog") is True
 
 
 @pytest.mark.django_db

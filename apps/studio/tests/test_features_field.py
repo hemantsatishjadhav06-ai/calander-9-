@@ -134,7 +134,23 @@ class FeaturesAdminTests(TestCase):
                 self.settings.refresh_from_db()
                 self.assertEqual(self.settings.features, {"queues": True})
 
+    def test_the_error_names_the_wrong_key_or_value(self):
+        response = self._save('{"blgo": true, "queues": "yes"}')
+        self.assertEqual(response.status_code, 200)
+        message = response.context["adminform"].form.errors["features"][0]
+        self.assertIn("blgo", message)
+        self.assertIn("queues", message)
+
+    def test_the_workspace_cannot_be_changed_on_an_existing_row(self):
+        # Moving the row would carry one workspace's settings to another.
+        response = self.client.get(self.url)
+        self.assertNotContains(response, 'name="workspace"')
+        self.client.post(self.url, {"workspace": self.other.pk, "features": "{}"})
+        self.settings.refresh_from_db()
+        self.assertEqual(self.settings.workspace_id, self.ws.pk)
+
     def test_the_change_page_lists_no_other_organisations_accounts(self):
+        # Page size and noise: the raw-id field lists no accounts at all.
         foreign_org = Organization.objects.create(name="Foreign")
         foreign_ws = Workspace.objects.create(organization=foreign_org, name="Foreign WS")
         SocialAccount.objects.create(
