@@ -1306,8 +1306,6 @@ def save_post(request, workspace_id, post_id=None):
         pending_target = "scheduled"
         initial_status = "scheduled"
     elif action == "add_to_queue":
-        from django.db import transaction
-
         from apps.calendar.services import QueueFullError, add_to_queue
 
         queue_id = request.POST.get("queue_id")
@@ -1351,8 +1349,6 @@ def save_post(request, workspace_id, post_id=None):
             return _post_saved_response(workspace, post)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "add_to_queue_priority":
-        from django.db import transaction
-
         from apps.calendar.services import QueueFullError, add_to_queue
 
         queue_id = request.POST.get("queue_id")
@@ -1439,7 +1435,9 @@ def save_post(request, workspace_id, post_id=None):
 
     post.save()
 
-    _attach_pending_session_media(request, workspace, post)
+    # The session's media list is cleared only once nothing below can refuse
+    # the save; a refusal rolls back these attachments.
+    _attach_pending_session_media(request, workspace, post, clear=False)
 
     # Sync any new tags to the Tag model
     _sync_tags_to_model(workspace, post.tags)
@@ -1485,7 +1483,17 @@ def save_post(request, workspace_id, post_id=None):
             target_only = [pid for pid in candidates if str(pid) not in reverted_ids]
         else:
             target_only = scoped_ids
-        _transition_post_children(post, pending_target, only=target_only)
+        moved, skipped = _transition_post_children(post, pending_target, only=target_only)
+        if not moved and any(pp.status not in PlatformPost.PROTECTED_STATUSES for pp in skipped):
+            # Every channel asked to move is waiting for approval or on hold. Write
+            # nothing, rather than stamp a time no channel will publish at and
+            # answer as if the post were scheduled.
+            transaction.set_rollback(True)
+            return JsonResponse(
+                {"errors": {"schedule": "Nothing was scheduled: this post needs approval first, or it is on hold."}},
+                status=400,
+            )
+    request.session.pop(f"pending_media_{workspace.id}", None)
 
     # Save version
     _save_version(post, request.user)

@@ -7,6 +7,8 @@ Review findings pinned here:
 - The composer guessed "sent for approval, the time is kept as a proposal" from the channel
   statuses alone. It said so after a Schedule that submitted nothing and cleared the proposal.
   The server now says what it did in X-Sent-For-Review.
+- A Schedule on a post whose every channel waits for approval (or is on hold) moved no channel,
+  yet stamped the post's time, cleared its proposal and answered as if it had worked.
 """
 
 from datetime import timedelta
@@ -16,7 +18,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.composer.models import PlatformPost, Post
+from apps.composer.models import PlatformPost, Post, PostMedia
+from apps.media_library.models import MediaAsset
 from apps.members.models import OrgMembership, WorkspaceMembership
 from apps.organizations.models import Organization
 from apps.social_accounts.models import SocialAccount
@@ -139,3 +142,81 @@ class SentForReviewHeaderTests(ReviewRequestResponseBase):
         response = self._save(action="submit_for_approval", caption="submitted")
         self.assertEqual(response.status_code, 204)
         self.assertNotIn("X-Sent-For-Review", response)
+
+
+class ScheduleWithNothingToMoveTests(ReviewRequestResponseBase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.owner)
+        self.proposal = timezone.now() + timedelta(days=2)
+        self.post = Post.objects.create(
+            workspace=self.ws, author=self.owner, caption="Original", proposed_publish_at=self.proposal
+        )
+
+    def _child(self, status, account=None):
+        return PlatformPost.objects.create(post=self.post, social_account=account or self.account, status=status)
+
+    def test_a_schedule_with_every_channel_in_review_is_refused_and_writes_nothing(self):
+        for status in (
+            PlatformPost.Status.PENDING_REVIEW,
+            PlatformPost.Status.PENDING_CLIENT,
+            PlatformPost.Status.ON_HOLD,
+        ):
+            with self.subTest(status=status):
+                PlatformPost.objects.filter(post=self.post).delete()
+                child = self._child(status)
+                response = self._save(
+                    self.post, action="schedule", caption="Edited", scheduled_date=WHEN, scheduled_time="10:00"
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("Nothing was scheduled", response.json()["errors"]["schedule"])
+                self.post.refresh_from_db()
+                self.assertIsNone(self.post.scheduled_at)
+                self.assertEqual(self.post.proposed_publish_at, self.proposal)
+                self.assertEqual(self.post.caption, "Original")
+                child.refresh_from_db()
+                self.assertEqual(child.status, status)
+                self.assertIsNone(child.scheduled_at)
+
+    def test_a_refused_schedule_keeps_the_media_waiting_to_be_attached(self):
+        self._child(PlatformPost.Status.PENDING_REVIEW)
+        asset = MediaAsset.objects.create(
+            organization=self.org,
+            workspace=self.ws,
+            uploaded_by=self.owner,
+            file="tests/pending.png",
+            filename="pending.png",
+            media_type="image",
+            mime_type="image/png",
+            file_size=1,
+        )
+        session = self.client.session
+        session[f"pending_media_{self.ws.id}"] = [str(asset.id)]
+        session.save()
+        response = self._save(self.post, action="schedule", scheduled_date=WHEN, scheduled_time="10:00")
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(PostMedia.objects.filter(post=self.post).exists())
+        self.assertEqual(self.client.session[f"pending_media_{self.ws.id}"], [str(asset.id)])
+
+    def test_a_schedule_that_moves_some_channel_still_goes_ahead(self):
+        other = SocialAccount.objects.create(
+            workspace=self.ws,
+            platform="bluesky",
+            account_platform_id="did:2",
+            account_name="Other",
+            connection_status=SocialAccount.ConnectionStatus.CONNECTED,
+        )
+        waiting = self._child(PlatformPost.Status.PENDING_REVIEW)
+        draft = self._child(PlatformPost.Status.DRAFT, account=other)
+        response = self._save(
+            self.post,
+            action="schedule",
+            selected_accounts=f"{self.account.id},{other.id}",
+            scheduled_date=WHEN,
+            scheduled_time="10:00",
+        )
+        self.assertEqual(response.status_code, 204)
+        waiting.refresh_from_db()
+        draft.refresh_from_db()
+        self.assertEqual(waiting.status, PlatformPost.Status.PENDING_REVIEW)
+        self.assertEqual(draft.status, PlatformPost.Status.SCHEDULED)
