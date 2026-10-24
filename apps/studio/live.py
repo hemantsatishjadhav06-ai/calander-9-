@@ -901,11 +901,12 @@ def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
     platforms = " and ".join(sorted({row.social_account.get_platform_display() for row in rows}))
     statuses = {row.status for row in rows}
     steps = [{"state": "done", "text": "Draft ready", "meta": when(brief.finished_at)}]
-    # Whether it was approved comes from what happened to the post: the gate stamps who approved
-    # and when only where dashboard approval is enforced, and keeps the stamp while the client decides.
+    # Whether it was approved comes from the channels: the gate stamps who approved and when only
+    # where dashboard approval is enforced, and keeps the stamp while the client decides; the brief
+    # stays APPROVED after an edit withdraws the approval or the client sends it back.
     if "pending_client" in statuses:
         steps.append({"state": "needs-you", "text": "Waiting for the client", "meta": ""})
-    elif brief.status == StudioBrief.Status.APPROVED or statuses & _APPROVED_ROWS:
+    elif statuses & _APPROVED_ROWS:
         stamped = next((row for row in rows if row.approved_at), None)
         who = ""
         if stamped is not None and stamped.approved_by is not None:
@@ -917,6 +918,8 @@ def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
                 "meta": when(stamped.approved_at) if stamped is not None else "",
             }
         )
+    elif "changes_requested" in statuses:
+        steps.append({"state": "current", "text": "Changes requested", "meta": ""})
     else:
         steps.append({"state": "needs-you", "text": "Waiting for your approval", "meta": ""})
     scheduled = next(

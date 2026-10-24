@@ -470,6 +470,20 @@ def test_the_receipt_waits_for_you_while_the_post_is_in_review(world):
     assert steps[1] == {"state": "needs-you", "text": "Waiting for your approval", "meta": ""}
 
 
+def test_the_receipt_drops_an_approval_that_was_withdrawn_or_sent_back(world):
+    # The brief stays APPROVED when an edit withdraws the approval or the client asks for changes;
+    # only the channels say what holds now.
+    post = _team_post(world, StudioBrief.Status.APPROVED, (world.linkedin, "pending_review", {}))
+
+    steps = live.snapshot(world.workspace, now=timezone.now())["receipt"]["steps"]
+    assert steps[1] == {"state": "needs-you", "text": "Waiting for your approval", "meta": ""}
+
+    PlatformPost.objects.filter(post=post).update(status="changes_requested")
+    steps = live.snapshot(world.workspace, now=timezone.now())["receipt"]["steps"]
+    assert steps[1] == {"state": "current", "text": "Changes requested", "meta": ""}
+    assert not any(step["text"].startswith("Approved") for step in steps)
+
+
 # ---------------------------------------------------------------------------
 # Isolation and privacy
 # ---------------------------------------------------------------------------
