@@ -18,31 +18,31 @@ JS body can't see the parent scope.
     {% include "components/_filter_icon.html" with name=icon %}
     <button type="button" @click="uiToggle($event)"
             class="cal-filter-select{% if icon %} has-icon{% endif %} flex items-center gap-1 whitespace-nowrap"
-            :class="{% if multiple %}{{ model }}.length{% else %}{{ model }}{% endif %} && 'border-orange-300 text-orange-700'">
+            :class="{% if multiple %}{{ model }}.length{% else %}{{ model }}{% endif %} && 'border-ink-900 text-ink-950'">
         <span x-text="{% if multiple %}{{ model }}.length ? {{ model }}.length + ' selected' : '{{ placeholder|escapejs }}'{% else %}uiLabel({{ model }}){% endif %}"></span>
-        <svg class="w-3 h-3 text-stone-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        <svg class="w-3 h-3 text-ink-500 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
     </button>
     <div x-show="open" x-cloak
          :style="`top:${top}px; left:${left}px;`"
-         class="fixed z-50 w-56 max-h-72 overflow-y-auto bg-white rounded-lg shadow-lg ring-1 ring-stone-200 py-1">
+         class="fixed z-50 w-56 max-h-72 overflow-y-auto bg-white rounded-xl shadow-lg ring-1 ring-ink-200 p-1">
         <button type="button"
                 @click="{% if multiple %}{{ model }} = []{% else %}{{ model }} = ''; open = false{% endif %}; {{ onchange }}"
-                class="w-full text-left px-3 py-1.5 text-xs font-semibold hover:bg-stone-50 border-b border-stone-100"
-                :class="{% if multiple %}!{{ model }}.length{% else %}!{{ model }}{% endif %} ? 'text-orange-700' : 'text-stone-500'">
+                class="w-full text-left px-2.5 min-h-[34px] max-lg:min-h-11 text-[13px] font-semibold rounded-lg hover:bg-ink-50 mb-1"
+                :class="{% if multiple %}!{{ model }}.length{% else %}!{{ model }}{% endif %} ? 'text-ink-950 bg-brand-50' : 'text-ink-500'">
             {{ placeholder }} — all
         </button>
         {% for opt in options %}
         {% if multiple %}
-        <label class="flex items-center gap-2 px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50 cursor-pointer">
+        <label class="flex items-center gap-2 px-2.5 min-h-[34px] max-lg:min-h-11 text-[13px] text-ink-900 rounded-lg hover:bg-ink-50 cursor-pointer">
             <input type="checkbox" value="{{ opt.value }}" x-model="{{ model }}" @change="{{ onchange }}"
-                   class="rounded border-stone-300 text-orange-700 focus:ring-orange-400">
+                   class="bb-checkbox rounded">
             {% if opt.icon %}<span class="w-4 h-4 rounded flex items-center justify-center pi-{{ opt.icon }} flex-shrink-0 text-white">{% include "social_accounts/partials/_platform_icon.html" with platform=opt.icon size="3" %}</span>{% endif %}
             <span class="truncate">{{ opt.label }}</span>
         </label>
         {% else %}
         <button type="button" @click="{{ model }} = '{{ opt.value|escapejs }}'; open = false; {{ onchange }}"
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50 text-left"
-                :class="String({{ model }}) === '{{ opt.value|escapejs }}' && 'bg-orange-50 text-orange-700'">
+                class="w-full flex items-center gap-2 px-2.5 min-h-[34px] max-lg:min-h-11 text-[13px] text-ink-900 rounded-lg hover:bg-ink-50 text-left"
+                :class="String({{ model }}) === '{{ opt.value|escapejs }}' && 'bg-brand-50 font-semibold text-ink-950'">
             {% if opt.icon %}<span class="w-4 h-4 rounded flex items-center justify-center pi-{{ opt.icon }} flex-shrink-0 text-white">{% include "social_accounts/partials/_platform_icon.html" with platform=opt.icon size="3" %}</span>{% endif %}
             <span class="truncate">{{ opt.label }}</span>
         </button>

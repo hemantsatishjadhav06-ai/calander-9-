@@ -5,19 +5,19 @@
 {% block page_title %}Blog{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl">
-    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
-        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Blog</a>
-        <span aria-hidden="true"> / </span><a href="{% url 'blog:write' workspace_id=workspace.id %}" class="underline hover:text-stone-900">SEO team</a>
-        <span aria-hidden="true"> / </span><span>{{ job.get_kind_display }}</span>
+<div class="w-full max-w-4xl">
+    <nav aria-label="Breadcrumb" class="mb-3 flex flex-wrap items-center gap-1.5 text-small text-ink-600">
+        <a href="{% url 'blog:list' workspace_id=workspace.id %}" class="link-inline">Blog</a>
+        <span aria-hidden="true" class="text-ink-400">/</span><a href="{% url 'blog:write' workspace_id=workspace.id %}" class="link-inline">SEO team</a>
+        <span aria-hidden="true" class="text-ink-400">/</span><span>{{ job.get_kind_display }}</span>
     </nav>
-    <div class="mb-6">
-        <h1 class="text-2xl text-stone-900 break-words" style="font-family: var(--font-display)">{{ job.title|default:job.get_kind_display }}</h1>
-        <p class="text-sm text-stone-600 mt-1">
+    <header class="mb-6">
+        <h1 class="break-words text-h1 text-ink-950">{{ job.title|default:job.get_kind_display }}</h1>
+        <p class="ui-page-status">
             {% if job.requested_by %}Asked by {{ job.requested_by.display_name }} · {% endif %}<time datetime="{{ job.created_at|date:'c' }}">{{ job.created_at|timezone:workspace.effective_timezone|date:"j M Y, H:i" }}</time>
-            · <a href="{% url 'studio:job' workspace_id=workspace.id job_id=job.id %}" class="underline hover:text-stone-900">See it in the Agency</a>
+            · <a href="{% url 'studio:job' workspace_id=workspace.id job_id=job.id %}" class="link-inline">See it in the Agency</a>
         </p>
-    </div>
+    </header>
 
     {% include "blog/partials/team_progress.html" %}
 </div>

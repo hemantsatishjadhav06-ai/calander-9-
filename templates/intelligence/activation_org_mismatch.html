@@ -2,15 +2,18 @@
 {% block title %}Org mismatch · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Org mismatch{% endblock %}
 {% block content %}
-<div class="max-w-xl mx-auto py-16 px-4 text-center">
-  <h1 class="text-xl font-semibold text-stone-900 mb-2">This activation isn't for your org</h1>
-  <p class="text-sm text-stone-600 mb-6">
-    The Stripe payment was made for a different organization, OR your
+<div class="mx-auto w-full max-w-xl py-12 text-center sm:py-16">
+  <span class="mx-auto mb-5 grid size-12 place-items-center rounded-full bg-warning-50 text-warning-600 ring-1 ring-inset ring-warning-200" aria-hidden="true">
+    <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </span>
+  <h1 class="text-h2 text-ink-950">This activation isn't for your org</h1>
+  <p class="mt-2 text-sm text-ink-700">
+    The Stripe payment was made for a different organization, or your
     role no longer permits managing billing for {{ organization.name }}.
   </p>
-  <p class="text-sm text-stone-600">
+  <p class="mt-6 text-small text-ink-600">
     If you believe this is a mistake, contact
-    <a href="mailto:{{ SUPPORT_EMAIL }}" class="text-orange-700 hover:text-orange-800">{{ SUPPORT_EMAIL }}</a>.
+    <a href="mailto:{{ SUPPORT_EMAIL }}" class="link-inline">{{ SUPPORT_EMAIL }}</a>.
   </p>
 </div>
 {% endblock %}

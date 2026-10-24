@@ -14,8 +14,8 @@
 <div>
     <div>
         <div class="flex items-center">
-            <div class="text-xs uppercase tracking-wide text-stone-500">Percentile</div>
-            <span class="intel-tooltip-trigger" tabindex="0" aria-describedby="pkg-percentile-tooltip">
+            <div class="text-caption font-semibold text-ink-600">Percentile</div>
+            <span class="intel-tooltip-trigger" tabindex="0" aria-label="What this means" aria-describedby="pkg-percentile-tooltip">
                 <span class="intel-tooltip-icon" aria-hidden="true">?</span>
                 <span id="pkg-percentile-tooltip" role="tooltip" class="intel-tooltip" data-align="left">
                     Where your packaging ranks against other recent videos in
@@ -26,7 +26,7 @@
                 </span>
             </span>
         </div>
-        <div class="mt-2 text-7xl font-bold tabular-nums leading-none" style="color: var(--primary);">{{ result.percentile }}</div>
+        <div class="mt-2 text-[56px] font-bold leading-none tracking-[-0.03em] tabular-nums text-ink-950">{{ result.percentile }}</div>
     </div>
 
     {% comment %}
@@ -37,19 +37,16 @@
       meaningful) is visually flagged. Each pill carries a "?" trigger
       with its own tooltip explaining the metric.
     {% endcomment %}
-    <div class="mt-5 pt-4 border-t border-stone-100">
+    <div class="mt-5 border-t border-ink-200 pt-4">
         <div class="flex items-center justify-between gap-3">
-            <div class="text-xs uppercase tracking-wide text-stone-500">Niche match</div>
+            <div class="text-caption font-semibold text-ink-600">Niche match</div>
             {% with conf=result.niche_confidence %}
             {% if conf is not None %}
             <div class="flex items-center gap-1">
-                <span class="text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded
-                             {% if conf >= 0.75 %}bg-green-50 text-green-700
-                             {% elif conf >= 0.5 %}bg-amber-50 text-amber-700
-                             {% else %}bg-stone-100 text-stone-600{% endif %}">
+                <span class="ui-pill tabular-nums {% if conf >= 0.75 %}ui-pill-success{% elif conf >= 0.5 %}ui-pill-warning{% endif %}">
                     {% widthratio conf 1 100 %}% confidence
                 </span>
-                <span class="intel-tooltip-trigger" tabindex="0" aria-describedby="pkg-confidence-tooltip">
+                <span class="intel-tooltip-trigger" tabindex="0" aria-label="What this means" aria-describedby="pkg-confidence-tooltip">
                     <span class="intel-tooltip-icon" aria-hidden="true">?</span>
                     <span id="pkg-confidence-tooltip" role="tooltip" class="intel-tooltip" data-align="right">
                         How confident the classifier is that your packaging
@@ -63,8 +60,8 @@
             {% endwith %}
         </div>
         <div class="mt-2 flex items-center justify-between gap-2 flex-wrap">
-            <span class="text-sm font-medium text-stone-900">{{ result.niche_label }}</span>
-            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-stone-100 text-stone-500">{{ result.niche_slug }}</span>
+            <span class="text-sm font-medium text-ink-900">{{ result.niche_label }}</span>
+            <span class="rounded bg-ink-100 px-1.5 py-0.5 font-mono text-[12px] text-ink-600">{{ result.niche_slug }}</span>
         </div>
     </div>
 </div>

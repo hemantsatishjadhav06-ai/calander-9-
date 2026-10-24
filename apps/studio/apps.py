@@ -4,7 +4,7 @@ from django.apps import AppConfig
 class StudioConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.studio"
-    verbose_name = "AI Studio"
+    verbose_name = "Agency"
 
     def ready(self):
         from apps.common.background import connect_recurring_tasks

@@ -1,13 +1,10 @@
-{% comment %}Status pill for a blog post. Context: status (value), label (display). Colours meet WCAG AA on their tint.{% endcomment %}
-<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap
-    {% if status == 'draft' %}bg-stone-100 text-stone-700
-    {% elif status == 'pending_review' %}bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200
-    {% elif status == 'changes_requested' %}bg-orange-50 text-orange-800 ring-1 ring-inset ring-orange-200
-    {% elif status == 'approved' %}bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200
-    {% elif status == 'publishing' %}bg-indigo-50 text-indigo-800 ring-1 ring-inset ring-indigo-200
-    {% elif status == 'published' %}bg-green-50 text-green-800 ring-1 ring-inset ring-green-200
-    {% elif status == 'failed' %}bg-red-50 text-red-800 ring-1 ring-inset ring-red-200
-    {% else %}bg-stone-100 text-stone-700{% endif %}">
-    {% if status == 'publishing' %}<svg class="w-3 h-3 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>{% endif %}
+{% comment %}Status pill for a blog post: icon and word in the five status tones. Context: status (value), label (display).{% endcomment %}
+<span class="ui-pill {% if status == 'pending_review' or status == 'changes_requested' %}ui-pill-warning{% elif status == 'approved' or status == 'published' %}ui-pill-success{% elif status == 'publishing' %}ui-pill-info{% elif status == 'failed' %}ui-pill-danger{% endif %}">
+    {% if status == 'publishing' %}<svg class="animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+    {% elif status == 'pending_review' %}<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    {% elif status == 'changes_requested' %}<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg>
+    {% elif status == 'approved' or status == 'published' %}<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+    {% elif status == 'failed' %}<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+    {% else %}<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg>{% endif %}
     {{ label }}
 </span>

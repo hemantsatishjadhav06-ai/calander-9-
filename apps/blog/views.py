@@ -6,6 +6,9 @@ about who may approve or publish live in :mod:`apps.blog.services` — these
 views only decide which buttons to show and translate refusals into messages.
 """
 
+import base64
+import dataclasses
+import logging
 import uuid
 from typing import Any
 from urllib.parse import urlsplit
@@ -29,6 +32,8 @@ from .forms import BlogPostForm, parse_faq
 from .models import BlogPost, BlogSite
 from .publisher import commit_link
 from .renderers import PostContent, absolutize_urls, render_post_page
+
+logger = logging.getLogger(__name__)
 
 Status = BlogPost.Status
 
@@ -485,17 +490,27 @@ def _preview_csp(site, request) -> str:
 def post_preview(request, workspace_id, post_id):
     """The page exactly as it will be published, with asset URLs made absolute."""
     _workspace_obj, post = _get_post(request, workspace_id, post_id)
+    content = services.post_content(post)
     hero_src = None
     if post.cover_style == BlogPost.CoverStyle.DESIGNED:
-        hero_src = (
-            request.build_absolute_uri(
-                reverse("blog:cover", kwargs={"workspace_id": post.workspace_id, "post_id": post.id})
-            )
-            + f"?v={post.revision}"
-        )
+        # Inline, not a link to blog:cover: the preview is sandboxed (an opaque origin), so the
+        # browser sends no session cookie with its image requests and the login-only cover URL
+        # answered with a redirect to sign in, leaving the hero blank.
+        # The cover is drawn inside this page view, so a featured image that cannot be read (a file
+        # gone from storage, an OSError, a storage backend's own error) leaves the hero out rather
+        # than turning the whole preview into an error page. Out means has_image=False: with no
+        # hero_src the renderer would fall back to the relative img/<slug>-hero.jpg, which points at
+        # the live site's old cover.
+        try:
+            hero_src = "data:image/jpeg;base64," + base64.b64encode(cover_for_post(post, content)).decode("ascii")
+        except ValueError:
+            content = dataclasses.replace(content, has_image=False)
+        except Exception:
+            logger.warning("Blog preview: could not draw the cover for post %s", post.pk, exc_info=True)
+            content = dataclasses.replace(content, has_image=False)
     elif post.featured_image_id and post.featured_image.file:
         hero_src = request.build_absolute_uri(post.featured_image.file.url)
-    page = render_post_page(post.site, services.post_content(post), hero_src=hero_src)
+    page = render_post_page(post.site, content, hero_src=hero_src)
     page = absolutize_urls(page, post.expected_url)
     response = HttpResponse(page, content_type="text/html; charset=utf-8")
     response["X-Robots-Tag"] = "noindex, nofollow"

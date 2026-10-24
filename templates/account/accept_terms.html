@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accept Terms - {{ SITE_NAME }}</title>
+    <title>Accept the terms · {{ SITE_NAME }}</title>
     <link rel="icon" href="{% static 'favicon/favicon.ico' %}" sizes="any">
     <link rel="icon" type="image/svg+xml" href="{% static 'favicon/favicon.svg' %}">
     <link rel="icon" type="image/png" sizes="96x96" href="{% static 'favicon/favicon-96x96.png' %}">
@@ -13,67 +13,42 @@
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
 </head>
 <body>
-<main class="auth-bg min-h-screen flex items-center justify-center py-12 px-4" style="font-family: var(--font-body);">
-    <div class="w-full max-w-md px-4">
-        <!-- Logo & Header -->
-        <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-12 h-12 mb-4">
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold tracking-tight" style="background: #C2410C;" aria-hidden="true">{{ SITE_NAME|make_list|first|upper }}</div>
-            </div>
-            <h1 class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">
-                Almost there
-            </h1>
-            <p class="text-sm mt-1" style="color: var(--text-secondary);">
-                Please review and accept our terms to continue
-            </p>
-        </div>
+<main class="auth-bg flex min-h-screen items-center justify-center px-4 py-12">
+    <div class="w-full max-w-[400px]">
+        {% include "account/_brand.html" %}
 
-        <!-- Card -->
         <div class="auth-card">
-            {% if messages %}
-            <div class="mb-5 space-y-2">
-                {% for message in messages %}
-                <div class="{% if message.tags == 'error' %}alert-error{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %}">
-                    {{ message }}
-                </div>
-                {% endfor %}
+            <h1 class="text-h1 text-ink-950">Almost there</h1>
+            <p class="mt-1.5 text-sm text-ink-600">One quick step before you get started: review and accept the terms.</p>
+
+            <div class="mt-6">
+                {% include "account/_messages.html" %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <label for="id_agree" class="mb-6 flex cursor-pointer items-start gap-3 rounded-xl p-3.5 ring-1 ring-inset ring-ink-200 transition-colors hover:bg-ink-25 has-[:checked]:bg-brand-50 has-[:checked]:ring-brand-700">
+                        <input type="checkbox"
+                               name="agree"
+                               id="id_agree"
+                               class="ui-checkbox mt-0.5 flex-shrink-0 cursor-pointer">
+                        <span class="text-sm text-ink-900">
+                            I agree to the
+                            <a href="{{ LEGAL_TERMS_URL }}" target="_blank" rel="noopener" class="link-inline font-medium">Terms of Service</a>
+                            and
+                            <a href="{{ LEGAL_PRIVACY_URL }}" target="_blank" rel="noopener" class="link-inline font-medium">Privacy Policy</a>
+                        </span>
+                    </label>
+
+                    <button type="submit" class="ui-btn ui-btn-primary ui-btn-lg w-full">Continue</button>
+                </form>
             </div>
-            {% endif %}
-
-            <p class="text-sm mb-6" style="color: var(--text-secondary); line-height: 1.6;">
-                One quick step before you get started.
-            </p>
-
-            <form method="post">
-                {% csrf_token %}
-
-                <label for="id_agree" class="btn-surface-1 flex items-start gap-3 cursor-pointer mb-6 p-3 rounded-lg transition-colors" style="border: 1.5px solid var(--border);">
-                    <input type="checkbox"
-                           name="agree"
-                           id="id_agree"
-                           class="w-4 h-4 rounded mt-0.5 flex-shrink-0 cursor-pointer accent-[var(--primary)]"
-                           style="border-color: var(--border);">
-                    <span class="text-sm" style="color: var(--text-primary); line-height: 1.5;">
-                        I agree to the
-                        <a href="{{ LEGAL_TERMS_URL }}" target="_blank" rel="noopener" class="font-semibold underline hover:no-underline" style="color: var(--primary);">Terms of Service</a>
-                        and
-                        <a href="{{ LEGAL_PRIVACY_URL }}" target="_blank" rel="noopener" class="font-semibold underline hover:no-underline" style="color: var(--primary);">Privacy Policy</a>
-                    </span>
-                </label>
-
-                <button type="submit" class="btn-brand">
-                    Continue
-                </button>
-            </form>
         </div>
 
-        <!-- Sign out link -->
-        <p class="text-center text-sm mt-6" style="color: var(--text-secondary);">
-            <form method="post" action="{% url 'accounts:logout' %}" class="inline">
-                {% csrf_token %}
-                <button type="submit" class="font-semibold hover:underline cursor-pointer bg-transparent border-0 p-0" style="color: var(--primary);">Sign out</button>
-            </form>
-        </p>
+        <form method="post" action="{% url 'accounts:logout' %}" class="mt-6 text-center">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex min-h-6 cursor-pointer items-center rounded-md text-sm font-medium text-ink-600 underline underline-offset-3 hover:text-ink-900 max-lg:min-h-11">Sign out</button>
+        </form>
     </div>
 </main>
 </body>

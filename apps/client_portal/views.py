@@ -212,6 +212,8 @@ def portal_approval_queue(request):
         # "scheduled" counts as approved from the client's side: it is their
         # approved post, now on the calendar, and still theirs to hold.
         post.client_approved = "approved" in child_statuses or "scheduled" in child_statuses
+        # Only a post that is really on the calendar says "Scheduled"; approved alone is not.
+        post.client_scheduled = "scheduled" in child_statuses
 
     return render(
         request,

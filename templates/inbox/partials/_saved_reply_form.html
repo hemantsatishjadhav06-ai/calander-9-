@@ -1,26 +1,33 @@
 <!-- Saved reply create/edit form partial -->
-<div class="max-w-lg">
-    <form method="post">
-        {% csrf_token %}
-        <div class="space-y-4">
-            <div>
-                <label for="id_title" class="block text-[13px] font-semibold text-stone-700 mb-1">Title</label>
-                {{ form.title }}
-            </div>
-            <div>
-                <label for="id_body" class="block text-[13px] font-semibold text-stone-700 mb-1">Reply Body</label>
-                {{ form.body }}
-                <p class="text-[11px] text-stone-500 mt-1">Variables: <code>{sender_name}</code>, <code>{account_name}</code>, <code>{post_url}</code></p>
-            </div>
+<form method="post" class="ui-card">
+    {% csrf_token %}
+    <h2 class="text-h3 text-ink-950">{% if saved_reply %}Edit saved reply{% else %}New saved reply{% endif %}</h2>
+    {% if form.non_field_errors %}
+    <div class="ui-callout ui-callout-danger mt-3" role="alert">{{ form.non_field_errors|join:" " }}</div>
+    {% endif %}
+    <div class="mt-4 space-y-4">
+        <div>
+            <label for="{{ form.title.id_for_label }}" class="ui-label">Title</label>
+            <input type="text" name="{{ form.title.html_name }}" id="{{ form.title.id_for_label }}"
+                   value="{{ form.title.value|default_if_none:'' }}" maxlength="255" required
+                   placeholder="Reply title"
+                   class="ui-input" {% if form.title.errors %}aria-invalid="true" aria-describedby="title-error"{% endif %}>
+            {% if form.title.errors %}<p id="title-error" class="ui-error">{{ form.title.errors|join:" " }}</p>{% endif %}
         </div>
-        <div class="flex items-center gap-3 mt-6">
-            <button type="submit"
-                    class="inline-flex items-center gap-1.5 px-5 py-2 text-[13px] font-semibold text-white rounded-full transition-all duration-150 cursor-pointer"
-                    style="background: var(--primary-strong); box-shadow: var(--shadow-primary);">
-                {% if saved_reply %}Update{% else %}Create{% endif %} Reply
-            </button>
-            <a href="{% url 'inbox:saved_replies' workspace_id=workspace.id %}"
-               class="text-[13px] font-medium text-stone-500 hover:text-stone-700 transition-colors">Cancel</a>
+        <div>
+            <label for="{{ form.body.id_for_label }}" class="ui-label">Reply</label>
+            <textarea name="{{ form.body.html_name }}" id="{{ form.body.id_for_label }}" rows="4" required
+                      placeholder="Reply body. Use {sender_name}, {account_name}, {post_url} for variables."
+                      aria-describedby="body-help{% if form.body.errors %} body-error{% endif %}"
+                      class="ui-input" {% if form.body.errors %}aria-invalid="true"{% endif %}>{{ form.body.value|default_if_none:'' }}</textarea>
+            {% if form.body.errors %}<p id="body-error" class="ui-error">{{ form.body.errors|join:" " }}</p>{% endif %}
+            <p id="body-help" class="ui-help">You can use <code class="font-mono text-[12px]">{sender_name}</code>, <code class="font-mono text-[12px]">{account_name}</code> and <code class="font-mono text-[12px]">{post_url}</code>.</p>
         </div>
-    </form>
-</div>
+    </div>
+    <div class="mt-5 flex items-center justify-end gap-2">
+        <a href="{% url 'inbox:saved_replies' workspace_id=workspace.id %}" class="ui-btn ui-btn-ghost no-underline">Cancel</a>
+        <button type="submit" class="ui-btn ui-btn-primary">
+            {% if saved_reply %}Save changes{% else %}Create reply{% endif %}
+        </button>
+    </div>
+</form>

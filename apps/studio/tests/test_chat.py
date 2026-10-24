@@ -568,6 +568,37 @@ class TestStaffPages:
         assert "Send to the team" in detail  # the brief page keeps its own change form below the thread
         assert not Conversation.objects.exists()
 
+    def test_the_message_log_is_a_keyboard_stop_so_it_can_be_scrolled(self, client, world, jobs, manager_agent):
+        client.force_login(world.editor)
+        client.post(_url("studio:thread_start", world), {"body": "What's next week?"}, HTTP_HX_REQUEST="true")
+        drive(AgencyJob.objects.get(kind=AgencyJob.Kind.CHAT))
+
+        home = client.get(_url("studio:index", world)).content.decode()
+
+        # It scrolls inside its own box on phones (axe: scrollable-region-focusable).
+        assert 'id="thread-home-messages" data-thread-log role="log" aria-live="off" tabindex="0"' in home
+
+    def test_an_empty_post_or_article_thread_does_not_invite_a_new_post(self, client, world, fake_team, rf):
+        from django.template.loader import render_to_string
+
+        brief = run_all(make_brief(world))
+        article = _article(world, "Land titles")
+        client.force_login(world.editor)
+        invite = "Tell your manager what you want to post"
+
+        home = client.get(_url("studio:index", world)).content.decode()
+        detail = client.get(_url("studio:detail", world, brief_id=brief.id)).content.decode()
+        request = rf.get("/")
+        request.user = world.editor
+        request.workspace_membership = None
+        article_html = render_to_string(
+            "studio/partials/thread_messages.html", {"thread": chat.blog_thread_context(request, article)}
+        )
+
+        assert invite in home  # the general thread is where a new post starts
+        assert "No messages about this post yet." in detail and invite not in detail
+        assert "No messages about this article yet." in article_html and invite not in article_html
+
     def test_viewers_see_no_panel_and_plain_clients_are_refused(self, client, world, fake_team, client_user):
         brief = run_all(make_brief(world))
         client.force_login(world.viewer)
@@ -669,7 +700,10 @@ class TestStaffPages:
         assert "Talk to the team" in listing and '2<span class="sr-only"> unread</span>' in listing
 
         opened = client.get(_url("studio:thread", world) + f"?c={client_thread.pk}").content.decode()
-        assert "Internal note" in opened and "Checking the price first" in opened and "(client)" in opened
+        # A client's message carries the neutral "Client" tag (it used to be a "(client)" suffix).
+        assert (
+            "Internal note" in opened and "Checking the price first" in opened and "data-client-tag>Client<" in opened
+        )
         assert "With the client" in opened
 
     def test_a_non_htmx_send_redirects_to_the_thread(self, client, world, jobs):

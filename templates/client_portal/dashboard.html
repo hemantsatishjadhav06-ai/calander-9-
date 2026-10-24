@@ -4,87 +4,60 @@
 {% block content %}
 <div>
     <!-- Welcome -->
-    <div class="mb-8">
-        <h1 class="text-2xl font-bold tracking-tight" style="color: var(--text-primary); font-family: var(--font-display);">
-            Welcome back
-        </h1>
-        <p class="text-[0.9375rem] mt-1" style="color: var(--text-secondary);">
-            Here's what's happening with {{ workspace.name }}
+    <div class="mb-6">
+        <h1 class="ui-page-title">Welcome back</h1>
+        <p class="ui-page-status tabular-nums">
+            {% if pending_count %}<strong class="font-semibold text-ink-900">{{ pending_count }}</strong> post{{ pending_count|pluralize }} waiting for you{% else %}Nothing is waiting for you{% endif %}
+            <span class="text-ink-400" aria-hidden="true">·</span>
+            {{ recent_published|length }} published recently
         </p>
     </div>
 
-    <section aria-labelledby="client-next-step" class="mb-8 rounded-xl border p-5 sm:p-6" style="background: var(--surface-0); border-color: var(--border);">
-        <p class="text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Your content, step by step</p>
-        <h2 id="client-next-step" class="mt-2 text-xl" style="font-family: var(--font-display); color: var(--text-primary);">Have an idea? Start a conversation.</h2>
-        <p class="mt-2 max-w-2xl text-sm leading-relaxed" style="color: var(--text-secondary);">Tell your team what you want to share. Answer their questions, review the draft they send, then check the approved posting time. You can ask for changes along the way.</p>
-        <ol aria-label="Your content process" class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs" style="color: var(--text-secondary);">
-            <li><strong style="color: var(--text-primary);">1. Share an idea</strong><span class="mt-1 block">Tell us in your own words.</span></li>
-            <li><strong style="color: var(--text-primary);">2. Answer questions</strong><span class="mt-1 block">Add the facts or photos needed.</span></li>
-            <li><strong style="color: var(--text-primary);">3. Review the draft</strong><span class="mt-1 block">Check it or request a change.</span></li>
-            <li><strong style="color: var(--text-primary);">4. Follow the schedule</strong><span class="mt-1 block">See the time shared for the post.</span></li>
+    <!-- What needs you: the one primary action on the page -->
+    {% if pending_count > 0 %}
+    <section aria-labelledby="client-waiting" class="ui-card mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex min-w-0 items-start gap-3">
+            <span class="mt-0.5 grid size-9 flex-shrink-0 place-items-center rounded-full bg-warning-50 text-warning-500 ring-1 ring-inset ring-warning-200" aria-hidden="true">
+                <svg class="size-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </span>
+            <div class="min-w-0">
+                <h2 id="client-waiting" class="text-h3 text-ink-950">{{ pending_count }} post{{ pending_count|pluralize }} waiting for your approval</h2>
+                <p class="mt-0.5 text-sm text-ink-600">Nothing is published until you approve it.</p>
+            </div>
+        </div>
+        <a href="{% url 'client_portal:approval_queue' %}" class="ui-btn ui-btn-primary max-sm:w-full">Review and approve</a>
+    </section>
+    {% endif %}
+
+    <section aria-labelledby="client-next-step" class="ui-card mb-6">
+        <h2 id="client-next-step" class="ui-card-title">Have an idea? Start a conversation.</h2>
+        <p class="mt-1 max-w-2xl text-body-lg text-ink-600">Tell your team what you want to share. Answer their questions, review the draft they send, then check the approved posting time. You can ask for changes along the way.</p>
+        <ol aria-label="Your content process" class="mt-5 grid grid-cols-1 gap-x-4 gap-y-3 text-[13px]/[18px] text-ink-600 sm:grid-cols-2 lg:grid-cols-4">
+            <li class="flex gap-2.5"><span class="grid size-6 flex-shrink-0 place-items-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700 tabular-nums" aria-hidden="true">1</span><span><strong class="block font-semibold text-ink-900">Share an idea</strong>Tell us in your own words.</span></li>
+            <li class="flex gap-2.5"><span class="grid size-6 flex-shrink-0 place-items-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700 tabular-nums" aria-hidden="true">2</span><span><strong class="block font-semibold text-ink-900">Answer questions</strong>Add the facts or photos needed.</span></li>
+            <li class="flex gap-2.5"><span class="grid size-6 flex-shrink-0 place-items-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700 tabular-nums" aria-hidden="true">3</span><span><strong class="block font-semibold text-ink-900">Review the draft</strong>Check it or request a change.</span></li>
+            <li class="flex gap-2.5"><span class="grid size-6 flex-shrink-0 place-items-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700 tabular-nums" aria-hidden="true">4</span><span><strong class="block font-semibold text-ink-900">Follow the schedule</strong>See the time shared for the post.</span></li>
         </ol>
-        <div class="mt-5 flex flex-wrap gap-3">
-            <a href="{% url 'client_portal:team' %}" class="inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700" style="background: var(--primary-strong);">Share an idea with the team</a>
-            <a href="{% url 'client_portal:telegram' %}" class="inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700" style="color: var(--text-primary); border-color: var(--border);">Get updates in Telegram</a>
+        <div class="mt-5 flex flex-wrap gap-2">
+            <a href="{% url 'client_portal:team' %}" class="ui-btn {% if pending_count > 0 %}ui-btn-secondary{% else %}ui-btn-primary{% endif %} max-sm:w-full">Share an idea with the team</a>
+            <a href="{% url 'client_portal:telegram' %}" class="ui-btn ui-btn-ghost max-sm:w-full">Get updates in Telegram</a>
         </div>
     </section>
 
-    <!-- Summary cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <!-- Pending approvals -->
-        <a href="{% url 'client_portal:approval_queue' %}"
-           class="rounded-xl border p-5 transition-all hover:shadow-lg hover:-translate-y-0.5"
-           style="background: var(--surface-0); border-color: var(--border);">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--primary-soft);">
-                    <svg class="w-5 h-5" style="color: var(--primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                {% if pending_count > 0 %}
-                <span class="w-2.5 h-2.5 rounded-full animate-pulse" style="background: var(--primary-strong);"></span>
-                {% endif %}
-            </div>
-            <p class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">{{ pending_count }}</p>
-            <p class="text-[0.8125rem] mt-0.5" style="color: var(--text-secondary);">Posts awaiting your review</p>
+    <!-- Summary -->
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <a href="{% url 'client_portal:approval_queue' %}" class="ui-card ui-card-link block">
+            <p class="text-[28px]/[34px] font-bold tracking-[-0.02em] text-ink-950 tabular-nums">{{ pending_count }}</p>
+            <p class="mt-1 text-sm text-ink-600">Posts awaiting your review</p>
         </a>
-
-        <!-- Recently published -->
-        <a href="{% url 'client_portal:published' %}"
-           class="rounded-xl border p-5 transition-all hover:shadow-lg hover:-translate-y-0.5"
-           style="background: var(--surface-0); border-color: var(--border);">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3" style="background: var(--success-50);">
-                <svg class="w-5 h-5" style="color: var(--success-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            </div>
-            <p class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">{{ recent_published|length }}</p>
-            <p class="text-[0.8125rem] mt-0.5" style="color: var(--text-secondary);">Recently published</p>
+        <a href="{% url 'client_portal:published' %}" class="ui-card ui-card-link block">
+            <p class="text-[28px]/[34px] font-bold tracking-[-0.02em] text-ink-950 tabular-nums">{{ recent_published|length }}</p>
+            <p class="mt-1 text-sm text-ink-600">Recently published</p>
         </a>
-
-        <!-- My actions -->
-        <a href="{% url 'client_portal:activity' %}"
-           class="rounded-xl border p-5 transition-all hover:shadow-lg hover:-translate-y-0.5"
-           style="background: var(--surface-0); border-color: var(--border);">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3" style="background: var(--info-50);">
-                <svg class="w-5 h-5" style="color: var(--info-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/></svg>
-            </div>
-            <p class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);">{{ my_actions|length }}</p>
-            <p class="text-[0.8125rem] mt-0.5" style="color: var(--text-secondary);">Recent actions</p>
+        <a href="{% url 'client_portal:activity' %}" class="ui-card ui-card-link block">
+            <p class="text-[28px]/[34px] font-bold tracking-[-0.02em] text-ink-950 tabular-nums">{{ my_actions|length }}</p>
+            <p class="mt-1 text-sm text-ink-600">Recent actions</p>
         </a>
     </div>
-
-    <!-- Quick action -->
-    {% if pending_count > 0 %}
-    <div class="rounded-xl border p-5" style="background: var(--primary-soft); border-color: var(--primary-muted);">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-                <p class="font-semibold text-[0.9375rem]" style="color: var(--brand-800);">You have {{ pending_count }} post{{ pending_count|pluralize }} waiting for review</p>
-                <p class="text-[0.8125rem] mt-0.5" style="color: var(--brand-700);">Review and approve content before it's published</p>
-            </div>
-            <a href="{% url 'client_portal:approval_queue' %}"
-               class="px-4 py-2 text-[0.8125rem] font-semibold rounded-full text-white transition-all hover:-translate-y-0.5"
-               style="background: var(--primary-strong); box-shadow: var(--shadow-primary);">
-                Review Now
-            </a>
-        </div>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}

@@ -194,13 +194,65 @@ def test_cover_endpoint_needs_membership(client, world):
 
 
 def test_preview_and_detail_show_the_designed_cover(client, world):
+    """The preview is sandboxed (an opaque origin), so its image requests carry no session
+    cookie: a link to the login-only cover URL came back as a sign-in redirect and the hero
+    was blank. The preview inlines the very bytes the cover endpoint serves."""
+    import base64
+    import re
+
     post = make_post(world, cover_style="designed")
     client.force_login(world.owner)
     cover_url = _url("cover", world, post)
-    preview = client.get(_url("preview", world, post)).content.decode()
-    assert f'src="http://testserver{cover_url}?v=1"' in preview
+    response = client.get(_url("preview", world, post))
+    csp = response["Content-Security-Policy"]
+    assert "sandbox" in csp and "allow-same-origin" not in csp
+    assert "img-src https: data:" in csp
+    preview = response.content.decode()
+    assert cover_url not in preview
+    inline = re.search(r'src="data:image/jpeg;base64,([A-Za-z0-9+/=]+)"', preview)
+    assert inline, "the designed cover is inlined"
+    assert base64.b64decode(inline.group(1)) == client.get(cover_url).content
     detail = client.get(_url("detail", world, post)).content.decode()
     assert f"{cover_url}?v=1" in detail and "Designed (title over the picture)" in detail
+
+
+def test_preview_survives_a_featured_image_whose_file_is_gone(client, world, image_asset):
+    """The designed cover is drawn inside the preview view, so a featured image that can no longer be
+    read (a redeployed MEDIA_ROOT, a media sweep, a storage error) must leave the hero out, not turn
+    the whole preview into a 500."""
+    asset = image_asset()
+    post = make_post(world, cover_style="designed")
+    BlogPost.objects.filter(pk=post.pk).update(featured_image=asset)
+    asset.file.storage.delete(asset.file.name)
+    client.force_login(world.owner)
+
+    response = client.get(_url("preview", world, post))
+
+    assert response.status_code == 200
+    assert "data:image/jpeg;base64," not in response.content.decode()
+
+
+@pytest.mark.parametrize("site_name", ["neopolis", "morespace"])
+@pytest.mark.parametrize("failure", ["file_gone", "not_an_image"])
+def test_a_cover_that_cannot_be_drawn_shows_no_hero_not_the_live_sites_old_one(
+    client, world, image_asset, site_name, failure
+):
+    """A designed cover always has a hero, so a failed drawing fell back to the relative
+    ``img/<slug>-hero.jpg``, which the preview points at the live site: the old cover of an
+    article already published, or a broken image for a new one."""
+    asset = image_asset(b"not an image" if failure == "not_an_image" else None)
+    post = make_post(world, site=getattr(world, site_name), cover_style="designed")
+    BlogPost.objects.filter(pk=post.pk).update(featured_image=asset)
+    if failure == "file_gone":
+        asset.file.storage.delete(asset.file.name)
+    client.force_login(world.owner)
+
+    response = client.get(_url("preview", world, post))
+
+    assert response.status_code == 200
+    preview = response.content.decode()
+    assert f"{post.slug}-hero.jpg" not in preview
+    assert 'class="ahero"' not in preview and 'class="blog-hero"' not in preview
 
 
 def test_editor_offers_the_cover_choice_and_shows_the_preview(client, world):

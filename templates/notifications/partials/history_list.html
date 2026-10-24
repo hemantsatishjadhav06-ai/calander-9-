@@ -2,78 +2,39 @@
 {# HTMX partial - notification history list items, swapped on filter/page change #}
 
 {% if notifications %}
-<div class="divide-y divide-stone-100">
+<div class="divide-y divide-ink-200">
     {% for n in notifications %}
-    <div class="group flex gap-4 px-5 py-4 {% if not n.is_read %}bg-orange-50/40{% endif %} hover:bg-stone-50/80 transition-colors duration-150">
+    <div class="group flex gap-3.5 px-4 sm:px-5 py-4 transition-colors duration-150 hover:bg-ink-25">
         {# Event icon #}
-        <div class="flex-shrink-0 mt-0.5">
-            {% if n.event_type == "post_approved" %}
-            <div class="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center ring-1 ring-green-100">
-                <svg class="w-[18px] h-[18px] text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-            </div>
-            {% elif n.event_type == "post_rejected" or n.event_type == "post_failed" %}
-            <div class="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center ring-1 ring-red-100">
-                <svg class="w-[18px] h-[18px] text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </div>
-            {% elif n.event_type == "post_published" %}
-            <div class="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center ring-1 ring-orange-100">
-                <svg class="w-[18px] h-[18px] text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-            </div>
-            {% elif n.event_type == "new_inbox_message" %}
-            <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center ring-1 ring-blue-100">
-                <svg class="w-[18px] h-[18px] text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-            </div>
-            {% elif n.event_type == "social_account_disconnected" %}
-            <div class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center ring-1 ring-amber-100">
-                <svg class="w-[18px] h-[18px] text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-            </div>
-            {% elif n.event_type == "post_submitted" or n.event_type == "post_changes_requested" %}
-            <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center ring-1 ring-indigo-100">
-                <svg class="w-[18px] h-[18px] text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-            </div>
-            {% elif n.event_type == "inbox_sla_overdue" %}
-            <div class="w-9 h-9 rounded-lg bg-rose-50 flex items-center justify-center ring-1 ring-rose-100">
-                <svg class="w-[18px] h-[18px] text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            </div>
-            {% elif n.event_type == "report_generated" %}
-            <div class="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center ring-1 ring-teal-100">
-                <svg class="w-[18px] h-[18px] text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            </div>
-            {% else %}
-            <div class="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center ring-1 ring-stone-200">
-                <svg class="w-[18px] h-[18px] text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-            </div>
-            {% endif %}
-        </div>
+        <div class="mt-0.5">{% include "notifications/partials/_event_icon.html" with n=n size="" %}</div>
 
         {# Content #}
         <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <p class="text-[13px] font-semibold text-stone-900 leading-snug">{% if n.data.action_url %}<a href="{{ n.data.action_url }}" class="hover:underline">{{ n.title }}</a>{% else %}{{ n.title }}{% endif %}</p>
+                    <p class="text-sm {% if n.is_read %}font-medium text-ink-800{% else %}font-semibold text-ink-900{% endif %}">{% if n.data.action_url %}<a href="{{ n.data.action_url }}" class="hover:underline underline-offset-2 rounded-sm">{{ n.title }}</a>{% else %}{{ n.title }}{% endif %}</p>
                     {% if n.body %}
-                    <p class="text-[13px] text-stone-500 leading-relaxed mt-0.5 line-clamp-2">{{ n.body }}</p>
+                    <p class="mt-0.5 text-[13px]/[18px] text-ink-600 line-clamp-2">{{ n.body }}</p>
                     {% endif %}
                 </div>
                 {% if not n.is_read %}
-                <div class="flex-shrink-0 mt-1">
-                    <div class="w-2 h-2 rounded-full bg-orange-500 ring-2 ring-orange-500/20"></div>
-                </div>
+                <span class="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-brand-700"><span class="sr-only">Unread</span></span>
                 {% endif %}
             </div>
-            <div class="flex items-center gap-3 mt-1.5">
-                <span class="text-[11px] text-stone-500 font-medium tabular-nums">{{ n.created_at|timesince }} ago</span>
-                <span class="text-[10px] font-semibold uppercase tracking-wider text-stone-500">{{ n.get_event_type_display }}</span>
+            <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span class="text-xs text-ink-500 tabular-nums">{{ n.created_at|timesince }} ago</span>
+                <span class="text-xs text-ink-500">{{ n.get_event_type_display }}</span>
                 {% if not n.is_read %}
                 <button
+                    type="button"
                     hx-post="{% url 'notifications:mark_as_read' n.id %}"
                     hx-target="#notification-history-list"
                     hx-swap="innerHTML"
                     hx-include="#notification-filters"
                     hx-vals='{"page": "{{ page }}"}'
-                    class="text-[11px] font-semibold text-orange-700 hover:text-orange-800 ml-auto opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 cursor-pointer"
+                    class="ml-auto inline-flex min-h-8 max-lg:min-h-11 items-center rounded-md px-1 text-xs font-medium text-brand-700 hover:text-brand-800 hover:underline underline-offset-3 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 lg:focus-visible:opacity-100 transition-opacity duration-150 cursor-pointer"
                 >
-                    Mark read
+                    Mark read<span class="sr-only">: {{ n.title }}</span>
                 </button>
                 {% endif %}
             </div>
@@ -84,8 +45,8 @@
 
 {# Pagination #}
 {% if has_prev or has_next %}
-<div class="flex items-center justify-between px-5 py-4 border-t border-stone-100 bg-stone-50/50">
-    <span class="text-xs text-stone-500 font-medium tabular-nums">{{ total }} notification{{ total|pluralize }}</span>
+<div class="flex items-center justify-between gap-3 border-t border-ink-200 bg-ink-25 px-4 sm:px-5 py-3">
+    <span class="text-xs text-ink-500 tabular-nums">{{ total }} notification{{ total|pluralize }}</span>
     <div class="flex items-center gap-2">
         {% if has_prev %}
         <a
@@ -93,23 +54,23 @@
             hx-get="{% url 'notifications:list' %}?page={{ page|add:"-1" }}{% if selected_event_type %}&event_type={{ selected_event_type }}{% endif %}{% if selected_read_status %}&read_status={{ selected_read_status }}{% endif %}"
             hx-target="#notification-history-list"
             hx-swap="innerHTML"
-            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-stone-600 bg-white border border-stone-200 rounded-full hover:border-stone-300 hover:bg-stone-50 transition-all duration-150"
+            class="ui-btn ui-btn-sm ui-btn-secondary"
         >
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            Prev
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            Previous
         </a>
         {% endif %}
-        <span class="text-xs text-stone-500 font-medium tabular-nums px-1">Page {{ page }}</span>
+        <span class="px-1 text-xs text-ink-500 tabular-nums">Page {{ page }}</span>
         {% if has_next %}
         <a
             href="?page={{ page|add:"1" }}{% if selected_event_type %}&event_type={{ selected_event_type }}{% endif %}{% if selected_read_status %}&read_status={{ selected_read_status }}{% endif %}"
             hx-get="{% url 'notifications:list' %}?page={{ page|add:"1" }}{% if selected_event_type %}&event_type={{ selected_event_type }}{% endif %}{% if selected_read_status %}&read_status={{ selected_read_status }}{% endif %}"
             hx-target="#notification-history-list"
             hx-swap="innerHTML"
-            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-stone-600 bg-white border border-stone-200 rounded-full hover:border-stone-300 hover:bg-stone-50 transition-all duration-150"
+            class="ui-btn ui-btn-sm ui-btn-secondary"
         >
             Next
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
         </a>
         {% endif %}
     </div>
@@ -117,12 +78,10 @@
 {% endif %}
 
 {% else %}
-<div class="flex flex-col items-center justify-center py-20 px-6">
-    <div class="w-14 h-14 rounded-2xl bg-stone-100 flex items-center justify-center mb-5">
-        <svg class="w-7 h-7 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-    </div>
-    <p class="text-sm font-semibold text-stone-600">No notifications</p>
-    <p class="text-xs text-stone-500 mt-1 max-w-[240px] text-center leading-relaxed">
+<div class="ui-empty py-16">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+    <p class="ui-empty-title">No notifications</p>
+    <p class="ui-empty-body">
         {% if selected_event_type or selected_read_status %}
         No notifications match your filters. Try adjusting them.
         {% else %}

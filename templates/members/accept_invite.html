@@ -5,80 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Join {{ invitation.organization.name }} - {{ SITE_NAME }}</title>
     <style>
+        /* Standalone page (no app stylesheet): literal values from the design tokens. */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background: #FAFAF9;
-            color: #1C1917;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+            background: #F6F7F8;
+            color: #1C1F24;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 24px;
+            padding: 24px 16px;
+            -webkit-font-smoothing: antialiased;
         }
         .card {
             background: #FFFFFF;
-            border: 1px solid #E7E5E4;
+            border: 1px solid #E1E4E8;
             border-radius: 16px;
             padding: 40px;
-            max-width: 440px;
+            max-width: 400px;
             width: 100%;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            box-shadow: 0 12px 32px -8px rgba(14, 17, 20, .16), 0 4px 8px -2px rgba(14, 17, 20, .06);
         }
-        .logo { font-size: 18px; font-weight: 800; color: #F97316; margin-bottom: 24px; letter-spacing: -0.02em; }
-        h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #1C1917; }
-        .subtitle { font-size: 15px; color: #78716C; line-height: 1.6; margin-bottom: 24px; }
+        @media (max-width: 480px) { .card { padding: 28px 20px; } }
+        .logo { font-size: 16px; font-weight: 600; color: #0E1114; margin-bottom: 24px; }
+        h1 { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 6px; color: #0E1114; }
+        .subtitle { font-size: 15px; color: #52575F; line-height: 1.6; margin-bottom: 24px; }
         .info-box {
-            background: #FAFAF9;
-            border: 1px solid #E7E5E4;
-            border-radius: 10px;
+            background: #F6F7F8;
+            box-shadow: inset 0 0 0 1px #E1E4E8;
+            border-radius: 12px;
             padding: 16px;
             margin-bottom: 24px;
         }
-        .info-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #78716C; margin-bottom: 8px; }
-        .info-value { font-size: 14px; color: #1C1917; }
+        .info-label { font-size: 12px; font-weight: 600; color: #656B73; margin-bottom: 4px; }
+        .info-value { font-size: 14px; color: #1C1F24; }
         .workspace-list { list-style: none; }
         .workspace-list li {
             font-size: 14px;
-            color: #44403C;
+            color: #3E434A;
             padding: 4px 0;
             display: flex;
+            align-items: center;
             justify-content: space-between;
+            gap: 12px;
         }
         .workspace-list li .role {
             font-size: 12px;
-            background: #F5F5F4;
-            color: #78716C;
+            font-weight: 600;
+            background: #EDEFF2;
+            color: #3E434A;
             padding: 2px 8px;
             border-radius: 9999px;
+            text-transform: capitalize;
         }
         .btn {
-            display: inline-block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             width: 100%;
-            padding: 12px 24px;
-            font-size: 14px;
+            min-height: 44px;
+            padding: 0 18px;
+            font: inherit;
+            font-size: 15px;
             font-weight: 600;
             text-align: center;
-            border-radius: 9999px;
+            border-radius: 10px;
             border: none;
             cursor: pointer;
             text-decoration: none;
-            transition: opacity 0.15s;
+            transition: background-color .1s ease-out;
         }
-        .btn:hover { opacity: 0.9; }
-        .btn-primary { background: #F97316; color: #FFFFFF; }
-        .btn-secondary { background: #F5F5F4; color: #1C1917; margin-top: 8px; }
-        .error { color: #DC2626; font-size: 14px; margin-bottom: 16px; }
+        .btn:focus-visible { outline: 2px solid #1E7057; outline-offset: 2px; }
+        .btn-primary { background: #115641; color: #FFFFFF; box-shadow: 0 1px 2px rgba(14, 17, 20, .12), inset 0 1px 0 rgba(255, 255, 255, .12); }
+        .btn-primary:hover { background: #0D4534; }
+        .btn-secondary { background: #FFFFFF; color: #1C1F24; box-shadow: inset 0 0 0 1px #CED2D7, 0 1px 2px rgba(14, 17, 20, .05); }
+        .btn-secondary:hover { background: #FBFCFD; box-shadow: inset 0 0 0 1px #83888F, 0 1px 2px rgba(14, 17, 20, .05); }
+        .error {
+            color: #6A0E0E; background: #FFF3F1; box-shadow: inset 0 0 0 1px #FFCDC6;
+            border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 20px; margin-bottom: 16px;
+        }
         .or-divider {
-            text-align: center;
-            font-size: 13px;
-            color: #78716C;
+            display: flex; align-items: center; gap: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #656B73;
             margin: 12px 0;
         }
+        .or-divider::before, .or-divider::after { content: ""; flex: 1; height: 1px; background: #E1E4E8; }
     </style>
 </head>
 <body>
-    <div class="card">
+    <main class="card">
         <div class="logo">{{ SITE_NAME }}</div>
 
         <h1>Join {{ invitation.organization.name }}</h1>
@@ -87,7 +105,7 @@
         </p>
 
         {% if error %}
-        <p class="error">{{ error }}</p>
+        <p class="error" role="alert">{{ error }}</p>
         {% endif %}
 
         <!-- Details -->
@@ -112,7 +130,7 @@
         </div>
 
         {% if user.is_authenticated %}
-        <!-- Logged-in user: confirm join -->
+        <!-- Signed-in person: confirm joining -->
         <form method="POST" action="{{ accept_url }}">
             {% csrf_token %}
             <button type="submit" class="btn btn-primary">
@@ -120,15 +138,15 @@
             </button>
         </form>
         {% else %}
-        <!-- Not logged in: signup or login -->
+        <!-- Not signed in: sign up or log in -->
         <a href="/accounts/signup/?next={{ accept_url }}" class="btn btn-primary">
-            Sign Up to Join
+            Sign up to join
         </a>
         <div class="or-divider">or</div>
         <a href="/accounts/login/?next={{ accept_url }}" class="btn btn-secondary">
-            Log In to Join
+            Log in to join
         </a>
         {% endif %}
-    </div>
+    </main>
 </body>
 </html>

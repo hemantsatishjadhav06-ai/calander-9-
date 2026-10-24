@@ -3,38 +3,43 @@
 {% block content %}
 <div class="max-w-xl space-y-5" data-portal-telegram>
   <div>
-    <h1 class="text-2xl font-semibold">Connect your Telegram account</h1>
-    <p class="mt-2 text-sm text-stone-700">Keep your ideas, questions and references with {{ workspace.name }} in Telegram. Your agency shares the finished work for sign-off; publication still needs the agency's approval.</p>
+    <h1 class="ui-page-title">Connect your Telegram account</h1>
+    <p class="ui-page-status">Keep your ideas, questions and references with {{ workspace.name }} in Telegram. Your agency shares the finished work for sign-off; publication still needs the agency's approval.</p>
   </div>
-  {% if error %}<div role="alert" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{{ error }}</div>{% endif %}
-  <section class="rounded-xl border bg-white p-4 space-y-3" aria-label="Your Telegram connection">
+  {% if error %}<div role="alert" class="alert-error">{{ error }}</div>{% endif %}
+  <section class="ui-card space-y-4" aria-label="Your Telegram connection">
     {% if can_pair %}
-    <p class="text-sm">Your agency's bot is <strong>@{{ connection.bot_username }}</strong>. Create your personal link below, open it in Telegram and press Start with your own account.</p>
+    <p class="text-sm text-ink-700">Your agency's bot is <strong class="font-semibold text-ink-900">@{{ connection.bot_username }}</strong>. Create your personal link below, open it in Telegram and press Start with your own account.</p>
     {% else %}
-    <p class="text-sm text-amber-900">Your agency has not activated this client's bot yet. Ask your account manager to finish the connection, then return here.</p>
-    {% endif %}
-    {% if own_link %}
-    <p class="text-sm font-semibold text-green-800">Your Telegram account is linked.</p>
-    <form method="post" action="{% url 'client_portal:telegram_unpair' %}">{% csrf_token %}<button type="submit" class="rounded-lg border px-4 py-3 text-sm">Disconnect my Telegram account</button></form>
-    {% endif %}
-    {% if pairing_command %}
-    <div role="status" class="rounded-lg border border-orange-200 bg-orange-50 p-3 space-y-3" data-portal-personal-pairing>
-      {% if pairing_url %}<a href="{{ pairing_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white">Open Telegram and link my account</a>{% endif %}
-      <p class="text-sm">Or open @{{ connection.bot_username }} in a private Telegram chat and send this command yourself:</p>
-      <code class="block break-all select-all text-sm">{{ pairing_command }}</code>
-      <p class="text-xs text-stone-700">Expires {{ expires_at|date:"j M Y, H:i T" }}. This link and code work once and are shown only now. Keep them private.</p>
+    <div class="ui-callout ui-callout-warning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <p>Your agency has not activated this client's bot yet. Ask your account manager to finish the connection, then return here.</p>
     </div>
     {% endif %}
-    <form method="post" action="{% url 'client_portal:telegram_pair' %}">{% csrf_token %}<button type="submit" class="w-full sm:w-auto rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"{% if not can_pair %} disabled{% endif %}>{% if own_link %}Create a fresh personal Telegram link{% else %}Create my personal Telegram link{% endif %}</button></form>
+    {% if own_link %}
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <span class="ui-pill ui-pill-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Your Telegram account is linked.</span>
+      <form method="post" action="{% url 'client_portal:telegram_unpair' %}">{% csrf_token %}<button type="submit" class="ui-btn ui-btn-danger-ghost ui-btn-sm">Disconnect my Telegram account</button></form>
+    </div>
+    {% endif %}
+    {% if pairing_command %}
+    <div role="status" class="space-y-3 rounded-xl bg-ink-50 p-4 ring-1 ring-inset ring-ink-200" data-portal-personal-pairing>
+      {% if pairing_url %}<a href="{{ pairing_url }}" target="_blank" rel="noopener noreferrer" class="ui-btn ui-btn-primary max-sm:w-full">Open Telegram and link my account</a>{% endif %}
+      <p class="text-sm text-ink-700">Or open @{{ connection.bot_username }} in a private Telegram chat and send this command yourself:</p>
+      <code class="block select-all break-all rounded-md bg-white px-3 py-2 font-mono text-[13px] text-ink-900 ring-1 ring-inset ring-ink-200">{{ pairing_command }}</code>
+      <p class="text-xs text-ink-600">Expires {{ expires_at|date:"j M Y, H:i T" }}. This link and code work once and are shown only now. Keep them private.</p>
+    </div>
+    {% endif %}
+    <form method="post" action="{% url 'client_portal:telegram_pair' %}">{% csrf_token %}<button type="submit" class="ui-btn {% if pairing_command %}ui-btn-secondary{% else %}ui-btn-primary{% endif %} w-full sm:w-auto"{% if not can_pair %} disabled{% endif %}>{% if own_link %}Create a fresh personal Telegram link{% else %}Create my personal Telegram link{% endif %}</button></form>
   </section>
-  <section class="rounded-xl border bg-white p-4 space-y-3" aria-labelledby="portal-telegram-next">
-    <h2 id="portal-telegram-next" class="font-semibold">After you link your account</h2>
-    <ul class="list-disc pl-5 space-y-2 text-sm text-stone-700">
-      <li>Send <code>/help</code> to see the available actions.</li>
-      <li>Use <code>/brainstorm</code> for ideas, <code>/brief</code> to ask for a post, and <code>/status</code> or <code>/week</code> for the work you may see.</li>
-      <li>Your private conversation stays private. To put a photo or PDF into the shared brand media library and publishing storage, send it with your own <code>/reference shared</code> caption. Paste important PDF facts; the bot does not extract them.</li>
+  <section class="ui-card space-y-3" aria-labelledby="portal-telegram-next">
+    <h2 id="portal-telegram-next" class="text-h3 text-ink-950">After you link your account</h2>
+    <ul class="list-disc space-y-2 pl-5 text-sm text-ink-700 marker:text-ink-400">
+      <li>Send <code class="rounded bg-ink-100 px-1 font-mono text-[13px] text-ink-900">/help</code> to see the available actions.</li>
+      <li>Use <code class="rounded bg-ink-100 px-1 font-mono text-[13px] text-ink-900">/brainstorm</code> for ideas, <code class="rounded bg-ink-100 px-1 font-mono text-[13px] text-ink-900">/brief</code> to ask for a post, and <code class="rounded bg-ink-100 px-1 font-mono text-[13px] text-ink-900">/status</code> or <code class="rounded bg-ink-100 px-1 font-mono text-[13px] text-ink-900">/week</code> for the work you may see.</li>
+      <li>Your private conversation stays private. To put a photo or PDF into the shared brand media library and publishing storage, send it with your own <code class="rounded bg-ink-100 px-1 font-mono text-[13px] text-ink-900">/reference shared</code> caption. Paste important PDF facts; the bot does not extract them.</li>
     </ul>
-    <p class="text-sm text-stone-600">Your agency links the client group separately. Do not share your personal code in a group. You can also keep using <a href="{% url 'client_portal:team' %}" class="underline text-orange-800">Talk to the team</a> here in the portal.</p>
+    <p class="text-sm text-ink-600">Your agency links the client group separately. Do not share your personal code in a group. You can also keep using <a href="{% url 'client_portal:team' %}" class="link-inline">Talk to the team</a> here in the portal.</p>
   </section>
 </div>
 {% endblock %}

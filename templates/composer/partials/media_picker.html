@@ -4,9 +4,9 @@ Context: assets, workspace, post (optional).
 {% endcomment %}
 
 {% if assets %}
-<div class="grid grid-cols-4 gap-3">
+<div class="grid grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-4 gap-3">
     {% for asset in assets %}
-    <div class="group relative rounded-xl overflow-hidden border border-stone-200 aspect-square cursor-pointer hover:border-orange-400 hover:shadow-md transition-all duration-150"
+    <div class="group relative rounded-[10px] overflow-hidden aspect-square cursor-pointer ring-1 ring-ink-200 hover:ring-ink-400 transition-shadow duration-150" role="button" tabindex="0" @keydown.enter.prevent="$el.click()"
          {% if post %}
          hx-post="{% url 'composer:attach_media' workspace_id=workspace.id post_id=post.id %}"
          {% else %}
@@ -23,37 +23,36 @@ Context: assets, workspace, post (optional).
         {% elif asset.file %}
         <img src="{{ asset.file.url }}" class="w-full h-full object-cover" alt="{{ asset.filename }}">
         {% else %}
-        <div class="w-full h-full bg-stone-100 flex items-center justify-center">
-            <svg class="w-8 h-8 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        <div class="w-full h-full bg-ink-100 flex items-center justify-center">
+            <svg class="w-8 h-8 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
         </div>
         {% endif %}
         <!-- Overlay on hover -->
-        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-150 flex items-center justify-center">
+        <div class="absolute inset-0 bg-ink-950/0 group-hover:bg-ink-950/20 transition-colors duration-150 flex items-center justify-center">
             <div class="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 shadow-sm">
-                <svg class="w-4 h-4 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <svg class="w-4 h-4 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             </div>
         </div>
         {% if asset.is_video %}
-        <div class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold text-white bg-black/60 backdrop-blur-sm">
+        <div class="absolute bottom-1.5 left-1.5 px-1.5 rounded-md text-xs leading-[18px] font-semibold tabular-nums text-white bg-ink-950/65">
             {{ asset.duration|floatformat:0 }}s
         </div>
         {% endif %}
         {% if asset.is_shared %}
-        <span class="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-white"
-              style="background: rgba(20,184,166,0.9); letter-spacing: 0.06em;">SHARED</span>
+        <span class="absolute top-1.5 right-1.5 px-1.5 rounded-full text-xs leading-5 font-semibold bg-white/95 text-ink-900 shadow-xs">Shared</span>
         {% endif %}
-        <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150">
-            <span class="text-[10px] text-white font-medium truncate block">{{ asset.filename }}</span>
+        <div class="absolute bottom-0 left-0 right-0 px-2 py-1 bg-ink-950/65 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150">
+            <span class="text-xs text-white font-medium truncate block">{{ asset.filename }}</span>
         </div>
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="text-center py-12">
-    <div class="w-14 h-14 mx-auto rounded-2xl bg-stone-100 flex items-center justify-center mb-3">
-        <svg class="w-6 h-6 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+<div class="ui-empty">
+    <div>
+        <svg class="w-8 h-8 mx-auto text-ink-400" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
     </div>
-    <p class="text-sm font-medium text-stone-500 mb-1">No media yet</p>
-    <p class="text-xs text-stone-500">Upload files to your media library to use them here</p>
+    <p class="ui-empty-title">No media yet</p>
+    <p class="ui-empty-body">Upload files to your media library to use them here.</p>
 </div>
 {% endif %}

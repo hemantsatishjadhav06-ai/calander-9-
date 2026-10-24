@@ -1208,6 +1208,33 @@ class TestChatAction:
         ).content.decode()
         assert f'name="next" value="{_url("studio:index", world)}"' in polled
 
+    def test_a_message_sent_from_home_keeps_the_panel_on_home(self, client, world, manager_agent, jobs):
+        """Send swaps the panel back in: it must stay Home's, or the next card's Turn on leaves Home."""
+        conversation = chat.general_conversation(world.workspace, created_by=world.owner)
+        client.force_login(world.owner)
+        home = client.get(_url("studio:index", world)).content.decode()
+        assert '<input type="hidden" name="home" value="1">' in home
+        send = reverse(
+            "studio:thread_send", kwargs={"workspace_id": world.workspace.id, "conversation_id": conversation.pk}
+        )
+
+        swapped = client.post(
+            send,
+            {"body": "Every Monday at 9 draft replies to new comments", "kind": "question", "home": "1"},
+            HTTP_HX_REQUEST="true",
+        )
+
+        assert swapped.status_code == 200
+        assert swapped.context["thread"]["home_panel"]
+        assert swapped.context["thread"]["messages_url"].endswith("?home=1")
+        assert '<input type="hidden" name="home" value="1">' in swapped.content.decode()
+        # Without JavaScript the form posts plainly and comes back to Home, not the thread page.
+        plain = client.post(send, {"body": "And a reel about the clubhouse", "kind": "question", "home": "1"})
+        assert plain.status_code == 302 and plain["Location"] == _url("studio:index", world)
+        # The thread page itself is not Home: no flag, and it returns to itself.
+        page = client.post(send, {"body": "One more thing", "kind": "question", "full": "1"})
+        assert page.status_code == 302 and "/studio/thread/" in page["Location"]
+
     def test_someone_else_sees_the_card_without_the_button(self, client, world, manager_agent, jobs):
         manager_agent.action = "set_routine"
         manager_agent.routine_instruction = "Tell me what is waiting."

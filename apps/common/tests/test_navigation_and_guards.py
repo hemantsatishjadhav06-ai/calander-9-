@@ -1,7 +1,7 @@
 """The rest of the audit's yellow list, each pinned by the thing a user sees.
 
 - The sidebar only advertises platforms that can actually be connected.
-- Six real pages (Drafts, Queues, Posting Schedule, Templates, Categories,
+- Six real pages (Drafts, Queues, Posting schedule, Templates, Categories,
   CSV import) are reachable by clicking.
 - The calendar's repeat-icon lookup no longer costs one query per chip.
 - Logging out is a POST: a GET must not end the session.

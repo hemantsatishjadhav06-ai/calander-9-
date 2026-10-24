@@ -154,8 +154,11 @@ def _index_context(request, workspace, form=None):
     if thread is not None:
         thread["home_panel"] = True  # Home's main column; the partial may size itself for it.
     routine_rows = _routine_rows(request, workspace, perms)
+    live_strip = _live_strip(request, workspace, perms)
     return {
         "workspace": workspace,
+        "live": live_strip,
+        "team_url": live_strip["team_url"] if live_strip else "",
         "profile": profile,
         "form": form,
         "briefs": briefs,
@@ -177,6 +180,31 @@ def _index_context(request, workspace, form=None):
         "agency_settings": dashboard.settings_for(workspace),
         "checklist_on_home": True,
     }
+
+
+def _live_strip(request, workspace, perms) -> dict | None:
+    """Home's "Right now" card: the live team snapshot, for the staff who direct or approve the team's work.
+
+    The snapshot is the Team tab's own (``apps.studio.live``), cached for a few
+    seconds per workspace, so Home and the Team tab share one build. Viewers
+    (neither ``create_posts`` nor ``approve_posts``) and plain clients get
+    None and no card; they still have the Team tab. A snapshot that fails never
+    breaks Home: the card is simply left out.
+    """
+    if is_plain_client(request.workspace_membership):
+        return None
+    if not (perms.get("create_posts") or perms.get("approve_posts")):
+        return None
+    from . import live
+
+    try:
+        # Trimmed as the card's own refresh trims it (views_live._context) for approvers who do not create.
+        return live.for_viewer(live.snapshot(workspace), workspace, can_create=bool(perms.get("create_posts")))
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Studio: could not build the live team snapshot for Home")
+        return None
 
 
 def _routine_rows(request, workspace, perms) -> list[dict] | None:

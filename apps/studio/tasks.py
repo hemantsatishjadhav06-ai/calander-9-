@@ -59,7 +59,7 @@ def sweep_stuck_briefs():
 
     failed = pipeline.sweep_stuck() + engine.sweep_stuck()
     if failed:
-        logger.warning("Marked %d AI Studio brief(s) or job(s) as stuck", failed)
+        logger.warning("Marked %d agency brief(s) or job(s) as stuck", failed)
 
 
 @background(schedule=0)

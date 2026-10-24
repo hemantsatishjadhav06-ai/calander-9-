@@ -3,37 +3,34 @@
 {% block title %}Intelligence - {{ organization.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-wrap items-center justify-between gap-3 mb-4 lg:mb-[25px]">
-    <div>
-        <h1 class="text-xl sm:text-2xl font-semibold text-stone-900" style="letter-spacing: -0.01em;">Intelligence</h1>
-        <p class="text-sm text-stone-500 mt-1">
-            YouTube packaging scoring, channel benchmarks, content-gap research.
-        </p>
+<header class="mb-6 flex flex-wrap items-start justify-between gap-3">
+    <div class="min-w-0">
+        <h1 class="text-h1 text-ink-950">Intelligence</h1>
+        <p class="ui-page-status">YouTube packaging scoring, channel benchmarks, content-gap research.</p>
     </div>
 
     {% if subscription and subscription.status == "active" %}
-    <div class="flex items-center gap-4 px-4 py-2 bg-stone-50 rounded-full border border-stone-200">
-        <div class="text-xs">
-            <div class="text-stone-500">Plan</div>
-            <div class="font-semibold text-stone-900 capitalize">{{ subscription.plan_slug|default:"," }}</div>
-        </div>
-        {% if me %}
-        <div class="h-7 w-px bg-stone-200"></div>
-        <div class="text-xs">
-            <div class="text-stone-500">Credits</div>
-            <div class="font-semibold text-stone-900">{{ me.credits_remaining|default:"," }}</div>
-        </div>
-        {% endif %}
+    <div class="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-white px-4 py-1.5 shadow-xs ring-1 ring-inset ring-ink-200">
+        <dl class="flex items-center gap-4">
+            <div>
+                <dt class="text-caption text-ink-600">Plan</dt>
+                <dd class="text-small font-semibold capitalize text-ink-950">{{ subscription.plan_slug|default:"Not set" }}</dd>
+            </div>
+            {% if me %}
+            <div class="h-7 w-px bg-ink-200" aria-hidden="true"></div>
+            <div>
+                <dt class="text-caption text-ink-600">Credits</dt>
+                <dd class="text-small font-semibold tabular-nums text-ink-950">{{ me.credits_remaining|default:"0" }}</dd>
+            </div>
+            {% endif %}
+        </dl>
         {% if can_manage_billing %}
-        <div class="h-7 w-px bg-stone-200"></div>
-        <a href="{% url 'intelligence:billing-settings' org_id=organization.id %}"
-           class="text-xs font-medium hover:underline" style="color: var(--primary);">
-            Billing →
-        </a>
+        <div class="h-7 w-px bg-ink-200" aria-hidden="true"></div>
+        <a href="{% url 'intelligence:billing-settings' org_id=organization.id %}" class="ui-link inline-flex min-h-8 items-center">Billing</a>
         {% endif %}
     </div>
     {% endif %}
-</div>
+</header>
 {% endblock %}
 
 {% block content %}
@@ -52,7 +49,7 @@
   needs to know something is wrong with the active sub.
 {% endcomment %}
 
-<div class="relative">
+<div class="relative w-full max-w-[1180px]">
 
     {% comment %} Inline preview banner for the not-subscribed cases {% endcomment %}
     {% if not subscription %}
@@ -67,40 +64,38 @@
 
     <div class="intel-tools">
 
-        {# Tab bar #}
-        <div class="overflow-x-auto border-b border-stone-200">
-            <div class="flex gap-1" role="tablist">
-                <button type="button" data-tab="packaging" id="intel-tab-packaging"
-                        class="intel-tab intel-tab-active -mb-px inline-flex flex-shrink-0 items-center gap-2 px-3 py-2.5 text-sm font-semibold border-b-2 cursor-pointer transition">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>
-                    Score packaging
-                </button>
-                <button type="button" data-tab="video-hook" id="intel-tab-video-hook"
-                        class="intel-tab -mb-px inline-flex flex-shrink-0 items-center gap-2 px-3 py-2.5 text-sm font-medium border-b-2 cursor-pointer transition">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
-                    Score video hook
-                </button>
-                <button type="button" data-tab="benchmark-channel" id="intel-tab-benchmark-channel"
-                        class="intel-tab -mb-px inline-flex flex-shrink-0 items-center gap-2 px-3 py-2.5 text-sm font-medium border-b-2 cursor-pointer transition">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
-                    Benchmark channel
-                </button>
-                <button type="button" data-tab="benchmark-video" id="intel-tab-benchmark-video"
-                        class="intel-tab -mb-px inline-flex flex-shrink-0 items-center gap-2 px-3 py-2.5 text-sm font-medium border-b-2 cursor-pointer transition">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M7 19v-4m5 4v-9m5 9v-14M3.5 22.5h17A2 2 0 0 0 22.5 20.5V3.5A2 2 0 0 0 20.5 1.5H3.5A2 2 0 0 0 1.5 3.5v17A2 2 0 0 0 3.5 22.5Z"/></svg>
-                    Benchmark video
-                </button>
-                <button type="button" data-tab="content-gaps" id="intel-tab-content-gaps"
-                        class="intel-tab -mb-px inline-flex flex-shrink-0 items-center gap-2 px-3 py-2.5 text-sm font-medium border-b-2 cursor-pointer transition">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
-                    Research content gaps
-                </button>
-                <button type="button" data-tab="niches" id="intel-tab-niches"
-                        class="intel-tab -mb-px inline-flex flex-shrink-0 items-center gap-2 px-3 py-2.5 text-sm font-medium border-b-2 cursor-pointer transition">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
-                    List niches
-                </button>
-            </div>
+        {# Tab bar: one tab per tool; arrow keys move between them. #}
+        <div class="ui-tabs" role="tablist" aria-label="Intelligence tools">
+            <button type="button" role="tab" aria-selected="true" aria-controls="intel-panel-packaging" data-tab="packaging" id="intel-tab-packaging"
+                    class="intel-tab intel-tab-active ui-tab flex-shrink-0 cursor-pointer max-lg:h-11">
+                <svg aria-hidden="true" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>
+                Score packaging
+            </button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="intel-panel-video-hook" data-tab="video-hook" id="intel-tab-video-hook"
+                    class="intel-tab ui-tab flex-shrink-0 cursor-pointer max-lg:h-11">
+                <svg aria-hidden="true" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+                Score video hook
+            </button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="intel-panel-benchmark-channel" data-tab="benchmark-channel" id="intel-tab-benchmark-channel"
+                    class="intel-tab ui-tab flex-shrink-0 cursor-pointer max-lg:h-11">
+                <svg aria-hidden="true" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+                Benchmark channel
+            </button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="intel-panel-benchmark-video" data-tab="benchmark-video" id="intel-tab-benchmark-video"
+                    class="intel-tab ui-tab flex-shrink-0 cursor-pointer max-lg:h-11">
+                <svg aria-hidden="true" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M7 19v-4m5 4v-9m5 9v-14M3.5 22.5h17A2 2 0 0 0 22.5 20.5V3.5A2 2 0 0 0 20.5 1.5H3.5A2 2 0 0 0 1.5 3.5v17A2 2 0 0 0 3.5 22.5Z"/></svg>
+                Benchmark video
+            </button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="intel-panel-content-gaps" data-tab="content-gaps" id="intel-tab-content-gaps"
+                    class="intel-tab ui-tab flex-shrink-0 cursor-pointer max-lg:h-11">
+                <svg aria-hidden="true" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+                Research content gaps
+            </button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="intel-panel-niches" data-tab="niches" id="intel-tab-niches"
+                    class="intel-tab ui-tab flex-shrink-0 cursor-pointer max-lg:h-11">
+                <svg aria-hidden="true" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+                List niches
+            </button>
         </div>
 
         {# Panels #}
@@ -137,132 +132,77 @@
 {% block extra_head %}
 {% include "intelligence/_cta_styles.html" %}
 <style>
-    /* Tab styling using Studio's brand color tokens. */
-    .intel-tab {
-        color: var(--text-secondary, #57534e);
-        border-color: transparent;
-    }
-    .intel-tab:hover {
-        color: var(--text-primary, #1c1917);
-    }
-    .intel-tab.intel-tab-active {
-        color: var(--primary);
-        border-color: var(--primary);
-    }
     /* Panel display: hidden by default; active via .intel-panel-active. */
     .intel-panel { display: none; }
     .intel-panel.intel-panel-active { display: grid; }
 
-    /* Form inputs inside the playground, match the polished spec from
-       /apps/playground (Intel) so the UX feels consistent across both
-       sides of the integration. */
+    /* Fields inside the playground follow the ui-input recipe: the control
+       boundary colour, 36px on desktop and 44px/16px on touch screens. */
     .intel-input {
         display: block;
         width: 100%;
-        padding: 0.625rem 0.875rem;
+        min-height: 36px;
+        padding: 7px 12px;
+        font-family: var(--font-body);
         font-size: 0.875rem;
-        color: var(--text-primary, #1c1917);
-        /* Grey input fill gives the input field enough contrast against
-           the white card body that the input boundary is obvious without
-           the user having to focus it first. */
-        background: var(--surface-1, #fafaf9);
-        border: 1px solid var(--border, #e7e5e4);
-        border-radius: 0.5rem;
-        box-shadow: inset 0 1px 1px 0 rgba(0,0,0,0.02);
-        transition: all 150ms ease;
-        outline: none;
+        line-height: 1.25rem;
+        color: var(--ink-900);
+        background: var(--surface-0);
+        border: 1px solid var(--border-control);
+        border-radius: var(--radius-lg);
+        transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
     }
-    .intel-input::placeholder { color: var(--text-ghost, #766F6A); }
-    .intel-input:hover {
-        border-color: var(--border-hover, #d6d3d1);
-        background: var(--surface-2, #f5f5f4);
+    .intel-input::placeholder { color: var(--ink-500); }
+    .intel-input:hover { border-color: var(--ink-500); }
+    .intel-input:focus,
+    .intel-input:focus-visible {
+        outline: 2px solid transparent;
+        border-color: var(--focus-ring);
+        box-shadow: 0 0 0 1px var(--focus-ring), 0 0 0 4px var(--primary-halo);
     }
-    .intel-input:focus {
-        background: white;
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+    @media (max-width: 1023px) {
+        .intel-input { min-height: 44px; padding-top: 10px; padding-bottom: 10px; font-size: 16px; }
     }
     .intel-label {
         display: block;
-        font-size: 0.875rem;
+        margin-bottom: 6px;
+        font-size: 0.8125rem;
+        line-height: 1.125rem;
         font-weight: 500;
-        color: var(--text-primary, #1c1917);
-        margin-bottom: 0.5rem;
+        color: var(--ink-900);
     }
-    .intel-label-hint {
-        font-weight: 400;
-        color: var(--text-ghost, #766F6A);
-    }
+    .intel-label-hint { font-weight: 400; color: var(--ink-600); }
     .intel-helper {
-        margin-top: 0.375rem;
-        font-size: 0.75rem;
-        color: var(--text-ghost, #766F6A);
+        margin-top: 6px;
+        font-size: 0.8125rem;
+        line-height: 1.125rem;
+        color: var(--ink-600);
     }
-    .intel-submit {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.625rem 1.25rem;
-        font-size: 0.875rem;
-        font-weight: 600;
-        color: white;
-        background: var(--primary-strong);
-        border: none;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 2px 0 rgba(0,0,0,0.06);
-        cursor: pointer;
-        transition: background 150ms ease, transform 150ms ease;
-    }
-    .intel-submit:hover {
-        background: var(--primary-hover);
-        transform: translateY(-1px);
-    }
-    .intel-submit:disabled {
-        background: var(--primary-muted, #fed7aa);
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-    }
-    .intel-submit:disabled:hover {
-        background: var(--primary-muted, #fed7aa);
-        transform: none;
-    }
-    /* Helper note rendered under the disabled CTA when the org is in
-       preview mode. Slim, muted, with a coloured link for the admin
-       path to /subscribe. Hand-written so it survives without the
-       Tailwind bundle being rebuilt. */
+    /* The note under the disabled button in preview mode. */
     .intel-activate-note {
-        /* The note + its CTA are wrapped in a shared <div> in each
-           panel so the form's space-y-5 (1.25rem) applies *between*
-           that wrapper and the previous form row, not between the
-           button and the note. Margin-top here governs only the
-           hugged gap inside the wrapper. */
-        margin-top: 0.5rem;
-        font-size: 0.75rem;
-        color: var(--text-ghost, #766F6A);
-        line-height: 1.5;
+        margin-top: 8px;
+        font-size: 0.8125rem;
+        line-height: 1.125rem;
+        color: var(--ink-600);
     }
     .intel-activate-note a {
-        color: var(--primary);
+        color: var(--brand-700);
         font-weight: 600;
-        text-decoration: none;
-        border-bottom: 1px solid var(--primary-muted, #fed7aa);
-        transition: border-color 150ms ease;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-decoration-color: var(--brand-200);
     }
-    .intel-activate-note a:hover {
-        border-bottom-color: var(--primary);
-    }
+    .intel-activate-note a:hover { color: var(--brand-800); text-decoration-color: currentColor; }
 
-    /* Tooltip primitives, defined here rather than via Tailwind utilities
-       because the Tailwind bundle (theme/static/css/dist/styles.css) is
-       pre-built; new utilities like ``invisible``, ``group-hover:visible``
-       added in templates after the last build are absent from the bundle
-       and the tooltip would show permanently. These hand-written rules
-       are independent of the Tailwind build. */
+    /* Tooltip primitives (hand-written so they never depend on the bundle). */
     .intel-tooltip-trigger {
         position: relative;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        min-height: 24px;
+        border-radius: 9999px;
         cursor: help;
     }
     .intel-tooltip {
@@ -270,18 +210,23 @@
         bottom: 100%;
         margin-bottom: 0.5rem;
         width: 18rem;
-        padding: 0.75rem;
-        font-size: 0.75rem;
-        line-height: 1.5;
-        color: white;
-        background: #1c1917; /* stone-900 */
-        border-radius: 0.5rem;
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        max-width: calc(100vw - 48px);
+        padding: 10px 12px;
+        font-size: 0.8125rem;
+        font-weight: 400;
+        line-height: 1.125rem;
+        text-align: left;
+        text-transform: none;
+        letter-spacing: normal;
+        color: #fff;
+        background: var(--ink-900);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
         z-index: 20;
         pointer-events: none;
         visibility: hidden;
         opacity: 0;
-        transition: opacity 100ms ease, visibility 100ms ease;
+        transition: opacity var(--dur-fast) var(--ease-out), visibility var(--dur-fast) var(--ease-out);
     }
     .intel-tooltip[data-align="left"]  { left: 0; }
     .intel-tooltip[data-align="right"] { right: 0; }
@@ -290,13 +235,12 @@
         visibility: visible;
         opacity: 1;
     }
-    /* Tiny down-arrow on the tooltip pointing back at the trigger. */
     .intel-tooltip::after {
         content: "";
         position: absolute;
         top: 100%;
         border: 4px solid transparent;
-        border-top-color: #1c1917;
+        border-top-color: var(--ink-900);
     }
     .intel-tooltip[data-align="left"]::after  { left: 0.75rem; }
     .intel-tooltip[data-align="right"]::after { right: 0.75rem; }
@@ -307,12 +251,13 @@
         align-items: center;
         justify-content: center;
         border-radius: 9999px;
-        background: var(--neutral-200, #e7e5e4);
-        color: var(--text-secondary, #57534e);
+        background: var(--ink-100);
+        color: var(--ink-700);
+        box-shadow: inset 0 0 0 1px var(--ink-300);
         font-size: 0.625rem;
         font-weight: 700;
-        margin-left: 0.25rem;
     }
+    .intel-tooltip-trigger:hover .intel-tooltip-icon { background: var(--ink-200); color: var(--ink-900); }
 </style>
 {% endblock %}
 
@@ -321,33 +266,44 @@
     (function () {
         const PANELS = ['packaging', 'video-hook', 'benchmark-channel', 'benchmark-video', 'content-gaps', 'niches'];
 
-        function switchPanel(name) {
+        function switchPanel(name, focusTab) {
             PANELS.forEach((p) => {
                 const tab = document.getElementById('intel-tab-' + p);
                 const panel = document.getElementById('intel-panel-' + p);
                 if (!tab || !panel) return;
-                if (p === name) {
-                    tab.classList.add('intel-tab-active');
-                    tab.classList.remove('font-medium');
-                    tab.classList.add('font-semibold');
-                    panel.classList.add('intel-panel-active');
-                } else {
-                    tab.classList.remove('intel-tab-active');
-                    tab.classList.remove('font-semibold');
-                    tab.classList.add('font-medium');
-                    panel.classList.remove('intel-panel-active');
-                }
+                const active = p === name;
+                tab.classList.toggle('intel-tab-active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+                tab.tabIndex = active ? 0 : -1;
+                panel.classList.toggle('intel-panel-active', active);
+                if (active && focusTab) tab.focus();
             });
             try { history.replaceState(null, '', '#' + name); } catch (e) {}
         }
 
         document.querySelectorAll('.intel-tab').forEach((btn) => {
             btn.addEventListener('click', () => switchPanel(btn.dataset.tab));
+            // Tab pattern: arrows, Home and End move between tools.
+            btn.addEventListener('keydown', (e) => {
+                const i = PANELS.indexOf(btn.dataset.tab);
+                let next = -1;
+                if (e.key === 'ArrowRight') next = (i + 1) % PANELS.length;
+                else if (e.key === 'ArrowLeft') next = (i - 1 + PANELS.length) % PANELS.length;
+                else if (e.key === 'Home') next = 0;
+                else if (e.key === 'End') next = PANELS.length - 1;
+                if (next < 0) return;
+                e.preventDefault();
+                switchPanel(PANELS[next], true);
+            });
         });
 
         // Honour URL hash on load so back/forward navigation feels right.
         const hash = (location.hash || '').replace(/^#/, '');
         if (PANELS.includes(hash)) switchPanel(hash);
+        window.addEventListener('hashchange', () => {
+            const next = (location.hash || '').replace(/^#/, '');
+            if (PANELS.includes(next)) switchPanel(next);
+        });
 
         // Loading-state plumbing for every panel form. Adds spinner + disables
         // the submit button while htmx is in-flight.

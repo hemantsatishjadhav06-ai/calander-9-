@@ -1,68 +1,68 @@
 {% load analytics_extras %}
 <div id="analytics-post-table">
     {# Toolbar #}
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--neutral-100);">
-        <span style="font-size: 0.8125rem; color: var(--text-secondary);">
-            <strong class="a-mono" style="color: var(--text-primary);">{{ table.total }}</strong> post{{ table.total|pluralize }} ·
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-ink-200 px-4 py-3 sm:px-5">
+        <span class="text-small text-ink-600">
+            <span class="font-semibold tabular-nums text-ink-900">{{ table.total }}</span> post{{ table.total|pluralize }} ·
             {% if table.days_filter %}last {{ table.days_filter }} days{% else %}all time{% endif %}
         </span>
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <div class="flex flex-wrap items-center gap-2">
             {% if table.media_kinds|length > 1 %}
-            <div class="a-pill-group">
+            <div class="ui-segmented" role="group" aria-label="Post type">
                 <a href="?range={{ days }}&type=all&table_range={{ table.days_filter|default_if_none:'all' }}"
                    hx-get="?range={{ days }}&type=all&table_range={{ table.days_filter|default_if_none:'all' }}&partial=table"
                    hx-target="#analytics-post-table"
                    hx-swap="outerHTML"
-                   class="{% if table.type_filter == 'all' %}active{% endif %}">All</a>
+                   class="ui-segment no-underline" {% if table.type_filter == 'all' %}aria-current="page"{% endif %}>All</a>
                 {% for k in table.media_kinds %}
                 <a href="?range={{ days }}&type={{ k }}&table_range={{ table.days_filter|default_if_none:'all' }}"
                    hx-get="?range={{ days }}&type={{ k }}&table_range={{ table.days_filter|default_if_none:'all' }}&partial=table"
                    hx-target="#analytics-post-table"
                    hx-swap="outerHTML"
-                   class="{% if table.type_filter == k %}active{% endif %}">{{ k }}s</a>
+                   class="ui-segment no-underline capitalize" {% if table.type_filter == k %}aria-current="page"{% endif %}>{{ k }}s</a>
                 {% endfor %}
             </div>
             {% endif %}
-            <div class="a-pill-group">
+            <div class="ui-segmented" role="group" aria-label="Posts from">
                 {% for r in range_choices %}
                 <a href="?range={{ days }}&table_range={{ r }}&type={{ table.type_filter }}"
                    hx-get="?range={{ days }}&table_range={{ r }}&type={{ table.type_filter }}&partial=table"
                    hx-target="#analytics-post-table"
                    hx-swap="outerHTML"
-                   class="{% if table.days_filter == r %}active{% endif %}">{{ r }}D</a>
+                   class="ui-segment tabular-nums no-underline" aria-label="Last {{ r }} days" {% if table.days_filter == r %}aria-current="page"{% endif %}>{{ r }}d</a>
                 {% endfor %}
                 <a href="?range={{ days }}&table_range=all&type={{ table.type_filter }}"
                    hx-get="?range={{ days }}&table_range=all&type={{ table.type_filter }}&partial=table"
                    hx-target="#analytics-post-table"
                    hx-swap="outerHTML"
-                   class="{% if table.days_filter is None %}active{% endif %}">All time</a>
+                   class="ui-segment no-underline" {% if table.days_filter is None %}aria-current="page"{% endif %}>All time</a>
             </div>
         </div>
     </div>
 
     {# Table #}
-    <div style="overflow-x: auto;">
+    <div class="overflow-x-auto">
         <table class="a-table">
             <thead>
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <th class="first">Post</th>
+                <tr>
+                    <th class="first" scope="col">Post</th>
                     {% with toggled_dir=table.toggled_dir %}
-                    <th>
+                    <th scope="col" {% if table.sort_key == 'date' %}aria-sort="{% if table.sort_dir == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
                         <a href="?range={{ days }}&sort=date&dir={% if table.sort_key == 'date' %}{{ toggled_dir }}{% else %}desc{% endif %}&type={{ table.type_filter }}&table_range={{ table.days_filter|default_if_none:'all' }}"
                            hx-get="?range={{ days }}&sort=date&dir={% if table.sort_key == 'date' %}{{ toggled_dir }}{% else %}desc{% endif %}&type={{ table.type_filter }}&table_range={{ table.days_filter|default_if_none:'all' }}&partial=table"
                            hx-target="#analytics-post-table"
                            hx-swap="outerHTML"
-                           style="text-decoration: none; color: inherit;">
+                           class="no-underline">
                             Date {% if table.sort_key == 'date' %}<span>{% if table.sort_dir == 'asc' %}↑{% else %}↓{% endif %}</span>{% endif %}
                         </a>
                     </th>
                     {% for ml in table.metric_labels %}
-                    <th>
+                    <th scope="col" {% if table.sort_key == ml.key %}aria-sort="{% if table.sort_dir == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
                         <a href="?range={{ days }}&sort={{ ml.key }}&dir={% if table.sort_key == ml.key %}{{ toggled_dir }}{% else %}desc{% endif %}&type={{ table.type_filter }}&table_range={{ table.days_filter|default_if_none:'all' }}"
                            hx-get="?range={{ days }}&sort={{ ml.key }}&dir={% if table.sort_key == ml.key %}{{ toggled_dir }}{% else %}desc{% endif %}&type={{ table.type_filter }}&table_range={{ table.days_filter|default_if_none:'all' }}&partial=table"
                            hx-target="#analytics-post-table"
                            hx-swap="outerHTML"
-                           style="text-decoration: none; color: inherit;">
+                           class="no-underline">
                             {{ ml.label }} {% if table.sort_key == ml.key %}<span>{% if table.sort_dir == 'asc' %}↑{% else %}↓{% endif %}</span>{% endif %}
                         </a>
                     </th>
@@ -72,29 +72,29 @@
             </thead>
             <tbody>
                 {% for r in table.rows %}
-                <tr data-post-url="{% url 'analytics:post_detail' workspace_id=workspace.id post_id=r.post.id %}" style="cursor: pointer;">
+                <tr data-post-url="{% url 'analytics:post_detail' workspace_id=workspace.id post_id=r.post.id %}" tabindex="0" aria-label="Open details for {{ r.caption|default:'a post without a caption'|truncatechars:60 }}">
                     <td class="first">
-                        <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="flex items-center gap-2.5">
                             {% if r.media_preview.kind == 'video' %}
                             <video src="{{ r.media_preview.url }}#t=0.5" muted preload="metadata"
-                                   style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--surface-2);"></video>
+                                   class="size-9 flex-shrink-0 rounded-[7px] bg-ink-50 object-cover shadow-[var(--shadow-creative)]"></video>
                             {% elif r.media_preview %}
                             <img src="{{ r.media_preview.url }}" alt=""
-                                 style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--surface-2);">
+                                 class="size-9 flex-shrink-0 rounded-[7px] bg-ink-50 object-cover shadow-[var(--shadow-creative)]">
                             {% else %}
-                            <div style="width: 36px; height: 36px; border-radius: 6px; background: var(--surface-2); flex-shrink: 0;"></div>
+                            <div class="size-9 flex-shrink-0 rounded-[7px] bg-ink-50 ring-1 ring-inset ring-ink-200" aria-hidden="true"></div>
                             {% endif %}
-                            <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;">{{ r.caption|default:"(no caption)" }}</span>
+                            <span class="line-clamp-1 whitespace-normal">{{ r.caption|default:"(no caption)" }}</span>
                         </div>
                     </td>
-                    <td style="font-size: 0.75rem; color: var(--text-tertiary);">{{ r.date }}</td>
+                    <td class="!text-small !text-ink-600">{{ r.date }}</td>
                     {% for ml in table.metric_labels %}
                     <td class="{% if ml.key == table.sort_key %}sort-col{% endif %}">{{ r.stats|get_stat:ml.key|fmt_metric:ml.kind }}</td>
                     {% endfor %}
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{{ table.metric_labels|length|add:2 }}" style="padding: 28px; text-align: center; color: var(--text-tertiary); font-family: inherit;">No posts match these filters.</td>
+                    <td colspan="{{ table.metric_labels|length|add:2 }}" class="!py-8 !text-center !text-ink-600 max-sm:!text-left">No posts match these filters.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -102,30 +102,30 @@
     </div>
 
     {# Pagination #}
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--neutral-100);">
-        <span class="a-mono" style="font-size: 0.75rem; color: var(--text-tertiary);">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-ink-200 px-4 py-3 sm:px-5">
+        <span class="text-caption tabular-nums text-ink-600">
             {{ table.page_from }}–{{ table.page_to }} of {{ table.total }}
         </span>
-        <div style="display: flex; align-items: center; gap: 8px;">
+        <nav class="flex items-center gap-1" aria-label="Pages">
             {% if table.page > 1 %}
             <a href="?range={{ days }}&sort={{ table.sort_key }}&dir={{ table.sort_dir }}&type={{ table.type_filter }}&table_range={{ table.days_filter|default_if_none:'all' }}&page={{ table.page|add:-1 }}"
                hx-get="?range={{ days }}&sort={{ table.sort_key }}&dir={{ table.sort_dir }}&type={{ table.type_filter }}&table_range={{ table.days_filter|default_if_none:'all' }}&page={{ table.page|add:-1 }}&partial=table"
                hx-target="#analytics-post-table"
                hx-swap="outerHTML"
-               style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: 1px solid var(--border); background: #fff; color: var(--text-secondary); text-decoration: none;">‹</a>
+               class="ui-btn ui-btn-icon no-underline" aria-label="Previous page"><svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
             {% else %}
-            <span style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: 1px solid var(--border); background: #fff; opacity: 0.4; color: var(--text-secondary);">‹</span>
+            <span class="ui-btn ui-btn-icon cursor-not-allowed !text-ink-400" aria-hidden="true"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span>
             {% endif %}
-            <span class="a-mono" style="font-size: 0.75rem; color: var(--text-secondary); min-width: 84px; text-align: center;">Page {{ table.page }} of {{ table.total_pages }}</span>
+            <span class="min-w-[84px] text-center text-caption tabular-nums text-ink-700">Page {{ table.page }} of {{ table.total_pages }}</span>
             {% if table.page < table.total_pages %}
             <a href="?range={{ days }}&sort={{ table.sort_key }}&dir={{ table.sort_dir }}&type={{ table.type_filter }}&table_range={{ table.days_filter|default_if_none:'all' }}&page={{ table.page|add:1 }}"
                hx-get="?range={{ days }}&sort={{ table.sort_key }}&dir={{ table.sort_dir }}&type={{ table.type_filter }}&table_range={{ table.days_filter|default_if_none:'all' }}&page={{ table.page|add:1 }}&partial=table"
                hx-target="#analytics-post-table"
                hx-swap="outerHTML"
-               style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: 1px solid var(--border); background: #fff; color: var(--text-secondary); text-decoration: none;">›</a>
+               class="ui-btn ui-btn-icon no-underline" aria-label="Next page"><svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
             {% else %}
-            <span style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: 1px solid var(--border); background: #fff; opacity: 0.4; color: var(--text-secondary);">›</span>
+            <span class="ui-btn ui-btn-icon cursor-not-allowed !text-ink-400" aria-hidden="true"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
             {% endif %}
-        </div>
+        </nav>
     </div>
 </div>

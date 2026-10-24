@@ -1,43 +1,48 @@
-<!-- Assignment dropdown -->
+<!-- Assignment menu -->
 <div x-data="{ assignOpen: false }" class="relative">
-    <button aria-haspopup="true" :aria-expanded="assignOpen" @click="assignOpen = !assignOpen"
-            class="inline-flex items-center gap-1 text-[12px] font-medium text-stone-500 hover:text-stone-700 px-2 py-1 rounded-md hover:bg-stone-50 transition-all cursor-pointer">
+    <button type="button" aria-haspopup="true" :aria-expanded="assignOpen" @click="assignOpen = !assignOpen"
+            class="ui-btn ui-btn-ghost ui-btn-sm !px-2"
+            {% if message.assigned_to %}aria-label="Assigned to {{ message.assigned_to.get_short_name|default:message.assigned_to.email }}. Change"{% endif %}>
         {% if message.assigned_to %}
-        <div class="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0" style="background: var(--accent-indigo);">
+        <span class="grid size-5 flex-shrink-0 place-items-center rounded-full bg-ink-900 text-[11px] font-semibold text-white" aria-hidden="true">
             {{ message.assigned_to.email|make_list|first|upper }}
-        </div>
-        <span class="text-stone-700">{{ message.assigned_to.get_short_name|default:message.assigned_to.email|truncatechars:12 }}</span>
+        </span>
+        <span class="max-w-[9rem] truncate text-ink-900">{{ message.assigned_to.get_short_name|default:message.assigned_to.email|truncatechars:14 }}</span>
         {% else %}
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
         Assign
         {% endif %}
     </button>
-    <div x-show="assignOpen" @click.away="assignOpen = false" x-cloak x-transition
-         class="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg ring-1 ring-stone-200 py-1 z-50 min-w-[180px] max-h-[220px] overflow-y-auto">
-        <!-- Unassign option -->
+    <div x-show="assignOpen" @click.away="assignOpen = false" @keydown.escape.window="assignOpen = false" x-cloak x-transition
+         class="ui-menu absolute right-0 top-full z-50 mt-1 max-h-[240px] min-w-[200px] overflow-y-auto">
         {% if message.assigned_to %}
-        <button hx-post="{% url 'inbox:assign' workspace_id=workspace.id message_id=message.id %}"
+        <button type="button"
+                hx-post="{% url 'inbox:assign' workspace_id=workspace.id message_id=message.id %}"
                 hx-vals='{"assigned_to": ""}'
                 hx-target="#inbox-detail-panel"
                 hx-swap="innerHTML"
                 @click="assignOpen = false"
-                class="w-full text-left px-3 py-2 text-[12px] text-stone-500 hover:bg-stone-50 transition-colors flex items-center gap-2">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                class="ui-menu-item">
+            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             Unassign
         </button>
-        <div class="border-t border-stone-100 my-0.5"></div>
+        <div class="ui-menu-separator" role="separator"></div>
         {% endif %}
         {% for membership in team_members %}
-        <button hx-post="{% url 'inbox:assign' workspace_id=workspace.id message_id=message.id %}"
+        <button type="button"
+                hx-post="{% url 'inbox:assign' workspace_id=workspace.id message_id=message.id %}"
                 hx-vals='{"assigned_to": "{{ membership.user.id }}"}'
                 hx-target="#inbox-detail-panel"
                 hx-swap="innerHTML"
                 @click="assignOpen = false"
-                class="w-full text-left px-3 py-2 text-[12px] text-stone-700 hover:bg-stone-50 transition-colors flex items-center gap-2 {% if message.assigned_to and message.assigned_to.id == membership.user.id %}font-semibold bg-stone-50{% endif %}">
-            <div class="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0" style="background: var(--accent-indigo);">
+                class="ui-menu-item {% if message.assigned_to and message.assigned_to.id == membership.user.id %}font-semibold{% endif %}">
+            <span class="grid size-5 flex-shrink-0 place-items-center rounded-full bg-ink-100 text-[11px] font-semibold text-ink-700" aria-hidden="true">
                 {{ membership.user.email|make_list|first|upper }}
-            </div>
-            {{ membership.user.get_short_name|default:membership.user.email }}
+            </span>
+            <span class="flex-1 truncate">{{ membership.user.get_short_name|default:membership.user.email }}</span>
+            {% if message.assigned_to and message.assigned_to.id == membership.user.id %}
+            <svg aria-label="Assigned" class="!text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            {% endif %}
         </button>
         {% endfor %}
     </div>

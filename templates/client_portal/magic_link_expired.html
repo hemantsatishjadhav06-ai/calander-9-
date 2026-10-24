@@ -13,32 +13,28 @@
     <link rel="manifest" href="{% static 'favicon/site.webmanifest' %}">
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
 </head>
-<body class="min-h-screen flex items-center justify-center px-4" style="background: var(--surface-1); font-family: var(--font-body);">
-    <div class="w-full max-w-sm text-center">
-        <div class="rounded-2xl border p-8" style="background: var(--surface-0); border-color: var(--border); box-shadow: var(--shadow-lg);">
-            <!-- Icon -->
-            <div class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-5" style="background: var(--warning-50);">
-                <svg class="w-7 h-7" style="color: var(--warning-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+<body class="auth-bg flex min-h-screen items-center justify-center px-4 py-12">
+    <main class="w-full max-w-[400px]">
+        <div class="auth-card">
+            <div class="mb-5 grid size-10 place-items-center rounded-xl bg-ink-100 text-ink-700" aria-hidden="true">
+                <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
             </div>
 
-            <h1 class="text-lg font-bold tracking-tight mb-2" style="color: var(--text-primary);">
-                {{ problem_title }}
-            </h1>
-            <p class="text-sm leading-relaxed mb-6" style="color: var(--text-secondary);">
-                {{ problem_body }}
-            </p>
+            <h1 class="text-h1 text-ink-950">{{ problem_title }}</h1>
+            <p class="mt-1.5 text-body-lg text-ink-600">{{ problem_body }}</p>
 
-            <div class="rounded-xl p-4 mb-4" style="background: var(--surface-1); border: 1px solid var(--border);">
-                <p class="text-[0.8125rem] font-medium" style="color: var(--text-primary);">Need a new link?</p>
-                <p class="text-[0.75rem] mt-1" style="color: var(--text-tertiary);">
-                    Ask your team to send you a fresh access link from the workspace settings.
-                </p>
-                {% if SUPPORT_EMAIL %}
-                <a href="mailto:{{ SUPPORT_EMAIL }}?subject=New%20approval%20link" class="inline-block mt-3 text-[0.8125rem] font-semibold underline" style="color: var(--primary-strong);">Request a new link</a>
-                {% endif %}
+            <div class="ui-callout mt-6">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                <div class="min-w-0 flex-1">
+                    <p class="ui-callout-title">Need a new link?</p>
+                    <p class="mt-0.5">Ask your team to send you a fresh access link from the workspace settings.</p>
+                    {% if SUPPORT_EMAIL %}
+                    <a href="mailto:{{ SUPPORT_EMAIL }}?subject=New%20approval%20link" class="link-inline mt-2 inline-flex min-h-6 items-center font-medium">Request a new link</a>
+                    {% endif %}
+                </div>
             </div>
-            <p class="text-[0.75rem]" style="color: var(--text-tertiary);">{{ SITE_NAME }}</p>
         </div>
-    </div>
+        <p class="mt-6 text-center text-xs text-ink-500">{{ SITE_NAME }}</p>
+    </main>
 </body>
 </html>

@@ -1,6 +1,6 @@
 """Set up: one checklist in plain words, the Settings hub, Home's status line and the Today card."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from django.urls import reverse
@@ -436,8 +436,13 @@ class TestToday:
         create_default_queue_and_slots(world.linkedin)
         ready = run_all(make_brief(world))
         post = Post.objects.create(workspace=world.workspace, author=world.editor, title="Out today")
+        # Later today in the workspace's time zone, whatever the clock says: "now + 30 minutes"
+        # is tomorrow between 23:30 and midnight there.
+        now = timezone.now()
+        local = now.astimezone(dashboard._zone(world.workspace))
+        day_end = datetime.combine(local.date(), datetime.min.time(), tzinfo=local.tzinfo) + timedelta(days=1)
         PlatformPost.objects.create(
-            post=post, social_account=world.x, status="scheduled", scheduled_at=timezone.now() + timedelta(minutes=30)
+            post=post, social_account=world.x, status="scheduled", scheduled_at=now + (day_end - local) / 2
         )
         AgencySettings.objects.create(workspace=world.workspace, autopilot_enabled=True, lead=world.owner)
 

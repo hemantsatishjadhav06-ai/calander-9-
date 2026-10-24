@@ -7,45 +7,42 @@ reveal modal on top of the freshly-rendered list page.
 <template x-teleport="body">
     <div x-show="showIssueModal" x-transition.opacity
          @keydown.escape.window="showIssueModal = false"
-         class="fixed inset-0 z-50 flex items-center justify-center"
-         style="background: rgba(0,0,0,0.4);">
+         class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+         style="background: var(--overlay);">
         <div @click.outside="showIssueModal = false"
              x-show="showIssueModal" x-transition
              x-trap.noscroll="showIssueModal" role="dialog" aria-modal="true" aria-labelledby="issue-key-title"
-             class="w-full max-w-xl mx-4 rounded-xl flex flex-col"
-             style="background: var(--surface-0); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.18); max-height: 90vh;">
-            <form method="POST" action="{% url 'api_keys:issue' %}" class="flex flex-col min-h-0">
+             class="ui-modal flex max-h-[92vh] flex-col max-sm:rounded-b-none">
+            <form method="POST" action="{% url 'api_keys:issue' %}" class="flex min-h-0 flex-col">
                 {% csrf_token %}
-                <div class="flex items-start justify-between px-6 pt-6 pb-5 flex-shrink-0">
+                <div class="ui-modal-header shrink-0">
                     <div>
-                        <h3 id="issue-key-title" class="text-lg font-semibold" style="color: var(--text-primary);">Issue a new API key</h3>
-                        <p class="text-xs mt-1" style="color: var(--text-tertiary);">
-                            The plaintext token is shown <strong>once</strong> immediately after creation.
+                        <h2 id="issue-key-title" class="ui-modal-title">Issue a new API key</h2>
+                        <p class="mt-0.5 text-small text-ink-600">
+                            You'll see the key <span class="font-semibold text-ink-900">once</span>, right after it's made.
                         </p>
                     </div>
-                    <button type="button" @click="showIssueModal = false" aria-label="Close"
-                            class="text-xl leading-none px-2 cursor-pointer"
-                            style="color: var(--text-tertiary);">&times;</button>
+                    <button type="button" @click="showIssueModal = false" aria-label="Close" class="ui-btn ui-btn-icon -mr-2 -mt-1">
+                        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                 </div>
 
-                <div class="space-y-4 px-6 overflow-y-auto flex-1 min-h-0">
+                <div class="ui-modal-body min-h-0 flex-1 space-y-5 overflow-y-auto">
                     <div>
-                        <label for="name" class="block text-sm font-semibold mb-1" style="color: var(--text-primary);">Name</label>
+                        <label for="name" class="ui-label">Name</label>
                         <input type="text" id="name" name="name" required maxlength="100" autocomplete="off"
                                placeholder="e.g. Zapier bot, content pipeline"
-                               class="input-focus w-full px-3 py-2 text-sm rounded-lg outline-none transition-colors"
-                               style="border: 1px solid var(--border); color: var(--text-primary); background: var(--surface-0);">
+                               class="ui-input">
                     </div>
 
                     <div>
-                        <label for="workspace_id" class="block text-sm font-semibold mb-1" style="color: var(--text-primary);">Workspace</label>
+                        <label for="workspace_id" class="ui-label">Workspace</label>
                         <select id="workspace_id" name="workspace_id" required
                                 hx-get="{% url 'api_keys:workspace_options' %}"
                                 hx-trigger="change"
                                 hx-target="#workspace-options-target"
                                 hx-include="this"
-                                class="input-focus w-full pl-3 pr-10 py-2 text-sm rounded-lg outline-none transition-colors"
-                                style="border: 1px solid var(--border); color: var(--text-primary); background: var(--surface-0);">
+                                class="ui-input">
                             <option value="">Pick a workspace…</option>
                             {% for ws in issuance.workspaces %}
                             <option value="{{ ws.id }}">{{ ws.name }}</option>
@@ -54,29 +51,19 @@ reveal modal on top of the freshly-rendered list page.
                     </div>
 
                     {# Populated by HTMX once a workspace is picked. #}
-                    <div id="workspace-options-target" class="space-y-4"></div>
+                    <div id="workspace-options-target" class="space-y-5 empty:hidden"></div>
 
                     <div>
-                        <label for="expires_at" class="block text-sm font-semibold mb-1" style="color: var(--text-primary);">
-                            Expires at <span class="font-normal" style="color: var(--text-tertiary);">(optional)</span>
+                        <label for="expires_at" class="ui-label">
+                            Expires on <span class="font-normal text-ink-600">(optional)</span>
                         </label>
-                        <input type="date" id="expires_at" name="expires_at"
-                               class="input-focus w-full px-3 py-2 text-sm rounded-lg outline-none transition-colors"
-                               style="border: 1px solid var(--border); color: var(--text-primary); background: var(--surface-0);">
+                        <input type="date" id="expires_at" name="expires_at" class="ui-input">
                     </div>
                 </div>
 
-                <div class="flex items-center justify-end gap-3 px-6 pt-5 pb-6 flex-shrink-0">
-                    <button type="button" @click="showIssueModal = false"
-                            class="btn-neutral px-4 py-2 text-sm font-medium rounded-full cursor-pointer"
-                            style="background: var(--neutral-100); color: var(--text-primary);">
-                        Cancel
-                    </button>
-                    <button type="submit"
-                            class="btn-primary-hover px-5 py-2 text-sm font-medium rounded-full cursor-pointer"
-                            style="background: var(--primary-strong); color: white;">
-                        Generate
-                    </button>
+                <div class="ui-modal-footer shrink-0">
+                    <button type="button" @click="showIssueModal = false" class="ui-btn ui-btn-secondary">Cancel</button>
+                    <button type="submit" class="ui-btn ui-btn-primary">Create key</button>
                 </div>
             </form>
         </div>

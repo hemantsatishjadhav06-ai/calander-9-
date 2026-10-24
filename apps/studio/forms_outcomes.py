@@ -36,7 +36,7 @@ class OutcomeForm(forms.Form):
         self.initial.setdefault("submission_token", outcomes.submission_token(workspace, user))
         for name, field in self.fields.items():
             if name != "submission_token":
-                field.widget.attrs["class"] = "w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
+                field.widget.attrs["class"] = "ui-input"
 
     def clean_occurred_on(self):
         value = self.cleaned_data["occurred_on"]

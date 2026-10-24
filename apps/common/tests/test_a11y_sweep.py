@@ -4,9 +4,9 @@ Renders the main app pages as a logged-in owner and checks the rendered HTML:
 
 - F2: every modal is a labelled ``role="dialog"`` with a focus trap, and the
   Alpine Focus plugin (which provides ``x-trap``) loads before Alpine itself.
-- F4: no visible copy is set in ``text-stone-300`` / ``text-stone-400``
-  (~1.5:1 / ~2.5:1 on white); those greys are reserved for icons, borders and
-  disabled controls.
+- F4: no visible copy is set in ``text-ink-300`` / ``text-ink-400``
+  (1.5:1 / 3.6:1 on white); those greys are reserved for icons, borders,
+  control boundaries and disabled controls (text starts at ``text-ink-500``).
 - F7: every visible form control has an accessible name.
 - F8: every button and link has an accessible name (not just an SVG icon).
 """
@@ -143,7 +143,7 @@ class _Audit(HTMLParser):
 
 # Opening tag whose static class list has a faint grey, immediately followed by text.
 FAINT_TEXT = re.compile(
-    r'<(\w+)(\s[^>]*?(?<=\s)class="[^"]*(?<![\w:-])text-stone-[34]00(?![\w-])[^"]*"[^>]*)>\s*([^<\s][^<]*)'
+    r'<(\w+)(\s[^>]*?(?<=\s)class="[^"]*(?<![\w:-])text-ink-[34]00(?![\w-])[^"]*"[^>]*)>\s*([^<\s][^<]*)'
 )
 
 
@@ -191,7 +191,7 @@ class A11ySweepTests(TestCase):
                     continue  # inactive controls and decorative separators are exempt
                 offenders.append(f"<{m.group(1)}> {text[:40]!r}")
             with self.subTest(page=name):
-                self.assertEqual(offenders, [], f"{name}: text in text-stone-300/400")
+                self.assertEqual(offenders, [], f"{name}: text in text-ink-300/400")
 
     def test_buttons_and_links_have_accessible_names(self):
         for name, url in self._pages().items():

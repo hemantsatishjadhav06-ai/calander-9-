@@ -1,0 +1,35 @@
+{% comment %}
+Home's "Right now" card (docs/DESIGN_SYSTEM.md 14.6, under Today): teammates working, stopped and idle, the busiest
+task's stage track, and a link to the Team tab. It refreshes itself every 15 s while the tab is visible
+(studio:team_board?part=strip); a refresh that changes nothing swaps nothing.
+To include it on Home: add "live": apps.studio.live.snapshot(workspace) to the context, then
+{% include "studio/partials/live_strip.html" %}. It needs workspace and live.
+{% endcomment %}
+{% load static %}
+{% if not refresh %}<script nonce="{{ request.csp_nonce }}" src="{% static 'js/live_board.js' %}" defer></script>{% endif %}
+<section id="live-strip" data-live-strip data-no-error-toast data-board-digest="{{ live.digest }}" aria-labelledby="live-strip-heading" class="ui-card"
+         hx-get="{% url 'studio:team_board' workspace_id=workspace.id %}?part=strip"
+         hx-trigger="every 15s [document.visibilityState === 'visible']"
+         hx-swap="outerHTML">
+    <div class="ui-card-header">
+        <h2 id="live-strip-heading" class="ui-card-title">Right now</h2>
+        <a href="{{ live.team_url }}" class="ui-link inline-flex items-center max-lg:min-h-11 max-lg:px-1">Open Team</a>
+    </div>
+    <p class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span class="live-state"><i class="live-dot live-dot--working" aria-hidden="true"></i>{{ live.agents.working }} working</span>
+        {% if live.agents.stopped %}<span class="live-state"><i class="live-dot live-dot--stopped" aria-hidden="true"></i>{{ live.agents.stopped }} stopped</span>{% endif %}
+        <span class="live-state"><i class="live-dot live-dot--idle" aria-hidden="true"></i>{{ live.agents.idle }} idle</span>
+        {% if live.health.state != 'online' %}<span class="live-state"><svg class="size-3.5 {% if live.health.state == 'delayed' %}text-warning-500{% else %}text-danger-500{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{{ live.health.label }}</span>{% endif %}
+    </p>
+    {% if live.busiest %}
+    {% with track=live.busiest %}
+    <p class="mt-4 text-sm font-semibold text-ink-900"><a href="{{ track.url }}" class="hover:underline underline-offset-3 break-words">{{ track.title }}</a></p>
+    <p class="mt-0.5 text-[13px]/[18px] text-ink-600">{{ track.doing }}</p>
+    <ul class="mt-1" aria-label="The busiest task">
+        {% include "studio/partials/team_track.html" with compact=True %}
+    </ul>
+    {% endwith %}
+    {% else %}
+    <p class="mt-3 text-[13px]/[18px] text-ink-600">{{ live.idle_text }}</p>
+    {% endif %}
+</section>

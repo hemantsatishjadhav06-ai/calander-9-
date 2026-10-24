@@ -8,11 +8,11 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
     <div class="preview-card" style="animation: slideUp 200ms {{ forloop.counter0|add:0 }}50ms cubic-bezier(0.16,1,0.3,1) both">
 
         <!-- Platform label + char badge -->
-        <div class="px-3.5 py-2 border-b flex items-center gap-2" style="border-color: #E7E5E4;">
+        <div class="px-3.5 py-2 border-b border-ink-200 flex items-center gap-2">
             {% include "partials/_platform_icon.html" with platform=p.account.platform size="sm" %}
-            <span class="text-[11px] font-semibold text-stone-500 flex-1">{{ p.account.platform|title }} Preview</span>
-            <span class="text-[10px] font-semibold tabular-nums px-2 py-0.5 rounded-full
-                         {% if p.is_over_limit %}bg-red-50 text-red-600{% else %}bg-stone-100 text-stone-500{% endif %}">
+            <span class="text-xs font-semibold text-ink-700 flex-1">{{ p.account.get_platform_display }} preview</span>
+            <span class="text-xs leading-[18px] font-semibold tabular-nums px-1.5 rounded-full
+                         {% if p.is_over_limit %}bg-danger-500 text-white{% else %}bg-ink-200 text-ink-700{% endif %}">
                 {{ p.char_count }}/{{ p.char_limit }}
             </span>
         </div>
@@ -26,7 +26,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                 {% if m.is_video %}
                 <video src="{{ m.url }}#t=0.5" class="w-full h-full object-contain" muted preload="metadata"></video>
                 <div class="absolute inset-0 flex items-center justify-center">
-                    <div class="w-12 h-12 rounded-full bg-red-600/90 flex items-center justify-center shadow-lg">
+                    <div class="w-12 h-12 rounded-full bg-[#FF0000]/90 flex items-center justify-center shadow-lg">
                         <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
                     </div>
                 </div>
@@ -36,27 +36,27 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             </div>
             {% endwith %}
             {% else %}
-            <div class="bg-stone-900 flex items-center justify-center" style="aspect-ratio: 16/9;">
+            <div class="bg-ink-900 flex items-center justify-center" style="aspect-ratio: 16/9;">
                 <div class="text-center">
-                    <svg class="w-8 h-8 mx-auto text-stone-600 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                    <span class="text-[11px] text-stone-500">Video thumbnail</span>
+                    <svg class="w-8 h-8 mx-auto text-ink-600 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span class="text-xs text-ink-300">Video thumbnail</span>
                 </div>
             </div>
             {% endif %}
             <div class="p-3">
-                <div class="text-[13px] font-semibold text-stone-900 leading-snug mb-1.5 line-clamp-2">{% if p.title %}{{ p.title|truncatechars:100 }}{% elif p.caption %}{{ p.caption|truncatechars:100 }}{% else %}<span class="text-stone-500 italic font-normal">Video title…</span>{% endif %}</div>
+                <div class="text-[13px] font-semibold text-ink-900 leading-snug mb-1.5 line-clamp-2">{% if p.title %}{{ p.title|truncatechars:100 }}{% elif p.caption %}{{ p.caption|truncatechars:100 }}{% else %}<span class="text-ink-500 italic font-normal">Video title…</span>{% endif %}</div>
                 <div class="flex items-center gap-2 mb-2">
                     {% if p.account.avatar_url %}
                     <img src="{{ p.account.avatar_url }}" class="w-6 h-6 rounded-full object-cover">
                     {% else %}
-                    <div class="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center text-[9px] font-bold text-white">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
+                    <div class="w-6 h-6 rounded-full bg-[#FF0000] flex items-center justify-center text-[11px] font-bold text-white">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
                     {% endif %}
                     <div>
-                        <div class="text-[11px] font-medium text-stone-600">{{ p.account.account_name|default:p.account.account_handle }}</div>
-                        <div class="text-[10px] text-stone-500">0 views · Just now</div>
+                        <div class="text-xs font-medium text-ink-600">{{ p.account.account_name|default:p.account.account_handle }}</div>
+                        <div class="text-xs text-ink-500">0 views · Just now</div>
                     </div>
                 </div>
-                {% if p.caption %}<div class="text-[11px] text-stone-500 leading-relaxed line-clamp-3 whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:200 }}</div>{% endif %}
+                {% if p.caption %}<div class="text-xs text-ink-500 leading-relaxed line-clamp-3 whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:200 }}</div>{% endif %}
             </div>
         </div>
 
@@ -65,17 +65,17 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
         <div class="bg-white">
             <div class="flex items-center gap-2.5 px-3 py-2.5">
                 {% if p.account.avatar_url %}
-                <img src="{{ p.account.avatar_url }}" class="w-8 h-8 rounded-full object-cover" style="border: 2px solid #E7E5E4;">
+                <img src="{{ p.account.avatar_url }}" class="w-8 h-8 rounded-full object-cover" style="border: 2px solid var(--border);">
                 {% else %}
                 <div class="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style="background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF);">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
                 {% endif %}
-                <span class="text-[13px] font-semibold text-stone-900">{{ p.account.account_name|default:p.account.account_handle }}</span>
-                <svg class="w-4 h-4 text-stone-400 ml-auto" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
+                <span class="text-[13px] font-semibold text-ink-900">{{ p.account.account_name|default:p.account.account_handle }}</span>
+                <svg class="w-4 h-4 text-ink-400 ml-auto" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
             </div>
             {% if media_items %}
             {% if media_items|length > 1 %}
             {# ─── Carousel ─── #}
-            <div class="relative bg-stone-100" style="aspect-ratio: 1/1;" x-data="{ slide: 0, count: {{ media_items|length }} }">
+            <div class="relative bg-ink-100" style="aspect-ratio: 1/1;" x-data="{ slide: 0, count: {{ media_items|length }} }">
                 {% for m in media_items %}
                 <div x-show="slide === {{ forloop.counter0 }}" class="absolute inset-0">
                     {% if m.is_video %}
@@ -86,14 +86,14 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                 </div>
                 {% endfor %}
                 <!-- Counter badge -->
-                <div class="absolute top-3 right-3 bg-black/60 text-white text-[11px] font-medium px-2 py-0.5 rounded-full" x-text="(slide + 1) + '/' + count"></div>
+                <div class="absolute top-3 right-3 bg-black/60 text-white text-xs font-medium px-2 py-0.5 rounded-full" x-text="(slide + 1) + '/' + count"></div>
                 <!-- Left arrow -->
                 <button aria-label="Previous slide" type="button" x-show="slide > 0" @click.stop="slide = Math.max(0, slide - 1)" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors">
-                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                 </button>
                 <!-- Right arrow -->
                 <button aria-label="Next slide" type="button" x-show="slide < count - 1" @click.stop="slide = Math.min(count - 1, slide + 1)" class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors">
-                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                 </button>
                 <!-- Dot indicators -->
                 <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
@@ -105,7 +105,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             {% else %}
             {# ─── Single media ─── #}
             {% with m=media_items.0 %}
-            <div class="relative bg-stone-100" style="aspect-ratio: 1/1;">
+            <div class="relative bg-ink-100" style="aspect-ratio: 1/1;">
                 {% if m.is_video %}
                 <video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video>
                 {% else %}
@@ -115,27 +115,27 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             {% endwith %}
             {% endif %}
             {% else %}
-            <div class="bg-stone-50 flex items-center justify-center" style="aspect-ratio: 1/1;">
-                <svg class="w-10 h-10 text-stone-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <div class="bg-ink-50 flex items-center justify-center" style="aspect-ratio: 1/1;">
+                <svg class="w-10 h-10 text-ink-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
             </div>
             {% endif %}
             <!-- IG action icons -->
             <div class="flex items-center gap-4 px-3 py-2.5">
-                <svg class="w-6 h-6 text-stone-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
-                <svg class="w-6 h-6 text-stone-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/></svg>
-                <svg class="w-6 h-6 text-stone-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
-                <svg class="w-5 h-5 text-stone-800 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/></svg>
+                <svg class="w-6 h-6 text-ink-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
+                <svg class="w-6 h-6 text-ink-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/></svg>
+                <svg class="w-6 h-6 text-ink-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+                <svg class="w-5 h-5 text-ink-800 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/></svg>
             </div>
             <div class="px-3 pb-3">
                 {% if p.caption %}
-                <div class="text-[13px] text-stone-900 leading-relaxed"><span class="font-semibold">{{ p.account.account_name|default:p.account.account_handle }}</span> <span class="whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:150 }}</span></div>
+                <div class="text-[13px] text-ink-900 leading-relaxed"><span class="font-semibold">{{ p.account.account_name|default:p.account.account_handle }}</span> <span class="whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:150 }}</span></div>
                 {% else %}
-                <div class="text-[13px] text-stone-500 italic">Write a caption…</div>
+                <div class="text-[13px] text-ink-500 italic">Write a caption…</div>
                 {% endif %}
                 {% if p.first_comment %}
-                <div class="text-[12px] text-stone-500 mt-1.5">View all comments</div>
+                <div class="text-[12px] text-ink-500 mt-1.5">View all comments</div>
                 {% endif %}
-                <div class="text-[10px] text-stone-500 uppercase tracking-wider mt-1.5">Just now</div>
+                <div class="text-xs text-ink-500 mt-1.5">Just now</div>
             </div>
         </div>
 
@@ -149,37 +149,37 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                 <div class="w-10 h-10 rounded-full bg-[#1877F2] flex items-center justify-center text-xs font-bold text-white">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
                 {% endif %}
                 <div class="flex-1">
-                    <div class="text-[13px] font-semibold text-stone-900">{{ p.account.account_name|default:p.account.account_handle }}</div>
-                    <div class="text-[11px] text-stone-500 flex items-center gap-1">Just now · <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16"><path d="M8 16A8 8 0 108 0a8 8 0 000 16zM4.5 7.5a.5.5 0 01.5-.5h6a.5.5 0 010 1H5a.5.5 0 01-.5-.5z"/></svg></div>
+                    <div class="text-[13px] font-semibold text-ink-900">{{ p.account.account_name|default:p.account.account_handle }}</div>
+                    <div class="text-xs text-ink-500 flex items-center gap-1">Just now · <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16"><path d="M8 16A8 8 0 108 0a8 8 0 000 16zM4.5 7.5a.5.5 0 01.5-.5h6a.5.5 0 010 1H5a.5.5 0 01-.5-.5z"/></svg></div>
                 </div>
-                <svg class="w-5 h-5 text-stone-400" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
+                <svg class="w-5 h-5 text-ink-400" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
             </div>
             {% if p.caption %}
-            <div class="px-3 pb-3 text-[14px] text-stone-800 leading-relaxed whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:250 }}</div>
+            <div class="px-3 pb-3 text-[14px] text-ink-800 leading-relaxed whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:250 }}</div>
             {% endif %}
             {% if media_items %}
             {% if media_items|length > 1 %}
             {# ─── Carousel ─── #}
-            <div class="relative bg-stone-100 overflow-hidden" style="aspect-ratio: 16/9;" x-data="{ slide: 0, count: {{ media_items|length }} }">
+            <div class="relative bg-ink-100 overflow-hidden" style="aspect-ratio: 16/9;" x-data="{ slide: 0, count: {{ media_items|length }} }">
                 {% for m in media_items %}
                 <div x-show="slide === {{ forloop.counter0 }}" class="absolute inset-0">
                     {% if m.is_video %}
                     <video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video>
-                    <div class="absolute inset-0 flex items-center justify-center"><div class="w-14 h-14 rounded-full bg-black/40 flex items-center justify-center"><svg class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg></div></div>
+                    <div class="absolute inset-0 flex items-center justify-center"><div class="w-14 h-14 rounded-full bg-ink-950/35 flex items-center justify-center"><svg class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg></div></div>
                     {% else %}
                     <img src="{{ m.url }}" class="w-full h-full object-cover" alt="">
                     {% endif %}
                 </div>
                 {% endfor %}
                 <!-- Counter badge -->
-                <div class="absolute top-3 right-3 bg-black/60 text-white text-[11px] font-medium px-2 py-0.5 rounded-full z-10" x-text="(slide + 1) + '/' + count"></div>
+                <div class="absolute top-3 right-3 bg-black/60 text-white text-xs font-medium px-2 py-0.5 rounded-full z-10" x-text="(slide + 1) + '/' + count"></div>
                 <!-- Left arrow -->
                 <button aria-label="Previous slide" type="button" x-show="slide > 0" @click.stop="slide = Math.max(0, slide - 1)" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors z-10 cursor-pointer">
-                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                 </button>
                 <!-- Right arrow -->
                 <button aria-label="Next slide" type="button" x-show="slide < count - 1" @click.stop="slide = Math.min(count - 1, slide + 1)" class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors z-10">
-                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                 </button>
                 <!-- Dot indicators -->
                 <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
@@ -191,10 +191,10 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             {% else %}
             {# ─── Single media ─── #}
             {% with m=media_items.0 %}
-            <div class="relative bg-stone-100">
+            <div class="relative bg-ink-100">
                 {% if m.is_video %}
                 <div style="aspect-ratio: 16/9;"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video>
-                <div class="absolute inset-0 flex items-center justify-center"><div class="w-14 h-14 rounded-full bg-black/40 flex items-center justify-center"><svg class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg></div></div></div>
+                <div class="absolute inset-0 flex items-center justify-center"><div class="w-14 h-14 rounded-full bg-ink-950/35 flex items-center justify-center"><svg class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg></div></div></div>
                 {% else %}
                 <img src="{{ m.url }}" class="w-full object-cover" alt="" style="max-height: 220px;">
                 {% endif %}
@@ -202,16 +202,16 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             {% endwith %}
             {% endif %}
             {% endif %}
-            <div class="px-3 py-2 border-t border-stone-100 flex items-center justify-around text-stone-500 text-[12px] font-medium">
-                <span class="flex items-center gap-1.5 hover:bg-stone-50 px-3 py-1.5 rounded-md">
+            <div class="px-3 py-2 border-t border-ink-100 flex items-center justify-around text-ink-500 text-[12px] font-medium">
+                <span class="flex items-center gap-1.5 hover:bg-ink-25 px-3 py-1.5 rounded-md">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 01-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h.096c.5 0 .905.405.905.905 0 .714-.211 1.412-.608 2.006L4 14.25l1.904 4.5z"/></svg>
                     Like
                 </span>
-                <span class="flex items-center gap-1.5 hover:bg-stone-50 px-3 py-1.5 rounded-md">
+                <span class="flex items-center gap-1.5 hover:bg-ink-25 px-3 py-1.5 rounded-md">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/></svg>
                     Comment
                 </span>
-                <span class="flex items-center gap-1.5 hover:bg-stone-50 px-3 py-1.5 rounded-md">
+                <span class="flex items-center gap-1.5 hover:bg-ink-25 px-3 py-1.5 rounded-md">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z"/></svg>
                     Share
                 </span>
@@ -228,19 +228,19 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                 <div class="w-12 h-12 rounded-full bg-[#0A66C2] flex items-center justify-center text-sm font-bold text-white">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
                 {% endif %}
                 <div class="flex-1 min-w-0">
-                    <div class="text-[13px] font-semibold text-stone-900">{{ p.account.account_name|default:p.account.account_handle }}</div>
-                    <div class="text-[11px] text-stone-500 leading-tight truncate">{{ p.account.account_handle|default:"Company page" }}</div>
-                    <div class="text-[11px] text-stone-500 flex items-center gap-1 mt-0.5">Just now · <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1116 0A8 8 0 010 8zm5.496-3.397A.75.75 0 004.5 5.25v5.5a.75.75 0 001.052.687l4.97-2.522.063-.035a.75.75 0 000-1.34l-.063-.036-4.97-2.521-.056-.02z"/></svg></div>
+                    <div class="text-[13px] font-semibold text-ink-900">{{ p.account.account_name|default:p.account.account_handle }}</div>
+                    <div class="text-xs text-ink-500 leading-tight truncate">{{ p.account.account_handle|default:"Company page" }}</div>
+                    <div class="text-xs text-ink-500 flex items-center gap-1 mt-0.5">Just now · <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1116 0A8 8 0 010 8zm5.496-3.397A.75.75 0 004.5 5.25v5.5a.75.75 0 001.052.687l4.97-2.522.063-.035a.75.75 0 000-1.34l-.063-.036-4.97-2.521-.056-.02z"/></svg></div>
                 </div>
-                <svg class="w-5 h-5 text-stone-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
+                <svg class="w-5 h-5 text-ink-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
             </div>
             {% if p.caption %}
-            <div class="px-3 pb-3 text-[13px] text-stone-700 leading-relaxed whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:200 }}</div>
+            <div class="px-3 pb-3 text-[13px] text-ink-700 leading-relaxed whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:200 }}</div>
             {% endif %}
             {% if media_items %}
             {% if media_items|length > 1 %}
             {# ─── Carousel ─── #}
-            <div class="relative bg-stone-100 overflow-hidden" style="aspect-ratio: 16/9;" x-data="{ slide: 0, count: {{ media_items|length }} }">
+            <div class="relative bg-ink-100 overflow-hidden" style="aspect-ratio: 16/9;" x-data="{ slide: 0, count: {{ media_items|length }} }">
                 {% for m in media_items %}
                 <div x-show="slide === {{ forloop.counter0 }}" class="absolute inset-0">
                     {% if m.is_video %}
@@ -252,14 +252,14 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                 </div>
                 {% endfor %}
                 <!-- Counter badge -->
-                <div class="absolute top-3 right-3 bg-black/60 text-white text-[11px] font-medium px-2 py-0.5 rounded-full z-10" x-text="(slide + 1) + '/' + count"></div>
+                <div class="absolute top-3 right-3 bg-black/60 text-white text-xs font-medium px-2 py-0.5 rounded-full z-10" x-text="(slide + 1) + '/' + count"></div>
                 <!-- Left arrow -->
                 <button aria-label="Previous slide" type="button" x-show="slide > 0" @click.stop="slide = Math.max(0, slide - 1)" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors z-10 cursor-pointer">
-                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                 </button>
                 <!-- Right arrow -->
                 <button aria-label="Next slide" type="button" x-show="slide < count - 1" @click.stop="slide = Math.min(count - 1, slide + 1)" class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors z-10">
-                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                    <svg aria-hidden="true" class="w-3.5 h-3.5 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                 </button>
                 <!-- Dot indicators -->
                 <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
@@ -271,7 +271,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             {% else %}
             {# ─── Single media ─── #}
             {% with m=media_items.0 %}
-            <div class="relative bg-stone-100">
+            <div class="relative bg-ink-100">
                 {% if m.is_video %}
                 <div style="aspect-ratio: 16/9;"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video>
                 <div class="absolute inset-0 flex items-center justify-center"><div class="w-14 h-14 rounded-full bg-[#0A66C2]/80 flex items-center justify-center"><svg class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg></div></div></div>
@@ -282,7 +282,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             {% endwith %}
             {% endif %}
             {% endif %}
-            <div class="px-3 py-2 border-t border-stone-100 flex items-center justify-around text-stone-500 text-[11px] font-medium">
+            <div class="px-3 py-2 border-t border-ink-100 flex items-center justify-around text-ink-500 text-xs font-medium">
                 <span class="flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 01-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h.096c.5 0 .905.405.905.905 0 .714-.211 1.412-.608 2.006L4 14.25l1.904 4.5z"/></svg> Like</span>
                 <span class="flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/></svg> Comment</span>
                 <span class="flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"/></svg> Repost</span>
@@ -303,9 +303,9 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             {% endif %}
             {% endwith %}
             {% else %}
-            <div class="absolute inset-0 flex flex-col items-center justify-center bg-stone-900">
-                <svg class="w-10 h-10 text-stone-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
-                <span class="text-[11px] text-stone-500">Upload a video</span>
+            <div class="absolute inset-0 flex flex-col items-center justify-center bg-ink-900">
+                <svg class="w-10 h-10 text-ink-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
+                <span class="text-xs text-ink-300">Upload a video</span>
             </div>
             {% endif %}
             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
@@ -316,7 +316,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                     {% if p.account.avatar_url %}
                     <img src="{{ p.account.avatar_url }}" class="w-10 h-10 rounded-full object-cover border-2 border-white">
                     {% else %}
-                    <div class="w-10 h-10 rounded-full bg-stone-700 flex items-center justify-center text-[11px] font-bold text-white border-2 border-white">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
+                    <div class="w-10 h-10 rounded-full bg-ink-700 flex items-center justify-center text-xs font-bold text-white border-2 border-white">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
                     {% endif %}
                     <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4.5 h-4.5 bg-[#FE2C55] rounded-full flex items-center justify-center">
                         <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" d="M12 6v12m-6-6h12"/></svg>
@@ -342,8 +342,8 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                     <svg class="w-6 h-6 drop-shadow-sm" fill="white" viewBox="0 0 24 24"><path d="M15 5l-1.41 1.41L15.17 8H11c-3.87 0-7 3.13-7 7v2h2v-2c0-2.76 2.24-5 5-5h4.17l-1.58 1.59L15 13l4-4-4-4z"/></svg>
                 </div>
                 <!-- Spinning music disc -->
-                <div class="w-8 h-8 rounded-full border-2 border-stone-500 bg-stone-800 flex items-center justify-center mt-0.5">
-                    <div class="w-3 h-3 rounded-full bg-stone-400"></div>
+                <div class="w-8 h-8 rounded-full border-2 border-ink-500 bg-ink-800 flex items-center justify-center mt-0.5">
+                    <div class="w-3 h-3 rounded-full bg-ink-400"></div>
                 </div>
             </div>
             <!-- Bottom text overlay -->
@@ -355,7 +355,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                 <!-- Music ticker -->
                 <div class="flex items-center gap-1.5 mt-2">
                     <svg class="w-3 h-3 flex-shrink-0" fill="white" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                    <span class="text-[11px] truncate drop-shadow-sm">Original sound - {{ p.account.account_name|default:p.account.account_handle }}</span>
+                    <span class="text-xs truncate drop-shadow-sm">Original sound - {{ p.account.account_name|default:p.account.account_handle }}</span>
                 </div>
             </div>
         </div>
@@ -372,13 +372,13 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                 {% endif %}
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-1.5 mb-0.5">
-                        <span class="text-[13px] font-semibold text-stone-900">{{ p.account.account_name|default:p.account.account_handle }}</span>
-                        <span class="text-[11px] text-stone-500">just now</span>
+                        <span class="text-[13px] font-semibold text-ink-900">{{ p.account.account_name|default:p.account.account_handle }}</span>
+                        <span class="text-xs text-ink-500">just now</span>
                     </div>
                     {% if p.caption %}
-                    <div class="text-[13px] text-stone-800 leading-relaxed whitespace-pre-wrap break-words mb-2">{{ p.truncated_caption|truncatechars:200 }}</div>
+                    <div class="text-[13px] text-ink-800 leading-relaxed whitespace-pre-wrap break-words mb-2">{{ p.truncated_caption|truncatechars:200 }}</div>
                     {% else %}
-                    <div class="text-[13px] text-stone-500 italic mb-2">Start a thread…</div>
+                    <div class="text-[13px] text-ink-500 italic mb-2">Start a thread…</div>
                     {% endif %}
                     {% if media_items %}
                     {% if media_items|length > 1 %}
@@ -387,7 +387,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                         {% for m in media_items %}
                         <div x-show="slide === {{ forloop.counter0 }}" class="absolute inset-0">
                             {% if m.is_video %}
-                            <div class="relative bg-stone-900 w-full h-full"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video></div>
+                            <div class="relative bg-ink-900 w-full h-full"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video></div>
                             {% else %}
                             <img src="{{ m.url }}" class="w-full h-full object-cover" alt="">
                             {% endif %}
@@ -395,16 +395,16 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                         {% endfor %}
                         <!-- Left arrow -->
                         <button aria-label="Previous slide" type="button" x-show="slide > 0" @click.stop="slide = Math.max(0, slide - 1)" class="absolute left-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors z-10">
-                            <svg aria-hidden="true" class="w-3 h-3 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+                            <svg aria-hidden="true" class="w-3 h-3 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                         </button>
                         <!-- Right arrow -->
                         <button aria-label="Next slide" type="button" x-show="slide < count - 1" @click.stop="slide = Math.min(count - 1, slide + 1)" class="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors z-10">
-                            <svg aria-hidden="true" class="w-3 h-3 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                            <svg aria-hidden="true" class="w-3 h-3 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                         </button>
                         <!-- Dot indicators -->
                         <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
                             {% for m in media_items %}
-                            <button aria-label="Go to slide {{ forloop.counter }}" type="button" @click.stop="slide = {{ forloop.counter0 }}" class="w-1.5 h-1.5 rounded-full transition-colors" :class="slide === {{ forloop.counter0 }} ? 'bg-stone-800' : 'bg-white/60'"></button>
+                            <button aria-label="Go to slide {{ forloop.counter }}" type="button" @click.stop="slide = {{ forloop.counter0 }}" class="w-1.5 h-1.5 rounded-full transition-colors" :class="slide === {{ forloop.counter0 }} ? 'bg-ink-800' : 'bg-white/60'"></button>
                             {% endfor %}
                         </div>
                     </div>
@@ -413,7 +413,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                     {% with m=media_items.0 %}
                     <div class="rounded-lg overflow-hidden mb-2">
                         {% if m.is_video %}
-                        <div class="relative bg-stone-900" style="aspect-ratio: 16/9;"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video></div>
+                        <div class="relative bg-ink-900" style="aspect-ratio: 16/9;"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video></div>
                         {% else %}
                         <img src="{{ m.url }}" class="w-full rounded-lg object-cover" alt="" style="max-height: 180px;">
                         {% endif %}
@@ -421,7 +421,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                     {% endwith %}
                     {% endif %}
                     {% endif %}
-                    <div class="flex items-center gap-4 text-stone-400">
+                    <div class="flex items-center gap-4 text-ink-500">
                         <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
                         <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/></svg>
                         <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"/></svg>
@@ -442,27 +442,27 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                 {% endif %}
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-1.5 mb-0.5">
-                        <span class="text-[13px] font-semibold text-stone-900">{{ p.account.account_name|default:p.account.account_handle }}</span>
-                        <span class="text-[12px] text-stone-500">{{ p.account.account_handle|default:"@handle" }}</span>
-                        <span class="text-[11px] text-stone-500 ml-auto">now</span>
+                        <span class="text-[13px] font-semibold text-ink-900">{{ p.account.account_name|default:p.account.account_handle }}</span>
+                        <span class="text-[12px] text-ink-500">{{ p.account.account_handle|default:"@handle" }}</span>
+                        <span class="text-xs text-ink-500 ml-auto">now</span>
                     </div>
                     {% if p.caption %}
-                    <div class="text-[13px] text-stone-800 leading-relaxed whitespace-pre-wrap break-words mb-2">{{ p.truncated_caption|truncatechars:200 }}</div>
+                    <div class="text-[13px] text-ink-800 leading-relaxed whitespace-pre-wrap break-words mb-2">{{ p.truncated_caption|truncatechars:200 }}</div>
                     {% else %}
-                    <div class="text-[13px] text-stone-500 italic mb-2">What's up?</div>
+                    <div class="text-[13px] text-ink-500 italic mb-2">What's up?</div>
                     {% endif %}
                     {% if media_items %}
                     {% with m=media_items.0 %}
-                    <div class="rounded-xl overflow-hidden border border-stone-200 mb-2">
+                    <div class="rounded-xl overflow-hidden border border-ink-200 mb-2">
                         {% if m.is_video %}
-                        <div class="relative bg-stone-900" style="aspect-ratio: 16/9;"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video></div>
+                        <div class="relative bg-ink-900" style="aspect-ratio: 16/9;"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video></div>
                         {% else %}
                         <img src="{{ m.url }}" class="w-full object-cover" alt="" style="max-height: 180px;">
                         {% endif %}
                     </div>
                     {% endwith %}
                     {% endif %}
-                    <div class="flex items-center justify-between text-stone-400 pr-4">
+                    <div class="flex items-center justify-between text-ink-500 pr-4">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/></svg>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"/></svg>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
@@ -477,7 +477,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
         <div class="bg-white">
             {% if media_items %}
             {% with m=media_items.0 %}
-            <div class="rounded-t-xl overflow-hidden bg-stone-100">
+            <div class="rounded-t-xl overflow-hidden bg-ink-100">
                 {% if m.is_video %}
                 <div class="relative" style="aspect-ratio: 2/3; max-height: 260px;"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video></div>
                 {% else %}
@@ -486,16 +486,16 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             </div>
             {% endwith %}
             {% else %}
-            <div class="bg-stone-50 flex items-center justify-center rounded-t-xl w-full" style="aspect-ratio: 2/3; max-height: 200px;">
+            <div class="bg-ink-50 flex items-center justify-center rounded-t-xl w-full" style="aspect-ratio: 2/3; max-height: 200px;">
                 <svg class="w-10 h-10 text-[#E60023]/30" fill="currentColor" viewBox="0 0 24 24"><path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.174.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.607 0 11.985-5.365 11.985-11.987C23.97 5.39 18.592.026 11.985.026L12.017 0z"/></svg>
             </div>
             {% endif %}
             <div class="p-3">
                 {% if p.title %}
-                <div class="text-[13px] font-semibold text-stone-900 leading-snug mb-1 line-clamp-2">{{ p.title|truncatechars:100 }}</div>
+                <div class="text-[13px] font-semibold text-ink-900 leading-snug mb-1 line-clamp-2">{{ p.title|truncatechars:100 }}</div>
                 {% endif %}
                 {% if p.caption %}
-                <div class="text-[11px] text-stone-500 leading-relaxed mb-2 line-clamp-2 whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:150 }}</div>
+                <div class="text-xs text-ink-500 leading-relaxed mb-2 line-clamp-2 whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:150 }}</div>
                 {% endif %}
                 <div class="flex items-center gap-2">
                     {% if p.account.avatar_url %}
@@ -503,7 +503,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                     {% else %}
                     <div class="w-6 h-6 rounded-full bg-[#E60023] flex items-center justify-center text-[9px] font-bold text-white">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
                     {% endif %}
-                    <span class="text-[11px] font-medium text-stone-600">{{ p.account.account_name|default:p.account.account_handle }}</span>
+                    <span class="text-xs font-medium text-ink-600">{{ p.account.account_name|default:p.account.account_handle }}</span>
                 </div>
             </div>
         </div>
@@ -513,34 +513,34 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
         <div class="bg-white p-4">
             <div class="flex items-center gap-2.5 mb-3">
                 {% if p.account.avatar_url %}
-                <img src="{{ p.account.avatar_url }}" class="w-10 h-10 rounded-full object-cover border border-stone-100">
+                <img src="{{ p.account.avatar_url }}" class="w-10 h-10 rounded-full object-cover border border-ink-100">
                 {% else %}
-                <div class="w-10 h-10 rounded-full bg-stone-500 flex items-center justify-center text-xs font-bold text-white">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
+                <div class="w-10 h-10 rounded-full bg-ink-500 flex items-center justify-center text-xs font-bold text-white">{{ p.account.account_name|default:p.account.account_handle|make_list|first|upper }}</div>
                 {% endif %}
                 <div>
-                    <div class="text-[13px] font-semibold text-stone-800 leading-tight">{{ p.account.account_name|default:p.account.account_handle }}</div>
-                    {% if p.account.account_handle %}<div class="text-[11px] text-stone-500 leading-tight">{{ p.account.account_handle }}</div>{% endif %}
-                    <div class="text-[10px] text-stone-500">Just now</div>
+                    <div class="text-[13px] font-semibold text-ink-800 leading-tight">{{ p.account.account_name|default:p.account.account_handle }}</div>
+                    {% if p.account.account_handle %}<div class="text-xs text-ink-500 leading-tight">{{ p.account.account_handle }}</div>{% endif %}
+                    <div class="text-xs text-ink-500">Just now</div>
                 </div>
             </div>
             {% if p.caption %}
-            <div class="text-[13px] leading-relaxed text-stone-700 mb-3 whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:200 }}</div>
+            <div class="text-[13px] leading-relaxed text-ink-700 mb-3 whitespace-pre-wrap break-words">{{ p.truncated_caption|truncatechars:200 }}</div>
             {% else %}
-            <div class="text-[13px] text-stone-500 italic mb-3">No caption yet…</div>
+            <div class="text-[13px] text-ink-500 italic mb-3">No caption yet…</div>
             {% endif %}
             {% if media_items %}
             {% with m=media_items.0 %}
             <div class="rounded-lg overflow-hidden mb-3">
                 {% if m.is_video %}
-                <div class="relative bg-stone-900" style="aspect-ratio: 16/9;"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video>
-                <div class="absolute inset-0 flex items-center justify-center"><div class="w-12 h-12 rounded-full bg-black/40 flex items-center justify-center"><svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg></div></div></div>
+                <div class="relative bg-ink-900" style="aspect-ratio: 16/9;"><video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video>
+                <div class="absolute inset-0 flex items-center justify-center"><div class="w-12 h-12 rounded-full bg-ink-950/35 flex items-center justify-center"><svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg></div></div></div>
                 {% else %}
                 <img src="{{ m.url }}" class="w-full object-cover" alt="" style="max-height: 200px;">
                 {% endif %}
             </div>
             {% endwith %}
             {% endif %}
-            <div class="flex items-center gap-5 text-stone-300">
+            <div class="flex items-center gap-5 text-ink-500">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/></svg>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z"/></svg>
@@ -549,7 +549,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
         {% endif %}
 
         {% if p.is_over_limit %}
-        <div class="px-3 py-2 border-t border-red-100 bg-red-50/50 flex items-center gap-1.5 text-[11px] font-medium text-red-500">
+        <div class="px-3 py-2 border-t border-danger-200 bg-danger-50 flex items-center gap-1.5 text-xs font-medium text-danger-600" role="alert">
             <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
             Caption exceeds {{ p.char_limit }} character limit
         </div>
@@ -559,14 +559,11 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
 
 {% else %}
     <!-- Empty preview state -->
-    <div class="flex flex-col items-center justify-center h-full text-center px-6 py-12">
-        <div class="w-16 h-16 rounded-2xl bg-stone-100 flex items-center justify-center mb-4"
-             style="animation: slideUp 400ms cubic-bezier(0.16,1,0.3,1) both">
-            <svg class="w-7 h-7 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+    <div class="ui-empty flex flex-col items-center justify-center h-full">
+        <div>
+            <svg class="w-8 h-8 mx-auto text-ink-400" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
         </div>
-        <p class="text-sm font-medium text-stone-500 mb-1"
-           style="animation: slideUp 400ms 80ms cubic-bezier(0.16,1,0.3,1) both">No preview yet</p>
-        <p class="text-xs text-stone-500 max-w-[200px]"
-           style="animation: slideUp 400ms 140ms cubic-bezier(0.16,1,0.3,1) both">Select a platform and start writing to see how your post will look</p>
+        <p class="ui-empty-title">No preview yet</p>
+        <p class="ui-empty-body max-w-[240px]">Choose a channel and start writing to see how your post will look.</p>
     </div>
 {% endif %}

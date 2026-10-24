@@ -3,78 +3,96 @@ The messages of one team thread, oldest first. Context: thread (apps.studio.chat
 Polls itself every 3 seconds while the manager is answering or the team is making a draft,
 every 30 seconds while something is going out, then stops (the response without hx-trigger
 replaces this element).
+Shapes (DESIGN_SYSTEM.md 12): your own message is a quiet ink-100 bubble on the right; the manager
+and specialists write without a bubble beside a neutral avatar; a client is a white bubble with a
+"Client" tag; a teammate an ink-50 bubble; a note for the team is dashed with a lock; system lines
+sit between hairlines.
+The log is a keyboard stop (tabindex="0"): on a phone it scrolls inside its own box, and a person
+without a pointer must be able to reach it to scroll it.
 {% endcomment %}
 {% load tz %}
-<div id="{{ thread.dom_id }}-messages" data-thread-log role="log" aria-live="off" tabindex="-1" aria-label="Messages in {{ thread.title|lower }}"
-     class="mt-3 space-y-2.5 {% if thread.full_page %}max-h-[60vh]{% else %}max-h-96{% endif %} overflow-y-auto pr-1"
+<div id="{{ thread.dom_id }}-messages" data-thread-log role="log" aria-live="off" tabindex="0" aria-label="Messages in {{ thread.title|lower }}"
+     class="mt-4 space-y-4 {% if thread.full_page %}max-h-[60vh]{% else %}max-h-96{% endif %} overflow-y-auto pr-1 -mr-1 rounded-lg"
      {% if thread.polling and thread.messages_url %}hx-get="{{ thread.messages_url }}" hx-trigger="{{ thread.poll_interval }}" hx-sync="closest [data-agency-thread]:drop" hx-target="this" hx-select="unset" hx-swap="outerHTML"{% endif %}>
     {% for m in thread.messages %}
     <div data-thread-message-id="{{ m.pk }}">
     {% if m.author_kind == 'system' %}
-    <p class="text-xs text-center px-2 py-1 break-words {% if m.is_internal %}text-amber-900 bg-amber-50 border border-amber-200 rounded-lg{% else %}text-stone-600{% endif %}">
-        {% if m.is_internal %}<span class="font-semibold">Internal note · </span>{% endif %}{{ m.body }}
+    {% if m.is_internal %}
+    <p class="rounded-xl border border-dashed border-ink-400 bg-ink-25 px-3.5 py-2 text-xs text-ink-700 break-words">
+        <span class="inline-flex items-center gap-1 font-semibold"><svg class="w-3.5 h-3.5 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Internal note · </span>{{ m.body }}
     </p>
+    {% else %}
+    <div class="flex items-center gap-3">
+        <span class="h-px flex-1 bg-ink-200" aria-hidden="true"></span>
+        <p class="max-w-[80%] text-center text-xs text-ink-500 break-words">{{ m.body }}</p>
+        <span class="h-px flex-1 bg-ink-200" aria-hidden="true"></span>
+    </div>
+    {% endif %}
     {% elif m.author_kind == 'agent' %}
-    <div class="mr-6 rounded-xl border px-3 py-2.5 {% if m.is_internal %}border-amber-200 bg-amber-50{% else %}border-stone-200 bg-white{% endif %}">
-        <p class="text-xs font-semibold text-orange-800">
-            {% if m.is_internal %}<span class="text-amber-900">Internal note · </span>{% endif %}{{ m.sender_name }}
-            <span class="font-normal text-stone-600">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:thread.tzname|date:"D j M, H:i" }}</time></span>
-        </p>
-        <p class="text-sm text-stone-800 mt-0.5 whitespace-pre-line break-words">{{ m.body }}</p>
-        {% if m.action_status == 'started' %}
-        <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-800">{% if m.queued and m.created_brief.status == 'planned' %}Waiting its turn{% else %}The team is on it{% endif %}</span>{% if m.created_brief and not m.auto_started and not m.queued %} <a href="{% url 'studio:detail' workspace_id=thread.workspace.id brief_id=m.created_brief.pk %}" class="text-xs text-stone-700 underline">Creative progress and next action</a>{% elif m.job_id and not m.created_brief %} <a href="{% url 'studio:job' workspace_id=thread.workspace.id job_id=m.job_id %}" class="text-xs text-stone-700 underline">See the job<span class="sr-only"> behind this reply</span></a>{% endif %}</p>
-        {% elif m.action_status == 'needs_human' %}
-        <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800">Waiting for a person</span></p>
-        {% elif m.action_status == 'declined' %}
-        <p class="mt-1.5"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-700">Not possible right now</span></p>
-        {% endif %}
-        {% if m.creative_request %}{% include "studio/partials/thread_creative_brief.html" %}{% endif %}
-        {% if m.created_brief %}{% include "studio/partials/thread_draft.html" with draft=m.created_brief %}{% endif %}
-        {% if m.routine %}
-        {# The routine card: proposed switched off; one tap turns it on (apps.studio.chat._routine_message_context). #}
-        <div class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3" data-routine-card="{{ m.routine.id }}" data-routine-state="{% if m.routine.enabled %}on{% else %}proposed{% endif %}">
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <p class="text-sm font-semibold text-stone-900">{% if m.routine.enabled %}Routine on{% else %}Routine proposed{% endif %} <span class="font-normal text-stone-700">· {{ m.routine.cadence_words }}</span></p>
-                {% if m.routine.can_change and not m.routine.enabled %}
-                <form method="post" action="{{ m.routine.toggle_url }}" class="sm:ml-auto" data-routine-turn-on="{{ m.routine.id }}">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{% if thread.home_panel %}{{ thread.home_url }}{% else %}{{ thread.thread_url }}{% endif %}">
-                    <button type="submit" class="rounded-lg bg-orange-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-orange-700">Turn on</button>
-                </form>
-                {% else %}
-                <a href="{{ m.routine.url }}" class="sm:ml-auto text-xs font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">All routines</a>
-                {% endif %}
+    <div class="flex items-start gap-2.5 {% if m.is_internal %}rounded-xl border border-dashed border-ink-400 bg-ink-25 px-3.5 py-2.5{% endif %}">
+        <span class="mt-px inline-flex w-7 h-7 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-semibold {% if m.agent == 'account_manager' or not m.agent %}bg-ink-900 text-white{% else %}bg-ink-100 text-ink-700{% endif %}" aria-hidden="true">{% for word in m.sender_name.split|slice:":2" %}{{ word|first|upper }}{% endfor %}</span>
+        <div class="min-w-0 flex-1">
+            <p class="text-[13px]/[18px] font-semibold text-ink-900">
+                {% if m.is_internal %}<span class="inline-flex items-center gap-1 text-ink-700"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Internal note · </span>{% endif %}{{ m.sender_name }}
+                <span class="font-normal text-ink-500">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:thread.tzname|date:"D j M, H:i" }}</time></span>
+            </p>
+            <p class="mt-0.5 text-body-lg text-ink-900 whitespace-pre-line break-words">{{ m.body }}</p>
+            {% if m.action_status == 'started' %}
+            <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">{% if m.queued and m.created_brief.status == 'planned' %}{% include "studio/partials/pill.html" with tone="info" icon="dots" label="Waiting its turn" data_state="" %}{% else %}{% include "studio/partials/pill.html" with tone="info" icon="spinner" label="The team is on it" data_state="" %}{% endif %}{% if m.created_brief and not m.auto_started and not m.queued %} <a href="{% url 'studio:detail' workspace_id=thread.workspace.id brief_id=m.created_brief.pk %}" class="text-[13px] link-inline">Creative progress and next action</a>{% elif m.job_id and not m.created_brief %} <a href="{% url 'studio:job' workspace_id=thread.workspace.id job_id=m.job_id %}" class="text-[13px] link-inline">See the job<span class="sr-only"> behind this reply</span></a>{% endif %}</p>
+            {% elif m.action_status == 'needs_human' %}
+            <p class="mt-2">{% include "studio/partials/pill.html" with tone="warning" icon="clock" label="Waiting for a person" data_state="" %}</p>
+            {% elif m.action_status == 'declined' %}
+            <p class="mt-2">{% include "studio/partials/pill.html" with tone="neutral" icon="dash" label="Not possible right now" data_state="" %}</p>
+            {% endif %}
+            {% if m.creative_request %}{% include "studio/partials/thread_creative_brief.html" %}{% endif %}
+            {% if m.created_brief %}{% include "studio/partials/thread_draft.html" with draft=m.created_brief %}{% endif %}
+            {% if m.routine %}
+            {# The routine card: proposed switched off; one tap turns it on (apps.studio.chat._routine_message_context). #}
+            <div class="mt-3 rounded-xl bg-white px-4 py-3.5 ring-1 ring-inset ring-ink-200" data-routine-card="{{ m.routine.id }}" data-routine-state="{% if m.routine.enabled %}on{% else %}proposed{% endif %}">
+                <p class="text-xs font-semibold text-ink-500">{% if m.routine.enabled %}Routine on{% else %}Routine proposed{% endif %}</p>
+                <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <p class="min-w-0 text-[15px]/[22px] font-semibold text-ink-950 break-words">{{ m.routine.title }} <span class="text-sm font-normal text-ink-600">· {{ m.routine.cadence_words }}</span></p>
+                    {% if m.routine.can_change and not m.routine.enabled %}
+                    <form method="post" action="{{ m.routine.toggle_url }}" class="sm:ml-auto" data-routine-turn-on="{{ m.routine.id }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% if thread.home_panel %}{{ thread.home_url }}{% else %}{{ thread.thread_url }}{% endif %}">
+                        <button type="submit" class="ui-btn ui-btn-sm ui-btn-tinted">Turn on</button>
+                    </form>
+                    {% else %}
+                    <a href="{{ m.routine.url }}" class="sm:ml-auto ui-link">All routines</a>
+                    {% endif %}
+                </div>
+                <p class="mt-1 text-[13px]/[18px] text-ink-800 break-words">{{ m.routine.instruction }}</p>
+                {% if not m.routine.enabled %}<p class="mt-1.5 text-[13px]/[18px] text-ink-600">Nothing runs until it is on. Its results come back here, and every post still waits for your approval.</p>{% endif %}
             </div>
-            <p class="mt-1 text-xs text-stone-800 break-words">{{ m.routine.instruction }}</p>
-            {% if not m.routine.enabled %}<p class="mt-1 text-xs text-stone-600">Nothing runs until it is on. Its results come back here, and every post still waits for your approval.</p>{% endif %}
+            {% endif %}
         </div>
-        {% endif %}
     </div>
     {% elif m.is_internal %}
-    <div class="ml-6 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-        <p class="text-xs font-semibold text-amber-900">Internal note · {% if m.author_id == thread.viewer_id %}You{% else %}{{ m.sender_name }}{% endif %}
-            <span class="font-normal text-stone-700">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:thread.tzname|date:"D j M, H:i" }}</time></span></p>
-        <p class="text-sm text-stone-800 mt-0.5 whitespace-pre-line break-words">{{ m.body }}</p>
+    <div class="rounded-xl border border-dashed border-ink-400 bg-ink-25 px-3.5 py-2.5">
+        <p class="flex flex-wrap items-center gap-x-1 text-xs font-semibold text-ink-700"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Internal note · {% if m.author_id == thread.viewer_id %}You{% else %}{{ m.sender_name }}{% endif %}
+            <span class="font-medium text-ink-500">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:thread.tzname|date:"D j M, H:i" }}</time></span></p>
+        <p class="mt-1 text-body-lg text-ink-900 whitespace-pre-line break-words">{{ m.body }}</p>
     </div>
     {% elif m.author_id == thread.viewer_id %}
-    <div class="ml-6 rounded-xl bg-orange-700 px-3 py-2.5 text-white">
-        <p class="text-xs font-semibold">You <span class="font-normal">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:thread.tzname|date:"D j M, H:i" }}</time></span></p>
-        <p class="text-sm mt-0.5 whitespace-pre-line break-words">{{ m.body }}</p>
+    <div class="ml-auto w-fit max-w-[88%] sm:max-w-[78%] rounded-[18px] rounded-br-md bg-ink-100 px-3.5 py-2.5">
+        <p class="text-right text-xs font-medium text-ink-500">You · <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:thread.tzname|date:"D j M, H:i" }}</time></p>
+        <p class="mt-0.5 text-body-lg text-ink-900 whitespace-pre-line break-words">{{ m.body }}</p>
     </div>
     {% else %}
-    <div class="ml-6 rounded-xl {% if m.author_kind == 'client' %}bg-sky-50 border border-sky-200{% else %}bg-stone-100{% endif %} px-3 py-2.5">
-        <p class="text-xs font-semibold {% if m.author_kind == 'client' %}text-sky-900{% else %}text-stone-800{% endif %}">{{ m.sender_name }}{% if m.author_kind == 'client' %} (client){% endif %}
-            <span class="font-normal text-stone-700">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:thread.tzname|date:"D j M, H:i" }}</time></span></p>
-        <p class="text-sm text-stone-800 mt-0.5 whitespace-pre-line break-words">{{ m.body }}</p>
+    <div class="w-fit max-w-[88%] sm:max-w-[78%] rounded-[18px] rounded-bl-md px-3.5 py-2.5 ring-1 ring-inset ring-ink-200 {% if m.author_kind == 'client' %}bg-white{% else %}bg-ink-50{% endif %}">
+        <p class="flex flex-wrap items-center gap-x-1.5 text-[13px]/[18px] font-semibold text-ink-900">{{ m.sender_name }}{% if m.author_kind == 'client' %} <span class="inline-flex h-5 items-center rounded-full bg-ink-100 px-2 text-xs font-semibold text-ink-700" data-client-tag>Client</span>{% endif %}
+            <span class="font-normal text-ink-500">· <time datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|timezone:thread.tzname|date:"D j M, H:i" }}</time></span></p>
+        <p class="mt-0.5 text-body-lg text-ink-900 whitespace-pre-line break-words">{{ m.body }}</p>
     </div>
     {% endif %}
     </div>
     {% empty %}
-    <p class="text-sm text-stone-600 py-3">{% if thread.is_client_thread %}No messages with the client yet.{% else %}Tell your manager what you want to post. You get the brief to check, and the finished post comes back here for your approval.{% endif %}</p>
+    <p class="py-3 text-sm text-ink-600" data-thread-empty>{% if thread.is_client_thread %}No messages with the client yet.{% elif thread.about_brief %}No messages about this post yet.{% elif thread.about_article %}No messages about this article yet.{% else %}Tell your manager what you want to post. You get the brief to check, and the finished post comes back here for your approval.{% endif %}</p>
     {% endfor %}
     {% if thread.polling %}
-    <p class="flex items-center gap-2 text-xs text-stone-700">
-        <span class="w-1.5 h-1.5 rounded-full bg-indigo-700 animate-pulse motion-reduce:animate-none" aria-hidden="true"></span>
+    <p class="flex items-center gap-2 text-xs text-ink-500">
+        <span class="inline-flex items-center gap-1" aria-hidden="true"><span class="w-1 h-1 rounded-full bg-ink-400 animate-pulse motion-reduce:animate-none"></span><span class="w-1 h-1 rounded-full bg-ink-400 animate-pulse motion-reduce:animate-none [animation-delay:150ms]"></span><span class="w-1 h-1 rounded-full bg-ink-400 animate-pulse motion-reduce:animate-none [animation-delay:300ms]"></span></span>
         {% if thread.poll_interval == 'every 30s' %}Checking scheduled delivery and platform results…{% else %}Your manager is writing a reply, or the team is preparing your draft…{% endif %}
     </p>
     {% endif %}

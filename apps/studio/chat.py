@@ -51,6 +51,8 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from apps.credentials.models import PlatformCredential
+
 from .models import AgencyJob, Conversation, Message, StudioBrief
 
 logger = logging.getLogger(__name__)
@@ -689,7 +691,25 @@ def _creative_message_context(conversation, messages, viewer, *, selected_draft_
             except (TypeError, ValueError):
                 message.website_source_url = ""
             accounts = result.get("selected_accounts")
-            message.creative_accounts = accounts if isinstance(accounts, list) else []
+            # The card shows words: a platform's name, never its key ("LinkedIn (Company Page)", not
+            # "linkedin_company"). The stored brief keeps the machine labels it matches on.
+            platform_names = dict(PlatformCredential.Platform.choices)
+            message.creative_accounts = [
+                {
+                    **account,
+                    "platform_label": platform_names.get(
+                        str(account.get("platform") or ""), account.get("platform", "")
+                    ),
+                }
+                for account in (accounts if isinstance(accounts, list) else [])
+                if isinstance(account, dict)
+            ]
+            account_names = {str(account.get("id")): account.get("name") for account in message.creative_accounts}
+            message.creative_channel_labels = [
+                platform_names.get(channel) or account_names.get(channel) or channel
+                for channel in (intake.get("channels") or [])
+                if isinstance(channel, str) and channel.strip()
+            ]
             message.creative_defaults = [
                 creative_brief.LABELS[key]
                 for key in (result.get("creative_defaults") or [])
@@ -1522,8 +1542,9 @@ def thread_context(
             for receipt in _publication_receipts(selected_draft)
         )
     working = has_active_job(conversation)
-    # The panel on Home polls with ``?home=1`` so a card's "Turn on" returns to Home, not the thread page.
-    home_panel = request.GET.get("home") == "1"
+    # The panel on Home polls with ``?home=1`` so a card's "Turn on" returns to Home, not the thread page;
+    # its forms (Send, Go ahead, Stop) carry ``home=1`` so the panel they swap back in stays Home's too.
+    home_panel = request.GET.get("home") == "1" or (request.method == "POST" and request.POST.get("home") == "1")
     if home_panel and messages_url:
         messages_url += "?home=1"
     return {
@@ -1546,6 +1567,8 @@ def thread_context(
         "can_post_internal": True,
         "internal_label": internal_label,
         "is_client_thread": is_client_thread,
+        "about_brief": about_brief,
+        "about_article": about_article,
         "guided_creation": guided_creation,
         "reference_choices": reference_choices,
         "draft_choices": draft_choices,

@@ -13,7 +13,7 @@
             <p class="mk-lead">{{ site_name }} is a social media management studio for creators, agencies and small teams. Compose once, publish to {{ LIVE_PLATFORM_NAMES|join:", " }} today (with {{ COMING_SOON_PLATFORM_NAMES|join:", " }} coming as each approves our app), run client approvals, handle supported conversations in one inbox, and review the metrics each platform provides.</p>
             <div class="mk-hero__actions">
                 <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %} {% include "marketing/_icon.html" with name="arrow" %}</a>
-                <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:how_it_works' %}">See how it works</a>
+                <a class="mk-link" href="{% url 'marketing:how_it_works' %}">See how it works {% include "marketing/_icon.html" with name="arrow" %}</a>
             </div>
             <ul class="mk-hero__trust">
                 <li>{% include "marketing/_icon.html" with name="check" %} Direct first-party APIs, no aggregator</li>
@@ -41,7 +41,7 @@
             </div>
             <div class="mk-browser">
                 <div class="mk-browser__bar"><i></i><i></i><i></i><span class="mk-browser__url">{% include "marketing/_icon.html" with name="lock" %} studio · publish · calendar</span></div>
-                <img src="{% static 'img/marketing/calendar.webp' %}" alt="Illustrative {{ site_name }} calendar with demo posts across Instagram, YouTube and LinkedIn" width="1283" height="698" fetchpriority="high">
+                <img src="{% static 'img/marketing/calendar.webp' %}" alt="Illustrative {{ site_name }} publishing calendar for a demo property brand: a month of published and scheduled posts across Instagram, YouTube and LinkedIn" width="1600" height="872" fetchpriority="high">
             </div>
             <div class="mk-hero__fade"></div>
         </div>
@@ -75,8 +75,8 @@
             <article class="mk-card mk-span-7 reveal">
                 <div class="mk-card__visual">
                     <div class="mk-browser">
-                        <div class="mk-browser__bar"><i></i><i></i><i></i><span class="mk-browser__url">create · new post</span></div>
-                        <img src="{% static 'img/marketing/composer.webp' %}" alt="The post composer with a caption, media, Pinterest board settings and live previews for Pinterest and YouTube" width="1283" height="699" loading="lazy" decoding="async">
+                        <div class="mk-browser__bar"><i></i><i></i><i></i><span class="mk-browser__url">publish · edit post</span></div>
+                        <img src="{% static 'img/marketing/composer.webp' %}" alt="The post composer with a caption, an attached creative, channel choices and live Instagram and LinkedIn previews" width="1600" height="872" loading="lazy" decoding="async">
                     </div>
                 </div>
                 <div class="mk-card__icon mk-card__icon--orange">{% include "marketing/_icon.html" with name="edit" %}</div>
@@ -111,10 +111,10 @@
                 <div class="mk-card__visual">
                     <div class="mo mo-window">
                         <div class="mo-cal" aria-hidden="true">
-                            <div class="mo-cal__day">1</div><div class="mo-cal__day">2<i class="mo-cal__post" style="background:#F97316"></i></div><div class="mo-cal__day">3</div><div class="mo-cal__day">4<i class="mo-cal__post" style="background:#0A66C2"></i><i class="mo-cal__post" style="background:#E4405F"></i></div><div class="mo-cal__day">5</div><div class="mo-cal__day">6</div><div class="mo-cal__day">7</div>
-                            <div class="mo-cal__day">8<i class="mo-cal__post" style="background:#FF0000"></i></div><div class="mo-cal__day is-today">9</div><div class="mo-cal__day">10<i class="mo-cal__post" style="background:#94A43F"></i></div><div class="mo-cal__day">11<i class="mo-cal__post" style="background:#0A66C2"></i></div><div class="mo-cal__day">12</div><div class="mo-cal__day">13</div><div class="mo-cal__day">14</div>
+                            <div class="mo-cal__day">1</div><div class="mo-cal__day">2<i class="mo-cal__post"></i></div><div class="mo-cal__day">3</div><div class="mo-cal__day">4<i class="mo-cal__post" style="background:#0A66C2"></i><i class="mo-cal__post" style="background:#E4405F"></i></div><div class="mo-cal__day">5</div><div class="mo-cal__day">6</div><div class="mo-cal__day">7</div>
+                            <div class="mo-cal__day">8<i class="mo-cal__post" style="background:#FF0000"></i></div><div class="mo-cal__day is-today">9</div><div class="mo-cal__day">10<i class="mo-cal__post"></i></div><div class="mo-cal__day">11<i class="mo-cal__post" style="background:#0A66C2"></i></div><div class="mo-cal__day">12</div><div class="mo-cal__day">13</div><div class="mo-cal__day">14</div>
                         </div>
-                        <div class="mo-slot"><time>Tue 09:00</time><span class="mo-bar"><i style="width:100%"></i></span><span class="mo-pill mo-pill--orange">queued</span></div>
+                        <div class="mo-slot"><time>Tue 09:00</time><span class="mo-bar"><i style="width:100%"></i></span><span class="mo-pill mo-pill--info">queued</span></div>
                         <div class="mo-slot"><time>Thu 12:30</time><span class="mo-bar"><i style="width:55%"></i></span><span class="mo-pill mo-pill--gray">next free</span></div>
                     </div>
                 </div>
@@ -126,9 +126,9 @@
             <article class="mk-card mk-span-4 reveal" data-delay="1">
                 <div class="mk-card__visual">
                     <div class="mo mo-window">
-                        <div class="mo-row"><span class="mo-platform" style="background:#FFF1F2">{% include "partials/_platform_icon.html" with platform="instagram" %}</span><div class="mo-grow"><div class="mo-name">@maya.runs <span class="mo-meta">· comment</span></div><div class="mo-text">Is the espresso blend back in stock?</div></div><span class="mo-pill mo-pill--sky"><i></i>neutral</span></div>
-                        <div class="mo-row"><span class="mo-platform" style="background:#EFF6FF">{% include "partials/_platform_icon.html" with platform="facebook" %}</span><div class="mo-grow"><div class="mo-name">Priya S. <span class="mo-meta">· message</span></div><div class="mo-text">Best latte in town, thank you!</div></div><span class="mo-pill mo-pill--green"><i></i>positive</span></div>
-                        <div class="mo-row"><span class="mo-platform" style="background:#FEF2F2">{% include "partials/_platform_icon.html" with platform="youtube" %}</span><div class="mo-grow"><div class="mo-name">dev_tom <span class="mo-meta">· comment</span></div><div class="mo-text">Audio drops out at 4:20</div></div><span class="mo-pill mo-pill--rose"><i></i>negative</span></div>
+                        <div class="mo-row"><span class="mo-platform">{% include "partials/_platform_icon.html" with platform="instagram" %}</span><div class="mo-grow"><div class="mo-name">@maya.runs <span class="mo-meta">· comment</span></div><div class="mo-text">Is the espresso blend back in stock?</div></div><span class="mo-pill mo-pill--sky"><i></i>neutral</span></div>
+                        <div class="mo-row"><span class="mo-platform">{% include "partials/_platform_icon.html" with platform="facebook" %}</span><div class="mo-grow"><div class="mo-name">Priya S. <span class="mo-meta">· message</span></div><div class="mo-text">Best latte in town, thank you!</div></div><span class="mo-pill mo-pill--green"><i></i>positive</span></div>
+                        <div class="mo-row"><span class="mo-platform">{% include "partials/_platform_icon.html" with platform="youtube" %}</span><div class="mo-grow"><div class="mo-name">dev_tom <span class="mo-meta">· comment</span></div><div class="mo-text">Audio drops out at 4:20</div></div><span class="mo-pill mo-pill--rose"><i></i>negative</span></div>
                     </div>
                 </div>
                 <div class="mk-card__icon mk-card__icon--sky">{% include "marketing/_icon.html" with name="inbox" %}</div>
@@ -146,9 +146,9 @@
                         </div>
                         <div class="mo-chart" aria-hidden="true">
                             <svg viewBox="0 0 300 88" preserveAspectRatio="none">
-                                <defs><linearGradient id="mkg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F97316" stop-opacity="0.35"/><stop offset="1" stop-color="#F97316" stop-opacity="0"/></linearGradient></defs>
+                                <defs><linearGradient id="mkg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1C1F24" stop-opacity="0.10"/><stop offset="1" stop-color="#1C1F24" stop-opacity="0"/></linearGradient></defs>
                                 <path d="M0 70 C 20 40, 40 30, 60 48 S 100 70, 120 44 S 160 20, 180 38 S 220 62, 240 34 S 280 26, 300 42 L300 88 L0 88 Z" fill="url(#mkg)"/>
-                                <path d="M0 70 C 20 40, 40 30, 60 48 S 100 70, 120 44 S 160 20, 180 38 S 220 62, 240 34 S 280 26, 300 42" fill="none" stroke="#F97316" stroke-width="2.5" stroke-linecap="round"/>
+                                <path d="M0 70 C 20 40, 40 30, 60 48 S 100 70, 120 44 S 160 20, 180 38 S 220 62, 240 34 S 280 26, 300 42" fill="none" stroke="#1C1F24" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                         </div>
                     </div>
@@ -161,7 +161,7 @@
             <article class="mk-card mk-span-6 reveal">
                 <div class="mk-card__visual">
                     <div class="mo mo-window">
-                        <div class="mo-folders"><span class="mo-pill mo-pill--gray">All assets</span><span class="mo-pill mo-pill--orange">Acme Coffee / Spring</span><span class="mo-pill mo-pill--gray">Reels</span><span class="mo-pill mo-pill--gray">Logos</span></div>
+                        <div class="mo-folders"><span class="mo-pill mo-pill--gray">All assets</span><span class="mo-pill mo-pill--selected">Acme Coffee / Spring</span><span class="mo-pill mo-pill--gray">Reels</span><span class="mo-pill mo-pill--gray">Logos</span></div>
                         <div class="mo-media" aria-hidden="true"><div class="g1" data-label="hero.jpg"></div><div class="g2" data-label="latte.mp4"></div><div class="g3" data-label="menu.png"></div><div class="g4" data-label="story.jpg"></div><div class="g5" data-label="team.jpg"></div><div class="g6" data-label="promo.mp4"></div><div class="g7" data-label="cup.png"></div><div class="g8" data-label="reel.mp4"></div></div>
                     </div>
                 </div>
@@ -282,7 +282,7 @@
                 <a class="mk-link" href="{% url 'marketing:developers' %}" style="margin-top: 18px;">API and MCP reference {% include "marketing/_icon.html" with name="arrow" %}</a>
             </div>
             <div class="mk-feature__media">
-                <div class="mk-code"><div class="mk-code__head"><span>POST /api/v1/posts</span><span>bearer bb_studio_…</span></div><pre><span class="c"># Create a draft for two accounts and schedule it</span>
+                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>POST /api/v1/posts</span><span>bearer bb_studio_…</span></div><pre><span class="c"># Create a draft for two accounts and schedule it</span>
 curl -X POST <span class="s">"$APP_URL/api/v1/posts"</span> \
   -H <span class="s">"Authorization: Bearer $KEY"</span> \
   -H <span class="s">"Content-Type: application/json"</span> \
@@ -305,7 +305,7 @@ curl -X POST <span class="s">"$APP_URL/api/v1/posts"</span> \
             <p class="mk-lead">{% if SIGNUP_OPEN %}Create an account and connect a supported channel, or run the app on your own server.{% else %}Request an invitation to the hosted app, or run the app on your own server.{% endif %}</p>
             <div class="mk-btn-row">
                 <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
-                <a class="mk-btn mk-btn--outline-light mk-btn--lg" href="{% url 'marketing:get_started' %}">Self-host it</a>
+                <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:get_started' %}">Self-host it</a>
             </div>
         </div>
     </div>

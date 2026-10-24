@@ -1,231 +1,173 @@
 {% extends "layouts/settings.html" %}
 {% block title %}General - Settings - {{ SITE_NAME }}{% endblock %}
 {% block content %}
-<div class="max-w-2xl">
-    <h2 class="text-xl font-semibold mb-8" style="color: var(--text-primary);">General</h2>
+<div class="w-full max-w-2xl">
+    <header class="mb-6">
+        <h1 class="text-h1 text-ink-950">General</h1>
+        <p class="ui-page-status">Your organization's name and the time zone new workspaces start with.</p>
+    </header>
 
-    <!-- Organization Name section -->
-    <form method="POST" class="mb-10">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="update_name">
-        <div class="flex items-end gap-4">
-            <div class="flex-1">
-                <label for="name" class="block text-sm font-semibold mb-2" style="color: var(--text-primary);">Organization Name</label>
+    <section class="ui-card" aria-labelledby="org-details-title">
+        <h2 id="org-details-title" class="ui-card-title">Organization</h2>
+
+        <!-- Organization name -->
+        <form method="POST" class="mt-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_name">
+            <label for="name" class="ui-label">Organization name</label>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <input type="text" id="name" name="name" value="{{ organization.name }}" required maxlength="100"
-                       class="input-focus w-full px-3 py-2 text-sm rounded-lg outline-none transition-colors"
-                       style="border: 1px solid var(--border); color: var(--text-primary); background: var(--surface-0);">
+                       class="ui-input sm:flex-1">
+                <button type="submit" class="ui-btn ui-btn-secondary shrink-0">Save name</button>
             </div>
-            <button type="submit"
-                    class="btn-neutral px-5 py-2 text-sm font-medium rounded-full cursor-pointer whitespace-nowrap"
-                    style="background: var(--neutral-100); color: var(--text-primary);">
-                Save Changes
-            </button>
-        </div>
-    </form>
+        </form>
 
-    <!-- Default Timezone section -->
-    <form method="POST" class="mb-10">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="update_timezone">
-        <div class="flex items-end gap-4">
-            <div class="flex-1">
-                <label for="timezone" class="block text-sm font-semibold mb-1" style="color: var(--text-primary);">Default Timezone</label>
-                <p class="text-xs mb-2" style="color: var(--text-tertiary);">Used as the fallback for workspaces that don't set their own.</p>
-                <select id="timezone" name="timezone"
-                        class="input-focus w-full px-3 py-2 text-sm rounded-lg outline-none transition-colors"
-                        style="border: 1px solid var(--border); color: var(--text-primary); background: var(--surface-0);">
+        <!-- Default time zone -->
+        <form method="POST" class="mt-5 border-t border-ink-200 pt-5">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_timezone">
+            <label for="timezone" class="ui-label">Default time zone</label>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <select id="timezone" name="timezone" aria-describedby="timezone-help" class="ui-input bb-select sm:flex-1">
                     <optgroup label="Common">
                         {% for tz in common_timezones %}
                         <option value="{{ tz }}" {% if tz == organization.default_timezone %}selected{% endif %}>{{ tz }}</option>
                         {% endfor %}
                     </optgroup>
-                    <optgroup label="All Timezones">
+                    <optgroup label="All time zones">
                         {% for tz in all_timezones %}
                         <option value="{{ tz }}" {% if tz == organization.default_timezone %}selected{% endif %}>{{ tz }}</option>
                         {% endfor %}
                     </optgroup>
                 </select>
+                <button type="submit" class="ui-btn ui-btn-secondary shrink-0">Save time zone</button>
             </div>
-            <button type="submit"
-                    class="btn-neutral px-5 py-2 text-sm font-medium rounded-full cursor-pointer whitespace-nowrap"
-                    style="background: var(--neutral-100); color: var(--text-primary);">
-                Save Changes
-            </button>
-        </div>
-    </form>
+            <p id="timezone-help" class="ui-help">Used by any workspace that doesn't set its own.</p>
+        </form>
+    </section>
 
     {% if is_owner %}
-    <hr class="my-10" style="border-color: var(--border);">
-
-    <!-- Delete Organization section -->
-    {% if organization.is_deletion_pending %}
-    <!-- Pending deletion state -->
-    <div x-data="{ showImmediateDeleteModal: false }"
-         class="rounded-lg p-4 mb-4"
-         style="background: var(--error-soft, #FEE2E2); border: 1px solid var(--error-500, #EF4444);">
-        <div class="flex items-start justify-between gap-4">
-            <div>
-                <h3 class="text-sm font-semibold mb-1" style="color: var(--error-500, #EF4444);">Deletion scheduled</h3>
-                <p class="text-sm" style="color: var(--text-secondary);">
-                    This organization is scheduled for deletion on <strong>{{ organization.deletion_scheduled_for|date:"F j, Y" }}</strong>.
-                    All workspaces, posts, social accounts, media, and team data will be permanently removed after this date.
-                </p>
+    <section class="mt-6" aria-labelledby="org-delete-title">
+        {% if organization.is_deletion_pending %}
+        <!-- Pending deletion -->
+        <div x-data="{ showImmediateDeleteModal: false }" class="ui-callout ui-callout-danger flex-col sm:flex-row sm:items-start">
+            <div class="flex min-w-0 flex-1 gap-3">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <div class="min-w-0">
+                    <h2 id="org-delete-title" class="ui-callout-title">Deletion scheduled</h2>
+                    <p class="mt-0.5">
+                        This organization will be deleted on <span class="font-semibold">{{ organization.deletion_scheduled_for|date:"j F Y" }}</span>.
+                        Every workspace, post, social account, file and team member goes with it.
+                    </p>
+                </div>
             </div>
-            <div class="flex flex-col gap-3 shrink-0">
+            <div class="flex shrink-0 flex-wrap gap-2 sm:flex-col">
                 <form method="POST">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="cancel_deletion">
-                    <button type="submit"
-                            class="btn-neutral px-5 py-2 text-sm font-medium rounded-full cursor-pointer whitespace-nowrap"
-                            style="background: var(--neutral-100); color: var(--text-primary);">
-                        Cancel Deletion
-                    </button>
+                    <button type="submit" class="ui-btn ui-btn-secondary w-full">Cancel deletion</button>
                 </form>
-                <button type="button" @click="showImmediateDeleteModal = true"
-                        class="btn-opacity px-5 py-2 text-sm font-medium rounded-full cursor-pointer whitespace-nowrap"
-                        style="background: var(--error-500, #EF4444); color: white;">
-                    Delete Now
+                <button type="button" @click="showImmediateDeleteModal = true" class="ui-btn ui-btn-danger-ghost">
+                    Delete now
                 </button>
             </div>
-        </div>
 
-        <!-- Immediate delete confirmation modal -->
-        <template x-teleport="body">
-            <div x-show="showImmediateDeleteModal" x-transition.opacity
-                 @keydown.escape.window="showImmediateDeleteModal = false"
-                 class="fixed inset-0 z-50 flex items-center justify-center"
-                 style="background: rgba(0,0,0,0.4);">
-                <div @click.outside="showImmediateDeleteModal = false"
-                     x-show="showImmediateDeleteModal"
-                     x-transition
-                     x-trap.noscroll="showImmediateDeleteModal" role="dialog" aria-modal="true" aria-labelledby="delete-org-now-title"
-                     class="w-full max-w-md rounded-xl shadow-xl"
-                     style="background: var(--surface-0);">
-
-                    <!-- Header -->
-                    <div class="flex items-center justify-between px-6 py-4" style="border-bottom: 1px solid var(--border);">
-                        <h3 id="delete-org-now-title" class="text-base font-semibold" style="color: var(--text-primary);">Delete immediately?</h3>
-                        <button type="button" @click="showImmediateDeleteModal = false" class="cursor-pointer" style="color: var(--text-tertiary);" aria-label="Close">
-                            <svg aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        </button>
-                    </div>
-
-                    <!-- Body -->
-                    <div class="px-6 py-5">
-                        <p class="text-sm mb-3" style="color: var(--text-secondary);">
-                            This will permanently delete <strong>{{ organization.name }}</strong> right now, bypassing the 14-day grace period. This action cannot be undone.
-                        </p>
-                        <p class="text-sm" style="color: var(--text-secondary);">
-                            All of the following will be permanently removed:
-                        </p>
-                        <ul class="text-sm mt-2 ml-4 list-disc space-y-1" style="color: var(--text-secondary);">
-                            <li>All workspaces and their settings</li>
-                            <li>All scheduled and published posts</li>
-                            <li>Connected social accounts and credentials</li>
-                            <li>Media assets and files</li>
-                            <li>Team memberships and invitations</li>
-                        </ul>
-                    </div>
-
-                    <!-- Footer -->
-                    <div class="flex justify-end gap-3 px-6 py-4" style="border-top: 1px solid var(--border);">
-                        <button type="button" @click="showImmediateDeleteModal = false"
-                                class="btn-neutral px-5 py-2 text-sm font-medium rounded-full cursor-pointer"
-                                style="background: var(--neutral-100); color: var(--text-primary);">
-                            Cancel
-                        </button>
-                        <form method="POST">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="delete_organization_now">
-                            <button type="submit"
-                                    class="btn-opacity px-5 py-2 text-sm font-semibold rounded-full cursor-pointer whitespace-nowrap"
-                                    style="background: var(--error-500, #EF4444); color: white;">
-                                Yes, delete permanently
+            <!-- Immediate delete confirmation -->
+            <template x-teleport="body">
+                <div x-show="showImmediateDeleteModal" x-transition.opacity
+                     @keydown.escape.window="showImmediateDeleteModal = false"
+                     class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+                     style="background: var(--overlay);">
+                    <div @click.outside="showImmediateDeleteModal = false"
+                         x-show="showImmediateDeleteModal"
+                         x-transition
+                         x-trap.noscroll="showImmediateDeleteModal" role="dialog" aria-modal="true" aria-labelledby="delete-org-now-title"
+                         class="ui-modal max-w-[440px] max-sm:max-h-[92vh] max-sm:overflow-y-auto max-sm:rounded-b-none">
+                        <div class="ui-modal-header">
+                            <h2 id="delete-org-now-title" class="ui-modal-title">Delete immediately?</h2>
+                            <button type="button" @click="showImmediateDeleteModal = false" class="ui-btn ui-btn-icon -mr-2 -mt-1" aria-label="Close">
+                                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
-                        </form>
+                        </div>
+                        <div class="ui-modal-body space-y-3">
+                            <p>This deletes <strong class="font-semibold text-ink-900">{{ organization.name }}</strong> right now, skipping the 14-day grace period. This can't be undone.</p>
+                            <p>These go with it:</p>
+                            <ul class="ml-4 list-disc space-y-1">
+                                <li>All workspaces and their settings</li>
+                                <li>All scheduled and published posts</li>
+                                <li>Connected social accounts and credentials</li>
+                                <li>Media and files</li>
+                                <li>Team memberships and invitations</li>
+                            </ul>
+                        </div>
+                        <div class="ui-modal-footer">
+                            <button type="button" @click="showImmediateDeleteModal = false" class="ui-btn ui-btn-secondary">Cancel</button>
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_organization_now">
+                                <button type="submit" class="ui-btn ui-btn-danger">Delete permanently</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </template>
-    </div>
-    {% else %}
-    <!-- Normal state -->
-    <div x-data="{ showDeleteModal: false }">
-        <div class="flex items-start justify-between gap-4">
-            <div>
-                <h3 class="text-base font-semibold mb-1" style="color: var(--text-primary);">Delete this organization</h3>
-                <p class="text-sm" style="color: var(--text-secondary); max-width: 480px;">
-                    Permanently delete this organization and all of its data. This includes all workspaces, scheduled posts, social accounts, media assets, and team memberships.
+            </template>
+        </div>
+        {% else %}
+        <!-- Normal state -->
+        <div x-data="{ showDeleteModal: false }" class="ui-card flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <div class="min-w-0">
+                <h2 id="org-delete-title" class="text-h3 text-ink-950">Delete this organization</h2>
+                <p class="mt-1 max-w-[52ch] text-sm text-ink-600">
+                    Removes the organization and all of its data: every workspace, scheduled post, social account, file and team membership.
                 </p>
             </div>
 
-            <button type="button" @click="showDeleteModal = true"
-                    class="btn-danger-soft px-5 py-2 text-sm font-medium rounded-full cursor-pointer whitespace-nowrap shrink-0"
-                    style="background: var(--error-soft, #FEE2E2); color: var(--error-500, #EF4444);">
-                Delete Organization
+            <button type="button" @click="showDeleteModal = true" class="ui-btn ui-btn-danger-ghost shrink-0 self-start">
+                Delete organization
             </button>
-        </div>
 
-        <!-- Delete confirmation modal -->
-        <template x-teleport="body">
-            <div x-show="showDeleteModal" x-transition.opacity
-                 @keydown.escape.window="showDeleteModal = false"
-                 class="fixed inset-0 z-50 flex items-center justify-center"
-                 style="background: rgba(0,0,0,0.4);">
-                <div @click.outside="showDeleteModal = false"
-                     x-show="showDeleteModal"
-                     x-transition
-                     x-trap.noscroll="showDeleteModal" role="dialog" aria-modal="true" aria-labelledby="delete-org-title"
-                     class="w-full max-w-md rounded-xl shadow-xl"
-                     style="background: var(--surface-0);">
-
-                    <!-- Header -->
-                    <div class="flex items-center justify-between px-6 py-4" style="border-bottom: 1px solid var(--border);">
-                        <h3 id="delete-org-title" class="text-base font-semibold" style="color: var(--text-primary);">Delete this organization</h3>
-                        <button type="button" @click="showDeleteModal = false" class="cursor-pointer" style="color: var(--text-tertiary);" aria-label="Close">
-                            <svg aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        </button>
-                    </div>
-
-                    <!-- Body -->
-                    <div class="px-6 py-5">
-                        <p class="text-sm mb-3" style="color: var(--text-secondary);">
-                            Are you sure you want to delete <strong>{{ organization.name }}</strong>? This will schedule the organization for permanent deletion in 14 days.
-                        </p>
-                        <p class="text-sm" style="color: var(--text-secondary);">
-                            All of the following will be permanently removed:
-                        </p>
-                        <ul class="text-sm mt-2 ml-4 list-disc space-y-1" style="color: var(--text-secondary);">
-                            <li>All workspaces and their settings</li>
-                            <li>All scheduled and published posts</li>
-                            <li>Connected social accounts and credentials</li>
-                            <li>Media assets and files</li>
-                            <li>Team memberships and invitations</li>
-                        </ul>
-                    </div>
-
-                    <!-- Footer -->
-                    <div class="flex justify-end gap-3 px-6 py-4" style="border-top: 1px solid var(--border);">
-                        <button type="button" @click="showDeleteModal = false"
-                                class="btn-neutral px-5 py-2 text-sm font-medium rounded-full cursor-pointer"
-                                style="background: var(--neutral-100); color: var(--text-primary);">
-                            Cancel
-                        </button>
-                        <form method="POST">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="delete_organization">
-                            <button type="submit"
-                                    class="btn-opacity px-5 py-2 text-sm font-semibold rounded-full cursor-pointer whitespace-nowrap"
-                                    style="background: var(--error-500, #EF4444); color: white;">
-                                Yes, delete this organization
+            <!-- Delete confirmation -->
+            <template x-teleport="body">
+                <div x-show="showDeleteModal" x-transition.opacity
+                     @keydown.escape.window="showDeleteModal = false"
+                     class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+                     style="background: var(--overlay);">
+                    <div @click.outside="showDeleteModal = false"
+                         x-show="showDeleteModal"
+                         x-transition
+                         x-trap.noscroll="showDeleteModal" role="dialog" aria-modal="true" aria-labelledby="delete-org-title"
+                         class="ui-modal max-w-[440px] max-sm:max-h-[92vh] max-sm:overflow-y-auto max-sm:rounded-b-none">
+                        <div class="ui-modal-header">
+                            <h2 id="delete-org-title" class="ui-modal-title">Delete this organization?</h2>
+                            <button type="button" @click="showDeleteModal = false" class="ui-btn ui-btn-icon -mr-2 -mt-1" aria-label="Close">
+                                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
-                        </form>
+                        </div>
+                        <div class="ui-modal-body space-y-3">
+                            <p><strong class="font-semibold text-ink-900">{{ organization.name }}</strong> will be deleted for good in 14 days. You can cancel until then.</p>
+                            <p>These go with it:</p>
+                            <ul class="ml-4 list-disc space-y-1">
+                                <li>All workspaces and their settings</li>
+                                <li>All scheduled and published posts</li>
+                                <li>Connected social accounts and credentials</li>
+                                <li>Media and files</li>
+                                <li>Team memberships and invitations</li>
+                            </ul>
+                        </div>
+                        <div class="ui-modal-footer">
+                            <button type="button" @click="showDeleteModal = false" class="ui-btn ui-btn-secondary">Cancel</button>
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_organization">
+                                <button type="submit" class="ui-btn ui-btn-danger">Delete organization</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </template>
-    </div>
-    {% endif %}
+            </template>
+        </div>
+        {% endif %}
+    </section>
     {% endif %}
 </div>
 {% endblock %}

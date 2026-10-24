@@ -132,4 +132,4 @@ class RetiredBrandAssetTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 body = response.content.decode()
                 self.assertNotIn(RETIRED_BRAND, body.lower())
-                self.assertIn(f">{initial}</div>", body)
+                self.assertIn(f">{initial}</span>", body)

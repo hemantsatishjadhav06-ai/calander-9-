@@ -81,6 +81,8 @@ def _after_send(
         return redirect("studio:detail", workspace_id=workspace.id, brief_id=brief.pk)
     if blog_post is not None:
         return redirect("blog:detail", workspace_id=workspace.id, post_id=blog_post.pk)
+    if request.POST.get("home") == "1":
+        return redirect("studio:index", workspace_id=workspace.id)
     return redirect(_thread_page_url(workspace, conversation))
 
 

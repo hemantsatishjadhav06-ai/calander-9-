@@ -151,7 +151,7 @@ class ProcessingStatusPollTests(UploadFeedbackBase):
         response = self._poll(asset)
 
         self.assertContains(response, "ml-asset-card")
-        self.assertContains(response, "FAILED")
+        self.assertContains(response, "Failed")  # the card's tag, in sentence case
         self.assertNotContains(response, 'hx-trigger="every 3s"')
 
     def test_non_htmx_callers_still_get_json(self):
@@ -193,8 +193,9 @@ class LocalTimeTests(UploadFeedbackBase):
         response = self.client.get(url, HTTP_HX_REQUEST="true")
 
         # 20:00 UTC is 01:30 the next day in India.
-        self.assertContains(response, "Jan 6, 2026 1:30 AM")
-        self.assertNotContains(response, "Jan 5, 2026 8:00 PM")
+        # Times are 24-hour, the same as the rest of the product.
+        self.assertContains(response, "6 Jan 2026, 01:30")
+        self.assertNotContains(response, "5 Jan 2026, 20:00")
 
 
 def test_caddy_serves_only_the_public_media_prefixes():

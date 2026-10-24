@@ -1,0 +1,40 @@
+{% comment %}
+The line under "Your team": the teammates by state (shape + word, never colour alone) and whether the team is
+checking in. Rendered in the page and, with refresh, again out of band by every board refresh.
+Context: live (apps.studio.live.snapshot), refresh (optional).
+{% endcomment %}
+<div id="team-status" class="mt-1.5"{% if refresh %} hx-swap-oob="true"{% endif %}>
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-ink-600">
+            <span class="live-state"><i class="live-dot live-dot--working" aria-hidden="true"></i>{{ live.agents.working }} {{ live.agents.working|pluralize:"teammate,teammates" }} working</span>
+            {% if live.agents.stopped %}
+            <span class="text-ink-400" aria-hidden="true">·</span>
+            <span class="live-state"><i class="live-dot live-dot--stopped" aria-hidden="true"></i>{{ live.agents.stopped }} stopped</span>
+            {% endif %}
+            <span class="text-ink-400" aria-hidden="true">·</span>
+            <span class="live-state"><i class="live-dot live-dot--idle" aria-hidden="true"></i>{{ live.agents.idle }} idle</span>
+        </p>
+        {% with health=live.health %}
+        <p class="ui-pill{% if health.state == 'online' %} ui-pill-success{% elif health.state == 'delayed' %} ui-pill-warning{% else %} ui-pill-danger{% endif %}" data-health="{{ health.state }}">
+            {% if health.state == 'online' %}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            {% elif health.state == 'delayed' %}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            {% else %}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+            {% endif %}
+            <span>{{ health.label }}</span><span aria-hidden="true">·</span><span class="font-medium tabular-nums"{% if health.last_checkin %} data-live-age data-checkin="{{ health.last_checkin|date:'U' }}" data-server-now="{{ live.generated_at|date:'U' }}" data-prefix="{% if health.state == 'online' %}checked{% else %}last check-in{% endif %}"{% endif %}>{{ health.detail }}</span>
+        </p>
+        {% endwith %}
+    </div>
+    {% if live.health.state != 'online' %}
+    <div class="mt-3 flex gap-2.5 rounded-xl p-3.5 text-[13px]/[18px] ring-1 ring-inset {% if live.health.state == 'delayed' %}bg-warning-50 text-warning-700 ring-warning-200{% else %}bg-danger-50 text-danger-700 ring-danger-200{% endif %}" role="note">
+        {% if live.health.state == 'delayed' %}
+        <svg class="mt-px size-4 flex-none text-warning-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        {% else %}
+        <svg class="mt-px size-4 flex-none text-danger-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        {% endif %}
+        <p>{{ live.health.sentence }}</p>
+    </div>
+    {% endif %}
+</div>

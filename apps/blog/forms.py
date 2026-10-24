@@ -7,10 +7,9 @@ from .models import BlogPost, BlogSite
 
 RECENT_IMAGE_LIMIT = 30
 
-_INPUT = (
-    "w-full px-3 py-2 text-sm rounded-lg border border-stone-300 bg-white text-stone-900 "
-    "focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-)
+# The design system's field (styles.css .ui-input): 36px, 8px radius, the edge-plus-halo focus, a
+# chevron on selects, and 16px text with a 44px height below 1024px so phones do not zoom.
+_INPUT = "ui-input"
 
 
 def parse_faq(text: str) -> list[dict]:

@@ -21,13 +21,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+#: ink-700: the one avatar fill (white on it reads 9.97:1).
+_NEUTRAL = "#3E434A"
+
 
 @dataclass(frozen=True)
 class Department:
     slug: str
     name: str
     does: str
-    #: The avatar fill: a 700 shade of the department's accent, so white initials read at 4.5:1 or more.
+    #: Kept for callers that read it; avatars are neutral now (colour in the team view means status,
+    #: never department), so every department carries the same ink-700.
     colour: str
 
 
@@ -53,7 +57,7 @@ class AgentSpec:
     @property
     def colour(self) -> str:
         department = DEPARTMENTS_BY_SLUG.get(self.department)
-        return department.colour if department else "#57534E"
+        return department.colour if department else _NEUTRAL
 
     @property
     def department_name(self) -> str:
@@ -62,13 +66,13 @@ class AgentSpec:
 
 
 DEPARTMENTS: tuple[Department, ...] = (
-    Department("client", "Client services", "Talks to you and your clients", "#BE123C"),
-    Department("strategy", "Strategy", "Decides what to say", "#4338CA"),
-    Department("insights", "Insights", "Learns from results", "#B45309"),
-    Department("creative", "Creative", "Makes the post", "#C2410C"),
-    Department("quality", "Quality", "Checks before you see it", "#047857"),
-    Department("publishing", "Publishing", "Gets it out, after you approve", "#0369A1"),
-    Department("seo", "Blog & SEO", "Gets you found on Google", "#0F766E"),
+    Department("client", "Client services", "Talks to you and your clients", _NEUTRAL),
+    Department("strategy", "Strategy", "Decides what to say", _NEUTRAL),
+    Department("insights", "Insights", "Learns from results", _NEUTRAL),
+    Department("creative", "Creative", "Makes the post", _NEUTRAL),
+    Department("quality", "Quality", "Checks before you see it", _NEUTRAL),
+    Department("publishing", "Publishing", "Gets it out, after you approve", _NEUTRAL),
+    Department("seo", "Blog & SEO", "Gets you found on Google", _NEUTRAL),
 )
 
 AGENTS: tuple[AgentSpec, ...] = (
@@ -155,7 +159,12 @@ AGENTS: tuple[AgentSpec, ...] = (
         jobs=("post", "blog"),
     ),
     AgentSpec(
-        "illustrator", "Illustrator", "creative", "Paints the picture (fal.ai).", kind="image", jobs=("post", "blog")
+        "illustrator",
+        "Illustrator",
+        "creative",
+        "Paints the picture for the post.",
+        kind="image",
+        jobs=("post", "blog"),
     ),
     AgentSpec(
         "designer",

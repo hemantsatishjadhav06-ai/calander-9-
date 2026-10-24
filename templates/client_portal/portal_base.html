@@ -13,121 +13,69 @@
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body class="min-h-screen" style="background: var(--surface-1); font-family: var(--font-body); color: var(--text-primary);">
+<body class="min-h-screen bg-ink-50 text-ink-900">
     {% csrf_token %}
     <script nonce="{{ request.csp_nonce }}">
         document.body.addEventListener('htmx:configRequest', function(event) {
             event.detail.headers['X-CSRFToken'] = document.querySelector('[name=csrfmiddlewaretoken]').value;
         });
     </script>
+    <a href="#portal-main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-ink-900 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white">Skip to content</a>
 
-    <!-- Top bar -->
-    <header class="sticky top-0 z-30 border-b" style="background: var(--surface-0); border-color: var(--border);">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6">
-            <div class="flex items-center justify-between h-14">
-                <!-- Left: Logo + workspace -->
-                <div class="flex items-center gap-3 min-w-0">
+    {% with url_name=request.resolver_match.url_name %}
+    <!-- Top bar: the agency's mark and the client's workspace, then the sections as underline tabs -->
+    <header class="sticky top-0 z-30 border-b border-ink-200 bg-white">
+        <div class="mx-auto max-w-[960px] px-4 sm:px-6">
+            <div class="flex h-14 items-center justify-between gap-3">
+                <div class="flex min-w-0 items-center gap-2.5">
                     {% if workspace.organization.logo_url %}
                     <img src="{{ workspace.organization.logo_url }}" alt="" class="h-7 w-auto">
                     {% else %}
-                    <div class="w-7 h-7 rounded-md flex items-center justify-center text-white text-[11px] font-bold" style="background: var(--primary-strong);">
+                    <div class="flex size-7 flex-shrink-0 items-center justify-center rounded-[7px] bg-ink-900 text-[13px] font-semibold text-white" aria-hidden="true">
                         {{ workspace.name|make_list|first|upper }}
                     </div>
                     {% endif %}
-                    <span class="font-bold text-[0.9375rem] tracking-tight truncate max-w-[200px]" style="color: var(--text-primary);">{{ workspace.name }}</span>
+                    <span class="max-w-[220px] truncate text-[15px] font-semibold text-ink-950">{{ workspace.name }}</span>
                 </div>
-
-                <!-- Right: Nav + logout -->
-                <div class="flex items-center gap-1">
-                    <nav aria-label="Client portal" class="hidden lg:flex items-center gap-0.5 mr-3">
-                        <a href="{% url 'client_portal:dashboard' %}"
-                           class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'dashboard' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'dashboard' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                            Home
-                        </a>
-                        <a href="{% url 'client_portal:telegram' %}"
-                           class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name|slice:':8' == 'telegram' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name|slice:':8' == 'telegram' %}aria-current="page" style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>Telegram</a>
-                        <a href="{% url 'client_portal:approval_queue' %}"
-                           class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'approval_queue' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'approval_queue' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                            Approvals
-                        </a>
-                        <a href="{% url 'client_portal:team' %}"
-                           class="inline-flex items-center px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'team' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'team' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                            Talk to the team
-                            <span id="team-unread-desktop" hx-get="{% url 'client_portal:team_unread' %}" hx-trigger="load" hx-swap="outerHTML"></span>
-                        </a>
-                        <a href="{% url 'client_portal:published' %}"
-                           class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'published' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'published' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                            Published
-                        </a>
-                        <a href="{% url 'client_portal:reports' %}"
-                           class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'reports' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'reports' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                            Reports
-                        </a>
-                        <a href="{% url 'client_portal:activity' %}"
-                           class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if request.resolver_match.url_name == 'activity' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                           {% if request.resolver_match.url_name == 'activity' %}style="background: var(--primary-strong); color: white;"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                            Activity
-                        </a>
-                    </nav>
-                    <form method="post" action="{% url 'accounts:logout' %}" class="inline">
-                        {% csrf_token %}
-                        <button type="submit"
-                                class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors hover:bg-black/[0.04] cursor-pointer"
-                                style="color: var(--text-tertiary);">
-                            Log out
-                        </button>
-                    </form>
-                </div>
+                <form method="post" action="{% url 'accounts:logout' %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="ui-btn ui-btn-ghost ui-btn-sm">Log out</button>
+                </form>
             </div>
 
-            <!-- Mobile nav -->
-            <nav aria-label="Client portal" class="flex lg:hidden items-center gap-1 pb-2 -mx-1 overflow-x-auto">
-                <a href="{% url 'client_portal:dashboard' %}"
-                   class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'dashboard' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'dashboard' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                    Home
+            <!-- Desktop tabs -->
+            <nav aria-label="Client portal" class="ui-tabs -mb-px hidden border-b-0 lg:flex">
+                <a href="{% url 'client_portal:dashboard' %}" class="ui-tab" {% if url_name == 'dashboard' %}aria-current="page"{% endif %}>Home</a>
+                <a href="{% url 'client_portal:approval_queue' %}" class="ui-tab" {% if url_name == 'approval_queue' %}aria-current="page"{% endif %}>Approvals</a>
+                <a href="{% url 'client_portal:team' %}" class="ui-tab [&>span:empty]:hidden" {% if url_name == 'team' %}aria-current="page"{% endif %}>
+                    Talk to the team
+                    <span id="team-unread-desktop" hx-get="{% url 'client_portal:team_unread' %}" hx-trigger="load" hx-swap="outerHTML"></span>
                 </a>
-                <a href="{% url 'client_portal:telegram' %}"
-                   class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name|slice:':8' == 'telegram' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name|slice:':8' == 'telegram' %}aria-current="page" style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>Telegram</a>
-                <a href="{% url 'client_portal:approval_queue' %}"
-                   class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'approval_queue' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'approval_queue' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                    Approvals
-                </a>
-                <a href="{% url 'client_portal:team' %}"
-                   class="inline-flex items-center px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'team' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'team' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
+                <a href="{% url 'client_portal:published' %}" class="ui-tab" {% if url_name == 'published' %}aria-current="page"{% endif %}>Published</a>
+                <a href="{% url 'client_portal:reports' %}" class="ui-tab" {% if url_name == 'reports' %}aria-current="page"{% endif %}>Reports</a>
+                <a href="{% url 'client_portal:activity' %}" class="ui-tab" {% if url_name == 'activity' %}aria-current="page"{% endif %}>Activity</a>
+                <a href="{% url 'client_portal:telegram' %}" class="ui-tab" {% if url_name|slice:':8' == 'telegram' %}aria-current="page"{% endif %}>Telegram</a>
+            </nav>
+
+            <!-- Phone and tablet tabs (scroll sideways) -->
+            <nav aria-label="Client portal" class="ui-tabs -mx-4 -mb-px gap-5 border-b-0 px-4 sm:-mx-6 sm:px-6 lg:hidden">
+                <a href="{% url 'client_portal:dashboard' %}" class="ui-tab h-11 flex-shrink-0" {% if url_name == 'dashboard' %}aria-current="page"{% endif %}>Home</a>
+                <a href="{% url 'client_portal:approval_queue' %}" class="ui-tab h-11 flex-shrink-0" {% if url_name == 'approval_queue' %}aria-current="page"{% endif %}>Approvals</a>
+                <a href="{% url 'client_portal:team' %}" class="ui-tab h-11 flex-shrink-0 [&>span:empty]:hidden" {% if url_name == 'team' %}aria-current="page"{% endif %}>
                     Talk to the team
                     <span id="team-unread-mobile"></span>
                 </a>
-                <a href="{% url 'client_portal:published' %}"
-                   class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'published' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'published' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                    Published
-                </a>
-                <a href="{% url 'client_portal:reports' %}"
-                   class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'reports' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'reports' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                    Reports
-                </a>
-                <a href="{% url 'client_portal:activity' %}"
-                   class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full flex-shrink-0 transition-colors {% if request.resolver_match.url_name == 'activity' %}text-white{% else %}hover:bg-black/[0.04]{% endif %}"
-                   {% if request.resolver_match.url_name == 'activity' %}style="background: var(--primary-strong);"{% else %}style="color: var(--text-secondary);"{% endif %}>
-                    Activity
-                </a>
+                <a href="{% url 'client_portal:published' %}" class="ui-tab h-11 flex-shrink-0" {% if url_name == 'published' %}aria-current="page"{% endif %}>Published</a>
+                <a href="{% url 'client_portal:reports' %}" class="ui-tab h-11 flex-shrink-0" {% if url_name == 'reports' %}aria-current="page"{% endif %}>Reports</a>
+                <a href="{% url 'client_portal:activity' %}" class="ui-tab h-11 flex-shrink-0" {% if url_name == 'activity' %}aria-current="page"{% endif %}>Activity</a>
+                <a href="{% url 'client_portal:telegram' %}" class="ui-tab h-11 flex-shrink-0" {% if url_name|slice:':8' == 'telegram' %}aria-current="page"{% endif %}>Telegram</a>
             </nav>
         </div>
     </header>
+    {% endwith %}
 
     <!-- Main content -->
-    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+    <main id="portal-main" tabindex="-1" class="mx-auto max-w-[960px] px-4 pt-8 pb-16 sm:px-6">
         {% block content %}{% endblock %}
     </main>
 

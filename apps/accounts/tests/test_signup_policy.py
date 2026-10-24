@@ -106,7 +106,9 @@ class InviteOnlyTests(TestCase):
         landing = self.client.get("/")
         self.assertContains(landing, "Request early access")
         self.assertNotContains(landing, "Create your account")
-        self.assertContains(self.client.get(reverse("pricing")), "Request access")
+        pricing = self.client.get(reverse("pricing"))
+        self.assertContains(pricing, "Request early access")
+        self.assertNotContains(pricing, "Create account")
 
 
 @override_settings(SIGNUP_MODE="open")

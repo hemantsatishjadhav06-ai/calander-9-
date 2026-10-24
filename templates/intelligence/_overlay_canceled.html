@@ -1,14 +1,15 @@
-<div class="absolute inset-0 flex items-center justify-center bg-white/85 backdrop-blur-sm rounded-lg">
-  <div class="text-center max-w-md px-6">
-    <h2 class="text-lg font-semibold text-stone-900 mb-2">Subscription canceled</h2>
-    <p class="text-sm text-stone-600 mb-5">
+<div class="absolute inset-0 z-10 flex items-start justify-center rounded-2xl bg-white/85 px-4 pt-16 backdrop-blur-sm">
+  <div class="ui-card w-full max-w-md text-center shadow-lg" role="status">
+    <h2 class="text-h3 text-ink-950">Subscription canceled</h2>
+    <p class="mt-1.5 text-sm text-ink-700">
       Resubscribe to start using Intelligence again.
     </p>
     {% if can_manage_billing %}
-      <a href="{% url 'intelligence:subscribe' org_id=organization.id %}"
-         class="inline-flex items-center px-6 py-2 text-sm font-semibold text-white bg-orange-600 rounded-full hover:bg-orange-700 cursor-pointer">
-        Resubscribe →
+      <a href="{% url 'intelligence:subscribe' org_id=organization.id %}" class="ui-btn ui-btn-primary mt-5 no-underline">
+        Resubscribe
       </a>
+    {% else %}
+      <p class="mt-4 text-small text-ink-600">Ask an org admin to resubscribe.</p>
     {% endif %}
   </div>
 </div>

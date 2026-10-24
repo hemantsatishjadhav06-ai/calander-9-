@@ -160,7 +160,7 @@ def invite_member(request):
         )
     except ValueError as e:
         return HttpResponse(
-            f'<div class="text-red-600 text-sm p-3">{escape(str(e))}</div>',
+            f'<div class="text-danger-600 text-sm p-3">{escape(str(e))}</div>',
             status=422,
         )
 
@@ -298,7 +298,7 @@ def update_member_role(request, membership_id):
         services.update_member_org_role(request.org, membership, new_role, caller=request.user)
     except ValueError as e:
         return HttpResponse(
-            f'<div class="text-red-600 text-sm">{escape(str(e))}</div>',
+            f'<div class="text-danger-600 text-sm">{escape(str(e))}</div>',
             status=422,
         )
 
@@ -346,7 +346,7 @@ def remove_member(request, membership_id):
         services.remove_member(request.org, membership, request.user)
     except ValueError as e:
         return HttpResponse(
-            f'<div class="text-red-600 text-sm">{escape(str(e))}</div>',
+            f'<div class="text-danger-600 text-sm">{escape(str(e))}</div>',
             status=422,
         )
 

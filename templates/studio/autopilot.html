@@ -4,25 +4,25 @@
 {% block title %}Autopilot - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl min-w-0">
+<div class="max-w-[1180px] min-w-0">
     {# ---- Header: one sentence on what autopilot does right now ---- #}
-    <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
-        <div class="max-w-2xl min-w-0">
-            <h1 class="text-2xl sm:text-3xl text-stone-900" style="font-family: var(--font-display)">Autopilot</h1>
-            <p class="text-sm text-stone-700 mt-1" data-autopilot-summary>
+    <div class="flex flex-wrap items-start justify-between gap-4 mb-5">
+        <header class="max-w-2xl min-w-0">
+            <h1 class="ui-page-title">Autopilot</h1>
+            <p class="ui-page-status text-ink-700" data-autopilot-summary>
                 {% if row.pk and row.autopilot_enabled %}
                 Autopilot is on: {{ row.posts_per_week }} post{{ row.posts_per_week|pluralize }} a week{% with names=row.accounts.all %}{% if names %} on {% for account in names %}{{ account.get_platform_display }}{% if not forloop.last %}{% if forloop.revcounter == 2 %} and {% else %}, {% endif %}{% endif %}{% endfor %}{% endif %}{% endwith %}, planned on {% for value, name in weekdays %}{% if value == row.plan_weekday %}{{ name }}s{% endif %}{% endfor %} at {{ row.plan_hour|stringformat:"02d" }}:00.
                 {% else %}
                 Autopilot is off: your team only works when someone asks it to. Switch it on and it plans a week of posts for you to approve.
                 {% endif %}
             </p>
-            <p class="text-xs text-stone-600 mt-1" data-readiness-line>{% if operational.blockers or operational.warnings %}<a href="{{ operational.setup_url }}" class="font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">{{ operational.line }}</a>{% else %}{{ operational.line }}{% endif %}</p>
-        </div>
+            <p class="mt-1 text-[13px] text-ink-600" data-readiness-line>{% if operational.blockers or operational.warnings %}<a href="{{ operational.setup_url }}" class="font-medium link-inline max-lg:inline-block max-lg:py-3.5 max-lg:-my-3.5">{{ operational.line }}</a>{% else %}{{ operational.line }}{% endif %}</p>
+        </header>
         {% if can_plan %}
         <form method="post" action="{% url 'studio:autopilot_plan' workspace_id=workspace.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
             {% csrf_token %}
             <button type="submit" x-bind:disabled="busy" {% if not claude_ready %}disabled aria-disabled="true"{% endif %}
-                    class="px-4 py-2 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-orange-700">Plan next week now</button>
+                    class="ui-btn ui-btn-secondary">Plan next week now</button>
         </form>
         {% endif %}
     </div>
@@ -31,50 +31,50 @@
 
     <div class="grid xl:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
         {# ---- The settings: the switch and the few things that matter, then Advanced ---- #}
-        <form id="autopilot-form" method="post" action="{% url 'studio:autopilot' workspace_id=workspace.id %}" class="bg-white border border-stone-200 rounded-2xl px-5 py-2 shadow-sm min-w-0" novalidate>
+        <form id="autopilot-form" method="post" action="{% url 'studio:autopilot' workspace_id=workspace.id %}" class="ui-card py-1 min-w-0 max-lg:[&_input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden])]:min-h-11 max-lg:[&_select]:min-h-11" novalidate>
             {% csrf_token %}
-            {% if form.non_field_errors %}<div class="my-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
-            {% if not can_save %}<p class="my-3 text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">Only someone who manages this workspace's settings (usually the owner) can change autopilot.</p>{% endif %}
-            <fieldset {% if not can_save %}disabled{% endif %} class="divide-y divide-stone-200">
+            {% if form.non_field_errors %}<div role="alert" class="my-3 ui-callout ui-callout-danger text-sm"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+            {% if not can_save %}<p class="my-3 ui-callout text-sm"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg><span>Only someone who manages this workspace's settings (usually the owner) can change autopilot.</span></p>{% endif %}
+            <fieldset {% if not can_save %}disabled{% endif %} class="divide-y divide-ink-200">
                 <legend class="sr-only">Autopilot settings</legend>
 
                 <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                    <div>
-                        <label for="{{ form.autopilot_enabled.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.autopilot_enabled.label }}</label>
-                        <p class="text-xs text-stone-600">Plan and prepare posts every week. Every post still waits for your approval.</p>
+                    <div class="min-w-0">
+                        <label for="{{ form.autopilot_enabled.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.autopilot_enabled.label }}</label>
+                        <p class="text-[13px]/[18px] text-ink-600">Plan and prepare posts every week. Every post still waits for your approval.</p>
                     </div>
-                    <span class="inline-flex items-center gap-2 text-sm text-stone-800">{{ form.autopilot_enabled }}<span>On</span></span>
+                    <label for="{{ form.autopilot_enabled.id_for_label }}" class="inline-flex min-h-8 max-lg:min-h-11 items-center gap-2 text-sm text-ink-800 cursor-pointer">{{ form.autopilot_enabled }}<span>On</span></label>
                 </div>
 
                 <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                    <div>
-                        <label for="{{ form.posts_per_week.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.posts_per_week.label }}</label>
-                        <p class="text-xs text-stone-600">Spread across your best days and times.</p>
+                    <div class="min-w-0">
+                        <label for="{{ form.posts_per_week.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.posts_per_week.label }}</label>
+                        <p class="text-[13px]/[18px] text-ink-600">Spread across your best days and times.</p>
                     </div>
                     <div class="w-full sm:w-44">{{ form.posts_per_week }}</div>
                 </div>
 
                 <div class="py-4">
                     <fieldset>
-                        <legend class="text-sm font-semibold text-stone-900">{{ form.accounts.label }}</legend>
-                        <p class="text-xs text-stone-600 mb-2">Where the planned posts go.</p>
+                        <legend class="text-sm font-semibold text-ink-900">{{ form.accounts.label }}</legend>
+                        <p class="text-[13px]/[18px] text-ink-600 mb-2.5">Where the planned posts go.</p>
                         {% if form.accounts.field.queryset.exists %}
                         <div class="flex flex-wrap gap-2">
                             {% for choice in form.accounts %}
-                            <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm text-stone-800 bg-stone-50 border border-stone-200 cursor-pointer has-[:checked]:bg-orange-50 has-[:checked]:border-orange-200 has-[:checked]:text-orange-800">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+                            <label class="inline-flex min-h-9 max-lg:min-h-11 items-center gap-2 rounded-full bg-white px-3 text-[13px] font-medium text-ink-800 ring-1 ring-inset ring-ink-300 cursor-pointer hover:ring-ink-400 has-[:checked]:bg-brand-50 has-[:checked]:text-ink-950 has-[:checked]:ring-2 has-[:checked]:ring-brand-700">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
                             {% endfor %}
                         </div>
                         {% else %}
-                        <p class="text-sm text-stone-600"><a class="underline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect an account</a> first.</p>
+                        <p class="text-sm text-ink-600"><a class="link-inline" href="{% url 'social_accounts:connect' workspace_id=workspace.id %}">Connect an account</a> first.</p>
                         {% endif %}
-                        {% if form.accounts.errors %}<p class="mt-1 text-sm text-red-800">{{ form.accounts.errors|join:" " }}</p>{% endif %}
+                        {% if form.accounts.errors %}<p class="ui-error">{{ form.accounts.errors|join:" " }}</p>{% endif %}
                     </fieldset>
                 </div>
 
                 <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                    <div>
-                        <label for="{{ form.plan_weekday.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.plan_weekday.label }}</label>
-                        <p class="text-xs text-stone-600">Your team prepares next week's posts at this time ({{ tzname }}).{% if plan_due_now %} Next week is due: the planner starts within 15 minutes.{% elif next_plan %} Next: {{ next_plan|timezone:tzname|date:"D j M, H:i" }}.{% endif %}</p>
+                    <div class="min-w-0">
+                        <label for="{{ form.plan_weekday.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.plan_weekday.label }}</label>
+                        <p class="text-[13px]/[18px] text-ink-600">Your team prepares next week's posts at this time ({{ tzname }}).{% if plan_due_now %} Next week is due: the planner starts within 15 minutes.{% elif next_plan %} Next: <span class="tabular-nums">{{ next_plan|timezone:tzname|date:"D j M, H:i" }}</span>.{% endif %}</p>
                     </div>
                     <div class="flex gap-2 w-full sm:w-auto">
                         <div class="flex-1 sm:w-36">{{ form.plan_weekday }}</div>
@@ -83,156 +83,157 @@
                 </div>
 
                 <div class="flex flex-wrap sm:flex-nowrap items-start justify-between gap-3 py-4">
-                    <div>
-                        <label for="{{ form.blog_posts_per_month.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.blog_posts_per_month.label }}</label>
-                        <p class="text-xs text-stone-600">Written by the SEO team{% if row.blog_site %} for {{ row.blog_site.name }}{% endif %}, and sent to you for approval.</p>
+                    <div class="min-w-0">
+                        <label for="{{ form.blog_posts_per_month.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.blog_posts_per_month.label }}</label>
+                        <p class="text-[13px]/[18px] text-ink-600">Written by the SEO team{% if row.blog_site %} for {{ row.blog_site.name }}{% endif %}, and sent to you for approval.</p>
                     </div>
                     <div class="flex flex-col gap-2 w-full sm:w-64">
                         {{ form.blog_posts_per_month }}
                         <label for="{{ form.blog_site.id_for_label }}" class="sr-only">{{ form.blog_site.label }}</label>
                         {{ form.blog_site }}
-                        {% if form.blog_site.errors %}<p class="text-sm text-red-800">{{ form.blog_site.errors|join:" " }}</p>{% endif %}
+                        {% if form.blog_site.errors %}<p class="ui-error">{{ form.blog_site.errors|join:" " }}</p>{% endif %}
                     </div>
                 </div>
 
                 <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4" data-creation-mode-field>
-                    <div>
-                        <label for="{{ form.creation_mode.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.creation_mode.label }}</label>
-                        <p class="text-xs text-stone-600">{{ form.creation_mode.help_text }}</p>
+                    <div class="min-w-0">
+                        <label for="{{ form.creation_mode.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.creation_mode.label }}</label>
+                        <p class="text-[13px]/[18px] text-ink-600">{{ form.creation_mode.help_text }}</p>
                     </div>
-                    <div class="w-full sm:w-64">{{ form.creation_mode }}{% if form.creation_mode.errors %}<p class="mt-1 text-sm text-red-800">{{ form.creation_mode.errors|join:" " }}</p>{% endif %}</div>
+                    <div class="w-full sm:w-64">{{ form.creation_mode }}{% if form.creation_mode.errors %}<p class="ui-error">{{ form.creation_mode.errors|join:" " }}</p>{% endif %}</div>
                 </div>
             </fieldset>
 
-            <details class="py-4 border-t border-stone-200" data-autopilot-advanced{% if advanced_open %} open{% endif %}>
-                <summary class="cursor-pointer text-sm font-semibold text-stone-900 rounded focus-visible:outline-2 focus-visible:outline-orange-700">Advanced <span class="font-normal text-stone-600">· approvers, budget, hold time, pillars, learning, inbox drafts</span></summary>
-                <fieldset {% if not can_save %}disabled{% endif %} class="divide-y divide-stone-200 mt-2">
+            <details class="group/adv py-4 border-t border-ink-200" data-autopilot-advanced{% if advanced_open %} open{% endif %}>
+                <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md [&::-webkit-details-marker]:hidden"><span class="text-sm font-semibold text-ink-900">Advanced <span class="font-normal text-ink-600">· approvers, budget, hold time, pillars, learning, inbox drafts</span></span><svg class="w-4 h-4 flex-shrink-0 text-ink-500 transition-transform group-open/adv:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+                <fieldset {% if not can_save %}disabled{% endif %} class="divide-y divide-ink-200 mt-2">
                     <legend class="sr-only">Advanced autopilot settings</legend>
 
                     <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                        <div>
-                            <label for="{{ form.lead.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.lead.label }}</label>
-                            <p class="text-xs text-stone-600">An owner or manager; approval requests come from them.</p>
+                        <div class="min-w-0">
+                            <label for="{{ form.lead.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.lead.label }}</label>
+                            <p class="text-[13px]/[18px] text-ink-600">An owner or manager; approval requests come from them.</p>
                         </div>
                         <div class="w-full sm:w-64">
                             {{ form.lead }}
-                            {% if form.lead.errors %}<p class="mt-1 text-sm text-red-800">{{ form.lead.errors|join:" " }}</p>{% endif %}
+                            {% if form.lead.errors %}<p class="ui-error">{{ form.lead.errors|join:" " }}</p>{% endif %}
                         </div>
                     </div>
 
                     <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                        <div><label for="{{ form.backup.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.backup.label }}</label><p class="text-xs text-stone-600">Gets the reminder before a proposed post becomes overdue. A different approver.</p></div>
-                        <div class="w-full sm:w-64">{{ form.backup }}{{ form.backup.errors }}</div>
+                        <div class="min-w-0"><label for="{{ form.backup.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.backup.label }}</label><p class="text-[13px]/[18px] text-ink-600">Gets the reminder before a proposed post becomes overdue. A different approver.</p></div>
+                        <div class="w-full sm:w-64">{{ form.backup }}{% if form.backup.errors %}<p class="ui-error">{{ form.backup.errors|join:" " }}</p>{% endif %}</div>
                     </div>
 
                     <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                        <div>
-                            <label for="{{ form.monthly_budget_usd.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.monthly_budget_usd.label }}</label>
-                            <p class="text-xs text-stone-600">A soft limit. New work pauses once the month's recorded total reaches it. This month: ${{ spend|floatformat:2 }} of ${{ budget|floatformat:2 }}.</p>
+                        <div class="min-w-0">
+                            <label for="{{ form.monthly_budget_usd.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.monthly_budget_usd.label }}</label>
+                            <p class="text-[13px]/[18px] text-ink-600">A soft limit. New work pauses once the month's recorded total reaches it. This month: <span class="tabular-nums">${{ spend|floatformat:2 }} of ${{ budget|floatformat:2 }}</span>.</p>
                         </div>
                         <div class="w-full sm:w-36">
                             {{ form.monthly_budget_usd }}
-                            {% if form.monthly_budget_usd.errors %}<p class="mt-1 text-sm text-red-800">{{ form.monthly_budget_usd.errors|join:" " }}</p>{% endif %}
+                            {% if form.monthly_budget_usd.errors %}<p class="ui-error">{{ form.monthly_budget_usd.errors|join:" " }}</p>{% endif %}
                         </div>
                     </div>
 
                     <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                        <div><label for="{{ form.delivery_delay_minutes.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.delivery_delay_minutes.label }}</label><p class="text-xs text-stone-600">Late approved posts are held this long for a fresh look and a new time. Default: 1,440 minutes (24 hours).</p></div>
-                        <div class="w-full sm:w-44">{{ form.delivery_delay_minutes }}{{ form.delivery_delay_minutes.errors }}</div>
+                        <div class="min-w-0"><label for="{{ form.delivery_delay_minutes.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.delivery_delay_minutes.label }}</label><p class="text-[13px]/[18px] text-ink-600">Late approved posts are held this long for a fresh look and a new time. Default: 1,440 minutes (24 hours).</p></div>
+                        <div class="w-full sm:w-44">{{ form.delivery_delay_minutes }}{% if form.delivery_delay_minutes.errors %}<p class="ui-error">{{ form.delivery_delay_minutes.errors|join:" " }}</p>{% endif %}</div>
                     </div>
 
                     <div class="grid sm:grid-cols-[minmax(0,1fr)_16rem] gap-3 py-4">
-                        <div>
-                            <label for="{{ form.pillars.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.pillars.label }}</label>
-                            <p class="text-xs text-stone-600">What the planner rotates between. One per line, up to eight.</p>
+                        <div class="min-w-0">
+                            <label for="{{ form.pillars.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.pillars.label }}</label>
+                            <p class="text-[13px]/[18px] text-ink-600">What the planner rotates between. One per line, up to eight.</p>
                         </div>
                         <div>
                             {{ form.pillars }}
-                            {% if form.pillars.errors %}<p class="mt-1 text-sm text-red-800">{{ form.pillars.errors|join:" " }}</p>{% endif %}
+                            {% if form.pillars.errors %}<p class="ui-error">{{ form.pillars.errors|join:" " }}</p>{% endif %}
                         </div>
                     </div>
 
                     <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                        <div>
-                            <label for="{{ form.learn_from_best.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.learn_from_best.label }}</label>
-                            <p class="text-xs text-stone-600">Let the art director start from your best creatives and references, not only the last post.</p>
+                        <div class="min-w-0">
+                            <label for="{{ form.learn_from_best.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.learn_from_best.label }}</label>
+                            <p class="text-[13px]/[18px] text-ink-600">Let the art director start from your best creatives and references, not only the last post.</p>
                         </div>
-                        <span class="inline-flex items-center gap-2 text-sm text-stone-800">{{ form.learn_from_best }}<span>On</span></span>
+                        <label for="{{ form.learn_from_best.id_for_label }}" class="inline-flex min-h-8 max-lg:min-h-11 items-center gap-2 text-sm text-ink-800 cursor-pointer">{{ form.learn_from_best }}<span>On</span></label>
                     </div>
 
                     <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 py-4">
-                        <div>
-                            <label for="{{ form.inbox_drafts_enabled.id_for_label }}" class="text-sm font-semibold text-stone-900">{{ form.inbox_drafts_enabled.label }}</label>
-                            <p class="text-xs text-stone-600">Drafts only: a person reads and sends every reply.</p>
+                        <div class="min-w-0">
+                            <label for="{{ form.inbox_drafts_enabled.id_for_label }}" class="text-sm font-semibold text-ink-900">{{ form.inbox_drafts_enabled.label }}</label>
+                            <p class="text-[13px]/[18px] text-ink-600">Drafts only: a person reads and sends every reply.</p>
                         </div>
-                        <span class="inline-flex items-center gap-2 text-sm text-stone-800">{{ form.inbox_drafts_enabled }}<span>On</span></span>
+                        <label for="{{ form.inbox_drafts_enabled.id_for_label }}" class="inline-flex min-h-8 max-lg:min-h-11 items-center gap-2 text-sm text-ink-800 cursor-pointer">{{ form.inbox_drafts_enabled }}<span>On</span></label>
                     </div>
                 </fieldset>
             </details>
 
             {% if can_save %}
-            <div class="flex justify-end py-4 border-t border-stone-200">
-                <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-lg hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Save</button>
+            <div class="flex justify-end py-4 border-t border-ink-200">
+                <button type="submit" class="ui-btn ui-btn-primary max-sm:w-full">Save</button>
             </div>
             {% endif %}
         </form>
 
         <aside class="space-y-6 min-w-0">
             {# ---- The promise ---- #}
-            <section aria-labelledby="promise-heading" class="bg-green-50 border border-green-700 rounded-2xl p-5">
-                <h2 id="promise-heading" class="text-base font-semibold text-green-800">Nothing goes out without you</h2>
-                <p class="text-sm text-stone-800 mt-1">Autopilot prepares drafts and proposes times. A person with approval rights approves every post and article; only then is it scheduled.</p>
+            <section aria-labelledby="promise-heading" class="ui-callout">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+                <div class="min-w-0">
+                    <h2 id="promise-heading" class="ui-callout-title">Nothing goes out without you</h2>
+                    <p class="mt-1">Autopilot prepares drafts and proposes times. A person with approval rights approves every post and article; only then is it scheduled.</p>
+                </div>
             </section>
 
             {# ---- Last run ---- #}
-            <section aria-labelledby="last-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+            <section aria-labelledby="last-heading" class="ui-card">
                 {% if last %}
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h2 id="last-heading" class="text-sm font-semibold text-stone-900">Last run · week of {{ last.week.week_start|date:"D j M" }}</h2>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold {% if last.week.status == 'planned' %}bg-green-50 text-green-800{% elif last.week.status == 'planning' %}bg-indigo-50 text-indigo-800{% elif last.week.status == 'failed' %}bg-red-50 text-red-800{% else %}bg-stone-100 text-stone-700{% endif %}">{{ last.week.get_status_display }}</span>
+                    <h2 id="last-heading" class="text-h3 text-ink-950">Last run · week of {{ last.week.week_start|date:"D j M" }}</h2>
+                    {% if last.week.status == 'planned' %}{% include "studio/partials/pill.html" with tone="success" icon="check" label=last.week.get_status_display data_state="" %}{% elif last.week.status == 'planning' %}{% include "studio/partials/pill.html" with tone="info" icon="spinner" label=last.week.get_status_display data_state="" %}{% elif last.week.status == 'failed' %}{% include "studio/partials/pill.html" with tone="danger" icon="x" label=last.week.get_status_display data_state="" %}{% else %}{% include "studio/partials/pill.html" with tone="neutral" icon="dash" label=last.week.get_status_display data_state="" %}{% endif %}
                 </div>
-                <ul class="mt-2 space-y-1.5 text-sm text-stone-700">
+                <ul class="mt-3 space-y-1.5 text-[13px]/[18px] text-ink-700 list-disc pl-4 marker:text-ink-400">
                     {% if last.job %}
-                    <li>• {{ last.planned }} post{{ last.planned|pluralize }} planned, {{ last.made }} made, {{ last.approved }} approved, {{ last.changed }} changed{% if last.working %} · {{ last.working }} still with the team{% endif %}</li>
+                    <li class="tabular-nums">{{ last.planned }} post{{ last.planned|pluralize }} planned, {{ last.made }} made, {{ last.approved }} approved, {{ last.changed }} changed{% if last.working %} · {{ last.working }} still with the team{% endif %}</li>
                     {% endif %}
                     {% for note in last.notes %}
-                    <li class="break-words">• {{ note.agent }}: {{ note.summary|truncatechars:140 }}</li>
+                    <li class="break-words">{{ note.agent }}: {{ note.summary|truncatechars:140 }}</li>
                     {% endfor %}
-                    {% if last.week.note %}<li class="break-words">• {{ last.week.note }}</li>{% endif %}
+                    {% if last.week.note %}<li class="break-words">{{ last.week.note }}</li>{% endif %}
                 </ul>
                 {% if last.job %}
-                <a href="{% url 'studio:job' workspace_id=workspace.id job_id=last.job.id %}" class="inline-block mt-3 text-sm font-semibold text-orange-800 underline rounded focus-visible:outline-2 focus-visible:outline-orange-700">Open the plan</a>
+                <a href="{% url 'studio:job' workspace_id=workspace.id job_id=last.job.id %}" class="mt-3 ui-link inline-flex min-h-8 items-center">Open the plan</a>
                 {% endif %}
                 {% else %}
-                <h2 id="last-heading" class="text-sm font-semibold text-stone-900">No weeks planned yet</h2>
-                <p class="text-sm text-stone-600 mt-1">Switch autopilot on and save, or press “Plan next week now” to see what the planner proposes.</p>
+                <h2 id="last-heading" class="text-h3 text-ink-950">No weeks planned yet</h2>
+                <p class="text-[13px]/[18px] text-ink-600 mt-1">Switch autopilot on and save, or press “Plan next week now” to see what the planner proposes.</p>
                 {% endif %}
             </section>
 
             {# ---- Weekly reports ---- #}
-            <section aria-labelledby="reports-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
-                <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
-                    <div>
-                        <h2 id="reports-heading" class="text-sm font-semibold text-stone-900">Weekly client reports</h2>
-                        <p class="text-xs text-stone-600">Written every Monday morning while autopilot is on. Your clients see them in their portal.</p>
-                    </div>
+            <section aria-labelledby="reports-heading" class="ui-card">
+                <div class="mb-3">
+                    <h2 id="reports-heading" class="text-h3 text-ink-950">Weekly client reports</h2>
+                    <p class="text-[13px]/[18px] text-ink-600">Written every Monday morning while autopilot is on. Your clients see them in their portal.</p>
                     {% if can_report %}
-                    <form method="post" action="{% url 'studio:autopilot_report' workspace_id=workspace.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                    <form method="post" action="{% url 'studio:autopilot_report' workspace_id=workspace.id %}" class="mt-3" x-data="{ busy: false }" x-on:submit="busy = true">
                         {% csrf_token %}
-                        <button type="submit" x-bind:disabled="busy" {% if not claude_ready %}disabled aria-disabled="true"{% endif %} class="px-3 py-1.5 text-sm font-semibold text-orange-800 bg-orange-50 rounded-lg hover:bg-orange-100 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-orange-700">Write last week's report</button>
+                        <button type="submit" x-bind:disabled="busy" {% if not claude_ready %}disabled aria-disabled="true"{% endif %} class="ui-btn ui-btn-sm ui-btn-tinted">Write last week's report</button>
                     </form>
                     {% endif %}
                 </div>
                 {% if reports %}
-                <div class="space-y-4 divide-y divide-stone-200">
+                <div class="divide-y divide-ink-200 border-t border-ink-200">
                     {% for report in reports %}
-                    <div class="{% if not forloop.first %}pt-4{% endif %}">
+                    <div class="py-4 last:pb-0">
                         {% include "studio/partials/report_card.html" with report=report compact=forloop.counter0 %}
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-sm text-stone-600">No reports yet.</p>
+                <p class="text-sm text-ink-600">No reports yet.</p>
                 {% endif %}
             </section>
         </aside>

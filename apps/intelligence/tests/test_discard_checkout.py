@@ -402,7 +402,7 @@ class SubscribeTemplateBranchingTests(TestCase):
     def test_no_attempt_renders_plan_picker_form(self):
         html = self._render()
         assert "Choose a plan" in html
-        assert "Discard Checkout Session" not in html
+        assert "Discard checkout session" not in html
         assert 'name="plan"' in html
 
     def test_resumable_renders_discard_form_and_hides_picker(self):
@@ -415,7 +415,7 @@ class SubscribeTemplateBranchingTests(TestCase):
         )
         html = self._render(resumable_attempt=attempt)
         assert "Resume your checkout" in html
-        assert "Discard Checkout Session" in html
+        assert "Discard checkout session" in html
         # Plan picker is suppressed — no radios, no "Choose a plan".
         assert "Choose a plan" not in html
         assert 'name="plan"' not in html
@@ -429,5 +429,5 @@ class SubscribeTemplateBranchingTests(TestCase):
         html = self._render(in_flight_attempt=attempt)
         assert "Setting up your checkout" in html
         # The discard CTA is only on the resume card, not the spinner card.
-        assert "Discard Checkout Session" not in html
+        assert "Discard checkout session" not in html
         assert "Choose a plan" not in html

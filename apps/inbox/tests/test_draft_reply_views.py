@@ -68,6 +68,45 @@ def test_save_reply_draft_creates_draft(client, workspace, account, message, org
 
 
 @pytest.mark.django_db
+def test_save_as_draft_button_disables_itself(client, workspace, account, message, org_owner, user):
+    """The reply form's ``hx-disabled-elt="find button[type=submit]"`` is inherited by
+    htmx; on the nested Save as draft button ``find`` looks inside that button,
+    matches nothing and htmx logs an error on every save. The button names itself.
+    """
+    import re
+
+    _member(workspace, user, WorkspaceMembership.WorkspaceRole.OWNER)
+    client.force_login(user)
+
+    resp = client.get(_url(workspace, f"{message.id}/"), HTTP_HX_REQUEST="true")
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    draft_button = re.search(r"<button[^>]*/reply/draft/[^>]*>", html, flags=re.S)
+    assert draft_button, "the Save as draft button is rendered"
+    assert 'hx-disabled-elt="this"' in draft_button.group(0)
+
+
+@pytest.mark.django_db
+def test_inbox_rows_are_one_button_beside_the_checkbox(client, workspace, account, message, org_owner, user):
+    """A row was role=button with the selection checkbox inside it (a control nested in a
+    control, and the checkbox had no clear space). The row opens through one named button;
+    the checkbox sits beside it, not inside."""
+    import re
+
+    _member(workspace, user, WorkspaceMembership.WorkspaceRole.OWNER)
+    client.force_login(user)
+
+    html = client.get(_url(workspace, "")).content.decode()
+
+    row = re.search(rf'<div id="msg-{message.id}"[^>]*>', html, flags=re.S)
+    assert row, "the message row is rendered"
+    assert 'role="button"' not in row.group(0) and "tabindex" not in row.group(0)
+    assert re.search(r'<button type="button"[^>]*aria-label="(Unread\. )?Comment from Ada"', html, flags=re.S)
+    assert 'aria-label="Select message from Ada"' in html
+
+
+@pytest.mark.django_db
 def test_save_reply_draft_denied_for_viewer(client, workspace, account, message, org_owner, user):
     _member(workspace, user, WorkspaceMembership.WorkspaceRole.VIEWER)
     client.force_login(user)

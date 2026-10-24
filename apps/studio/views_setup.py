@@ -64,7 +64,7 @@ def _post(label: str, url: str, **fields: str) -> dict[str, Any] | None:
     return {"label": label, "url": url, "method": "post", "fields": fields} if url else None
 
 
-def _row(key, title, state, status, *, action=None, detail="", note="") -> dict[str, Any]:
+def _row(key, title, state, status, *, action=None, detail="", note="", link=None) -> dict[str, Any]:
     return {
         "key": key,
         "title": title,
@@ -73,6 +73,7 @@ def _row(key, title, state, status, *, action=None, detail="", note="") -> dict[
         "action": action,
         "detail": detail,  # owners only: the exact names to set
         "note": note,
+        "link": link,  # optional standalone link under the status (a place to see the result)
     }
 
 
@@ -190,6 +191,7 @@ def _autopilot_row(workspace, row: AgencySettings, can_manage: bool) -> dict[str
             f"On · {n} post{'s' if n != 1 else ''} a week, planned every {_weekday_name(row.plan_weekday)} "
             f"at {row.plan_hour:02d}:00. Every post still waits for your approval.",
             action=_link("Change", autopilot_url),
+            link=_link("See your team at work", _url("studio:team", workspace_id=workspace.pk)),
         )
     status = "Off. The team only works when someone asks it to."
     if can_manage:

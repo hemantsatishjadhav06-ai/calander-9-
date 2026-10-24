@@ -5,58 +5,40 @@ Context:
   accounts                — list of connected SocialAccounts in that workspace
   grantable_permissions   — list of (perm_key, label) the issuer can grant
 {% endcomment %}
-<div>
-    <label class="block text-sm font-semibold mb-1" style="color: var(--text-primary);">
-        Connected accounts
-    </label>
+<fieldset>
+    <legend class="ui-label">Connected accounts</legend>
     {% if accounts %}
-    <div class="space-y-1.5">
+    <div class="ui-list rounded-xl ring-1 ring-inset ring-ink-200">
         {% for sa in accounts %}
-        <label class="flex items-center gap-2 text-sm px-2 py-1.5 rounded cursor-pointer"
-               style="background: var(--surface-1, #F9FAFB); border: 1px solid var(--border);">
-            <input type="checkbox" name="social_account_ids" value="{{ sa.id }}"
-                   class="w-4 h-4">
-            <span class="font-mono text-xs" style="color: var(--text-tertiary);">{{ sa.platform }}</span>
-            <span style="color: var(--text-primary);">{{ sa.account_name }}</span>
+        <label class="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-ink-25">
+            <input type="checkbox" name="social_account_ids" value="{{ sa.id }}" class="ui-checkbox shrink-0">
+            <span class="text-sm text-ink-900">{{ sa.account_name }}</span>
+            <span class="ml-auto text-caption text-ink-500">{{ sa.get_platform_display }}</span>
         </label>
         {% endfor %}
     </div>
-    <p class="text-xs mt-1" style="color: var(--text-tertiary);">
-        Select at least one. The key can only act on these accounts.
-    </p>
+    <p class="ui-help">Pick at least one. The key can only act on these accounts.</p>
     {% else %}
-    <p class="text-xs px-3 py-2 rounded-lg"
-       style="background: var(--warning-soft, #FEF3C7); color: var(--warning-700, #B45309);">
-        No connected accounts in this workspace. Connect one before issuing a key.
-    </p>
+    <p class="ui-callout ui-callout-warning !p-3">No connected accounts in this workspace. Connect one before making a key.</p>
     {% endif %}
-</div>
+</fieldset>
 
-<div>
-    <label class="block text-sm font-semibold mb-1" style="color: var(--text-primary);">
-        Permissions
-    </label>
+<fieldset>
+    <legend class="ui-label">Permissions</legend>
     {% if grantable_permissions %}
-    <div class="space-y-1.5">
+    <div class="ui-list rounded-xl ring-1 ring-inset ring-ink-200">
         {% for perm_key, label in grantable_permissions %}
-        <label class="flex items-start gap-2 text-sm px-2 py-1.5 rounded cursor-pointer"
-               style="background: var(--surface-1, #F9FAFB); border: 1px solid var(--border);">
-            <input type="checkbox" name="permissions" value="{{ perm_key }}"
-                   class="w-4 h-4 mt-0.5">
-            <span>
-                <span class="font-mono text-xs" style="color: var(--text-tertiary);">{{ perm_key }}</span>
-                <span class="block text-xs" style="color: var(--text-secondary);">{{ label }}</span>
+        <label class="flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-ink-25">
+            <input type="checkbox" name="permissions" value="{{ perm_key }}" class="ui-checkbox mt-0.5 shrink-0">
+            <span class="min-w-0">
+                <span class="block text-sm text-ink-900">{{ label }}</span>
+                <span class="block font-mono text-caption text-ink-500">{{ perm_key }}</span>
             </span>
         </label>
         {% endfor %}
     </div>
-    <p class="text-xs mt-1" style="color: var(--text-tertiary);">
-        Only permissions you currently hold in this workspace are listed.
-    </p>
+    <p class="ui-help">Only permissions you hold in this workspace are listed.</p>
     {% else %}
-    <p class="text-xs px-3 py-2 rounded-lg"
-       style="background: var(--warning-soft, #FEF3C7); color: var(--warning-700, #B45309);">
-        You don't hold any grantable permissions in this workspace.
-    </p>
+    <p class="ui-callout ui-callout-warning !p-3">You don't hold any permissions you can give in this workspace.</p>
     {% endif %}
-</div>
+</fieldset>

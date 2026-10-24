@@ -3,6 +3,9 @@ Scoped toast host for the approval surfaces (publish tab, composer, client porta
 Fires on an `HX-Trigger: {"showToast": {tone,title,body}}` response header — htmx
 dispatches a `showToast` event whose `event.detail` is the payload. tone ∈
 success|info|warn|error. Self-contained: not added to base.html (app shell untouched).
+Design system 10.8: success and info leave after 6 s (or `duration`), and the timer pauses while
+the pointer or keyboard focus is on the toast; errors and warnings stay until dismissed, and an
+error is announced as an alert. Every toast has a Dismiss button.
 Include this ONCE per page, OUTSIDE any htmx-refetched region, so a list refresh
 fired by the same response doesn't tear down the toast before it's seen.
 {% endcomment %}
@@ -18,10 +21,16 @@ fired by the same response doesn't tear down the toast before it's seen.
      so explicit cursor utilities still win; disabled buttons stay not-allowed. */
   button { cursor: pointer; }
   button:disabled, button[disabled] { cursor: not-allowed; }
-  #bb-toast-host { position:fixed; z-index:200; bottom:1.5rem; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:.5rem; pointer-events:none; }
-  .bb-toast { display:flex; align-items:center; gap:.625rem; padding:.625rem 1rem .625rem .75rem; border-radius:.75rem; color:#fff; box-shadow:0 12px 30px rgba(23,20,18,.32); animation:bb-toastPop 240ms cubic-bezier(.16,1,.3,1); pointer-events:auto; }
-  .bb-toast-title { font-size:.8125rem; font-weight:600; line-height:1.2; }
-  .bb-toast-body { font-size:.75rem; color:#A8A29E; line-height:1.2; }
+  /* The dark toast (design system: toast): ink-900, a status-coloured icon, white title, ink-300 detail. */
+  #bb-toast-host { position:fixed; z-index:200; bottom:1.5rem; right:1.5rem; display:flex; flex-direction:column; align-items:flex-end; gap:.5rem; pointer-events:none; }
+  @media (max-width: 639px) { #bb-toast-host { left:1rem; right:1rem; bottom:1rem; align-items:stretch; } }
+  .bb-toast { display:flex; align-items:flex-start; gap:.75rem; max-width:420px; padding:.75rem .875rem; border-radius:var(--radius-xl); background:var(--ink-900); color:#fff; box-shadow:var(--shadow-lg); animation:bb-toastPop 240ms var(--ease-out); pointer-events:auto; }
+  .bb-toast-title { font-size:.875rem; font-weight:500; line-height:1.25rem; }
+  .bb-toast-body { font-size:.8125rem; color:var(--ink-300); line-height:1.125rem; }
+  .bb-toast-close { flex:none; display:grid; place-items:center; width:32px; height:32px; margin:-6px -6px -6px auto; border:0; border-radius:var(--radius-lg); background:transparent; color:var(--ink-300); }
+  .bb-toast-close:hover { color:#fff; background:rgb(255 255 255 / .1); }
+  .bb-toast-close:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+  @media (max-width: 1023px) { .bb-toast-close { width:44px; height:44px; margin:-12px -12px -12px auto; } }
 </style>
 <div id="bb-toast-host" aria-live="polite" aria-atomic="true"></div>
 <script nonce="{{ request.csp_nonce }}">
@@ -29,10 +38,10 @@ fired by the same response doesn't tear down the toast before it's seen.
   if (window.__bbToastInit) return;
   window.__bbToastInit = true;
   var TONES = {
-    success: { accent: '#34D399', bg: '#1C1917', icon: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>' },
-    info:    { accent: '#FB923C', bg: '#1C1917', icon: '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>' },
-    warn:    { accent: '#FBBF24', bg: '#1C1917', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
-    error:   { accent: '#FCA5A5', bg: '#7F1D1D', icon: '<path d="M6 18L18 6M6 6l12 12"/>' },
+    success: { accent: 'var(--success-300)', bg: 'var(--ink-900)', icon: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>' },
+    info:    { accent: 'var(--info-300)', bg: 'var(--ink-900)', icon: '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>' },
+    warn:    { accent: 'var(--warning-300)', bg: 'var(--ink-900)', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
+    error:   { accent: 'var(--danger-300)', bg: 'var(--ink-900)', icon: '<path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><path d="M15 9l-6 6M9 9l6 6"/>' },
   };
   function render(detail) {
     if (!detail || !detail.title) return;
@@ -42,13 +51,42 @@ fired by the same response doesn't tear down the toast before it's seen.
     var el = document.createElement('div');
     el.className = 'bb-toast';
     el.style.background = t.bg;
+    var persists = detail.tone === 'error' || detail.tone === 'warn';
+    if (detail.tone === 'error') el.setAttribute('role', 'alert');
     el.innerHTML =
-      '<span style="color:' + t.accent + ';display:flex"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + t.icon + '</svg></span>' +
-      '<div><div class="bb-toast-title"></div>' + (detail.body ? '<div class="bb-toast-body"></div>' : '') + '</div>';
+      '<span style="color:' + t.accent + ';display:flex;margin-top:1px" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + t.icon + '</svg></span>' +
+      '<div style="flex:1;min-width:0"><div class="bb-toast-title"></div>' + (detail.body ? '<div class="bb-toast-body"></div>' : '') + '</div>' +
+      '<button type="button" class="bb-toast-close" aria-label="Dismiss"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>';
     el.querySelector('.bb-toast-title').textContent = detail.title;
     if (detail.body) el.querySelector('.bb-toast-body').textContent = detail.body;
     host.appendChild(el);
-    setTimeout(function () { el.remove(); }, detail.duration || 3400);
+
+    var timer = null;
+    var remaining = detail.duration || 6000;
+    var startedAt = 0;
+    function dismiss() {
+      if (timer) clearTimeout(timer);
+      // Keep keyboard focus on the page rather than losing it with the toast.
+      if (el.contains(document.activeElement) && document.activeElement.blur) document.activeElement.blur();
+      el.remove();
+    }
+    function start() {
+      if (persists || timer) return;
+      startedAt = Date.now();
+      timer = setTimeout(dismiss, remaining);
+    }
+    function pause() {
+      if (!timer) return;
+      clearTimeout(timer);
+      timer = null;
+      remaining = Math.max(1000, remaining - (Date.now() - startedAt));
+    }
+    el.querySelector('.bb-toast-close').addEventListener('click', dismiss);
+    el.addEventListener('mouseenter', pause);
+    el.addEventListener('mouseleave', function () { if (!el.contains(document.activeElement)) start(); });
+    el.addEventListener('focusin', pause);
+    el.addEventListener('focusout', function (e) { if (!el.contains(e.relatedTarget) && !el.matches(':hover')) start(); });
+    start();
   }
   document.body.addEventListener('showToast', function (e) { render(e.detail); });
 })();

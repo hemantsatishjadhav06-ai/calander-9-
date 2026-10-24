@@ -1,0 +1,35 @@
+{% comment %}
+One post on the calendar grid (month, week and day). Var: pp (a PlatformPost), workspace.
+The tone (fill, hairline and status shape) comes from .post-chip.status-* in calendar.html;
+the words stay ink so every chip reads at 15:1. The status is also spoken (sr-only), so the
+shape and colour are never the only cue. `.post-chip.is-draggable` and data-platform-post-id
+are the drag-and-drop hooks in calendarApp().
+{% endcomment %}
+{% load approval_extras %}
+<a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=pp.post_id %}?account={{ pp.social_account_id }}"
+   class="post-chip status-{{ pp.status }}{% if pp.is_reschedulable %} is-draggable{% endif %}"
+   title="{{ pp.status|status_label }} · {% if pp.is_reschedulable %}Move or open{% else %}Open{% endif %}"
+   {% if pp.is_reschedulable %}draggable="true" data-platform-post-id="{{ pp.id }}"{% else %}draggable="false"{% endif %}>
+    {% if pp.is_bulk_selectable %}{% include "calendar/partials/_select_checkbox.html" with pp_id=pp.id %}{% endif %}
+    <span class="chip-dot" aria-hidden="true"></span>
+    <span class="sr-only">{{ pp.status|status_label }}:</span>
+    <span class="chip-glyph" aria-hidden="true">{% include "partials/_platform_icon.html" with platform=pp.social_account.platform size="sm" %}</span>
+    {% with first_media=pp.post.media_attachments.all.0 %}
+    {% if first_media and first_media.media_asset.thumbnail %}
+    <img src="{{ first_media.media_asset.thumbnail.url }}" alt="" class="chip-thumb">
+    {% elif first_media and not first_media.media_asset.is_video %}
+    <img src="{{ first_media.media_asset.file.url }}" alt="" class="chip-thumb">
+    {% elif first_media and first_media.media_asset.is_video %}
+    <video src="{{ first_media.media_asset.file.url }}#t=0.5" class="chip-thumb" muted preload="metadata"></video>
+    {% endif %}
+    {% endwith %}
+    <span class="truncate">{{ pp.post.title|default:pp.post.caption_snippet|truncatechars:28 }}</span>
+    {% if pp.post.recurrence_rule %}
+    <svg class="w-3 h-3 flex-shrink-0 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-label="Repeats" role="img"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+    {% endif %}
+    {% if pp.takes_calendar_slot %}
+    <span class="calendar-post-slot-check" title="Scheduled in a channel slot">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    </span>
+    {% endif %}
+</a>

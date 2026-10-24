@@ -1,5 +1,24 @@
 {% load allauth %}
-{% for field in attrs.form %}
-    {% element field field=field %}
-    {% endelement %}
+{% comment %}
+allauth renders whole forms through this element ({% element fields form=form %}): the password
+change and set pages, reauthentication, the email page and the third-party sign-up. Each visible
+field goes through account/_field.html, the markup the sign-in cards use, so names, ids, types,
+labels and errors come from the form and passwords are never echoed back. (The element field.html
+takes explicit attributes; handing it the bound field alone drew nameless, unlabelled inputs.)
+{% endcomment %}
+{% with form=attrs.form %}
+{% include "account/_form_errors.html" %}
+{% for bound_field in form %}
+    {% if bound_field.is_hidden %}
+        {{ bound_field }}
+    {% elif bound_field.widget_type == "select" or bound_field.widget_type == "textarea" %}
+        <div class="mb-4">
+            <label for="{{ bound_field.id_for_label }}" class="ui-label">{{ bound_field.label }}</label>
+            {{ bound_field }}
+            {% for error in bound_field.errors %}<p class="ui-error"><span>{{ error }}</span></p>{% endfor %}
+        </div>
+    {% else %}
+        {% include "account/_field.html" with field=bound_field %}
+    {% endif %}
 {% endfor %}
+{% endwith %}

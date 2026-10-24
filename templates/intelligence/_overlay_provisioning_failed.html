@@ -1,12 +1,15 @@
-<div class="absolute inset-0 flex items-center justify-center bg-white/85 backdrop-blur-sm rounded-lg">
-  <div class="text-center max-w-md px-6">
-    <h2 class="text-lg font-semibold text-stone-900 mb-2">Setup couldn't complete</h2>
-    <p class="text-sm text-stone-600 mb-5">
+<div class="absolute inset-0 z-10 flex items-start justify-center rounded-2xl bg-white/85 px-4 pt-16 backdrop-blur-sm">
+  <div class="ui-card w-full max-w-md text-center shadow-lg" role="alert">
+    <span class="mx-auto mb-3 grid size-10 place-items-center rounded-full bg-danger-50 text-danger-600 ring-1 ring-inset ring-danger-200" aria-hidden="true">
+      <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </span>
+    <h2 class="text-h3 text-ink-950">Setup couldn't complete</h2>
+    <p class="mt-1.5 text-sm text-ink-700">
       Stripe confirmed your payment but the billing service didn't finalize
       access. Please contact support, we have your payment record.
     </p>
-    <p class="text-sm text-stone-600">
-      <a href="mailto:{{ SUPPORT_EMAIL }}" class="text-orange-700 hover:text-orange-800">{{ SUPPORT_EMAIL }}</a>
+    <p class="mt-3 text-sm">
+      <a href="mailto:{{ SUPPORT_EMAIL }}" class="link-inline">{{ SUPPORT_EMAIL }}</a>
     </p>
   </div>
 </div>

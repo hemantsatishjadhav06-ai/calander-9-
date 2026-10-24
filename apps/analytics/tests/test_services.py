@@ -76,6 +76,63 @@ def test_account_bundle_prefers_fresher_post_fallback_for_content_metrics(facebo
 
 
 @pytest.mark.django_db
+def test_account_bundle_keeps_complete_account_days_when_post_data_is_fresher(facebook_account):
+    """Fresher post snapshots may only fill the days the account sync can still lag on.
+
+    Past days already hold the page's whole total; replacing them with the sum
+    over the posts we know (a lower number) made the 30-day Impressions card
+    read 3.1k where the stored daily rows add up to 3,660.
+    """
+    from apps.analytics.models import AccountInsightsSnapshot, PostInsightsSnapshot
+    from apps.analytics.services import account_analytics_bundle
+
+    today = timezone.now().date()
+    platform_post = _published_platform_post(facebook_account)
+    platform_post.published_at = timezone.now() - timedelta(days=6)
+    platform_post.save(update_fields=["published_at"])
+    for offset in range(7):
+        row = AccountInsightsSnapshot.objects.create(
+            social_account=facebook_account, metric_key="views", date=today - timedelta(days=offset), value=120
+        )
+        AccountInsightsSnapshot.objects.filter(id=row.id).update(captured_at=timezone.now() - timedelta(hours=2))
+    for offset, value in ((2, 50), (1, 60), (0, 70)):  # cumulative lifetime counts, rising
+        PostInsightsSnapshot.objects.create(
+            platform_post=platform_post, metric_key="views", date=today - timedelta(days=offset), value=value
+        )
+
+    series = account_analytics_bundle(facebook_account, 7)["series_map"]["views"]
+
+    assert series[-7:] == [120] * 7
+    assert sum(series[-7:]) == 840
+
+
+@pytest.mark.django_db
+def test_account_bundle_fills_days_after_the_last_account_row_from_posts(facebook_account):
+    """Days the account sync has not reached yet still come from fresher post data."""
+    from apps.analytics.models import AccountInsightsSnapshot, PostInsightsSnapshot
+    from apps.analytics.services import account_analytics_bundle
+
+    today = timezone.now().date()
+    platform_post = _published_platform_post(facebook_account)
+    platform_post.published_at = timezone.now() - timedelta(days=5)
+    platform_post.save(update_fields=["published_at"])
+    row = AccountInsightsSnapshot.objects.create(
+        social_account=facebook_account, metric_key="views", date=today - timedelta(days=2), value=300
+    )
+    AccountInsightsSnapshot.objects.filter(id=row.id).update(captured_at=timezone.now() - timedelta(days=1))
+    for offset, value in ((3, 40), (1, 65), (0, 90)):
+        PostInsightsSnapshot.objects.create(
+            platform_post=platform_post, metric_key="views", date=today - timedelta(days=offset), value=value
+        )
+
+    series = account_analytics_bundle(facebook_account, 7)["series_map"]["views"]
+
+    assert series[-3] == 300  # the account's own (latest) day keeps the larger, account total
+    assert series[-2] == 25  # yesterday: no account row yet, the post delta fills it
+    assert series[-1] == 25
+
+
+@pytest.mark.django_db
 def test_account_bundle_keeps_account_reach_instead_of_summing_post_reach(facebook_account):
     from apps.analytics.models import AccountInsightsSnapshot, PostInsightsSnapshot
     from apps.analytics.services import account_analytics_bundle

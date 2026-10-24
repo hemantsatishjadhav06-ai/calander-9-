@@ -6,39 +6,39 @@
       x-data="{ visibility: 'external' }">
 
     <textarea name="body" rows="2" required aria-label="Comment"
-              class="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent resize-none"
-              placeholder="Write a comment... Use @name to mention someone"></textarea>
+              class="ui-input resize-none"
+              :class="visibility === 'internal' && 'border-dashed bg-ink-25'"
+              placeholder="Write a comment… Use @name to mention someone"></textarea>
 
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <!-- Visibility toggle -->
-            <div class="flex items-center gap-1.5">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <!-- Who sees it: a note for the team is drawn dashed, never in warning colours -->
+            <div class="ui-segmented" role="group" aria-label="Who can see this comment">
                 <button type="button" @click="visibility = 'external'"
-                        :class="visibility === 'external' ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'"
-                        class="px-2.5 py-1 text-[0.6875rem] font-semibold rounded-full transition-colors">
-                    Visible to Client
+                        :class="visibility === 'external' && 'is-active'" :aria-pressed="(visibility === 'external').toString()"
+                        class="ui-segment">
+                    Visible to client
                 </button>
                 <button type="button" @click="visibility = 'internal'"
-                        :class="visibility === 'internal' ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'"
-                        class="px-2.5 py-1 text-[0.6875rem] font-semibold rounded-full transition-colors">
-                    Internal Only
+                        :class="visibility === 'internal' && 'is-active'" :aria-pressed="(visibility === 'internal').toString()"
+                        class="ui-segment gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                    Internal only
                 </button>
             </div>
             <input type="hidden" name="visibility" :value="visibility">
 
             <!-- Attachment -->
-            {# sr-only, not hidden: a display:none input cannot take keyboard focus, so
-               attaching an image was mouse-only. The ring shows where focus is. #}
-            <label class="cursor-pointer text-stone-500 hover:text-stone-700 transition-colors rounded focus-within:ring-2 focus-within:ring-orange-400"
+            {% comment %}sr-only, not hidden: a display:none input cannot take keyboard focus, so
+               attaching an image was mouse-only. The ring shows where focus is.{% endcomment %}
+            <label class="ui-btn ui-btn-icon cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600"
                    title="Attach an image">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
                 <input type="file" name="attachment" accept="image/*" class="sr-only" aria-label="Attach an image">
             </label>
         </div>
 
-        <button type="submit"
-                class="px-3.5 py-1.5 text-[0.8125rem] font-semibold rounded-full text-white transition-colors"
-                style="background: var(--primary-strong);">
+        <button type="submit" class="ui-btn ui-btn-secondary ui-btn-sm">
             Comment
         </button>
     </div>

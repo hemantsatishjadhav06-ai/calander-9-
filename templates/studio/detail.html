@@ -1,29 +1,28 @@
 {% extends "base.html" %}
-{% load tz %}
+{% load tz approval_extras %}
 
 {% block title %}{{ brief.title|truncatechars:60 }} - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl {% if brief.status == 'ready' or brief.status == 'approved' %}pb-24 lg:pb-0{% endif %}">
-    <nav aria-label="Breadcrumb" class="text-sm text-stone-600 mb-3">
-        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="underline hover:text-stone-900">Agency</a>
-        <span aria-hidden="true"> / </span><span>{% if brief.status == 'ready' %}Waiting for approval{% else %}Post{% endif %}</span>
+<div class="max-w-[1180px] min-w-0 {% if brief.status == 'ready' or brief.status == 'approved' %}pb-24 lg:pb-0{% endif %}">
+    <nav aria-label="Breadcrumb" class="mb-3 text-[13px] text-ink-600">
+        <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="link-inline text-ink-600 hover:text-ink-900">Agency</a>
+        <span class="mx-1 text-ink-500" aria-hidden="true">/</span><span>{% if brief.status == 'ready' %}Waiting for approval{% else %}Post{% endif %}</span>
     </nav>
 
     <div class="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div class="min-w-0 max-w-3xl">
-            <div class="flex flex-wrap items-center gap-2 mb-2">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
                 {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
-                <span class="text-xs text-stone-600">Revision {{ brief.revision }}{% if brief.author %} · by {{ brief.author.display_name }}{% endif %} · {{ brief.created_at|date:"j M Y, H:i" }}</span>
+                <span class="text-xs text-ink-500 tabular-nums">Revision {{ brief.revision }}{% if brief.author %} · by {{ brief.author.display_name }}{% endif %} · {{ brief.created_at|date:"j M Y, H:i" }}</span>
             </div>
-            <h1 class="text-2xl sm:text-3xl text-stone-900 break-words" style="font-family: var(--font-display)">{{ brief.title }}</h1>
-            <p class="text-sm text-stone-600 mt-1 break-words"><span class="font-medium text-stone-700">From the idea:</span> {{ brief.idea }}</p>
-            {% if brief.get_origin_display and brief.origin != 'manual' %}<p class="text-xs text-stone-600 mt-1">{{ brief.get_origin_display }}{% if brief.requested_by %} — asked for by {{ brief.requested_by.display_name }}{% endif %}</p>{% endif %}
-            {% if brief.feedback and brief.revision > 1 %}<p class="text-sm text-stone-600 mt-1 break-words"><span class="font-medium text-stone-700">Latest notes to the team:</span> {{ brief.feedback }}</p>{% endif %}
+            <h1 class="ui-page-title break-words">{{ brief.title }}</h1>
+            <p class="mt-1.5 text-body-lg text-ink-600 break-words"><span class="font-medium text-ink-800">From the idea:</span> {{ brief.idea }}</p>
+            {% if brief.get_origin_display and brief.origin != 'manual' %}<p class="text-[13px] text-ink-500 mt-1">{{ brief.get_origin_display }}{% if brief.requested_by %} — asked for by {{ brief.requested_by.display_name }}{% endif %}</p>{% endif %}
+            {% if brief.feedback and brief.revision > 1 %}<p class="text-sm text-ink-600 mt-1 break-words"><span class="font-medium text-ink-800">Latest notes to the team:</span> {{ brief.feedback }}</p>{% endif %}
         </div>
         {% if post %}
-        <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=post.id %}"
-           class="inline-flex items-center px-4 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Open in composer</a>
+        <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=post.id %}" class="ui-btn ui-btn-secondary">Open in composer</a>
         {% endif %}
     </div>
 
@@ -33,27 +32,30 @@
         {% if can_discard %}
         <form method="post" action="{% url 'studio:discard' workspace_id=workspace.id brief_id=brief.id %}" class="mt-4">
             {% csrf_token %}
-            <button type="submit" class="text-sm text-stone-700 underline hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-orange-700 rounded">Stop and discard</button>
+            <button type="submit" class="ui-btn ui-btn-sm ui-btn-danger-ghost -ml-3">Stop and discard</button>
         </form>
         {% endif %}
     </div>
 
     {% elif brief.status == 'failed' %}
     <div class="max-w-2xl space-y-4">
-        <div role="alert" class="text-sm text-red-900 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <p class="font-semibold mb-0.5">The team couldn't finish.</p>
-            <p class="break-words">{{ brief.error }}</p>
+        <div role="alert" class="ui-callout ui-callout-danger text-sm">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+            <div class="min-w-0">
+                <p class="font-semibold text-danger-700 mb-0.5">The team couldn't finish.</p>
+                <p class="break-words">{{ brief.error }}</p>
+            </div>
         </div>
         {% if can_create %}
-        <div class="flex flex-wrap gap-3">
+        <div class="flex flex-wrap gap-2">
             <form method="post" action="{% url 'studio:retry' workspace_id=workspace.id brief_id=brief.id %}">
                 {% csrf_token %}
-                <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Retry from the {{ brief.get_stage_display|lower }}</button>
+                <button type="submit" class="ui-btn ui-btn-primary">Retry from the {{ brief.get_stage_display|lower }}</button>
             </form>
             {% if can_discard %}
             <form method="post" action="{% url 'studio:discard' workspace_id=workspace.id brief_id=brief.id %}">
                 {% csrf_token %}
-                <button type="submit" class="px-5 py-2 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Discard</button>
+                <button type="submit" class="ui-btn ui-btn-danger-ghost">Discard</button>
             </form>
             {% endif %}
         </div>
@@ -62,86 +64,89 @@
     </div>
 
     {% elif brief.status == 'discarded' %}
-    <p class="text-sm text-stone-700 bg-stone-50 border border-stone-200 rounded-xl p-4 max-w-2xl">This brief was discarded.</p>
+    <p class="ui-callout max-w-2xl text-sm text-ink-700">This brief was discarded.</p>
 
     {% else %}
     {# ---- The decision comes first on a phone: a sticky bar with the one thing to do ---- #}
     {% if can_approve and proposed_in_future %}
-    <div class="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur px-4 py-3" data-decision-bar>
+    <div class="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" data-decision-bar>
         <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true" class="flex items-center gap-3">
             {% csrf_token %}<input type="hidden" name="mode" value="proposed">
-            <p class="flex-1 min-w-0 text-xs text-stone-700 truncate">Proposed {{ proposed_local|timezone:tzname|date:"D j M, H:i" }}</p>
-            <button type="submit" x-bind:disabled="busy" class="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Approve &amp; schedule</button>
+            <p class="flex-1 min-w-0 text-[13px] text-ink-600 truncate">Proposed <span class="font-semibold text-ink-900 tabular-nums">{{ proposed_local|timezone:tzname|date:"D j M, H:i" }}</span></p>
+            <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn ui-btn-primary flex-shrink-0">Approve &amp; schedule</button>
         </form>
     </div>
     {% elif next_step %}
-    <div class="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur px-4 py-3" data-decision-bar>
-        <p class="text-sm font-semibold text-green-800">{{ next_step }}</p>
+    <div class="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" data-decision-bar>
+        <p class="text-sm font-semibold text-ink-900">{{ next_step }}</p>
     </div>
     {% endif %}
 
     <div class="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
         <div class="space-y-6 min-w-0 order-2 lg:order-1">
             {# ---- The post, as the channel will show it ---- #}
-            <section aria-labelledby="preview-heading" class="bg-white border border-stone-200 rounded-2xl overflow-hidden max-w-xl">
+            <section aria-labelledby="preview-heading" class="max-w-xl overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs">
                 <h2 id="preview-heading" class="sr-only">Preview</h2>
                 <div class="flex items-start gap-2.5 px-4 pt-4 pb-3">
                     {% if preview_account.avatar_url %}
-                    <img src="{{ preview_account.avatar_url }}" alt="" class="w-12 h-12 rounded-full object-cover bg-stone-100">
+                    <img src="{{ preview_account.avatar_url }}" alt="" class="w-12 h-12 rounded-full object-cover bg-ink-100">
                     {% else %}
                     <div class="w-12 h-12 rounded-full bg-[#0A66C2] flex items-center justify-center text-sm font-bold text-white" aria-hidden="true">{{ preview_account.account_name|default:workspace.name|make_list|first|upper }}</div>
                     {% endif %}
                     <div class="min-w-0">
-                        <p class="text-sm font-semibold text-stone-900">{{ preview_account.account_name|default:workspace.name }}</p>
-                        <p class="text-xs text-stone-600">{{ preview_account.get_platform_display|default:"LinkedIn" }} · preview</p>
+                        <p class="text-sm font-semibold text-ink-900">{{ preview_account.account_name|default:workspace.name }}</p>
+                        <p class="text-xs text-ink-500">{{ preview_account.get_platform_display|default:"LinkedIn" }} · preview</p>
                     </div>
                 </div>
                 {% if caption_rest %}
-                <div class="px-4 pb-3 text-sm text-stone-800 leading-relaxed whitespace-pre-line break-words" x-data="{ more: false }">{{ caption_hook }}<span x-show="more" x-cloak>{{ caption_rest }}{% if hashtags %}<span class="block mt-3 text-[#0A66C2] font-medium">{{ hashtags }}</span>{% endif %}</span><button type="button" x-show="!more" x-on:click="more = true" class="text-stone-600 hover:underline">…see more</button></div>
+                <div class="px-4 pb-3 text-sm text-ink-900 leading-relaxed whitespace-pre-line break-words" x-data="{ more: false }">{{ caption_hook }}<span x-show="more" x-cloak>{{ caption_rest }}{% if hashtags %}<span class="block mt-3 text-[#0A66C2] font-medium">{{ hashtags }}</span>{% endif %}</span><button type="button" x-show="!more" x-on:click="more = true" class="text-ink-600 hover:underline rounded-sm">…see more</button></div>
                 {% else %}
-                <div class="px-4 pb-3 text-sm text-stone-800 leading-relaxed whitespace-pre-line break-words">{{ caption_hook }}{% if hashtags %}<span class="block mt-3 text-[#0A66C2] font-medium">{{ hashtags }}</span>{% endif %}</div>
+                <div class="px-4 pb-3 text-sm text-ink-900 leading-relaxed whitespace-pre-line break-words">{{ caption_hook }}{% if hashtags %}<span class="block mt-3 text-[#0A66C2] font-medium">{{ hashtags }}</span>{% endif %}</div>
                 {% endif %}
                 {% if brief.graphic %}
-                <img src="{{ brief.graphic.file.url }}" alt="{{ post_copy.alt_text }}" width="{{ brief.graphic.width }}" height="{{ brief.graphic.height }}" class="w-full h-auto bg-stone-100">
+                <img src="{{ brief.graphic.file.url }}" alt="{{ post_copy.alt_text }}" width="{{ brief.graphic.width }}" height="{{ brief.graphic.height }}" class="w-full h-auto bg-ink-50">
                 {% endif %}
                 {% if post_copy.first_comment %}
-                <div class="px-4 py-3 border-t border-stone-200 bg-stone-50">
-                    <p class="text-xs font-semibold text-stone-700 mb-0.5">First comment</p>
-                    <p class="text-sm text-stone-800 whitespace-pre-line break-words">{{ post_copy.first_comment }}</p>
+                <div class="px-4 py-3 border-t border-ink-200 bg-ink-25">
+                    <p class="text-xs font-semibold text-ink-500 mb-0.5">First comment</p>
+                    <p class="text-sm text-ink-900 whitespace-pre-line break-words">{{ post_copy.first_comment }}</p>
                 </div>
                 {% endif %}
             </section>
 
             {% if platform_posts|length > 1 or post_copy.short_caption %}
             {% for pp in platform_posts %}{% if pp.platform_specific_caption %}
-            <p class="text-sm text-stone-700 max-w-xl"><span class="font-medium">{{ pp.social_account.account_name }} ({{ pp.social_account.get_platform_display }})</span> gets its own version: <span class="whitespace-pre-line">{{ pp.platform_specific_caption }}</span></p>
+            <p class="text-sm text-ink-700 max-w-xl"><span class="font-semibold text-ink-900">{{ pp.social_account.account_name }} ({{ pp.social_account.get_platform_display }})</span> gets its own version: <span class="whitespace-pre-line">{{ pp.platform_specific_caption }}</span></p>
             {% endif %}{% endfor %}
             {% endif %}
 
             {# ---- Brand reviewer: what to check before approving ---- #}
             {% if review %}
-            <section aria-labelledby="review-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
-                <div class="flex items-center justify-between gap-3 mb-2">
-                    <h2 id="review-heading" class="text-sm font-semibold text-stone-900">Brand reviewer</h2>
-                    <span class="text-sm font-semibold {% if review.score >= 8 %}text-green-800{% elif review.score >= 6 %}text-amber-800{% else %}text-red-800{% endif %}">{{ review.score }}/10</span>
+            <section aria-labelledby="review-heading" class="ui-card">
+                <div class="ui-card-header mb-2">
+                    <h2 id="review-heading" class="ui-card-title">Brand reviewer</h2>
+                    <span class="text-sm font-semibold tabular-nums {% if review.score >= 8 %}text-success-600{% elif review.score >= 6 %}text-warning-600{% else %}text-danger-600{% endif %}">{{ review.score }}/10</span>
                 </div>
-                <p class="text-sm text-stone-700 mb-3">{{ review.summary }}</p>
+                <p class="text-sm text-ink-700 mb-3">{{ review.summary }}</p>
                 {% if review.risk_flags %}
-                <div class="mb-3 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    <p class="font-semibold mb-1">Check before you approve</p>
-                    <ul class="list-disc pl-5 space-y-0.5">{% for flag in review.risk_flags %}<li>{{ flag }}</li>{% endfor %}</ul>
+                <div class="ui-callout ui-callout-warning mb-4">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-warning-700 mb-1">Check before you approve</p>
+                        <ul class="list-disc pl-5 space-y-0.5 text-[13px]">{% for flag in review.risk_flags %}<li>{{ flag }}</li>{% endfor %}</ul>
+                    </div>
                 </div>
                 {% endif %}
                 <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-2">
                     {% for check in review.checks %}
                     <li class="flex gap-2 text-sm">
                         {% if check.passed %}
-                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                         {% else %}
-                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" d="M12 8v5m0 3h.01"/></svg>
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-warning-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
                         {% endif %}
-                        <span><span class="font-medium text-stone-900">{{ check.name }}</span><span class="sr-only">{% if check.passed %} (passed){% else %} (needs attention){% endif %}</span>
-                            <span class="text-stone-600">— {{ check.note }}</span></span>
+                        <span><span class="font-medium text-ink-900">{{ check.name }}</span><span class="sr-only">{% if check.passed %} (passed){% else %} (needs attention){% endif %}</span>
+                            <span class="text-ink-600">— {{ check.note }}</span></span>
                     </li>
                     {% endfor %}
                 </ul>
@@ -150,34 +155,34 @@
 
             {# ---- Strategist ---- #}
             {% if concepts %}
-            <section aria-labelledby="angles-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
-                <h2 id="angles-heading" class="text-sm font-semibold text-stone-900 mb-3">Strategist's angles</h2>
+            <section aria-labelledby="angles-heading" class="ui-card">
+                <h2 id="angles-heading" class="ui-card-title mb-3">Strategist's angles</h2>
                 <ul class="space-y-3">
                     {% for concept in concepts %}
-                    <li class="rounded-xl border p-4 {% if brief.chosen_concept_id == concept.id %}border-orange-300 bg-orange-50/40{% else %}border-stone-200{% endif %}">
+                    <li class="rounded-xl p-4 {% if brief.chosen_concept_id == concept.id %}bg-brand-50 ring-2 ring-inset ring-brand-700{% else %}ring-1 ring-inset ring-ink-200{% endif %}">
                         <div class="flex flex-wrap items-center gap-2 mb-1">
-                            <p class="text-sm font-semibold text-stone-900">{{ concept.title }}</p>
-                            {% if brief.chosen_concept_id == concept.id %}<span class="text-xs font-semibold text-orange-900 bg-orange-100 rounded-full px-2 py-0.5">Used</span>
-                            {% elif concept.recommended %}<span class="text-xs font-semibold text-stone-700 bg-stone-100 rounded-full px-2 py-0.5">Recommended</span>{% endif %}
-                            <span class="text-xs text-stone-600">{{ concept.get_post_format_display }}</span>
+                            <p class="text-sm font-semibold text-ink-900">{{ concept.title }}</p>
+                            {% if brief.chosen_concept_id == concept.id %}<span class="inline-flex items-center gap-1 text-xs font-semibold text-brand-700"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Used</span>
+                            {% elif concept.recommended %}<span class="inline-flex h-5 items-center rounded-full bg-ink-100 px-2 text-xs font-semibold text-ink-700">Recommended</span>{% endif %}
+                            <span class="text-xs text-ink-500">{{ concept.get_post_format_display }}</span>
                         </div>
-                        <p class="text-sm text-stone-800 italic">“{{ concept.hook }}”</p>
-                        {% if concept.angle %}<p class="text-sm text-stone-700 mt-1">{{ concept.angle }}</p>{% endif %}
-                        {% if concept.rationale %}<p class="text-xs text-stone-600 mt-1">{{ concept.rationale }}</p>{% endif %}
+                        <p class="text-sm text-ink-800 italic">“{{ concept.hook }}”</p>
+                        {% if concept.angle %}<p class="text-sm text-ink-700 mt-1">{{ concept.angle }}</p>{% endif %}
+                        {% if concept.rationale %}<p class="text-xs text-ink-600 mt-1">{{ concept.rationale }}</p>{% endif %}
                         {% if brief.chosen_concept_id != concept.id and can_create %}
-                        <div class="flex flex-wrap gap-3 mt-3">
+                        <div class="flex flex-wrap gap-2 mt-3">
                             {% if can_revise %}
                             <form method="post" action="{% url 'studio:use_angle' workspace_id=workspace.id brief_id=brief.id concept_id=concept.id %}">
                                 {% csrf_token %}
-                                <button type="submit" class="px-4 py-1.5 text-sm font-semibold text-orange-900 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-orange-700">Use this angle instead</button>
+                                <button type="submit" class="ui-btn ui-btn-sm ui-btn-tinted">Use this angle instead</button>
                             </form>
                             {% endif %}
                             {% if concept.saved_idea_id %}
-                            <span class="text-sm text-stone-600 py-1.5">Saved to ideas</span>
+                            <span class="inline-flex min-h-8 items-center text-[13px] text-ink-600">Saved to ideas</span>
                             {% else %}
                             <form method="post" action="{% url 'studio:save_idea' workspace_id=workspace.id brief_id=brief.id concept_id=concept.id %}">
                                 {% csrf_token %}
-                                <button type="submit" class="px-4 py-1.5 text-sm font-medium text-stone-800 border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Save to ideas</button>
+                                <button type="submit" class="ui-btn ui-btn-sm ui-btn-ghost">Save to ideas</button>
                             </form>
                             {% endif %}
                         </div>
@@ -189,45 +194,47 @@
             {% endif %}
 
             {# ---- Details: how it was made, the art direction, the QA checks and what it cost ---- #}
-            <details class="bg-white border border-stone-200 rounded-2xl p-5" data-brief-details>
-                <summary class="cursor-pointer text-sm font-semibold text-stone-900 rounded focus-visible:outline-2 focus-visible:outline-orange-700">Details</summary>
-                <p class="mt-2 text-xs text-stone-600">{% if agents_used %}Made by {{ agents_used }} agent{{ agents_used|pluralize }}{% if elapsed_minutes %} in {{ elapsed_minutes }} min{% endif %}{% endif %}{% if cost is not None %} · about ${{ cost|floatformat:2 }} in AI usage (estimate){% endif %}</p>
+            <details class="group/details ui-card" data-brief-details>
+                <summary class="flex min-h-8 max-lg:min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-h3 text-ink-950 [&::-webkit-details-marker]:hidden">Details<svg class="w-4 h-4 text-ink-500 transition-transform group-open/details:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+                <p class="mt-2 text-xs text-ink-500">{% if agents_used %}Made by {{ agents_used }} agent{{ agents_used|pluralize }}{% if elapsed_minutes %} in {{ elapsed_minutes }} min{% endif %}{% endif %}{% if cost is not None %} · about ${{ cost|floatformat:2 }} in AI usage (estimate){% endif %}</p>
                 {% if spec %}
-                <h3 class="text-sm font-semibold text-stone-900 mt-4 mb-2">Art director</h3>
+                <h3 class="text-sm font-semibold text-ink-900 mt-5 mb-2">Art director</h3>
                 <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-                    <dt class="text-stone-600">Look</dt><dd class="text-stone-900">{{ spec.template|capfirst }} layout · {{ spec.format }} · {{ spec.grade|cut:"_" }}</dd>
-                    {% if reference.label %}<dt class="text-stone-600">Matched to</dt><dd class="text-stone-900">{{ reference.label|capfirst }}</dd>{% endif %}
-                    {% if spec.consistency_notes %}<dt class="text-stone-600">Kept</dt><dd class="text-stone-900">{{ spec.consistency_notes }}</dd>{% endif %}
-                    {% if spec.design_rationale %}<dt class="text-stone-600">Why</dt><dd class="text-stone-900">{{ spec.design_rationale }}</dd>{% endif %}
-                    {% if spec.picture_style %}<dt class="text-stone-600">Picture style</dt><dd class="text-stone-900">{{ spec.picture_style }}</dd>{% endif %}
+                    <dt class="text-ink-500">Look</dt><dd class="text-ink-900">{{ spec.template|capfirst }} layout · {{ spec.format }} · {{ spec.grade|cut:"_" }}</dd>
+                    {% if reference.label %}<dt class="text-ink-500">Matched to</dt><dd class="text-ink-900">{{ reference.label|capfirst }}</dd>{% endif %}
+                    {% if spec.consistency_notes %}<dt class="text-ink-500">Kept</dt><dd class="text-ink-900">{{ spec.consistency_notes }}</dd>{% endif %}
+                    {% if spec.design_rationale %}<dt class="text-ink-500">Why</dt><dd class="text-ink-900">{{ spec.design_rationale }}</dd>{% endif %}
+                    {% if spec.picture_style %}<dt class="text-ink-500">Picture style</dt><dd class="text-ink-900">{{ spec.picture_style }}</dd>{% endif %}
                 </dl>
                 {% endif %}
                 {% if qa.checks %}
-                <h3 class="text-sm font-semibold text-stone-900 mt-4 mb-2">QA inspector <span class="font-normal text-stone-600">· {{ qa.passed }} of {{ qa.total }} checks pass</span></h3>
+                <h3 class="text-sm font-semibold text-ink-900 mt-5 mb-2">QA inspector <span class="font-normal text-ink-500">· {{ qa.passed }} of {{ qa.total }} checks pass</span></h3>
                 <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-2">
                     {% for check in qa.checks %}
                     <li class="flex gap-2 text-sm">
                         {% if check.passed %}
-                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        {% elif check.level == 'fail' %}
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
                         {% else %}
-                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 {% if check.level == 'fail' %}text-red-700{% else %}text-amber-700{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" d="M12 8v5m0 3h.01"/></svg>
+                        <svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-warning-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
                         {% endif %}
-                        <span><span class="font-medium text-stone-900">{{ check.name }}</span><span class="sr-only">{% if check.passed %} (passed){% else %} (needs attention){% endif %}</span>
-                            <span class="text-stone-600">— {{ check.note }}</span></span>
+                        <span><span class="font-medium text-ink-900">{{ check.name }}</span><span class="sr-only">{% if check.passed %} (passed){% else %} (needs attention){% endif %}</span>
+                            <span class="text-ink-600">— {{ check.note }}</span></span>
                     </li>
                     {% endfor %}
                 </ul>
                 {% endif %}
-                <h3 class="text-sm font-semibold text-stone-900 mt-4 mb-2">How the team made it</h3>
+                <h3 class="text-sm font-semibold text-ink-900 mt-5 mb-2">How the team made it</h3>
                 <ol class="space-y-3">
                     {% for run in runs %}
                     <li class="flex items-start gap-3 text-sm">
                         {% include "components/agent_avatar.html" with agent=run.agent_spec size="sm" %}
                         <div class="min-w-0">
-                            <span class="font-medium text-stone-900">{{ run.agent_name }}</span>
-                            <span class="text-stone-600">· revision {{ run.revision }} · {{ run.get_status_display|lower }}{% if run.duration_ms %} · {{ run.seconds }}s{% endif %}{% if run.output_tokens %} · {{ run.input_tokens|add:run.cache_read_tokens }} in / {{ run.output_tokens }} out tokens{% endif %}</span>
-                            {% if run.summary %}<p class="text-stone-700 break-words">{{ run.summary }}</p>{% endif %}
-                            {% if run.error %}<p class="text-red-800 break-words">{{ run.error }}</p>{% endif %}
+                            <span class="font-medium text-ink-900">{{ run.agent_name }}</span>
+                            <span class="text-ink-500">· revision {{ run.revision }} · {{ run.get_status_display|lower }}{% if run.duration_ms %} · {{ run.seconds }}s{% endif %}{% if run.output_tokens %} · {{ run.input_tokens|add:run.cache_read_tokens }} in / {{ run.output_tokens }} out tokens{% endif %}</span>
+                            {% if run.summary %}<p class="text-ink-700 break-words">{{ run.summary }}</p>{% endif %}
+                            {% if run.error %}<p class="text-danger-600 break-words">{{ run.error }}</p>{% endif %}
                         </div>
                     </li>
                     {% endfor %}
@@ -235,27 +242,27 @@
             </details>
         </div>
 
-        <aside class="space-y-6 order-1 lg:order-2 min-w-0">
+        <aside class="space-y-6 order-1 lg:order-2 min-w-0 max-lg:[&_input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden])]:min-h-11 max-lg:[&_select]:min-h-11">
             {# ---- Your decision: one primary action per state ---- #}
-            <section aria-labelledby="approval-heading" class="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm" data-decision>
-                <h2 id="approval-heading" class="text-lg text-stone-900" style="font-family: var(--font-display)">Your decision</h2>
-                <p class="text-xs text-stone-600 mb-3">Nothing goes out until you approve.</p>
+            <section aria-labelledby="approval-heading" class="ui-card" data-decision>
+                <h2 id="approval-heading" class="ui-card-title">Your decision</h2>
+                <p class="ui-card-subtitle mb-4 flex items-center gap-1.5"><svg class="w-3.5 h-3.5 flex-shrink-0 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Nothing goes out until you approve.</p>
                 {% if brief.status == 'ready' and proposed_local %}
-                <div class="rounded-xl bg-orange-50 px-3 py-2.5 mb-4">
-                    <p class="text-sm font-semibold text-orange-800">Proposed: {{ proposed_local|timezone:tzname|date:"D j M, H:i" }} <span class="font-normal text-stone-600">({{ workspace.effective_timezone|default:"UTC" }})</span></p>
-                    {% if scheduler_note %}<p class="text-xs text-stone-700 mt-0.5 break-words">{{ scheduler_note }}</p>{% endif %}
+                <div class="rounded-xl bg-ink-50 px-3.5 py-3 mb-4 ring-1 ring-inset ring-ink-200">
+                    <p class="flex items-center gap-1.5 text-sm text-ink-900"><svg class="w-4 h-4 flex-shrink-0 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><span class="font-semibold">Proposed: <span class="tabular-nums">{{ proposed_local|timezone:tzname|date:"D j M, H:i" }}</span></span> <span class="text-ink-600">({{ workspace.effective_timezone|default:"UTC" }})</span></span></p>
+                    {% if scheduler_note %}<p class="text-xs text-ink-600 mt-1 break-words">{{ scheduler_note }}</p>{% endif %}
                 </div>
                 {% endif %}
-                {% if next_step %}<p class="text-sm font-semibold text-green-800 mb-3" data-next-step>{{ next_step }}</p>{% endif %}
+                {% if next_step %}<p class="mb-4 flex items-start gap-1.5 text-sm font-semibold text-ink-900" data-next-step><svg class="mt-0.5 w-4 h-4 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span>{{ next_step }}</span></p>{% endif %}
                 {% if platform_posts %}
-                <ul class="space-y-1.5 mb-4">
+                <ul class="mb-4 divide-y divide-ink-200 rounded-xl ring-1 ring-inset ring-ink-200">
                     {% for pp in platform_posts %}
-                    <li class="text-sm">
-                        <span class="font-medium text-stone-900">{{ pp.social_account.account_name|default:pp.social_account.account_handle }}</span>
-                        <span class="text-stone-600">· {{ pp.social_account.get_platform_display }}</span><br>
-                        <span class="text-stone-700">{{ pp.get_status_display }}{% if pp.status == 'scheduled' and pp.scheduled_at %} for {{ pp.scheduled_at|timezone:tzname|date:"D j M, H:i" }}{% endif %}{% if pp.status == 'published' and pp.published_at %} {{ pp.published_at|timezone:tzname|date:"j M, H:i" }}{% endif %}</span>
-                        {% if pp.platform_extra.permalink %} · <a class="underline" href="{{ pp.platform_extra.permalink }}" target="_blank" rel="noopener">View<span class="sr-only"> (opens in a new tab)</span></a>{% endif %}
-                        {% if pp.status == 'failed' and pp.publish_error %}<p class="text-red-800 break-words">{{ pp.publish_error }}</p>{% endif %}
+                    <li class="px-3.5 py-2.5 text-sm">
+                        <span class="font-semibold text-ink-900">{{ pp.social_account.account_name|default:pp.social_account.account_handle }}</span>
+                        <span class="text-ink-500">· {{ pp.social_account.get_platform_display }}</span><br>
+                        <span class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-700">{% status_badge pp.status %}{% if pp.status == 'scheduled' and pp.scheduled_at %}<span class="tabular-nums">for {{ pp.scheduled_at|timezone:tzname|date:"D j M, H:i" }}</span>{% endif %}{% if pp.status == 'published' and pp.published_at %}<span class="tabular-nums">{{ pp.published_at|timezone:tzname|date:"j M, H:i" }}</span>{% endif %}</span>
+                        {% if pp.platform_extra.permalink %} · <a class="text-[13px] link-inline" href="{{ pp.platform_extra.permalink }}" target="_blank" rel="noopener">View<span class="sr-only"> (opens in a new tab)</span></a>{% endif %}
+                        {% if pp.status == 'failed' and pp.publish_error %}<p class="text-[13px] text-danger-600 break-words">{{ pp.publish_error }}</p>{% endif %}
                     </li>
                     {% endfor %}
                 </ul>
@@ -264,56 +271,57 @@
                 {% if can_approve %}
                 <div class="space-y-3">
                     {% if proposed_in_future %}
-                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                    {# On a phone the sticky decision bar carries this button, so the card does not repeat it. #}
+                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true" class="max-lg:hidden">
                         {% csrf_token %}<input type="hidden" name="mode" value="proposed">
-                        <button type="submit" x-bind:disabled="busy" class="w-full px-5 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                        <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn ui-btn-lg ui-btn-primary w-full">
                             <span x-show="!busy">Approve &amp; schedule for {{ proposed_local|timezone:tzname|date:"D H:i" }}</span><span x-show="busy" x-cloak>Approving…</span>
                         </button>
                     </form>
                     {% else %}
-                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" class="rounded-xl border border-stone-200 p-3">
+                    <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" class="rounded-xl bg-ink-50 p-3.5 ring-1 ring-inset ring-ink-200">
                         {% csrf_token %}<input type="hidden" name="mode" value="schedule">
-                        <p class="text-xs font-semibold text-stone-700 mb-2">Approve and schedule ({{ workspace.effective_timezone|default:"UTC" }})</p>
-                        <div class="grid grid-cols-2 gap-2 mb-2">
+                        <p class="ui-label">Approve and schedule ({{ workspace.effective_timezone|default:"UTC" }})</p>
+                        <div class="grid grid-cols-2 gap-2 mb-3">
                             <label class="sr-only" for="{{ schedule_form.date.id_for_label }}">Date</label>{{ schedule_form.date }}
                             <label class="sr-only" for="{{ schedule_form.time.id_for_label }}">Time</label>{{ schedule_form.time }}
                         </div>
-                        <button type="submit" class="w-full px-5 py-2.5 text-sm font-semibold text-white bg-orange-700 rounded-full hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Approve &amp; schedule</button>
+                        <button type="submit" class="ui-btn ui-btn-lg ui-btn-primary w-full">Approve &amp; schedule</button>
                     </form>
                     {% endif %}
-                    <details class="rounded-xl border border-stone-200 p-3" data-decision-more>
-                        <summary class="cursor-pointer text-xs font-semibold text-stone-700 rounded focus-visible:outline-2 focus-visible:outline-orange-700">Other options</summary>
-                        <div class="mt-3 space-y-3">
+                    <details class="group/more rounded-xl ring-1 ring-inset ring-ink-200" data-decision-more>
+                        <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3.5 text-[13px] font-semibold text-ink-700 hover:text-ink-900 [&::-webkit-details-marker]:hidden">Other options<svg class="w-4 h-4 text-ink-500 transition-transform group-open/more:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+                        <div class="space-y-4 border-t border-ink-200 px-3.5 pt-3 pb-3.5">
                             {% if proposed_in_future %}
                             <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}">
                                 {% csrf_token %}<input type="hidden" name="mode" value="schedule">
-                                <p class="text-xs font-semibold text-stone-700 mb-2">Pick another time ({{ workspace.effective_timezone|default:"UTC" }})</p>
+                                <p class="ui-label">Pick another time ({{ workspace.effective_timezone|default:"UTC" }})</p>
                                 <div class="grid grid-cols-2 gap-2 mb-2">
                                     <label class="sr-only" for="{{ schedule_form.date.id_for_label }}">Date</label>{{ schedule_form.date }}
                                     <label class="sr-only" for="{{ schedule_form.time.id_for_label }}">Time</label>{{ schedule_form.time }}
                                 </div>
-                                <button type="submit" class="w-full px-5 py-2 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-full hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-orange-700">Approve &amp; schedule for this time</button>
+                                <button type="submit" class="ui-btn ui-btn-secondary w-full">Approve &amp; schedule for this time</button>
                             </form>
                             {% endif %}
                             {% if can_publish_now %}
                             <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
                                 {% csrf_token %}<input type="hidden" name="mode" value="now">
-                                <button type="submit" x-bind:disabled="busy" class="w-full px-5 py-2 text-sm font-semibold text-stone-800 bg-white border border-stone-300 rounded-full hover:bg-stone-50 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                                <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn ui-btn-secondary w-full">
                                     <span x-show="!busy">Approve &amp; publish now</span><span x-show="busy" x-cloak>Approving…</span>
                                 </button>
                             </form>
                             {% endif %}
                             <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=brief.id %}">
                                 {% csrf_token %}<input type="hidden" name="mode" value="approve">
-                                <button type="submit" class="text-sm text-stone-800 underline hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-orange-700 rounded">Approve only — schedule it later</button>
+                                <button type="submit" class="min-h-8 max-lg:min-h-11 text-[13px] font-medium text-ink-700 underline underline-offset-3 hover:text-ink-900 rounded-sm">Approve only — schedule it later</button>
                             </form>
                         </div>
                     </details>
                 </div>
                 {% elif brief.status == 'ready' %}
-                <p class="text-sm text-stone-700">Waiting for an approver (an owner or manager). It's also on the Approvals list.</p>
+                <p class="text-sm text-ink-700">Waiting for an approver (an owner or manager). It's also on the Approvals list.</p>
                 {% elif brief.status == 'approved' and not next_step %}
-                <p class="text-sm text-green-800">Approved.</p>
+                <p class="flex items-center gap-1.5 text-sm font-semibold text-ink-900"><svg class="w-4 h-4 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Approved.</p>
                 {% endif %}
             </section>
 
@@ -322,33 +330,33 @@
             {% include thread.template with thread=thread %}
             {% endif %}
             {% if can_revise %}
-            <section aria-labelledby="changes-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
-                <h2 id="changes-heading" class="text-sm font-semibold text-stone-900">Send it back with notes</h2>
-                <p class="text-xs text-stone-600 mt-0.5 mb-3">Goes straight to the copywriter and art director.</p>
+            <section aria-labelledby="changes-heading" class="ui-card">
+                <h2 id="changes-heading" class="ui-card-title">Send it back with notes</h2>
+                <p class="ui-card-subtitle mb-3">Goes straight to the copywriter and art director.</p>
                 <form method="post" action="{% url 'studio:request_changes' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
                     {% csrf_token %}
                     <label for="{{ feedback_form.feedback.id_for_label }}" class="sr-only">{{ feedback_form.feedback.label }}</label>
                     {{ feedback_form.feedback }}
-                    <label class="flex items-center gap-2 mt-2 text-sm text-stone-800 cursor-pointer">{{ feedback_form.new_picture }} {{ feedback_form.new_picture.label }}</label>
-                    <button type="submit" x-bind:disabled="busy" class="mt-3 px-4 py-2 text-sm font-semibold text-orange-900 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-orange-700">Send to the team</button>
+                    <label class="flex items-center gap-2 mt-2 min-h-8 max-lg:min-h-11 text-[13px] text-ink-800 cursor-pointer">{{ feedback_form.new_picture }} {{ feedback_form.new_picture.label }}</label>
+                    <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="mt-3 ui-btn ui-btn-secondary">Send to the team</button>
                 </form>
                 <form method="post" action="{% url 'studio:new_angles' workspace_id=workspace.id brief_id=brief.id %}" class="mt-3">
                     {% csrf_token %}
-                    <button type="submit" class="text-sm text-stone-800 underline hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-orange-700 rounded">Start over with three new angles</button>
+                    <button type="submit" class="min-h-8 max-lg:min-h-11 text-[13px] font-medium text-ink-700 underline underline-offset-3 hover:text-ink-900 rounded-sm">Start over with three new angles</button>
                 </form>
             </section>
             {% endif %}
 
-            <section aria-labelledby="files-heading" class="bg-white border border-stone-200 rounded-2xl p-5">
-                <h2 id="files-heading" class="text-sm font-semibold text-stone-900 mb-3">Files</h2>
+            <section aria-labelledby="files-heading" class="ui-card">
+                <h2 id="files-heading" class="text-h3 text-ink-950 mb-2">Files</h2>
                 <ul class="space-y-1.5 text-sm">
-                    {% if brief.graphic %}<li><a class="underline" href="{{ brief.graphic.file.url }}" download>Download the graphic</a> <span class="text-stone-600">({{ brief.graphic.width }}×{{ brief.graphic.height }})</span></li>{% endif %}
-                    {% if brief.picture %}<li><a class="underline" href="{{ brief.picture.file.url }}" download>Download the picture without type</a></li>{% endif %}
+                    {% if brief.graphic %}<li><a class="link-inline" href="{{ brief.graphic.file.url }}" download>Download the graphic</a> <span class="text-ink-500 tabular-nums">({{ brief.graphic.width }}×{{ brief.graphic.height }})</span></li>{% endif %}
+                    {% if brief.picture %}<li><a class="link-inline" href="{{ brief.picture.file.url }}" download>Download the picture without type</a></li>{% endif %}
                 </ul>
                 {% if can_discard %}
-                <form method="post" action="{% url 'studio:discard' workspace_id=workspace.id brief_id=brief.id %}" class="mt-4 pt-4 border-t border-stone-200">
+                <form method="post" action="{% url 'studio:discard' workspace_id=workspace.id brief_id=brief.id %}" class="mt-4 pt-3 border-t border-ink-200">
                     {% csrf_token %}
-                    <button type="submit" class="text-sm text-red-800 underline hover:text-red-900 focus-visible:outline-2 focus-visible:outline-red-700 rounded">Discard this post</button>
+                    <button type="submit" class="ui-btn ui-btn-sm ui-btn-danger-ghost -ml-3">Discard this post</button>
                 </form>
                 {% endif %}
             </section>

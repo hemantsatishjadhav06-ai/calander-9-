@@ -6,7 +6,7 @@ children never appeared there. An idea turned into a post kept its text only
 in ``title``, which the composer hides for most platforms and the Drafts page
 did not render. With no channels connected every Publish tab was replaced by
 the same big "Welcome — connect a channel" block, so Drafts could not show
-drafts. The sidebar also lit "Create Idea" on New Post and "Queues" on any
+drafts. The sidebar also lit "Ideas" (then "Create Idea") on New Post and "Queues" on any
 view whose name was a substring of "queue_list,queue_detail".
 """
 
@@ -68,7 +68,8 @@ class SaveDraftResponseTests(ChannellessDraftBase):
         always the publish mode, so a successful Save Draft redirected away."""
         html = self.client.get(reverse("composer:compose", kwargs=self.kw)).content.decode()
         start = html.index("onFormSaved(event) {")
-        body = html[start : start + 2500]
+        # The whole method: it ends at the first close of an Alpine property.
+        body = html[start : html.index("\n        },\n", start)]
         self.assertNotIn("getElementById('publish-action-btn')", body)
         self.assertIn("requestConfig", body)
         self.assertIn("Draft saved", body)
@@ -176,7 +177,8 @@ class SidebarActiveStateTests(ChannellessDraftBase):
 
     def test_new_post_does_not_light_create_idea(self):
         response = self.client.get(reverse("composer:compose", kwargs=self.kw))
-        self.assertNotIn("Create Idea", self._active_labels(response))
+        self.assertNotIn("Ideas", self._active_labels(response))
+        self.assertIn("Ideas", self._active_labels(self.client.get(reverse("composer:create_landing", kwargs=self.kw))))
 
     def test_queues_only_lights_on_queue_views(self):
         # "list" is a substring of "queue_list,queue_detail" — the old ``in`` test lit Queues here.
