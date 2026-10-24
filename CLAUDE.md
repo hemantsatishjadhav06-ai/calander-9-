@@ -161,7 +161,7 @@ uncertain send or delivery is held for a person, never replayed.
 
 ### `apps/studio` — the agency
 
-- `models.py` — `BrandProfile`; `StudioBrief` (a post in the making) and `StudioConcept`; `AgentRun` (one agent turn: tokens, cost); `AgencyJob` (every other kind of work); `AgencySettings` (autopilot, approvers, budget, creation mode); `BrandClaim`; `CampaignOutcome`; `AutopilotWeek`; `CreativeInsight`; `Conversation` and `Message`; `Routine` and `RoutineRun`.
+- `models.py` — `BrandProfile`; `StudioBrief` (a post in the making) and `StudioConcept`; `AgentRun` (one agent turn: tokens, cost); `AgencyJob` (every other kind of work); `AgencySettings` (autopilot, approvers, budget, creation mode, feature switches); `BrandClaim`; `CampaignOutcome`; `AutopilotWeek`; `CreativeInsight`; `Conversation` and `Message`; `Routine` and `RoutineRun`.
 - `views.py` — Home, create, the post page and its actions, the brand profile. `views_setup.py` — Set up and the Settings hub. `views_routines.py`. `views_agency.py` — Team and job pages. `views_autopilot.py`. `views_chat.py` — threads and inbox drafts. `views_memory.py`, `views_outcomes.py`, `views_trust.py`. `views_customer_workflow.py` — the older endpoints (redirect to Home). `opendots_views.py` — task controls.
 - `dashboard.py` — Today, the tabs, the settings cards, waiting / at work / week / stats; queries only.
 - `readiness.py` — the one readiness line; its copy never names a setting or a worker.

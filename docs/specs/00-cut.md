@@ -195,6 +195,18 @@ None block Phase 0.
 - *(engineering, Phase 2)* Which old routes get a 301 and which keep rendering inside the new
   screen (the five URL-contract names keep rendering).
 - *(engineering, Phase 5)* The `extra_providers` / `LAUNCHED_PLATFORMS` split above.
+- *(owner + engineering, Phase 2 spec)* Whether a flag hides navigation only or also stops
+  background work: `blog` off with `blog_posts_per_month > 0` still lets autopilot plan articles;
+  `queues` off leaves existing queues and recurring rules publishing. Recommendation: navigation
+  and creation only, and say so on the Advanced tab; nothing already scheduled stops.
+- *(engineering, Phase 2)* `extra_providers` gates the connect page and the Bluesky, Mastodon and
+  DEV.to connect forms only; reconnect and the OAuth callback stay open so connected Threads and
+  TikTok accounts can refresh their tokens.
+- *(engineering, Phase 2)* The navigation reads several keys per request: add
+  `features_for(workspace) -> dict[str, bool]` (one query, plus one blog check) or cache per request.
+- *(engineering, Phase 3)* When the Advanced → Features panel writes switches, write only that
+  field (`select_for_update`, `update_fields=["features"]`) so the autopilot form saving the whole
+  row cannot overwrite a switch changed a moment earlier.
 
 ## Phasing
 

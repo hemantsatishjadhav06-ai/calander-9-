@@ -73,8 +73,13 @@ Files: `apps/studio/admin.py`, `apps/studio/tests/test_features_field.py`.
 1. Red: as a superuser, the `AgencySettings` change page renders and posting
    `features={"queues": true}` saves it (and `feature_enabled` then says on).
 2. Green: `@admin.register(AgencySettings)` with `list_display = ("workspace", "autopilot_enabled", "creation_mode")`,
-   `search_fields = ("workspace__name",)`, `raw_id_fields = ("workspace", "lead", "backup", "blog_site")`,
-   `filter_horizontal = ("accounts",)`.
+   `search_fields = ("workspace__name",)`, `raw_id_fields = ("workspace", "lead", "backup", "blog_site", "accounts")`.
+3. Added after review (each with a failing test first): `accounts` is a raw id, not
+   `filter_horizontal`, so the page lists no other organisation's accounts and decrypts no tokens;
+   `workspace` is read-only on an existing row (moving it would carry one workspace's settings to
+   another); the admin form saves an emptied `features` or `pillars` box as an empty value instead
+   of crashing on the NOT NULL column, and refuses anything but known keys with true or false,
+   naming the wrong ones.
 
 ## Task 4 — Docs and changelog
 
