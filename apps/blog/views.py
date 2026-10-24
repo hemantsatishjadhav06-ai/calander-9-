@@ -7,6 +7,7 @@ views only decide which buttons to show and translate refusals into messages.
 """
 
 import base64
+import dataclasses
 import logging
 import uuid
 from typing import Any
@@ -497,14 +498,16 @@ def post_preview(request, workspace_id, post_id):
         # answered with a redirect to sign in, leaving the hero blank.
         # The cover is drawn inside this page view, so a featured image that cannot be read (a file
         # gone from storage, an OSError, a storage backend's own error) leaves the hero out rather
-        # than turning the whole preview into an error page.
+        # than turning the whole preview into an error page. Out means has_image=False: with no
+        # hero_src the renderer would fall back to the relative img/<slug>-hero.jpg, which points at
+        # the live site's old cover.
         try:
             hero_src = "data:image/jpeg;base64," + base64.b64encode(cover_for_post(post, content)).decode("ascii")
         except ValueError:
-            hero_src = None
+            content = dataclasses.replace(content, has_image=False)
         except Exception:
             logger.warning("Blog preview: could not draw the cover for post %s", post.pk, exc_info=True)
-            hero_src = None
+            content = dataclasses.replace(content, has_image=False)
     elif post.featured_image_id and post.featured_image.file:
         hero_src = request.build_absolute_uri(post.featured_image.file.url)
     page = render_post_page(post.site, content, hero_src=hero_src)
