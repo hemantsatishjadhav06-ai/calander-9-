@@ -1050,6 +1050,27 @@ def _platform_status_map(post):
     return {str(pp.id): pp.status for pp in post.platform_posts.all()}
 
 
+def _post_saved_response(workspace, post):
+    """The 204 every save_post branch answers an htmx save with.
+
+    X-Post-Edit-Url goes with every one: whenever the composer stays open (a
+    first Save Draft, a Schedule that became a review request) it switches to
+    that URL, otherwise the next save or autosave makes a second post.
+    """
+    from django.urls import reverse
+
+    return HttpResponse(
+        status=204,
+        headers={
+            "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
+            "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
+            "X-Post-Edit-Url": reverse(
+                "composer:compose_edit", kwargs={"workspace_id": workspace.id, "post_id": post.id}
+            ),
+        },
+    )
+
+
 def _combine_schedule_dt(workspace, sched_date, sched_time):
     """Combine the composer's date + time inputs into a workspace-tz-aware datetime.
 
@@ -1325,13 +1346,7 @@ def save_post(request, workspace_id, post_id=None):
         request.session.pop(f"pending_media_{workspace.id}", None)
         _save_version(post, request.user)
         if request.htmx:
-            return HttpResponse(
-                status=204,
-                headers={
-                    "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
-                    "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                },
-            )
+            return _post_saved_response(workspace, post)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "add_to_queue_priority":
         from django.db import transaction
@@ -1367,13 +1382,7 @@ def save_post(request, workspace_id, post_id=None):
         request.session.pop(f"pending_media_{workspace.id}", None)
         _save_version(post, request.user)
         if request.htmx:
-            return HttpResponse(
-                status=204,
-                headers={
-                    "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
-                    "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                },
-            )
+            return _post_saved_response(workspace, post)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "submit_for_approval":
         # Save post first so it has a PK, then delegate to approval service
@@ -1389,13 +1398,7 @@ def save_post(request, workspace_id, post_id=None):
 
         submit_for_review(post, request.user, workspace)
         if request.htmx:
-            return HttpResponse(
-                status=204,
-                headers={
-                    "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
-                    "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                },
-            )
+            return _post_saved_response(workspace, post)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "resubmit_for_approval":
         # Resubmit after changes requested or rejection
@@ -1410,13 +1413,7 @@ def save_post(request, workspace_id, post_id=None):
 
         resubmit_post(post, request.user, workspace)
         if request.htmx:
-            return HttpResponse(
-                status=204,
-                headers={
-                    "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
-                    "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                },
-            )
+            return _post_saved_response(workspace, post)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "save_draft":
         # The Schedule Post panel doubles as the proposed-time picker for a
@@ -1480,28 +1477,7 @@ def save_post(request, workspace_id, post_id=None):
 
     # Return appropriate response
     if request.htmx:
-        from django.urls import reverse
-
-        return HttpResponse(
-            status=204,
-            headers={
-                "HX-Trigger": json.dumps(
-                    {
-                        "postSaved": {
-                            "postId": str(post.id),
-                            "status": post.status,
-                        }
-                    }
-                ),
-                "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                # A first Save Draft stays on the composer, so it needs the
-                # edit URL to switch to — otherwise the next save makes a
-                # second post.
-                "X-Post-Edit-Url": reverse(
-                    "composer:compose_edit", kwargs={"workspace_id": workspace.id, "post_id": post.id}
-                ),
-            },
-        )
+        return _post_saved_response(workspace, post)
 
     return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
 
