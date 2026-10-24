@@ -103,7 +103,7 @@ A post waiting for the client opens expanded, so its actions are visible at once
             {% elif post.client_approved %}
             <span class="mr-1 inline-flex items-center gap-1.5 text-sm text-ink-700">
                 <svg class="size-4 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
-                You approved this. {% if post.scheduled_at %}It's on the calendar.{% else %}Your agency team schedules it next.{% endif %}
+                You approved this. {% if post.client_scheduled %}It's on the calendar.{% else %}Your agency team schedules it next.{% endif %}
             </span>
             <div class="flex flex-wrap gap-2 sm:ml-auto">
                 <button @click="panel = panel === 'ask' ? null : 'ask'" :aria-expanded="(panel === 'ask').toString()"

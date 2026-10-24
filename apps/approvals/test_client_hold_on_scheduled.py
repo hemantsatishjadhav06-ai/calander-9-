@@ -134,3 +134,20 @@ class PortalHoldViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Put on hold")
         self.assertContains(response, reverse("client_portal:request_hold", kwargs={"post_id": post.id}))
+        self.assertContains(response, "It's on the calendar.")
+
+    def test_a_resumed_post_keeps_its_old_time_but_is_not_said_to_be_on_the_calendar(self):
+        """Resume goes back to approved; Post.scheduled_at stays set, yet nothing is scheduled."""
+        post = _scheduled_post(self.ws, self.manager, self.account)
+        services.request_hold(post, self.client_user, self.ws, "Legal wants to check the figures")
+        services.resume_hold(post, self.manager, self.ws)
+        post.refresh_from_db()
+        self.assertIsNotNone(post.scheduled_at)
+        self.assertEqual(post.platform_posts.get().status, "approved")
+
+        response = self.client.get(reverse("client_portal:approval_queue"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "It's on the calendar.")
+        self.assertContains(response, "Your agency team schedules it next.")
+        self.assertContains(response, "Proposed for")
