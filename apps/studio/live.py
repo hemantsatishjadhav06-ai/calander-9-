@@ -11,9 +11,11 @@ Rules it keeps:
   (``tests/test_live.py`` holds the budget), every list capped.
 * This workspace only. Private Telegram jobs and their turns stay out
   (``chat.web_jobs`` / ``chat.web_agent_runs``); the pages that show it are for
-  the agency's staff only (``views._workspace``), never clients.
-* Cached for a few seconds per workspace, so a room of open tabs refreshing
-  every five seconds costs one snapshot.
+  the agency's staff only (``views._workspace``), never clients, and
+  ``for_viewer`` trims it for staff without ``create_posts``.
+* Cached per workspace for a little longer than the Team tab's five-second
+  refresh, so however many tabs are open it is built at most once every six
+  seconds.
 
 Copy follows CLAUDE.md: status in words, no model, vendor, worker or token
 names, times in the workspace's timezone.
@@ -30,17 +32,21 @@ from typing import Any
 
 from django.core.cache import cache
 from django.db.models import Case, Count, IntegerField, Max, Q, Value, When
+from django.db.models.functions import Coalesce
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
 from . import chat, team
 from .models import AgencyJob, AgencySettings, AgentRun, Routine, StudioBrief
 
-CACHE_SECONDS = 3
+#: A little longer than the Team tab's 5 s refresh, so even a single open tab reuses every other snapshot.
+CACHE_SECONDS = 6
 CACHE_PREFIX = "studio:live:v1:"
 
 #: At most this many tasks get a stage track; the rest are counted.
 MAX_TRACKS = 8
+#: The roster reads each agent's last turn from this many of the workspace's latest turns.
+LATEST_TURNS = 400
 #: Rows in "Recently finished".
 RECENT_LIMIT = 10
 #: Failed, paused and interrupted tasks count in "Needs you" for this long, so an old failure ages out.
@@ -396,19 +402,22 @@ def _job_track(job: AgencyJob, running: dict, now: datetime, zone) -> dict[str, 
 
 
 def _roster(workspace, visible_runs, running_agents: set, track_agents: dict, day_start, now):
+    # Today's turns only: the history only grows, and this runs on every refresh.
     per_agent = {
         row["agent"]: row
-        for row in visible_runs.values("agent").annotate(
-            total=Count("id"),
-            today=Count("id", filter=Q(started_at__gte=day_start)),
-            last=Max("started_at"),
-        )
+        for row in visible_runs.filter(started_at__gte=day_start)
+        .values("agent")
+        .annotate(today=Count("id"), last=Max("started_at"))
     }
-    latest: dict[str, dict] = {}
-    for row in visible_runs.order_by("-started_at").values(
+    turns = visible_runs.order_by("-started_at").values(
         "agent", "status", "summary", "started_at", "brief_id", "job_id"
-    )[:400]:
+    )
+    recent = list(turns[:LATEST_TURNS])
+    latest: dict[str, dict] = {}
+    for row in recent:
         latest.setdefault(row["agent"], row)
+    # Fewer turns than were asked for means the whole history was read, so an agent missing here never worked.
+    whole_history = len(recent) < LATEST_TURNS
 
     def run_url(row) -> str:
         if row.get("brief_id"):
@@ -452,8 +461,10 @@ def _roster(workspace, visible_runs, running_agents: set, track_agents: dict, da
                 last_text, last_url, last_at = "Took a turn", "", stats["last"]
             elif agent.kind == "code":
                 last_text, last_url = "Works by rules, so it costs nothing.", ""
-            else:
+            elif whole_history:
                 last_text, last_url = "Not needed yet.", ""
+            else:
+                last_text, last_url = "No turns today.", ""
             last_ago = ago((now - last_at).total_seconds()) if last_at else ""
             rows.append(
                 {
@@ -469,7 +480,6 @@ def _roster(workspace, visible_runs, running_agents: set, track_agents: dict, da
                     "last_ago": last_ago,
                     "last_at": last_at,
                     "turns_today": stats.get("today", 0),
-                    "turns_total": stats.get("total", 0),
                 }
             )
         working = sum(1 for row in rows if row["state"] == "working")
@@ -673,15 +683,16 @@ def _upcoming(workspace, now: datetime, zone, queued_count: int) -> dict[str, An
 
     posts: dict[Any, dict[str, Any]] = {}
     for pp in (
-        PlatformPost.objects.filter(
-            post__workspace=workspace, status="scheduled", scheduled_at__gte=now, scheduled_at__lt=end
-        )
+        PlatformPost.objects.filter(post__workspace=workspace, status="scheduled")
+        # A channel without its own time goes out at the post's, as the publisher and the calendar read it.
+        .annotate(effective_at=Coalesce("scheduled_at", "post__scheduled_at"))
+        .filter(effective_at__gte=now, effective_at__lt=end)
         .select_related("post", "social_account")
-        .order_by("scheduled_at")[:40]
+        .order_by("effective_at")[:40]
     ):
-        if pp.scheduled_at is None:
+        if pp.effective_at is None:  # excluded by the filter; keeps the type checker sure
             continue
-        when = pp.scheduled_at.astimezone(zone)
+        when = pp.effective_at.astimezone(zone)
         key = (pp.post_id, when)
         if key not in posts:
             label = (pp.post.title or " ".join((pp.post.caption or "").split()) or "Your post")[:80]
@@ -855,8 +866,13 @@ def _recent(workspace, jobs, zone, local_now) -> list[dict[str, Any]]:
     return rows
 
 
+#: A channel in any of these was approved, whether or not the gate stamped an approver.
+_APPROVED_ROWS = frozenset({"approved", "scheduled", "publishing", "published", "failed"})
+
+
 def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
     """The team's latest post, from draft to published: the delivery receipt (DESIGN_SYSTEM.md 14.3)."""
+    from apps.approvals.gate import effective_publish_at
     from apps.composer.models import PlatformPost
 
     brief = (
@@ -873,7 +889,7 @@ def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
         return None
     rows = list(
         PlatformPost.objects.filter(post_id=brief.post_id)
-        .select_related("social_account", "approved_by")
+        .select_related("post", "social_account", "approved_by")
         .order_by("pk")
     )
     if not rows:
@@ -883,25 +899,39 @@ def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
         return _day_label(value.astimezone(zone), local_now) if value else ""
 
     platforms = " and ".join(sorted({row.social_account.get_platform_display() for row in rows}))
-    approved = next((row for row in rows if row.approved_at), None)
     statuses = {row.status for row in rows}
     steps = [{"state": "done", "text": "Draft ready", "meta": when(brief.finished_at)}]
-    if approved is not None:
-        who = (getattr(approved.approved_by, "name", "") or "").split(" ")[0] if approved.approved_by else ""
-        steps.append(
-            {"state": "done", "text": f"Approved by {who}" if who else "Approved", "meta": when(approved.approved_at)}
-        )
-    elif "pending_client" in statuses:
+    # Whether it was approved comes from what happened to the post: the gate stamps who approved
+    # and when only where dashboard approval is enforced, and keeps the stamp while the client decides.
+    if "pending_client" in statuses:
         steps.append({"state": "needs-you", "text": "Waiting for the client", "meta": ""})
+    elif brief.status == StudioBrief.Status.APPROVED or statuses & _APPROVED_ROWS:
+        stamped = next((row for row in rows if row.approved_at), None)
+        who = ""
+        if stamped is not None and stamped.approved_by is not None:
+            who = (getattr(stamped.approved_by, "name", "") or "").split(" ")[0]
+        steps.append(
+            {
+                "state": "done",
+                "text": f"Approved by {who}" if who else "Approved",
+                "meta": when(stamped.approved_at) if stamped is not None else "",
+            }
+        )
     else:
         steps.append({"state": "needs-you", "text": "Waiting for your approval", "meta": ""})
     scheduled = next(
-        (row for row in rows if row.status in ("scheduled", "publishing", "published", "failed") and row.scheduled_at),
+        (
+            row
+            for row in rows
+            if row.status in ("scheduled", "publishing", "published", "failed") and effective_publish_at(row)
+        ),
         None,
     )
     if scheduled is not None:
         state = "current" if scheduled.status == "scheduled" else "done"
-        steps.append({"state": state, "text": f"Scheduled for {platforms}", "meta": when(scheduled.scheduled_at)})
+        steps.append(
+            {"state": state, "text": f"Scheduled for {platforms}", "meta": when(effective_publish_at(scheduled))}
+        )
     else:
         steps.append({"state": "pending", "text": f"Scheduled for {platforms}", "meta": "Pending"})
     published = next((row for row in rows if row.status == "published"), None)
@@ -1070,11 +1100,6 @@ def _build(workspace, now: datetime) -> dict[str, Any]:
         "posts_ready_24h": brief_counts["ready_24h"] or 0,
     }
     busiest = next((track for track in tracks if track["status"] == "working"), tracks[0] if tracks else None)
-    next_event = upcoming["next"]
-    if next_event is not None:
-        idle_text = f"Nothing is running right now. Next: {next_event['title']}, {next_event['time_text']}."
-    else:
-        idle_text = "Nothing is running right now. Ask for something on Home and the team starts at once."
     announce = (
         f"{counts['working']} working, {counts['queued']} queued, {counts['done_today']} done today, "
         f"{counts['needs_you']} {'needs' if counts['needs_you'] == 1 else 'need'} you. Team {health['label'].lower()}."
@@ -1090,7 +1115,7 @@ def _build(workspace, now: datetime) -> dict[str, Any]:
         "tracks": tracks,
         "hidden_tracks": hidden_tracks,
         "busiest": busiest,
-        "idle_text": idle_text,
+        "idle_text": _idle_text(upcoming["next"]),
         "departments": departments,
         "activity": activity,
         "upcoming": upcoming,
@@ -1102,6 +1127,49 @@ def _build(workspace, now: datetime) -> dict[str, Any]:
     }
     data["digest"] = digest(data)
     return data
+
+
+def _idle_text(next_event: dict[str, Any] | None) -> str:
+    if next_event is not None:
+        return f"Nothing is running right now. Next: {next_event['title']}, {next_event['time_text']}."
+    return "Nothing is running right now. Ask for something on Home and the team starts at once."
+
+
+def for_viewer(data: dict[str, Any], workspace, *, can_create: bool) -> dict[str, Any]:
+    """The snapshot as a person without ``create_posts`` may see it; the cached snapshot is left as it is.
+
+    The Routines, Autopilot and composer pages refuse such a person, and Home
+    leaves routines out for them, so a routine keeps its place on the timeline
+    but not its title (its instruction), and nothing links to those pages.
+    """
+    if can_create:
+        return data
+    closed = {_url("studio:routines", workspace_id=workspace.id), _url("studio:autopilot", workspace_id=workspace.id)}
+    events = []
+    for original in data["upcoming"]["events"]:
+        event = dict(original)
+        if event["kind"] == "routine" and event["caption"] == "Routine":  # the autopilot plan's title is fixed copy
+            event.update(title="Routine", caption="")
+        if event["kind"] in ("routine", "post"):
+            event["url"] = ""
+        events.append(event)
+    upcoming = {
+        **data["upcoming"],
+        "events": events,
+        "clusters": _lay_out(events),  # placed by time alone, so where they were
+        "next": next((event for event in events if event["kind"] != "queued"), None),
+    }
+    tracks = [{**track, "policy_url": ""} if track["policy_url"] in closed else track for track in data["tracks"]]
+    busiest_key = data["busiest"]["key"] if data["busiest"] else None
+    shown = {
+        **data,
+        "upcoming": upcoming,
+        "tracks": tracks,
+        "busiest": next((track for track in tracks if track["key"] == busiest_key), None),
+        "idle_text": _idle_text(upcoming["next"]),
+    }
+    shown["digest"] = digest(shown)
+    return shown
 
 
 def _approvals_url(workspace) -> str:

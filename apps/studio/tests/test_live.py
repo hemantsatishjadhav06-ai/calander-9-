@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -368,6 +369,108 @@ def test_upcoming_routines_autopilot_posts_approvals_and_queued_work(world, monk
 
 
 # ---------------------------------------------------------------------------
+# The latest post's receipt
+# ---------------------------------------------------------------------------
+
+
+def _team_post(world, brief_status, *rows, post_at=None):
+    """A team brief whose post has one channel per (account, status, fields) row."""
+    post = Post.objects.create(workspace=world.workspace, title="Clubhouse reel", scheduled_at=post_at)
+    for account, status, fields in rows:
+        PlatformPost.objects.create(post=post, social_account=account, status=status, **fields)
+    _brief(world.workspace, status=brief_status, post=post, finished_at=timezone.now() - timedelta(hours=1))
+    return post
+
+
+def _label(world, when, now):
+    zone = live._zone(world.workspace)
+    return live._day_label(when.astimezone(zone), now.astimezone(zone))
+
+
+def test_the_receipt_counts_an_approval_the_gate_did_not_stamp(world):
+    # Without dashboard approval (the default) the gate records no approver, yet the post was approved.
+    assert not world.workspace.require_dashboard_approval
+    now = timezone.now()
+    at = now + timedelta(hours=20)
+    post = _team_post(world, StudioBrief.Status.APPROVED, (world.linkedin, "scheduled", {"scheduled_at": at}))
+
+    steps = live.snapshot(world.workspace, now=now)["receipt"]["steps"]
+
+    assert steps[1] == {"state": "done", "text": "Approved", "meta": ""}
+    assert steps[2] == {
+        "state": "current",
+        "text": f"Scheduled for {world.linkedin.get_platform_display()}",
+        "meta": _label(world, at, now),
+    }
+    assert steps[3] == {"state": "pending", "text": "Published", "meta": "Pending"}
+
+    PlatformPost.objects.filter(post=post).update(status="published", published_at=at)
+    steps = live.snapshot(world.workspace, now=now)["receipt"]["steps"]
+    assert steps[1]["text"] == "Approved" and steps[3]["state"] == "done"
+    assert not any(step["state"] == "needs-you" for step in steps)
+
+
+def test_the_receipt_waits_for_the_client_after_the_internal_approval(world):
+    Workspace.objects.filter(pk=world.workspace.pk).update(
+        require_dashboard_approval=True,
+        approval_workflow_mode=Workspace.ApprovalWorkflowMode.REQUIRED_INTERNAL_AND_CLIENT,
+    )
+    now = timezone.now()
+    approved = {"approved_by": world.manager, "approved_at": now - timedelta(minutes=30)}
+    post = _team_post(world, StudioBrief.Status.APPROVED, (world.linkedin, "pending_client", approved))
+
+    steps = live.snapshot(world.workspace, now=now)["receipt"]["steps"]
+
+    assert steps[1] == {"state": "needs-you", "text": "Waiting for the client", "meta": ""}
+    assert steps[2]["state"] == "pending"
+
+    # The client signs off and the team schedules it: the approver's name and time come back.
+    at = now + timedelta(hours=3)
+    PlatformPost.objects.filter(post=post).update(status="scheduled", scheduled_at=at)
+    steps = live.snapshot(world.workspace, now=now)["receipt"]["steps"]
+    assert steps[1] == {
+        "state": "done",
+        "text": "Approved by Manager",
+        "meta": _label(world, approved["approved_at"], now),
+    }
+
+
+def test_coming_up_and_the_receipt_fall_back_to_the_posts_time(world):
+    # A scheduled channel with no time of its own goes out at the post's time (the publisher's Coalesce).
+    now = timezone.now()
+    at = now + timedelta(hours=2)
+    _team_post(world, StudioBrief.Status.APPROVED, (world.linkedin, "scheduled", {}), post_at=at)
+    early = Post.objects.create(workspace=world.workspace, title="Site visit", scheduled_at=now + timedelta(hours=9))
+    PlatformPost.objects.create(
+        post=early, social_account=world.x, status="scheduled", scheduled_at=now + timedelta(hours=1)
+    )
+    late = Post.objects.create(workspace=world.workspace, title="Moved out", scheduled_at=now + timedelta(hours=3))
+    PlatformPost.objects.create(
+        post=late, social_account=world.x, status="scheduled", scheduled_at=now + timedelta(hours=30)
+    )
+
+    snap = live.snapshot(world.workspace, now=now)
+
+    posts = [event for event in snap["upcoming"]["events"] if event["kind"] == "post"]
+    assert [event["title"] for event in posts] == ["Site visit", "Clubhouse reel"]  # the channel's own time wins
+    assert posts[1]["time_text"] == _label(world, at, now)
+    assert snap["idle_text"] == f"Nothing is running right now. Next: Site visit, {posts[0]['time_text']}."
+    assert snap["receipt"]["steps"][2] == {
+        "state": "current",
+        "text": f"Scheduled for {world.linkedin.get_platform_display()}",
+        "meta": _label(world, at, now),
+    }
+
+
+def test_the_receipt_waits_for_you_while_the_post_is_in_review(world):
+    _team_post(world, StudioBrief.Status.READY, (world.linkedin, "pending_review", {}))
+
+    steps = live.snapshot(world.workspace, now=timezone.now())["receipt"]["steps"]
+
+    assert steps[1] == {"state": "needs-you", "text": "Waiting for your approval", "meta": ""}
+
+
+# ---------------------------------------------------------------------------
 # Isolation and privacy
 # ---------------------------------------------------------------------------
 
@@ -443,6 +546,76 @@ def test_the_board_partial_refreshes_with_get_only(client, world):
     assert client.post(url).status_code == 405
 
 
+SECRET_ROUTINE = "Push the Diwali price drop to the VIP list"
+
+
+def _plans(world, monkeypatch, now):
+    """A routine, the autopilot plan and a scheduled post, all in the next 24 hours."""
+    Routine.objects.create(workspace=world.workspace, instruction=SECRET_ROUTINE, next_run_at=now + timedelta(hours=2))
+    local = now.astimezone(live._zone(world.workspace))
+    plan_at = local + timedelta(hours=5)
+    AgencySettings.objects.create(
+        workspace=world.workspace, autopilot_enabled=True, plan_weekday=plan_at.weekday(), plan_hour=plan_at.hour
+    )
+    monkeypatch.setattr(autopilot, "local_now", lambda workspace, now=None: local)
+    post = Post.objects.create(workspace=world.workspace, title="Clubhouse reel")
+    PlatformPost.objects.create(
+        post=post, social_account=world.linkedin, status="scheduled", scheduled_at=now + timedelta(hours=8)
+    )
+    return post
+
+
+def test_viewers_see_no_routine_text_and_no_links_that_refuse_them(client, world, monkeypatch):
+    # The Routines, Autopilot and composer pages need create_posts; the snapshot is shared by the workspace.
+    assert not WorkspaceMembership.objects.get(user=world.viewer, workspace=world.workspace).effective_permissions[
+        "create_posts"
+    ]
+    post = _plans(world, monkeypatch, timezone.now())
+    _job(world.workspace, "report", status=AgencyJob.Status.QUEUED, error=autopilot.AUTOPILOT_PAUSED)
+    closed = [
+        f'href="{_url("studio:routines", world)}"',
+        f'href="{_url("studio:autopilot", world)}"',
+        f'href="{_url("composer:compose_edit", world, post_id=post.id)}"',
+    ]
+    board = _url("studio:team_board", world)
+
+    client.force_login(world.owner)
+    owner = client.get(board).content.decode()
+    assert SECRET_ROUTINE in owner and all(link in owner for link in closed)
+
+    client.force_login(world.viewer)
+    for url in (_url("studio:team", world), board):
+        html = client.get(url).content.decode()
+        assert SECRET_ROUTINE not in html, url
+        assert not any(link in html for link in closed), url
+        # They still see that something is planned, and when.
+        assert "Clubhouse reel" in html and "Plan next week" in html and "Routine" in html, url
+        assert "once autopilot is on" in html, url
+
+    client.force_login(world.owner)
+    assert SECRET_ROUTINE in client.get(board).content.decode()
+
+
+def test_the_idle_line_names_no_routine_to_viewers(client, world, rf):
+    from apps.studio import views
+
+    Routine.objects.create(
+        workspace=world.workspace, instruction=SECRET_ROUTINE, next_run_at=timezone.now() + timedelta(hours=2)
+    )
+    client.force_login(world.viewer)
+
+    for url in (_url("studio:team", world), _url("studio:team_board", world) + "?part=strip"):
+        html = client.get(url).content.decode()
+        assert SECRET_ROUTINE not in html and "Next: Routine, " in html, url
+
+    # Home's card, for someone who approves the team's work but does not direct it.
+    request = rf.get("/")
+    request.workspace_membership = WorkspaceMembership.objects.get(user=world.editor, workspace=world.workspace)
+    approver = views._live_strip(request, world.workspace, {"create_posts": False, "approve_posts": True})
+    assert SECRET_ROUTINE not in approver["idle_text"]
+    assert SECRET_ROUTINE in views._live_strip(request, world.workspace, {"create_posts": True})["idle_text"]
+
+
 def test_clients_get_a_403_and_viewers_may_watch(client, world):
     viewer = client
     viewer.force_login(world.viewer)
@@ -506,6 +679,41 @@ def test_the_snapshot_runs_a_fixed_number_of_queries(world):
 
     assert len(large) == len(small), "the snapshot's queries grow with the rows (an N+1)"
     assert len(large) <= 22
+
+
+def test_the_roster_reads_only_todays_turns(world, monkeypatch):
+    now = datetime(2026, 10, 23, 10, 45, tzinfo=UTC)  # 16:15 in Hyderabad
+    job = _job(world.workspace, "report")
+    _run("reporter", job=job, started_at=now - timedelta(days=3), summary="Wrote last week's report.")
+    _run("copywriter", job=job, started_at=now - timedelta(minutes=2))
+    _run("copywriter", job=job, started_at=now - timedelta(minutes=1))
+
+    with CaptureQueriesContext(connection) as queries:
+        snap = live.snapshot(world.workspace, now=now)
+
+    # The per-agent count is bounded to today where it reads, so it never scans the whole history.
+    (grouped,) = [
+        query["sql"] for query in queries if "studio_agent_run" in query["sql"] and "GROUP BY" in query["sql"]
+    ]
+    assert '"studio_agent_run"."started_at" >=' in grouped.split(" FROM ", 1)[1]
+    assert _agent(snap, "copywriter")["turns_today"] == 2
+    reporter = _agent(snap, "reporter")
+    assert reporter["turns_today"] == 0 and reporter["last_text"] == "Wrote last week's report."
+    assert "turns_total" not in reporter
+
+    # Older than the latest turns read and nothing today: never "Not needed yet." for an agent that has worked.
+    monkeypatch.setattr(live, "LATEST_TURNS", 2)
+    reporter = _agent(live.snapshot(world.workspace, now=now), "reporter")
+    assert reporter["last_text"] == "No turns today." and reporter["last_ago"] == ""
+
+
+def test_the_cache_outlives_the_team_tabs_refresh(client, world):
+    # Shorter, and even one open tab would miss it and build a fresh snapshot on every refresh.
+    client.force_login(world.owner)
+    html = client.get(_url("studio:team", world)).content.decode()
+    match = re.search(r'id="team-board"[^>]*hx-trigger="every (\d+)s ', html)
+    assert match is not None
+    assert int(match.group(1)) < live.CACHE_SECONDS
 
 
 def test_the_snapshot_is_cached_briefly_per_workspace(world, django_assert_num_queries):
@@ -625,7 +833,7 @@ def test_the_home_card_adds_no_queries_once_the_snapshot_is_cached(client, world
     from apps.studio import views
 
     _busy(world, 3)
-    monkeypatch.setattr(live, "CACHE_SECONDS", 300)  # the test must not race the real 3 s lifetime
+    monkeypatch.setattr(live, "CACHE_SECONDS", 300)  # the test must not race the real few-second lifetime
     client.force_login(world.owner)
     url = _url("studio:index", world)
     client.get(url)  # warm the session, the middleware and the snapshot caches
