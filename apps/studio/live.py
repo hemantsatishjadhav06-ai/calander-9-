@@ -30,6 +30,7 @@ from typing import Any
 
 from django.core.cache import cache
 from django.db.models import Case, Count, IntegerField, Max, Q, Value, When
+from django.db.models.functions import Coalesce
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
@@ -673,15 +674,16 @@ def _upcoming(workspace, now: datetime, zone, queued_count: int) -> dict[str, An
 
     posts: dict[Any, dict[str, Any]] = {}
     for pp in (
-        PlatformPost.objects.filter(
-            post__workspace=workspace, status="scheduled", scheduled_at__gte=now, scheduled_at__lt=end
-        )
+        PlatformPost.objects.filter(post__workspace=workspace, status="scheduled")
+        # A channel without its own time goes out at the post's, as the publisher and the calendar read it.
+        .annotate(effective_at=Coalesce("scheduled_at", "post__scheduled_at"))
+        .filter(effective_at__gte=now, effective_at__lt=end)
         .select_related("post", "social_account")
-        .order_by("scheduled_at")[:40]
+        .order_by("effective_at")[:40]
     ):
-        if pp.scheduled_at is None:
+        if pp.effective_at is None:  # excluded by the filter; keeps the type checker sure
             continue
-        when = pp.scheduled_at.astimezone(zone)
+        when = pp.effective_at.astimezone(zone)
         key = (pp.post_id, when)
         if key not in posts:
             label = (pp.post.title or " ".join((pp.post.caption or "").split()) or "Your post")[:80]
@@ -861,6 +863,7 @@ _APPROVED_ROWS = frozenset({"approved", "scheduled", "publishing", "published", 
 
 def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
     """The team's latest post, from draft to published: the delivery receipt (DESIGN_SYSTEM.md 14.3)."""
+    from apps.approvals.gate import effective_publish_at
     from apps.composer.models import PlatformPost
 
     brief = (
@@ -877,7 +880,7 @@ def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
         return None
     rows = list(
         PlatformPost.objects.filter(post_id=brief.post_id)
-        .select_related("social_account", "approved_by")
+        .select_related("post", "social_account", "approved_by")
         .order_by("pk")
     )
     if not rows:
@@ -908,12 +911,18 @@ def _receipt(workspace, zone, local_now) -> dict[str, Any] | None:
     else:
         steps.append({"state": "needs-you", "text": "Waiting for your approval", "meta": ""})
     scheduled = next(
-        (row for row in rows if row.status in ("scheduled", "publishing", "published", "failed") and row.scheduled_at),
+        (
+            row
+            for row in rows
+            if row.status in ("scheduled", "publishing", "published", "failed") and effective_publish_at(row)
+        ),
         None,
     )
     if scheduled is not None:
         state = "current" if scheduled.status == "scheduled" else "done"
-        steps.append({"state": state, "text": f"Scheduled for {platforms}", "meta": when(scheduled.scheduled_at)})
+        steps.append(
+            {"state": state, "text": f"Scheduled for {platforms}", "meta": when(effective_publish_at(scheduled))}
+        )
     else:
         steps.append({"state": "pending", "text": f"Scheduled for {platforms}", "meta": "Pending"})
     published = next((row for row in rows if row.status == "published"), None)

@@ -434,6 +434,33 @@ def test_the_receipt_waits_for_the_client_after_the_internal_approval(world):
     }
 
 
+def test_coming_up_and_the_receipt_fall_back_to_the_posts_time(world):
+    # A scheduled channel with no time of its own goes out at the post's time (the publisher's Coalesce).
+    now = timezone.now()
+    at = now + timedelta(hours=2)
+    _team_post(world, StudioBrief.Status.APPROVED, (world.linkedin, "scheduled", {}), post_at=at)
+    early = Post.objects.create(workspace=world.workspace, title="Site visit", scheduled_at=now + timedelta(hours=9))
+    PlatformPost.objects.create(
+        post=early, social_account=world.x, status="scheduled", scheduled_at=now + timedelta(hours=1)
+    )
+    late = Post.objects.create(workspace=world.workspace, title="Moved out", scheduled_at=now + timedelta(hours=3))
+    PlatformPost.objects.create(
+        post=late, social_account=world.x, status="scheduled", scheduled_at=now + timedelta(hours=30)
+    )
+
+    snap = live.snapshot(world.workspace, now=now)
+
+    posts = [event for event in snap["upcoming"]["events"] if event["kind"] == "post"]
+    assert [event["title"] for event in posts] == ["Site visit", "Clubhouse reel"]  # the channel's own time wins
+    assert posts[1]["time_text"] == _label(world, at, now)
+    assert snap["idle_text"] == f"Nothing is running right now. Next: Site visit, {posts[0]['time_text']}."
+    assert snap["receipt"]["steps"][2] == {
+        "state": "current",
+        "text": f"Scheduled for {world.linkedin.get_platform_display()}",
+        "meta": _label(world, at, now),
+    }
+
+
 def test_the_receipt_waits_for_you_while_the_post_is_in_review(world):
     _team_post(world, StudioBrief.Status.READY, (world.linkedin, "pending_review", {}))
 
