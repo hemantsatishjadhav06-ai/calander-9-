@@ -33,4 +33,4 @@ phase gate (section 6) said. Newest first.
 - ruff check and format, mypy (924 files), `test:ui` (30/30), `recolor.py --check`: clean.
 - Reviews: three independent passes; every finding fixed with a failing test first, or recorded
   as a Phase 2/3 question in `00-cut.md`.
-- Spec approval: **waiting for the owner.**
+- Spec approval: **approved by the owner, 24 Oct 2026.** Phase 0 gate passed.
