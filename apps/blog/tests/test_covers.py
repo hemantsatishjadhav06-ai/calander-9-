@@ -232,6 +232,29 @@ def test_preview_survives_a_featured_image_whose_file_is_gone(client, world, ima
     assert "data:image/jpeg;base64," not in response.content.decode()
 
 
+@pytest.mark.parametrize("site_name", ["neopolis", "morespace"])
+@pytest.mark.parametrize("failure", ["file_gone", "not_an_image"])
+def test_a_cover_that_cannot_be_drawn_shows_no_hero_not_the_live_sites_old_one(
+    client, world, image_asset, site_name, failure
+):
+    """A designed cover always has a hero, so a failed drawing fell back to the relative
+    ``img/<slug>-hero.jpg``, which the preview points at the live site: the old cover of an
+    article already published, or a broken image for a new one."""
+    asset = image_asset(b"not an image" if failure == "not_an_image" else None)
+    post = make_post(world, site=getattr(world, site_name), cover_style="designed")
+    BlogPost.objects.filter(pk=post.pk).update(featured_image=asset)
+    if failure == "file_gone":
+        asset.file.storage.delete(asset.file.name)
+    client.force_login(world.owner)
+
+    response = client.get(_url("preview", world, post))
+
+    assert response.status_code == 200
+    preview = response.content.decode()
+    assert f"{post.slug}-hero.jpg" not in preview
+    assert 'class="ahero"' not in preview and 'class="blog-hero"' not in preview
+
+
 def test_editor_offers_the_cover_choice_and_shows_the_preview(client, world):
     post = make_post(world, cover_style="designed")
     client.force_login(world.editor)
