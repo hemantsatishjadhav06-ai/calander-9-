@@ -3,10 +3,19 @@
   "private": true,
   "scripts": {
     "heroku-postbuild": "cd theme/static_src && npm ci && npm run build",
-    "test:ui": "node --test tests/js/*.test.cjs"
+    "test:ui": "node --test tests/js/*.test.cjs",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "jsdom": "26.1.0"
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.56.1",
+    "jsdom": "26.1.0",
+    "lighthouse": "13.5.0"
   },
-  "cacheDirectories": ["theme/static_src/node_modules"]
+  "cacheDirectories": [
+    "theme/static_src/node_modules"
+  ],
+  "overrides": {
+    "playwright-core": "1.56.1"
+  }
 }
