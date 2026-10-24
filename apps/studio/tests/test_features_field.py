@@ -80,14 +80,14 @@ class FeaturesAdminTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="features"')
 
-    def _save(self, features):
+    def _save(self, features, pillars="[]"):
         return self.client.post(
             self.url,
             {
                 "workspace": self.ws.pk,
                 "creation_mode": AgencySettings.CreationMode.CONFIRM,
                 "posts_per_week": 5,
-                "pillars": "[]",
+                "pillars": pillars,
                 "plan_weekday": 4,
                 "plan_hour": 16,
                 "blog_posts_per_month": 0,
@@ -112,6 +112,16 @@ class FeaturesAdminTests(TestCase):
                 self.assertEqual(response.status_code, 302)
                 self.settings.refresh_from_db()
                 self.assertEqual(self.settings.features, {})
+
+    def test_an_empty_pillars_box_saves_no_pillars(self):
+        # The same NOT NULL column trap as features: an empty box or null is None to the form.
+        for pillars in ("", "null"):
+            with self.subTest(pillars=pillars):
+                AgencySettings.objects.filter(pk=self.settings.pk).update(pillars=["Launches"])
+                response = self._save("{}", pillars=pillars)
+                self.assertEqual(response.status_code, 302)
+                self.settings.refresh_from_db()
+                self.assertEqual(self.settings.pillars, [])
 
     def test_anything_but_known_keys_with_booleans_is_a_form_error(self):
         AgencySettings.objects.filter(pk=self.settings.pk).update(features={"queues": True})

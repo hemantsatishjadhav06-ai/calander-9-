@@ -32,6 +32,11 @@ class AgencySettingsAdminForm(forms.ModelForm):
             )
         return features
 
+    def clean_pillars(self):
+        """An empty box or ``null`` is no pillars (the column is NOT NULL)."""
+        pillars = self.cleaned_data.get("pillars")
+        return [] if pillars is None else pillars
+
 
 @admin.register(AgencySettings)
 class AgencySettingsAdmin(admin.ModelAdmin):
