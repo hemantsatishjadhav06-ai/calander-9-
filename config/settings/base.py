@@ -251,6 +251,8 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
+# The project's own catalogues; compilemessages needs one locale directory to exist.
+LOCALE_PATHS = [BASE_DIR / "locale"]
 
 # Static files
 STATIC_URL = "/static/"

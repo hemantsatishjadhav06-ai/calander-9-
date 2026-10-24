@@ -126,6 +126,14 @@ jobs:
       - name: Install dependencies
         run: pip install --require-hashes -r requirements.lock
 
+      # The translation catalogues must compile. msgfmt comes from gettext,
+      # which the runner image does not promise, so it is installed here.
+      - name: compilemessages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gettext
+          python manage.py compilemessages --ignore=.venv --ignore=node_modules
+
       # Catches a model change whose migration was never generated. The
       # companion hazard — a migration that is fine against an empty table but
       # fails on one with rows — is covered by tests that apply migrations over
@@ -221,3 +229,39 @@ jobs:
 
       - name: Run gitleaks
         run: gitleaks detect --source . --redact --verbose --no-banner
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install pip-audit
+        run: pip install "pip-audit==2.10.1"
+
+      # Audits the hashed lock as written; nothing from it is installed.
+      - name: pip-audit
+        run: pip-audit -r requirements.lock --disable-pip --require-hashes --progress-spinner off
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      # npm audit reads each lockfile; no install is needed.
+      - name: npm audit (root)
+        run: npm audit --audit-level=high
+
+      - name: npm audit (theme)
+        working-directory: theme/static_src
+        run: npm audit --audit-level=high
