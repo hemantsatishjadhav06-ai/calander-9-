@@ -11,7 +11,8 @@ Rules it keeps:
   (``tests/test_live.py`` holds the budget), every list capped.
 * This workspace only. Private Telegram jobs and their turns stay out
   (``chat.web_jobs`` / ``chat.web_agent_runs``); the pages that show it are for
-  the agency's staff only (``views._workspace``), never clients.
+  the agency's staff only (``views._workspace``), never clients, and
+  ``for_viewer`` trims it for staff without ``create_posts``.
 * Cached for a few seconds per workspace, so a room of open tabs refreshing
   every five seconds costs one snapshot.
 
@@ -1091,11 +1092,6 @@ def _build(workspace, now: datetime) -> dict[str, Any]:
         "posts_ready_24h": brief_counts["ready_24h"] or 0,
     }
     busiest = next((track for track in tracks if track["status"] == "working"), tracks[0] if tracks else None)
-    next_event = upcoming["next"]
-    if next_event is not None:
-        idle_text = f"Nothing is running right now. Next: {next_event['title']}, {next_event['time_text']}."
-    else:
-        idle_text = "Nothing is running right now. Ask for something on Home and the team starts at once."
     announce = (
         f"{counts['working']} working, {counts['queued']} queued, {counts['done_today']} done today, "
         f"{counts['needs_you']} {'needs' if counts['needs_you'] == 1 else 'need'} you. Team {health['label'].lower()}."
@@ -1111,7 +1107,7 @@ def _build(workspace, now: datetime) -> dict[str, Any]:
         "tracks": tracks,
         "hidden_tracks": hidden_tracks,
         "busiest": busiest,
-        "idle_text": idle_text,
+        "idle_text": _idle_text(upcoming["next"]),
         "departments": departments,
         "activity": activity,
         "upcoming": upcoming,
@@ -1123,6 +1119,49 @@ def _build(workspace, now: datetime) -> dict[str, Any]:
     }
     data["digest"] = digest(data)
     return data
+
+
+def _idle_text(next_event: dict[str, Any] | None) -> str:
+    if next_event is not None:
+        return f"Nothing is running right now. Next: {next_event['title']}, {next_event['time_text']}."
+    return "Nothing is running right now. Ask for something on Home and the team starts at once."
+
+
+def for_viewer(data: dict[str, Any], workspace, *, can_create: bool) -> dict[str, Any]:
+    """The snapshot as a person without ``create_posts`` may see it; the cached snapshot is left as it is.
+
+    The Routines, Autopilot and composer pages refuse such a person, and Home
+    leaves routines out for them, so a routine keeps its place on the timeline
+    but not its title (its instruction), and nothing links to those pages.
+    """
+    if can_create:
+        return data
+    closed = {_url("studio:routines", workspace_id=workspace.id), _url("studio:autopilot", workspace_id=workspace.id)}
+    events = []
+    for original in data["upcoming"]["events"]:
+        event = dict(original)
+        if event["kind"] == "routine" and event["caption"] == "Routine":  # the autopilot plan's title is fixed copy
+            event.update(title="Routine", caption="")
+        if event["kind"] in ("routine", "post"):
+            event["url"] = ""
+        events.append(event)
+    upcoming = {
+        **data["upcoming"],
+        "events": events,
+        "clusters": _lay_out(events),  # placed by time alone, so where they were
+        "next": next((event for event in events if event["kind"] != "queued"), None),
+    }
+    tracks = [{**track, "policy_url": ""} if track["policy_url"] in closed else track for track in data["tracks"]]
+    busiest_key = data["busiest"]["key"] if data["busiest"] else None
+    shown = {
+        **data,
+        "upcoming": upcoming,
+        "tracks": tracks,
+        "busiest": next((track for track in tracks if track["key"] == busiest_key), None),
+        "idle_text": _idle_text(upcoming["next"]),
+    }
+    shown["digest"] = digest(shown)
+    return shown
 
 
 def _approvals_url(workspace) -> str:

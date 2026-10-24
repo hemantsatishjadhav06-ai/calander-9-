@@ -198,7 +198,8 @@ def _live_strip(request, workspace, perms) -> dict | None:
     from . import live
 
     try:
-        return live.snapshot(workspace)
+        # Trimmed as the card's own refresh trims it (views_live._context) for approvers who do not create.
+        return live.for_viewer(live.snapshot(workspace), workspace, can_create=bool(perms.get("create_posts")))
     except Exception:
         import logging
 

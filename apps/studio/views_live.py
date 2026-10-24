@@ -5,7 +5,8 @@
 HTMX refresh every few seconds, or Home's "Right now" card with
 ``?part=strip``. Both are GET only, read-only and for the agency's staff
 (``views._workspace``: clients get a 403 and use the portal). The numbers come
-from ``apps.studio.live.snapshot``, cached for a few seconds per workspace.
+from ``apps.studio.live.snapshot``, cached for a few seconds per workspace, and
+``live.for_viewer`` trims them for staff without ``create_posts``.
 """
 
 from __future__ import annotations
@@ -26,10 +27,12 @@ logger = logging.getLogger(__name__)
 
 def _context(request, workspace) -> dict:
     perms = _perms(request)
+    can_create = bool(perms.get("create_posts"))
     return {
         "workspace": workspace,
-        "live": live.snapshot(workspace),
-        "can_create": bool(perms.get("create_posts")),
+        # Cached per workspace, then trimmed per person: routines, autopilot and the composer need create_posts.
+        "live": live.for_viewer(live.snapshot(workspace), workspace, can_create=can_create),
+        "can_create": can_create,
         "can_approve": bool(perms.get("approve_posts")),
     }
 

@@ -545,6 +545,76 @@ def test_the_board_partial_refreshes_with_get_only(client, world):
     assert client.post(url).status_code == 405
 
 
+SECRET_ROUTINE = "Push the Diwali price drop to the VIP list"
+
+
+def _plans(world, monkeypatch, now):
+    """A routine, the autopilot plan and a scheduled post, all in the next 24 hours."""
+    Routine.objects.create(workspace=world.workspace, instruction=SECRET_ROUTINE, next_run_at=now + timedelta(hours=2))
+    local = now.astimezone(live._zone(world.workspace))
+    plan_at = local + timedelta(hours=5)
+    AgencySettings.objects.create(
+        workspace=world.workspace, autopilot_enabled=True, plan_weekday=plan_at.weekday(), plan_hour=plan_at.hour
+    )
+    monkeypatch.setattr(autopilot, "local_now", lambda workspace, now=None: local)
+    post = Post.objects.create(workspace=world.workspace, title="Clubhouse reel")
+    PlatformPost.objects.create(
+        post=post, social_account=world.linkedin, status="scheduled", scheduled_at=now + timedelta(hours=8)
+    )
+    return post
+
+
+def test_viewers_see_no_routine_text_and_no_links_that_refuse_them(client, world, monkeypatch):
+    # The Routines, Autopilot and composer pages need create_posts; the snapshot is shared by the workspace.
+    assert not WorkspaceMembership.objects.get(user=world.viewer, workspace=world.workspace).effective_permissions[
+        "create_posts"
+    ]
+    post = _plans(world, monkeypatch, timezone.now())
+    _job(world.workspace, "report", status=AgencyJob.Status.QUEUED, error=autopilot.AUTOPILOT_PAUSED)
+    closed = [
+        f'href="{_url("studio:routines", world)}"',
+        f'href="{_url("studio:autopilot", world)}"',
+        f'href="{_url("composer:compose_edit", world, post_id=post.id)}"',
+    ]
+    board = _url("studio:team_board", world)
+
+    client.force_login(world.owner)
+    owner = client.get(board).content.decode()
+    assert SECRET_ROUTINE in owner and all(link in owner for link in closed)
+
+    client.force_login(world.viewer)
+    for url in (_url("studio:team", world), board):
+        html = client.get(url).content.decode()
+        assert SECRET_ROUTINE not in html, url
+        assert not any(link in html for link in closed), url
+        # They still see that something is planned, and when.
+        assert "Clubhouse reel" in html and "Plan next week" in html and "Routine" in html, url
+        assert "once autopilot is on" in html, url
+
+    client.force_login(world.owner)
+    assert SECRET_ROUTINE in client.get(board).content.decode()
+
+
+def test_the_idle_line_names_no_routine_to_viewers(client, world, rf):
+    from apps.studio import views
+
+    Routine.objects.create(
+        workspace=world.workspace, instruction=SECRET_ROUTINE, next_run_at=timezone.now() + timedelta(hours=2)
+    )
+    client.force_login(world.viewer)
+
+    for url in (_url("studio:team", world), _url("studio:team_board", world) + "?part=strip"):
+        html = client.get(url).content.decode()
+        assert SECRET_ROUTINE not in html and "Next: Routine, " in html, url
+
+    # Home's card, for someone who approves the team's work but does not direct it.
+    request = rf.get("/")
+    request.workspace_membership = WorkspaceMembership.objects.get(user=world.editor, workspace=world.workspace)
+    approver = views._live_strip(request, world.workspace, {"create_posts": False, "approve_posts": True})
+    assert SECRET_ROUTINE not in approver["idle_text"]
+    assert SECRET_ROUTINE in views._live_strip(request, world.workspace, {"create_posts": True})["idle_text"]
+
+
 def test_clients_get_a_403_and_viewers_may_watch(client, world):
     viewer = client
     viewer.force_login(world.viewer)
