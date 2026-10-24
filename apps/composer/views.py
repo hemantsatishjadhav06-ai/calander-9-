@@ -1050,6 +1050,28 @@ def _platform_status_map(post):
     return {str(pp.id): pp.status for pp in post.platform_posts.all()}
 
 
+def _post_saved_response(workspace, post, *, sent_for_review=None):
+    """The 204 every save_post branch answers an htmx save with.
+
+    X-Post-Edit-Url goes with every one: whenever the composer stays open (a
+    first Save Draft, a Schedule that became a review request) it switches to
+    that URL, otherwise the next save or autosave makes a second post.
+    ``sent_for_review`` becomes X-Sent-For-Review, set only when Schedule, Add
+    to queue or Publish now was turned into a review request; the composer's
+    message says what it names and nothing more.
+    """
+    from django.urls import reverse
+
+    headers = {
+        "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
+        "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
+        "X-Post-Edit-Url": reverse("composer:compose_edit", kwargs={"workspace_id": workspace.id, "post_id": post.id}),
+    }
+    if sent_for_review:
+        headers["X-Sent-For-Review"] = sent_for_review
+    return HttpResponse(status=204, headers=headers)
+
+
 def _combine_schedule_dt(workspace, sched_date, sched_time):
     """Combine the composer's date + time inputs into a workspace-tz-aware datetime.
 
@@ -1114,6 +1136,7 @@ def save_post(request, workspace_id, post_id=None):
     """
     workspace = _get_workspace(request, workspace_id)
     action = request.POST.get("action", "save_draft")
+    requested_action = action  # ``action`` may become a review request below
 
     if post_id:
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
@@ -1283,8 +1306,6 @@ def save_post(request, workspace_id, post_id=None):
         pending_target = "scheduled"
         initial_status = "scheduled"
     elif action == "add_to_queue":
-        from django.db import transaction
-
         from apps.calendar.services import QueueFullError, add_to_queue
 
         queue_id = request.POST.get("queue_id")
@@ -1325,17 +1346,9 @@ def save_post(request, workspace_id, post_id=None):
         request.session.pop(f"pending_media_{workspace.id}", None)
         _save_version(post, request.user)
         if request.htmx:
-            return HttpResponse(
-                status=204,
-                headers={
-                    "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
-                    "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                },
-            )
+            return _post_saved_response(workspace, post)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "add_to_queue_priority":
-        from django.db import transaction
-
         from apps.calendar.services import QueueFullError, add_to_queue
 
         queue_id = request.POST.get("queue_id")
@@ -1367,13 +1380,7 @@ def save_post(request, workspace_id, post_id=None):
         request.session.pop(f"pending_media_{workspace.id}", None)
         _save_version(post, request.user)
         if request.htmx:
-            return HttpResponse(
-                status=204,
-                headers={
-                    "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
-                    "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                },
-            )
+            return _post_saved_response(workspace, post)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "submit_for_approval":
         # Save post first so it has a PK, then delegate to approval service
@@ -1387,15 +1394,22 @@ def save_post(request, workspace_id, post_id=None):
         _save_version(post, request.user)
         from apps.approvals.services import submit_for_review
 
-        submit_for_review(post, request.user, workspace)
+        submitted = submit_for_review(post, request.user, workspace)
         if request.htmx:
-            return HttpResponse(
-                status=204,
-                headers={
-                    "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
-                    "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                },
-            )
+            sent_for_review = None
+            if action != requested_action:
+                # Schedule, Add to queue or Publish now became this request: say whether a
+                # channel went to review, and whether the picked time is now the proposal.
+                picked = _combine_schedule_dt(
+                    workspace, form.cleaned_data.get("scheduled_date"), form.cleaned_data.get("scheduled_time")
+                )
+                if not submitted:
+                    sent_for_review = "not_sent"
+                elif requested_action == "schedule" and picked is not None and post.proposed_publish_at == picked:
+                    sent_for_review = "proposal"
+                else:
+                    sent_for_review = "sent"
+            return _post_saved_response(workspace, post, sent_for_review=sent_for_review)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "resubmit_for_approval":
         # Resubmit after changes requested or rejection
@@ -1410,13 +1424,7 @@ def save_post(request, workspace_id, post_id=None):
 
         resubmit_post(post, request.user, workspace)
         if request.htmx:
-            return HttpResponse(
-                status=204,
-                headers={
-                    "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
-                    "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                },
-            )
+            return _post_saved_response(workspace, post)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "save_draft":
         # The Schedule Post panel doubles as the proposed-time picker for a
@@ -1427,7 +1435,9 @@ def save_post(request, workspace_id, post_id=None):
 
     post.save()
 
-    _attach_pending_session_media(request, workspace, post)
+    # The session's media list is cleared only once nothing below can refuse
+    # the save; a refusal rolls back these attachments.
+    _attach_pending_session_media(request, workspace, post, clear=False)
 
     # Sync any new tags to the Tag model
     _sync_tags_to_model(workspace, post.tags)
@@ -1473,35 +1483,24 @@ def save_post(request, workspace_id, post_id=None):
             target_only = [pid for pid in candidates if str(pid) not in reverted_ids]
         else:
             target_only = scoped_ids
-        _transition_post_children(post, pending_target, only=target_only)
+        moved, skipped = _transition_post_children(post, pending_target, only=target_only)
+        if not moved and any(pp.status not in PlatformPost.PROTECTED_STATUSES for pp in skipped):
+            # Every channel asked to move is waiting for approval or on hold. Write
+            # nothing, rather than stamp a time no channel will publish at and
+            # answer as if the post were scheduled.
+            transaction.set_rollback(True)
+            return JsonResponse(
+                {"errors": {"schedule": "Nothing was scheduled: this post needs approval first, or it is on hold."}},
+                status=400,
+            )
+    request.session.pop(f"pending_media_{workspace.id}", None)
 
     # Save version
     _save_version(post, request.user)
 
     # Return appropriate response
     if request.htmx:
-        from django.urls import reverse
-
-        return HttpResponse(
-            status=204,
-            headers={
-                "HX-Trigger": json.dumps(
-                    {
-                        "postSaved": {
-                            "postId": str(post.id),
-                            "status": post.status,
-                        }
-                    }
-                ),
-                "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-                # A first Save Draft stays on the composer, so it needs the
-                # edit URL to switch to — otherwise the next save makes a
-                # second post.
-                "X-Post-Edit-Url": reverse(
-                    "composer:compose_edit", kwargs={"workspace_id": workspace.id, "post_id": post.id}
-                ),
-            },
-        )
+        return _post_saved_response(workspace, post)
 
     return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
 

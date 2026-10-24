@@ -2791,21 +2791,15 @@ function composerApp() {
                 const cfg = event.detail.requestConfig || {};
                 let action = cfg.formData ? cfg.formData.get('action') : (cfg.parameters || {}).action;
                 if (!action) action = 'save_draft';
-                let sentForReview = false;
-                if (action === 'schedule' || action === 'publish_now' || action === 'add_to_queue' || action === 'add_to_queue_priority') {
-                    // Where approval is required, the server turns a "Schedule" of content nobody has
-                    // approved into a review request that keeps the chosen time as the proposal. Say so and
-                    // stay here, rather than open a calendar the post is not on yet.
-                    let statuses = [];
-                    try {
-                        statuses = Object.values(JSON.parse((xhr && xhr.getResponseHeader('X-Platform-Statuses')) || '{}'));
-                    } catch (e) { statuses = []; }
-                    sentForReview = statuses.length > 0 && statuses.every((s) => s === 'pending_review' || s === 'pending_client');
-                    if (!sentForReview) {
-                        // Redirect to calendar after scheduling/publishing/queuing
-                        window.location.href = '{% url "calendar:calendar" workspace_id=workspace.id %}';
-                        return;
-                    }
+                // Set only when the server turned Schedule, Add to queue or Publish now into a review
+                // request: 'proposal' (sent; the picked time is the proposal), 'sent', or 'not_sent'
+                // (nothing new to send). Then stay here, rather than open a calendar the post is not on.
+                const review = (xhr && xhr.getResponseHeader('X-Sent-For-Review')) || '';
+                const sentForReview = review === 'proposal' || review === 'sent';
+                if (!review && (action === 'schedule' || action === 'publish_now' || action === 'add_to_queue' || action === 'add_to_queue_priority')) {
+                    // Redirect to calendar after scheduling/publishing/queuing
+                    window.location.href = '{% url "calendar:calendar" workspace_id=workspace.id %}';
+                    return;
                 }
                 // Stay on the composer; a first save moves it to the post's
                 // edit URL so a reload or the next save reuses the same post.
@@ -2817,17 +2811,19 @@ function composerApp() {
                         history.replaceState(history.state, '', editUrl + window.location.search);
                     }
                 }
-                // Only "Schedule" carries a time the person picked; Publish now and the queue actions
-                // send no proposed time, so the message never mentions one for them.
+                // Only a kept proposal mentions the picked time; Publish now and the queue actions send
+                // none, and a post that keeps an earlier schedule does not take one.
                 this.saveToastText = sentForReview
-                    ? (action === 'schedule'
+                    ? (review === 'proposal'
                         ? 'Sent for approval. The time you picked is kept as a proposal until someone approves it.'
                         : 'Sent for approval. Nothing goes out until someone approves it.')
-                    : (action === 'save_draft' ? 'Draft saved' : 'Post saved');
+                    : review === 'not_sent'
+                        ? 'Saved. Nothing was scheduled or sent for approval.'
+                        : (action === 'save_draft' ? 'Draft saved' : 'Post saved');
                 this.showSaveToast = true;
                 const now = new Date();
                 this.lastSaved = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                setTimeout(() => { this.showSaveToast = false; }, sentForReview ? 8000 : 2000);
+                setTimeout(() => { this.showSaveToast = false; }, review ? 8000 : 2000);
             } else if (xhr && xhr.status >= 400) {
                 try {
                     const data = JSON.parse(xhr.responseText);
