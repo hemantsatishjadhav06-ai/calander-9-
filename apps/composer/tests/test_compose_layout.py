@@ -9,7 +9,7 @@ Review findings pinned here:
   focusable preview region were invisible tab stops. Closed, it is now visibility:hidden.
 - Disabled publish actions faded to translucent Pine; they now use the design's grey disabled style.
 - "The time you picked is kept as a proposal" showed for Publish now and the queue actions, which send
-  no time at all; only Schedule mentions a time.
+  no time at all; only Schedule mentions a time, and only when the server says it kept it.
 """
 
 from django.test import TestCase
@@ -113,9 +113,20 @@ class ComposerLayoutTests(TestCase):
         body = self._body(self._post(PlatformPost.Status.DRAFT))
         start = body.index("this.saveToastText = sentForReview")
         logic = body[start : start + 500]
-        self.assertIn("action === 'schedule'", logic)
+        self.assertIn("review === 'proposal'", logic)
         self.assertIn("The time you picked is kept as a proposal", logic)
         self.assertIn("Sent for approval. Nothing goes out until someone approves it.", logic)
+
+    def test_the_review_toast_follows_what_the_server_says_it_did(self):
+        # Inferred from the channel statuses, it claimed a submission and a kept proposal after a
+        # Schedule that did neither. save_post now says so in X-Sent-For-Review.
+        body = self._body(self._post(PlatformPost.Status.DRAFT))
+        start = body.index("onFormSaved(event) {")
+        handler = body[start : body.index("\n        },\n", start)]
+        self.assertIn("getResponseHeader('X-Sent-For-Review')", handler)
+        self.assertNotIn("X-Platform-Statuses", handler)
+        self.assertIn("review === 'not_sent'", handler)
+        self.assertIn("Saved. Nothing was scheduled or sent for approval.", handler)
 
     def test_new_workspaces_get_sentence_case_idea_columns(self):
         from apps.composer.models import IdeaGroup

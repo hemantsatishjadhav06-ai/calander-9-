@@ -4,7 +4,12 @@ Review findings pinned here:
 - On a new post, a Schedule that became a review request answered without X-Post-Edit-Url. The
   composer now stays open in that case, so it kept the create URL and the next autosave made a
   second copy of the post.
+- The composer guessed "sent for approval, the time is kept as a proposal" from the channel
+  statuses alone. It said so after a Schedule that submitted nothing and cleared the proposal.
+  The server now says what it did in X-Sent-For-Review.
 """
+
+from datetime import timedelta
 
 from django.test import TestCase
 from django.urls import reverse
@@ -86,3 +91,51 @@ class NewPostReviewRequestTests(ReviewRequestResponseBase):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(post.platform_posts.get().status, PlatformPost.Status.PENDING_REVIEW)
         self.assertEqual(response["X-Post-Edit-Url"], self._edit_url(post))
+
+
+class SentForReviewHeaderTests(ReviewRequestResponseBase):
+    def test_a_schedule_sent_for_review_keeps_the_picked_time_as_the_proposal(self):
+        self.client.force_login(self.contributor)
+        response = self._save(action="schedule", scheduled_date=WHEN, scheduled_time="10:00")
+        self.assertEqual(response["X-Sent-For-Review"], "proposal")
+        post = Post.objects.get()
+        self.assertIsNone(post.scheduled_at)
+        self.assertIsNotNone(post.proposed_publish_at)
+
+    def test_a_queue_sent_for_review_mentions_no_time(self):
+        self.client.force_login(self.contributor)
+        response = self._save(action="add_to_queue")
+        self.assertEqual(response["X-Sent-For-Review"], "sent")
+
+    def test_a_schedule_whose_time_was_not_kept_mentions_no_time(self):
+        # A post that still carries an old schedule keeps it; the picked time is not a proposal.
+        self.client.force_login(self.contributor)
+        post = Post.objects.create(
+            workspace=self.ws,
+            author=self.contributor,
+            caption="Launch day",
+            scheduled_at=timezone.now() + timedelta(days=3),
+        )
+        PlatformPost.objects.create(post=post, social_account=self.account, status=PlatformPost.Status.DRAFT)
+        response = self._save(post, action="schedule", scheduled_date=WHEN, scheduled_time="10:00")
+        self.assertEqual(response["X-Sent-For-Review"], "sent")
+        post.refresh_from_db()
+        self.assertIsNone(post.proposed_publish_at)
+
+    def test_a_review_request_that_submitted_nothing_says_so(self):
+        self.client.force_login(self.contributor)
+        post = Post.objects.create(workspace=self.ws, author=self.contributor, caption="Launch day")
+        PlatformPost.objects.create(post=post, social_account=self.account, status=PlatformPost.Status.PENDING_REVIEW)
+        response = self._save(post, action="schedule", scheduled_date=WHEN, scheduled_time="10:00")
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response["X-Sent-For-Review"], "not_sent")
+
+    def test_a_real_schedule_and_an_explicit_submission_carry_no_header(self):
+        self.client.force_login(self.owner)
+        response = self._save(action="schedule", caption="scheduled", scheduled_date=WHEN, scheduled_time="10:00")
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(Post.objects.get(caption="scheduled").platform_posts.get().status, "scheduled")
+        self.assertNotIn("X-Sent-For-Review", response)
+        response = self._save(action="submit_for_approval", caption="submitted")
+        self.assertEqual(response.status_code, 204)
+        self.assertNotIn("X-Sent-For-Review", response)

@@ -1050,25 +1050,26 @@ def _platform_status_map(post):
     return {str(pp.id): pp.status for pp in post.platform_posts.all()}
 
 
-def _post_saved_response(workspace, post):
+def _post_saved_response(workspace, post, *, sent_for_review=None):
     """The 204 every save_post branch answers an htmx save with.
 
     X-Post-Edit-Url goes with every one: whenever the composer stays open (a
     first Save Draft, a Schedule that became a review request) it switches to
     that URL, otherwise the next save or autosave makes a second post.
+    ``sent_for_review`` becomes X-Sent-For-Review, set only when Schedule, Add
+    to queue or Publish now was turned into a review request; the composer's
+    message says what it names and nothing more.
     """
     from django.urls import reverse
 
-    return HttpResponse(
-        status=204,
-        headers={
-            "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
-            "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
-            "X-Post-Edit-Url": reverse(
-                "composer:compose_edit", kwargs={"workspace_id": workspace.id, "post_id": post.id}
-            ),
-        },
-    )
+    headers = {
+        "HX-Trigger": json.dumps({"postSaved": {"postId": str(post.id), "status": post.status}}),
+        "X-Platform-Statuses": json.dumps(_platform_status_map(post)),
+        "X-Post-Edit-Url": reverse("composer:compose_edit", kwargs={"workspace_id": workspace.id, "post_id": post.id}),
+    }
+    if sent_for_review:
+        headers["X-Sent-For-Review"] = sent_for_review
+    return HttpResponse(status=204, headers=headers)
 
 
 def _combine_schedule_dt(workspace, sched_date, sched_time):
@@ -1135,6 +1136,7 @@ def save_post(request, workspace_id, post_id=None):
     """
     workspace = _get_workspace(request, workspace_id)
     action = request.POST.get("action", "save_draft")
+    requested_action = action  # ``action`` may become a review request below
 
     if post_id:
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
@@ -1396,9 +1398,22 @@ def save_post(request, workspace_id, post_id=None):
         _save_version(post, request.user)
         from apps.approvals.services import submit_for_review
 
-        submit_for_review(post, request.user, workspace)
+        submitted = submit_for_review(post, request.user, workspace)
         if request.htmx:
-            return _post_saved_response(workspace, post)
+            sent_for_review = None
+            if action != requested_action:
+                # Schedule, Add to queue or Publish now became this request: say whether a
+                # channel went to review, and whether the picked time is now the proposal.
+                picked = _combine_schedule_dt(
+                    workspace, form.cleaned_data.get("scheduled_date"), form.cleaned_data.get("scheduled_time")
+                )
+                if not submitted:
+                    sent_for_review = "not_sent"
+                elif requested_action == "schedule" and picked is not None and post.proposed_publish_at == picked:
+                    sent_for_review = "proposal"
+                else:
+                    sent_for_review = "sent"
+            return _post_saved_response(workspace, post, sent_for_review=sent_for_review)
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
     elif action == "resubmit_for_approval":
         # Resubmit after changes requested or rejection
