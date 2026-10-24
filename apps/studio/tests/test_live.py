@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -680,6 +681,41 @@ def test_the_snapshot_runs_a_fixed_number_of_queries(world):
     assert len(large) <= 22
 
 
+def test_the_roster_reads_only_todays_turns(world, monkeypatch):
+    now = datetime(2026, 10, 23, 10, 45, tzinfo=UTC)  # 16:15 in Hyderabad
+    job = _job(world.workspace, "report")
+    _run("reporter", job=job, started_at=now - timedelta(days=3), summary="Wrote last week's report.")
+    _run("copywriter", job=job, started_at=now - timedelta(minutes=2))
+    _run("copywriter", job=job, started_at=now - timedelta(minutes=1))
+
+    with CaptureQueriesContext(connection) as queries:
+        snap = live.snapshot(world.workspace, now=now)
+
+    # The per-agent count is bounded to today where it reads, so it never scans the whole history.
+    (grouped,) = [
+        query["sql"] for query in queries if "studio_agent_run" in query["sql"] and "GROUP BY" in query["sql"]
+    ]
+    assert '"studio_agent_run"."started_at" >=' in grouped.split(" FROM ", 1)[1]
+    assert _agent(snap, "copywriter")["turns_today"] == 2
+    reporter = _agent(snap, "reporter")
+    assert reporter["turns_today"] == 0 and reporter["last_text"] == "Wrote last week's report."
+    assert "turns_total" not in reporter
+
+    # Older than the latest turns read and nothing today: never "Not needed yet." for an agent that has worked.
+    monkeypatch.setattr(live, "LATEST_TURNS", 2)
+    reporter = _agent(live.snapshot(world.workspace, now=now), "reporter")
+    assert reporter["last_text"] == "No turns today." and reporter["last_ago"] == ""
+
+
+def test_the_cache_outlives_the_team_tabs_refresh(client, world):
+    # Shorter, and even one open tab would miss it and build a fresh snapshot on every refresh.
+    client.force_login(world.owner)
+    html = client.get(_url("studio:team", world)).content.decode()
+    match = re.search(r'id="team-board"[^>]*hx-trigger="every (\d+)s ', html)
+    assert match is not None
+    assert int(match.group(1)) < live.CACHE_SECONDS
+
+
 def test_the_snapshot_is_cached_briefly_per_workspace(world, django_assert_num_queries):
     first = live.snapshot(world.workspace)
     with django_assert_num_queries(0):
@@ -797,7 +833,7 @@ def test_the_home_card_adds_no_queries_once_the_snapshot_is_cached(client, world
     from apps.studio import views
 
     _busy(world, 3)
-    monkeypatch.setattr(live, "CACHE_SECONDS", 300)  # the test must not race the real 3 s lifetime
+    monkeypatch.setattr(live, "CACHE_SECONDS", 300)  # the test must not race the real few-second lifetime
     client.force_login(world.owner)
     url = _url("studio:index", world)
     client.get(url)  # warm the session, the middleware and the snapshot caches

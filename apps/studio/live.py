@@ -13,8 +13,9 @@ Rules it keeps:
   (``chat.web_jobs`` / ``chat.web_agent_runs``); the pages that show it are for
   the agency's staff only (``views._workspace``), never clients, and
   ``for_viewer`` trims it for staff without ``create_posts``.
-* Cached for a few seconds per workspace, so a room of open tabs refreshing
-  every five seconds costs one snapshot.
+* Cached per workspace for a little longer than the Team tab's five-second
+  refresh, so however many tabs are open it is built at most once every six
+  seconds.
 
 Copy follows CLAUDE.md: status in words, no model, vendor, worker or token
 names, times in the workspace's timezone.
@@ -38,11 +39,14 @@ from django.utils import timezone
 from . import chat, team
 from .models import AgencyJob, AgencySettings, AgentRun, Routine, StudioBrief
 
-CACHE_SECONDS = 3
+#: A little longer than the Team tab's 5 s refresh, so even a single open tab reuses every other snapshot.
+CACHE_SECONDS = 6
 CACHE_PREFIX = "studio:live:v1:"
 
 #: At most this many tasks get a stage track; the rest are counted.
 MAX_TRACKS = 8
+#: The roster reads each agent's last turn from this many of the workspace's latest turns.
+LATEST_TURNS = 400
 #: Rows in "Recently finished".
 RECENT_LIMIT = 10
 #: Failed, paused and interrupted tasks count in "Needs you" for this long, so an old failure ages out.
@@ -398,19 +402,22 @@ def _job_track(job: AgencyJob, running: dict, now: datetime, zone) -> dict[str, 
 
 
 def _roster(workspace, visible_runs, running_agents: set, track_agents: dict, day_start, now):
+    # Today's turns only: the history only grows, and this runs on every refresh.
     per_agent = {
         row["agent"]: row
-        for row in visible_runs.values("agent").annotate(
-            total=Count("id"),
-            today=Count("id", filter=Q(started_at__gte=day_start)),
-            last=Max("started_at"),
-        )
+        for row in visible_runs.filter(started_at__gte=day_start)
+        .values("agent")
+        .annotate(today=Count("id"), last=Max("started_at"))
     }
-    latest: dict[str, dict] = {}
-    for row in visible_runs.order_by("-started_at").values(
+    turns = visible_runs.order_by("-started_at").values(
         "agent", "status", "summary", "started_at", "brief_id", "job_id"
-    )[:400]:
+    )
+    recent = list(turns[:LATEST_TURNS])
+    latest: dict[str, dict] = {}
+    for row in recent:
         latest.setdefault(row["agent"], row)
+    # Fewer turns than were asked for means the whole history was read, so an agent missing here never worked.
+    whole_history = len(recent) < LATEST_TURNS
 
     def run_url(row) -> str:
         if row.get("brief_id"):
@@ -454,8 +461,10 @@ def _roster(workspace, visible_runs, running_agents: set, track_agents: dict, da
                 last_text, last_url, last_at = "Took a turn", "", stats["last"]
             elif agent.kind == "code":
                 last_text, last_url = "Works by rules, so it costs nothing.", ""
-            else:
+            elif whole_history:
                 last_text, last_url = "Not needed yet.", ""
+            else:
+                last_text, last_url = "No turns today.", ""
             last_ago = ago((now - last_at).total_seconds()) if last_at else ""
             rows.append(
                 {
@@ -471,7 +480,6 @@ def _roster(workspace, visible_runs, running_agents: set, track_agents: dict, da
                     "last_ago": last_ago,
                     "last_at": last_at,
                     "turns_today": stats.get("today", 0),
-                    "turns_total": stats.get("total", 0),
                 }
             )
         working = sum(1 for row in rows if row["state"] == "working")
