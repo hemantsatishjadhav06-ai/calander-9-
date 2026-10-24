@@ -156,7 +156,7 @@ uncertain send or delivery is held for a person, never replayed.
 - `api`, `api_keys`, `mcp`, `oauth_server` — the Agent API, its keys, the MCP server and its OAuth.
 - `intelligence` — an optional hosted add-on; off unless all five of its variables are set.
 - `marketing` — the public pages.
-- `common` — encrypted fields, scoped managers, `background.py` (recurring tasks, the worker lease), the mail budget, the `release`, `live_verify`, `run_worker` and backup commands.
+- `common` — encrypted fields, scoped managers, `features.py` (per-workspace feature switches, `feature_enabled`), `background.py` (recurring tasks, the worker lease), the mail budget, the `release`, `live_verify`, `run_worker` and backup commands.
 - `providers/` (top level) — one module per platform API.
 
 ### `apps/studio` — the agency

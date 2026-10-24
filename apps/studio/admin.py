@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AgentRun, BrandProfile, StudioBrief, StudioConcept
+from .models import AgencySettings, AgentRun, BrandProfile, StudioBrief, StudioConcept
 
 
 @admin.register(BrandProfile)
@@ -8,6 +8,14 @@ class BrandProfileAdmin(admin.ModelAdmin):
     list_display = ("brand_name", "workspace", "display_font", "default_template", "updated_at")
     search_fields = ("brand_name", "workspace__name")
     raw_id_fields = ("workspace", "logo")
+
+
+@admin.register(AgencySettings)
+class AgencySettingsAdmin(admin.ModelAdmin):
+    list_display = ("workspace", "autopilot_enabled", "creation_mode")
+    search_fields = ("workspace__name",)
+    raw_id_fields = ("workspace", "lead", "backup", "blog_site")
+    filter_horizontal = ("accounts",)
 
 
 class StudioConceptInline(admin.TabularInline):
