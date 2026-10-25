@@ -7,6 +7,7 @@ from time import sleep
 from zoneinfo import ZoneInfo
 
 import pytest
+import time_machine
 from django.db import close_old_connections
 from django.utils import timezone
 
@@ -19,6 +20,13 @@ from apps.studio.tests.test_insights import agency_settings, drive, install_fake
 pytestmark = pytest.mark.django_db(transaction=True)
 FRIDAY = datetime(2026, 10, 16, 17, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
 MONDAY = date(2026, 10, 19)
+
+
+@pytest.fixture(autouse=True)
+def at_the_friday_tick():
+    """Every test runs at FRIDAY, so MONDAY's week is still ahead of the clock whatever today's date is."""
+    with time_machine.travel(FRIDAY):
+        yield
 
 
 @pytest.fixture
