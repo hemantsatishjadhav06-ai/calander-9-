@@ -3,13 +3,18 @@
 // own guard has refused nothing.
 import { expect, test } from '../support/test';
 
-test('a navigation to a host other than the server is aborted', async ({ page, network }) => {
+test('a navigation to a host other than the server is aborted', async ({ page, network, browserName }) => {
   const failure = await page.goto('https://outside.e2e.invalid/landing?ref=e2e').then(
     () => null,
     (error: Error) => error,
   );
 
-  expect(failure?.message ?? '').toMatch(/ERR_BLOCKED_BY_CLIENT/);
+  // Each engine words an aborted navigation its own way (WebKit reports a cancellation), so the
+  // check is that it failed and that the guard was the one that stopped it.
+  expect(failure).toBeInstanceOf(Error);
+  if (browserName === 'chromium') {
+    expect(failure?.message).toMatch(/ERR_BLOCKED_BY_CLIENT/);
+  }
   expect(network.blocked).toContain('https://outside.e2e.invalid/landing');
 });
 
