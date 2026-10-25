@@ -2,10 +2,11 @@
 
 Installed by ``__main__`` before the seed runs, it replaces ``socket.socket.connect``,
 ``socket.socket.connect_ex`` and ``socket.getaddrinfo``. A connection to a loopback address on an
-allowed port (the database, the server itself) goes through; every other connection and every name
-lookup outside the machine is refused and recorded, with a short stack tail, for the
-``refused_network`` probe. The database driver resolves its host through ``getaddrinfo`` and then
-connects in C, so the database's host name is allowed by name.
+allowed port (the database, the server itself) goes through; every other connection, whatever host
+or port, and every name lookup outside the machine is refused and recorded, with a short stack tail,
+for the ``refused_network`` probe. The database driver resolves its host through ``getaddrinfo``
+and then connects in C, so the database's host name may be *looked up* by name; ``__main__`` refuses
+to start unless that host is this machine.
 """
 
 from __future__ import annotations
@@ -29,7 +30,8 @@ _allowed: dict[str, frozenset[Any]] = {"ports": frozenset(), "hosts": frozenset(
 _originals: dict[str, Callable[..., Any]] = {}
 
 
-def _is_loopback(host: str) -> bool:
+def is_loopback(host: str) -> bool:
+    """``localhost`` and its aliases, 127.0.0.0/8, ``::1`` and IPv4-mapped loopback."""
     if host.lower() in _LOOPBACK_NAMES:
         return True
     try:
@@ -42,8 +44,8 @@ def _is_loopback(host: str) -> bool:
     return bool(mapped is not None and mapped.is_loopback)
 
 
-def _host_allowed(host: str) -> bool:
-    return host in _allowed["hosts"] or _is_loopback(host)
+def _lookup_allowed(host: str) -> bool:
+    return host in _allowed["hosts"] or is_loopback(host)
 
 
 def _split(address: Any) -> tuple[str | None, int | None]:
@@ -57,9 +59,7 @@ def _address_allowed(address: Any) -> bool:
     host, port = _split(address)
     if host is None:
         return True
-    if host in _allowed["hosts"]:
-        return True
-    return _is_loopback(host) and port in _allowed["ports"]
+    return is_loopback(host) and port in _allowed["ports"]
 
 
 def _record(kind: str, host: str | None, port: int | None) -> None:
@@ -70,7 +70,7 @@ def _record(kind: str, host: str | None, port: int | None) -> None:
 
 
 def install(*, allowed_ports: Iterable[int], allowed_hosts: Iterable[str] = ()) -> None:
-    """Refuse every connection but loopback on ``allowed_ports`` (and ``allowed_hosts``, by name)."""
+    """Refuse every connection but loopback on ``allowed_ports``; ``allowed_hosts`` may only be looked up."""
     _allowed["ports"] = frozenset(int(port) for port in allowed_ports)
     _allowed["hosts"] = frozenset(str(host) for host in allowed_hosts if host)
     if _originals:
@@ -96,7 +96,7 @@ def install(*, allowed_ports: Iterable[int], allowed_hosts: Iterable[str] = ()) 
 
     def getaddrinfo(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
         name = host.decode() if isinstance(host, bytes) else host
-        if name is not None and not _host_allowed(str(name)):
+        if name is not None and not _lookup_allowed(str(name)):
             _record("resolve", str(name), port if isinstance(port, int) else None)
             raise socket.gaierror(socket.EAI_NONAME, f"e2e: name lookups outside this machine are off ({name})")
         return real_getaddrinfo(host, port, *args, **kwargs)

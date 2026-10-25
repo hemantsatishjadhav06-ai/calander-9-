@@ -36,8 +36,8 @@ that port, so you can keep one running in another terminal:
 ```
 
 Environment: `E2E_PORT` (default 8150) and `DB_NAME` (default `brightbean_e2e`). The server refuses
-any settings module but `config.settings.e2e` and any database whose name does not end in `_e2e`,
-before it runs a statement. Two runs at once need their own port and database
+any settings module but `config.settings.e2e`, any database whose name does not end in `_e2e` and any
+`DB_HOST` that is not this machine (loopback or a local socket), before it runs a statement. Two runs at once need their own port and database
 (`E2E_PORT=8162 DB_NAME=brightbean_g2_e2e`). No `.env` or `dev.env` is needed.
 
 **iPhone 13.** CI runs the `iphone-13` project on WebKit. WebKit cannot be downloaded in the agents'

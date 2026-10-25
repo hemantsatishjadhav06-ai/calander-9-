@@ -11,6 +11,8 @@ import re
 
 from django.conf import settings
 
+from .netguard import is_loopback
+
 E2E_SETTINGS_MODULE = "config.settings.e2e"
 _E2E_DATABASE = re.compile(r"[a-z0-9_]+_e2e")
 
@@ -37,3 +39,13 @@ def assert_e2e_database(name: object) -> None:
             f"Refusing the database {name!r}: the e2e server uses, and drops on --reset, only a database "
             "whose name is lower-case letters, digits and underscores ending in _e2e (for example brightbean_e2e)."
         )
+
+
+def assert_local_database_host(host: object) -> None:
+    """The database is on this machine: a loopback name or address, or a local socket (empty or a path)."""
+    if isinstance(host, str) and (host == "" or host.startswith("/") or is_loopback(host)):
+        return
+    raise GuardError(
+        f"Refusing the database host {host!r}: the e2e server uses, and drops on --reset, a database on this "
+        "machine only (DB_HOST localhost, 127.0.0.1, ::1 or a local socket directory)."
+    )

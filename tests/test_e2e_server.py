@@ -140,6 +140,16 @@ def test_database_guard_needs_a_name_ending_in_e2e():
         guard.assert_e2e_database(name)
 
 
+def test_database_host_guard_allows_this_machine_only():
+    from tests.e2e.server import guard
+
+    for host in ("localhost", "LOCALHOST", "127.0.0.1", "127.0.0.53", "::1", "", "/var/run/postgresql"):
+        guard.assert_local_database_host(host)
+    for host in ("db.e2e.invalid", "10.0.0.5", "203.0.113.4", "localhost.e2e.invalid", "localhost,10.0.0.5", None):
+        with pytest.raises(guard.GuardError):
+            guard.assert_local_database_host(host)
+
+
 def test_settings_guard_refuses_the_test_settings():
     from tests.e2e.server import guard
 
@@ -202,6 +212,23 @@ def test_server_command_refuses_a_database_not_named_for_e2e():
     )
     assert result.returncode != 0
     assert "_e2e" in result.stderr
+
+
+def test_server_command_refuses_a_database_host_off_this_machine():
+    # --reset drops and re-creates the database: never on another machine, whatever DB_HOST says.
+    result = subprocess.run(
+        [sys.executable, "-m", "tests.e2e.server", "--reset", "--no-worker"],
+        cwd=REPO,
+        env=_server_env(
+            DJANGO_SETTINGS_MODULE=E2E_SETTINGS, DB_NAME="brightbean_hostcheck_e2e", DB_HOST="db.e2e.invalid"
+        ),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 2, result.stderr[-2000:]
+    assert "db.e2e.invalid" in result.stderr
+    assert "Traceback" not in result.stderr
 
 
 # ---------------------------------------------------------------------------
@@ -677,6 +704,16 @@ def test_netguard_allows_loopback_on_the_allowed_ports_only(guarded):
     with pytest.raises(ConnectionRefusedError), socket.socket() as sock:
         sock.connect(("127.0.0.1", other_port))
     assert [item["port"] for item in netguard.refused()] == [other_port]
+
+
+def test_netguard_lets_a_named_host_resolve_but_never_connects_off_the_machine(guarded):
+    netguard, port = guarded
+    netguard.install(allowed_ports=(port,), allowed_hosts=("db.e2e.invalid",))
+    for target_port in (port, 6543):
+        with pytest.raises(ConnectionRefusedError), socket.socket() as sock:
+            sock.connect(("db.e2e.invalid", target_port))
+    refused = [(item["kind"], item["host"], item["port"]) for item in netguard.refused()]
+    assert refused == [("connect", "db.e2e.invalid", port), ("connect", "db.e2e.invalid", 6543)]
 
 
 def test_netguard_uninstall_restores_the_socket_module():
