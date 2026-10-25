@@ -7,6 +7,11 @@
 // override caption on the LinkedIn one only; the library image attached first (position 0); and a
 // "submitted" approval action by the author. The owner and an editor both can; a client is refused
 // the composer.
+//
+// The channel pills are toggle buttons: LinkedIn is pressed with a click, Instagram with the keyboard,
+// and each says it is selected (aria-pressed). Axe runs once each screen, the picker and the saved
+// toast have finished appearing.
+import { settled } from '../support/settled';
 import { expect, test } from '../support/test';
 
 type PublishingPost = {
@@ -44,11 +49,18 @@ for (const role of ['owner', 'editor'] as const) {
     const response = await page.goto(`/workspace/${workspace}/compose/`);
     expect(response?.status()).toBe(200);
     await expect(page.getByTestId('compose-caption')).toBeVisible();
+    await settled(page.getByTestId('compose-caption'), 'the composer');
     await axe(page, `Compose (${role})`);
 
-    // Two accounts and one caption.
-    await page.getByTestId(`compose-account-${linkedin.id}`).click();
-    await page.getByTestId(`compose-account-${instagram.id}`).click();
+    // Two accounts (one by click, one from the keyboard) and one caption.
+    const linkedinPill = page.getByTestId(`compose-account-${linkedin.id}`);
+    const instagramPill = page.getByTestId(`compose-account-${instagram.id}`);
+    await expect(linkedinPill).toHaveAttribute('aria-pressed', 'false');
+    await expect(instagramPill).toHaveAttribute('aria-pressed', 'false');
+    await linkedinPill.click();
+    await instagramPill.press('Enter');
+    await expect(linkedinPill).toHaveAttribute('aria-pressed', 'true');
+    await expect(instagramPill).toHaveAttribute('aria-pressed', 'true');
     await page.getByTestId('compose-caption').fill(caption);
 
     // Own wording for LinkedIn only.
@@ -65,6 +77,7 @@ for (const role of ['owner', 'editor'] as const) {
     await expect(page.getByRole('dialog', { name: 'Media library' })).toBeVisible();
     const tile = picker.getByTestId(`compose-media-picker-asset-${asset.id}`);
     await expect(tile).toBeVisible();
+    await settled(picker, 'the Media library picker');
     await axe(page, `Media library picker (${role})`, { include: '[data-testid="compose-media-picker"]' });
     await tile.click();
     await expect(picker).toBeHidden();
@@ -75,6 +88,7 @@ for (const role of ['owner', 'editor'] as const) {
     await expect(page).toHaveURL(POST_URL);
     const postId = POST_URL.exec(page.url())![1];
     await expect(page.getByTestId('compose-saved-toast')).toBeVisible();
+    await settled(page.getByTestId('compose-saved-toast'), 'the saved toast');
     await axe(page, `Compose after Submit for approval (${role})`);
 
     const saved = await harness.probe<PublishingPost>('publishing_post', { post_id: postId });

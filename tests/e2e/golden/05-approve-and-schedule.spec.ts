@@ -8,8 +8,14 @@
 // fingerprint. On the week view of that date, its chip sits in the cell for the local date and hour.
 // An editor sees the row without any approve control, and a direct POST to the approve URL with the
 // editor's session is refused with 403 and changes nothing.
-import { type BrowserContext } from '@playwright/test';
+//
+// The database is read once, after the approve request has answered (204, sent when the approval,
+// its audit row and the schedule are written). The list is checked after the reload that answer
+// triggers has replaced it, and axe runs once the reloaded list and the toast have finished
+// appearing.
+import { type BrowserContext, type Page, type Response } from '@playwright/test';
 
+import { settled } from '../support/settled';
 import { expect, test } from '../support/test';
 
 type ReviewPost = {
@@ -46,6 +52,28 @@ const sameInstant = (a: string | null | undefined, b: string | null | undefined)
 /** The calendar week cell's test id for a workspace-local date and HH:MM time. */
 const weekCell = (date: string, time: string) => `calendar-week-cell-${date}-${time.replace(':', '')}`;
 
+/** The approve POST for one post and the Approvals list reload its answer triggers. */
+function watchApprove(
+  page: Page,
+  workspace: string,
+  postId: string,
+): { approved: Promise<Response>; reloaded: Promise<Response> } {
+  const approved = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === `/workspace/${workspace}/approvals/${postId}/approve/`,
+  );
+  const reloaded = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/workspace/${workspace}/calendar/publish/approvals/`,
+  );
+  // Both are awaited below; a test that fails first must not also report them as unhandled.
+  approved.catch(() => undefined);
+  reloaded.catch(() => undefined);
+  return { approved, reloaded };
+}
+
 async function csrfToken(context: BrowserContext): Promise<string> {
   const cookie = (await context.cookies()).find((item) => item.name === 'csrftoken');
   expect(cookie, 'the page set the CSRF cookie').toBeTruthy();
@@ -72,15 +100,18 @@ test('owner presses Approve & schedule on the Approvals list, and the post lands
   await as('owner');
   const response = await page.goto(`/workspace/${workspace}/calendar/?mode=list&tab=approvals`);
   expect(response?.status()).toBe(200);
-  const row = page.getByTestId(`approvals-row-${made.post_id}`);
+  const list = page.getByTestId('approvals-list');
+  const row = list.getByTestId(`approvals-row-${made.post_id}`);
   await expect(row).toBeVisible();
+  await settled(list, 'the Approvals list');
   await axe(page, 'Approvals list (owner)');
 
+  const shown = await list.elementHandle();
+  const { approved: answered, reloaded } = watchApprove(page, workspace, made.post_id);
   await row.getByTestId('approvals-row-approve-schedule').click();
-
-  // The row leaves the list once the post is scheduled.
-  await expect(row).toHaveCount(0);
-  await axe(page, 'Approvals list after Approve & schedule (owner)');
+  const answer = await answered;
+  const refusal = answer.status() === 204 ? '' : await answer.text().catch(() => '');
+  expect(answer.status(), `Approve & schedule answered ${answer.status()} ${refusal}`).toBe(204);
 
   const after = await harness.probe<PublishingPost>('publishing_post', { post_id: made.post_id });
   expect(after.platform_posts).toHaveLength(1);
@@ -103,6 +134,16 @@ test('owner presses Approve & schedule on the Approvals list, and the post lands
   });
   expect(sameInstant(approved[0].publish_at, made.proposed_publish_at)).toBe(true);
 
+  // The list reloads without the row once the post is scheduled.
+  expect((await reloaded).status(), 'the Approvals list reloaded').toBe(200);
+  await expect
+    .poll(() => shown.evaluate((element) => element.isConnected), { message: 'the reload replaced the list' })
+    .toBe(false);
+  await expect(list).toBeVisible();
+  await expect(row).toHaveCount(0);
+  await settled(list, 'the reloaded Approvals list');
+  await axe(page, 'Approvals list after Approve & schedule (owner)');
+
   // The week of that date: the chip sits in the cell for the local date and hour.
   await page.goto(`/workspace/${workspace}/calendar/?mode=calendar&view=week&date=${made.local.date}`);
   const cell = page.getByTestId(weekCell(made.local.date, made.local.time));
@@ -112,6 +153,7 @@ test('owner presses Approve & schedule on the Approvals list, and the post lands
   await expect(cell).toHaveAttribute('data-time', made.local.time);
   await expect(chip).toHaveAttribute('data-platform-post-id', pp.id);
   await expect(page.getByTestId(`calendar-chip-${pp.id}`)).toHaveCount(1);
+  await settled(page.getByTestId('calendar-week-grid'), 'the week grid');
   await axe(page, 'Calendar week (owner)');
 
   expect(network.blocked).toEqual([]);
@@ -136,8 +178,9 @@ test('an editor sees no approve control, and a direct approve POST with the edit
   await as('editor');
   const response = await page.goto(`/workspace/${workspace}/calendar/?mode=list&tab=approvals`);
   expect(response?.status()).toBe(200);
-  const row = page.getByTestId(`approvals-row-${made.post_id}`);
+  const row = page.getByTestId('approvals-list').getByTestId(`approvals-row-${made.post_id}`);
   await expect(row).toBeVisible();
+  await settled(page.getByTestId('approvals-list'), 'the Approvals list');
   await axe(page, 'Approvals list (editor)');
   await expect(page.getByTestId('approvals-row-approve-schedule')).toHaveCount(0);
   await expect(page.getByTestId('approvals-row-approve')).toHaveCount(0);

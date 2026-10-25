@@ -10,8 +10,13 @@
 // Desktop Chrome drives the real drag (SortableJS, native HTML5 drag and drop). The two touch
 // projects call the page's own drop handler, rescheduleChip(platformPostId, newDatetime), with the
 // target cell's date and time, exactly as the drop does; the test title says which one ran.
-import { type Locator, type Page, type TestInfo } from '@playwright/test';
+//
+// The database is read once, after the reschedule request has answered: the view moves the time,
+// then re-checks the approval and writes its audit row, each in its own statement, and answers only
+// when all of them are done. The grid is checked after the reload that follows has replaced it.
+import { type Locator, type Page, type Response, type TestInfo } from '@playwright/test';
 
+import { settled } from '../support/settled';
 import { expect, test } from '../support/test';
 
 type ScheduledPost = {
@@ -43,8 +48,8 @@ type PublishingPost = {
   }[];
 };
 
-const sameInstant = (a: string | null | undefined, b: string | null | undefined) =>
-  !!a && !!b && new Date(a).getTime() === new Date(b).getTime();
+/** The same instant in one spelling (UTC ISO), so a mismatch prints both times. */
+const instant = (value: string | null | undefined) => (value ? new Date(value).toISOString() : value);
 
 const weekCell = (date: string, time: string) => `calendar-week-cell-${date}-${time.replace(':', '')}`;
 
@@ -57,6 +62,28 @@ const touchProject = (testInfo: TestInfo) => testInfo.project.name !== 'desktop-
 
 /** Said in every title: which move each project makes. */
 const HOW = "(desktop-chrome: the real drag; iphone-13 and pixel-7: the page's drop handler rescheduleChip)";
+
+/**
+ * The reschedule POST the drop sends and the week-grid reload that follows it. Registered before the
+ * move, so neither response can be missed.
+ */
+function watchMove(page: Page, workspace: string): { saved: Promise<Response>; reloaded: Promise<Response> } {
+  const calendar = `/workspace/${workspace}/calendar/`;
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname === `${calendar}reschedule/`,
+  );
+  const reloaded = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' && url.pathname === calendar && url.searchParams.get('view') === 'week'
+    );
+  });
+  // Both are awaited below; a test that fails first must not also report them as unhandled.
+  saved.catch(() => undefined);
+  reloaded.catch(() => undefined);
+  return { saved, reloaded };
+}
 
 /**
  * Move the chip into the target cell: the real drag on Desktop Chrome; on the touch projects, the
@@ -89,24 +116,28 @@ async function moveChip(page: Page, testInfo: TestInfo, chip: Locator, target: L
   );
 }
 
-/** Read the post until `ready` holds, and return what was read last. */
-async function until(
-  harness: { probe: <T>(name: string, params: Record<string, string>) => Promise<T> },
-  postId: string,
-  ready: (post: PublishingPost) => boolean,
-  message: string,
-): Promise<PublishingPost> {
-  let value: PublishingPost | undefined;
+/**
+ * Move the chip and wait for the whole round trip: the reschedule answered 204 (sent after the
+ * approval re-check and its audit row), then the reload replaced the week grid the move started on.
+ */
+async function moveAndReload(
+  page: Page,
+  testInfo: TestInfo,
+  workspace: string,
+  move: { chip: Locator; target: Locator; platformPostId: string },
+): Promise<void> {
+  const grid = await page.getByTestId('calendar-week-grid').elementHandle();
+  const { saved, reloaded } = watchMove(page, workspace);
+
+  await moveChip(page, testInfo, move.chip, move.target, move.platformPostId);
+
+  const answer = await saved;
+  const refusal = answer.status() === 204 ? '' : await answer.text().catch(() => '');
+  expect(answer.status(), `the reschedule answered ${answer.status()} ${refusal}`).toBe(204);
+  expect((await reloaded).status(), 'the week grid reloaded').toBe(200);
   await expect
-    .poll(
-      async () => {
-        value = await harness.probe<PublishingPost>('publishing_post', { post_id: postId });
-        return ready(value);
-      },
-      { message, timeout: 15_000, intervals: [200, 500, 1_000] },
-    )
-    .toBe(true);
-  return value as PublishingPost;
+    .poll(() => grid.evaluate((element) => element.isConnected), { message: 'the reload replaced the week grid' })
+    .toBe(false);
 }
 
 test(`owner moves a scheduled post two hours later ${HOW}: still scheduled, the new time approved`, async ({
@@ -139,33 +170,34 @@ test(`owner moves a scheduled post two hours later ${HOW}: still scheduled, the 
   const target = page.getByTestId(weekCell(made.local.date, newTime));
   const chip = source.getByTestId(`calendar-chip-${ppId}`);
   await expect(chip).toBeVisible();
+  await settled(page.getByTestId('calendar-week-grid'), 'the week grid');
   await axe(page, 'Calendar week before the move (owner)');
 
-  await moveChip(page, testInfo, chip, target, ppId);
+  await moveAndReload(page, testInfo, workspace, { chip, target, platformPostId: ppId });
 
-  const after = await until(
-    harness,
-    made.post_id,
-    (post) => sameInstant(post.platform_posts[0].scheduled_at, newInstant),
-    'the post moved to the new time',
-  );
+  const after = await harness.probe<PublishingPost>('publishing_post', { post_id: made.post_id });
   const pp = after.platform_posts[0];
-  expect(pp.status).toBe('scheduled');
-  expect(sameInstant(pp.approved_publish_at, newInstant)).toBe(true);
-  expect(pp.approved_fingerprint).toBe(approvedFingerprint);
-  expect(pp.approved_fingerprint).toBe(pp.fingerprint);
-  expect(pp.approved_by).toBe(users.owner.email);
+  expect(pp).toMatchObject({
+    status: 'scheduled',
+    approved_fingerprint: approvedFingerprint,
+    fingerprint: approvedFingerprint,
+    approved_by: users.owner.email,
+  });
+  expect(instant(pp.scheduled_at), 'scheduled_at is the new time').toBe(newInstant);
+  expect(instant(pp.approved_publish_at), 'approved_publish_at is the new time').toBe(newInstant);
 
   const timeApproved = after.actions.filter((action) => action.action === 'time_approved');
-  expect(timeApproved).toHaveLength(1);
+  expect(timeApproved, JSON.stringify(after.actions)).toHaveLength(1);
   expect(timeApproved[0]).toMatchObject({ user: users.owner.email, channel: 'dashboard', platform_post_id: ppId });
-  expect(sameInstant(timeApproved[0].publish_at, newInstant)).toBe(true);
-  expect(after.actions.some((action) => action.action === 'approval_withdrawn')).toBe(false);
+  expect(instant(timeApproved[0].publish_at), 'the time_approved action names the new time').toBe(newInstant);
+  expect(after.actions.map((action) => action.action)).not.toContain('approval_withdrawn');
 
-  // The grid reloads with the chip in the cell for the new hour.
+  // The reloaded grid has the chip in the cell for the new hour, and only there.
   await expect(target.getByTestId(`calendar-chip-${ppId}`)).toBeVisible();
   await expect(target).toHaveAttribute('data-time', newTime);
+  await expect(source.getByTestId(`calendar-chip-${ppId}`)).toHaveCount(0);
   await expect(page.getByTestId(`calendar-chip-${ppId}`)).toHaveCount(1);
+  await settled(page.getByTestId('calendar-week-grid'), 'the reloaded week grid');
   await axe(page, 'Calendar week after the move (owner)');
 
   expect(network.blocked).toEqual([]);
@@ -197,29 +229,32 @@ test(`editor moves their own scheduled post ${HOW}: the approval is withdrawn an
   const target = page.getByTestId(weekCell(made.local.date, newTime));
   const chip = source.getByTestId(`calendar-chip-${ppId}`);
   await expect(chip).toBeVisible();
+  await settled(page.getByTestId('calendar-week-grid'), 'the week grid');
   await axe(page, 'Calendar week before the move (editor)');
 
-  await moveChip(page, testInfo, chip, target, ppId);
+  await moveAndReload(page, testInfo, workspace, { chip, target, platformPostId: ppId });
 
-  const after = await until(
-    harness,
-    made.post_id,
-    (post) => post.platform_posts[0].status === 'pending_review',
-    'the approval was withdrawn',
-  );
+  const after = await harness.probe<PublishingPost>('publishing_post', { post_id: made.post_id });
   const pp = after.platform_posts[0];
-  expect(sameInstant(pp.scheduled_at, newInstant)).toBe(true);
-  expect(pp.approved_fingerprint).toBe('');
-  expect(pp.approved_by).toBeNull();
-  expect(pp.approved_at).toBeNull();
-  expect(pp.approved_publish_at).toBeNull();
+  expect(pp).toMatchObject({
+    status: 'pending_review',
+    approved_fingerprint: '',
+    approved_by: null,
+    approved_at: null,
+    approved_publish_at: null,
+  });
+  expect(instant(pp.scheduled_at), 'scheduled_at is the new time').toBe(newInstant);
 
   const withdrawn = after.actions.filter((action) => action.action === 'approval_withdrawn');
-  expect(withdrawn).toHaveLength(1);
+  expect(withdrawn, JSON.stringify(after.actions)).toHaveLength(1);
   expect(withdrawn[0]).toMatchObject({ user: users.editor.email, channel: 'dashboard', platform_post_id: ppId });
-  expect(after.actions.some((action) => action.action === 'time_approved')).toBe(false);
+  expect(after.actions.map((action) => action.action)).not.toContain('time_approved');
 
+  // The reloaded grid has the chip in the cell for the new hour, and only there.
   await expect(target.getByTestId(`calendar-chip-${ppId}`)).toBeVisible();
+  await expect(source.getByTestId(`calendar-chip-${ppId}`)).toHaveCount(0);
+  await expect(page.getByTestId(`calendar-chip-${ppId}`)).toHaveCount(1);
+  await settled(page.getByTestId('calendar-week-grid'), 'the reloaded week grid');
   await axe(page, 'Calendar week after the move (editor)');
 
   expect(network.blocked).toEqual([]);

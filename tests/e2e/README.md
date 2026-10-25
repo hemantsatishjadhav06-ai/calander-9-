@@ -7,7 +7,8 @@ against (`tests/e2e/server/`, Python). Spec: [`docs/specs/01-harness.md`](../../
 tests/e2e/
   server/      python -m tests.e2e.server: web app + worker in one process, fakes, mocks, seed, fixtures
   support/     test.ts (test, expect and the fixtures below), harness.ts, axe.ts, network.ts,
-               global-setup.ts (the end-of-run network check)
+               settled.ts (wait for a swap or a fade to finish), global-setup.ts (the end-of-run
+               network check)
   self/        the harness's own checks (axe helper, network guard, session fixture)
   golden/      the golden paths, one file each (NN-name.spec.ts)
   __screenshots__/   toHaveScreenshot baselines (none yet; Phase 3 takes them per screen)
@@ -116,6 +117,12 @@ test('…', async ({ page, harness, as, axe, network }) => {
   `reset_login_limits` first). Everything else signs in with `as(...)`.
 - **Axe** on every screen a test reaches and on each dialog it opens; it fails on serious or critical
   violations with the rule, impact, element and help page. Fix the template, not the check.
+  axe counts opacity in colour contrast, so after an htmx swap, a toast or a dialog that fades in,
+  first `await settled(locator, 'what')` (`support/settled.ts`): the element and its ancestors
+  fully opaque and no finite animation still running.
+- **After an action, wait for its answer:** register `page.waitForResponse(...)` before the click or
+  drop, check its status, then probe once. A view that writes in several statements answers only
+  when all are done; polling a probe can catch the first write alone.
 - **Outcomes in the database:** assert through probes, not only on the page.
 - **Network:** every browser request to another host is aborted (`network.blocked` lists them). A
   test that needs an outside page (an OAuth authorize URL) installs `page.route(...)` first, which
