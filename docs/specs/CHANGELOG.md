@@ -3,6 +3,27 @@
 One entry per phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md): the date, what changed, and what the
 phase gate (section 6) said. Newest first.
 
+## In progress — Phase 1: the test harness
+
+**Changed** (so far; the gate is recorded when the phase closes)
+
+- Dependencies: Pillow's range moves to `>=13.0,<14.0`, and `requirements.lock` now pins Pillow
+  13.0.0 and certifi 2026.10.23. That clears the 38 known vulnerabilities `pip-audit` found in the
+  lock: 37 in Pillow 12.3.0 and one in certifi 2026.7.22 (PYSEC-2026-4320). Pillow 13.0.0 is eight
+  days old; it is taken anyway because it is the only fixed version and several of the bugs are
+  memory corruption in parsers that read uploaded files. No other pin, hash or annotation changed.
+- The lock's header command no longer has `--no-index`. In pip-tools 7.6.2 that flag means "ignore
+  the package index", so the recorded command could not resolve anything (it stops at
+  `No matching distribution found for Django`); the new header command, run again, writes the
+  committed lock byte for byte. The lock is still written without an index URL
+  (`--no-emit-index-url`). This is the only line outside the Pillow and certifi blocks that
+  differs.
+- CI: a new **Dependency audit** job (`pip-audit` 2.10.1 on the hashed lock, nothing installed;
+  `npm audit --audit-level=high` in the repository root and in `theme/static_src`), and
+  `compilemessages` in the **Test (pytest)** job after `gettext` is installed.
+- `LOCALE_PATHS = [BASE_DIR / "locale"]`, with `locale/.gitkeep` keeping the directory: Django reads
+  the project's own catalogues (outside any app) only from `LOCALE_PATHS`.
+
 ## 24 Oct 2026 — Phase 0: agree the cut
 
 **Changed**
