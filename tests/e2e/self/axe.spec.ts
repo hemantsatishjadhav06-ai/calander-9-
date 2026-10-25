@@ -37,3 +37,20 @@ test('the axe helper passes a page whose controls are labelled', async ({ page, 
   expect(blocking).toEqual([]);
   expect(results.passes.map((rule) => rule.id)).toContain('label');
 });
+
+test('the axe helper reads colours once a fade-in has finished', async ({ page, axe }) => {
+  // Text that fades in, as the account menu does when it opens: read straight away, it would be
+  // half transparent and fail the contrast rule although it ends fully opaque.
+  await page.setContent(
+    fixturePage(
+      '<p id="fade" style="color:#1a1a1a;background:#ffffff;opacity:0.1;transition:opacity 1200ms linear">Fades in</p>' +
+        '<script>requestAnimationFrame(() => requestAnimationFrame(() => {' +
+        ' document.getElementById("fade").style.opacity = "1"; }));</script>',
+    ),
+  );
+
+  const results = await axe(page, 'fade-in');
+
+  expect(results.violations.filter((violation) => violation.id === 'color-contrast')).toEqual([]);
+  expect(results.passes.map((rule) => rule.id)).toContain('color-contrast');
+});

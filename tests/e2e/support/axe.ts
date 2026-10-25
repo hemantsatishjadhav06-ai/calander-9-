@@ -1,10 +1,13 @@
 // Axe on every screen a test reaches (and on each dialog it opens): WCAG 2.2 AA, failing on any
-// serious or critical violation with the rule, the impact, the elements and the help page.
+// serious or critical violation with the rule, the impact, the elements and the help page. It waits
+// for transitions to finish first, so a menu that fades in is read at its final colours.
 import AxeBuilder from '@axe-core/playwright';
 import type { Page, TestInfo } from '@playwright/test';
 
 export const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const BLOCKING = new Set(['serious', 'critical']);
+/** How long to wait for running transitions and animations before checking anyway. */
+const SETTLE_TIMEOUT_MS = 3_000;
 
 export type AxeResults = Awaited<ReturnType<AxeBuilder['analyze']>>;
 type Violation = AxeResults['violations'][number];
@@ -38,12 +41,35 @@ export function formatViolations(label: string, url: string, violations: Violati
   return lines.join('\n');
 }
 
+/**
+ * Wait until no finite transition or animation is running: two frames first, so a transition a click
+ * has just asked for (Alpine starts one on the next frame) has begun. Endless ones (a spinner) are
+ * left alone; after SETTLE_TIMEOUT_MS the check runs anyway.
+ */
+async function settle(page: Page): Promise<void> {
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+  await page
+    .waitForFunction(
+      () =>
+        document.getAnimations().every((animation) => {
+          const endless = animation.effect?.getComputedTiming().endTime === Infinity;
+          return endless || (animation.playState !== 'running' && !animation.pending);
+        }),
+      undefined,
+      { timeout: SETTLE_TIMEOUT_MS },
+    )
+    .catch(() => undefined);
+}
+
 export async function checkAccessibility(
   page: Page,
   label: string,
   testInfo?: TestInfo,
   options: AxeOptions = {},
 ): Promise<AxeResults> {
+  await settle(page);
   let builder = new AxeBuilder({ page }).withTags(AXE_TAGS);
   if (options.include) {
     builder = builder.include(options.include);
