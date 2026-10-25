@@ -2,8 +2,14 @@
 
 Mounted only by ``tests.e2e.server.urls`` (``ROOT_URLCONF`` of ``config.settings.e2e``). Each view
 answers 404, like a path that does not exist, unless the settings module is ``config.settings.e2e``,
-and 403 to any address that is not loopback. CSRF-exempt: the callers are the Playwright runner and
-its request context, never a page.
+and 403 to any address that is not loopback.
+
+CSRF-exempt, because the callers are the Playwright runner and its request context, never a page. In
+place of the token, a request a browser marks as coming from another site (an ``Origin`` other than
+the server's own, or ``Sec-Fetch-Site`` other than ``same-origin`` or ``none``) is refused with 403,
+and a fixture body must be ``application/json``, which no page on another site can send without a
+preflight this server never answers. So a page open in the developer's browser cannot create rows
+here while the server runs.
 """
 
 from __future__ import annotations
@@ -40,12 +46,26 @@ def _is_loopback(address: str) -> bool:
     return parsed.is_loopback or bool(mapped is not None and mapped.is_loopback)
 
 
+_SAME_SITE_FETCHES = frozenset({"same-origin", "none"})
+
+
+def _from_another_site(request: HttpRequest) -> bool:
+    """Whether the browser says this request comes from a page that is not the server's own."""
+    origin = request.headers.get("Origin")
+    if origin is not None and origin != f"{request.scheme}://{request.get_host()}":
+        return True
+    fetch_site = request.headers.get("Sec-Fetch-Site")
+    return fetch_site is not None and fetch_site not in _SAME_SITE_FETCHES
+
+
 def harness_only(view: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
     def wrapped(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         if not guard.is_e2e_settings():
             raise Http404
         if not _is_loopback(str(request.META.get("REMOTE_ADDR", ""))):
             return _json({"error": "The e2e harness answers loopback only."}, status=403)
+        if _from_another_site(request):
+            return _json({"error": "The e2e harness does not answer requests from other sites."}, status=403)
         return view(request, *args, **kwargs)
 
     wrapped.__name__ = view.__name__
@@ -87,6 +107,8 @@ def run_fixture(request: HttpRequest, name: str) -> HttpResponse:
         return _json({"error": f"No e2e fixture named {name!r}."}, status=404)
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
+    if request.content_type != "application/json":
+        return _json({"error": "Send the fixture's payload as application/json."}, status=415)
     try:
         payload = json.loads(request.body or b"{}")
     except ValueError:

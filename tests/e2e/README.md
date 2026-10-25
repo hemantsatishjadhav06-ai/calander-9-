@@ -76,7 +76,8 @@ A test never runs code on the server. It calls named, typed steps:
 | `GET /__e2e__/probe/<name>?k=v` | the probe's JSON; reads the rows a test asserts on |
 
 Unknown name: 404, whatever the method; a known name with the wrong method: 405. Bad payload: 400
-`{"error": ...}`. Not loopback: 403. Any settings module but
+`{"error": ...}`. A fixture body that is not `application/json`: 415. Not loopback, or a request a
+browser marks as coming from another site (`Origin` or `Sec-Fetch-Site`): 403. Any settings module but
 `config.settings.e2e`: 404, and `config/urls.py` never mounts them (only `tests/e2e/server/urls.py`).
 
 A step is `(payload: dict[str, Any]) -> dict[str, Any]`, registered with `@fixture(name)` or

@@ -91,6 +91,35 @@ def test_harness_refuses_non_loopback_addresses(client, e2e_urls):
 
 
 @pytest.mark.django_db
+def test_harness_refuses_cross_site_requests_and_non_json_fixture_bodies(client, e2e_urls, seeded):
+    # A page on another site, open in the developer's browser, can send a blind text/plain or form POST
+    # to the loopback server without a preflight; the harness refuses it before any step runs.
+    sessions = Session.objects.count()
+    body = json.dumps({"role": "owner"})
+    assert client.post("/__e2e__/fixture/session", data=body, content_type="text/plain").status_code == 415
+    assert client.post("/__e2e__/fixture/session", {"role": "owner"}).status_code == 415
+    cross_site: list[dict[str, str]] = [
+        {"HTTP_ORIGIN": "https://attacker.example"},
+        {"HTTP_ORIGIN": "http://localhost:3000"},
+        {"HTTP_ORIGIN": "null"},
+        {"HTTP_SEC_FETCH_SITE": "cross-site"},
+        {"HTTP_SEC_FETCH_SITE": "same-site"},
+    ]
+    for headers in cross_site:
+        assert _post_json(client, "/__e2e__/fixture/session", {"role": "owner"}, **headers).status_code == 403, headers
+        assert client.get("/__e2e__/ping", **headers).status_code == 403, headers
+        assert client.get("/__e2e__/probe/refused_network", **headers).status_code == 403, headers
+    assert Session.objects.count() == sessions
+
+    # The server's own origin passes, and so does a request with neither header (Playwright's request context).
+    same_origin = {"HTTP_ORIGIN": "http://testserver", "HTTP_SEC_FETCH_SITE": "same-origin"}
+    assert _post_json(client, "/__e2e__/fixture/session", {"role": "owner"}, **same_origin).status_code == 200
+    assert client.get("/__e2e__/ping", HTTP_SEC_FETCH_SITE="none").status_code == 200
+    assert _post_json(client, "/__e2e__/fixture/session", {"role": "owner"}).status_code == 200
+    assert Session.objects.count() == sessions + 2
+
+
+@pytest.mark.django_db
 def test_the_app_is_still_served_under_the_e2e_url_conf(client, e2e_urls):
     assert client.get("/health/").status_code == 200
     assert client.get("/accounts/login/").status_code == 200
