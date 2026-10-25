@@ -514,7 +514,9 @@ def test_the_plan_queues_the_months_articles_for_the_seo_team(world, agency):
 
     job = drive(plan_job(world))
 
-    children = list(AgencyJob.objects.filter(parent=job, kind="blog"))
+    # Oldest first: in a month's last week the plan queues both articles, and the default
+    # ordering (newest first) would put Guide 1 ahead of Guide 0.
+    children = list(AgencyJob.objects.filter(parent=job, kind="blog").order_by("created_at"))
     assert 1 <= len(children) <= 2
     child = children[0]
     assert child.input == {
