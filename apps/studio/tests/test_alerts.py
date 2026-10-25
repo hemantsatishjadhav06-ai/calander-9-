@@ -2,16 +2,27 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
+import time_machine
 
 from apps.notifications.models import Notification
 from apps.studio import alerts, autopilot, chat, engine
 from apps.studio.models import AgencySettings, AutopilotWeek, Conversation, Message
 from apps.studio.tests.test_insights import agency_settings, assert_nothing_approved, drive, install_fake_agency
 
+#: The Friday plan tick (after 16:00 by default), and the Monday it plans for.
+FRIDAY_EVENING = datetime(2026, 10, 23, 17, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
 NEXT_MONDAY = date(2026, 10, 26)
+
+
+@pytest.fixture(autouse=True)
+def at_the_friday_tick():
+    """Every test runs at FRIDAY_EVENING, so NEXT_MONDAY's week is still ahead of the clock whatever today's date is."""
+    with time_machine.travel(FRIDAY_EVENING):
+        yield
 
 
 @pytest.fixture

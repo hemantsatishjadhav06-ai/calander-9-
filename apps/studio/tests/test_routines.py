@@ -14,6 +14,7 @@ import types
 import zoneinfo
 
 import pytest
+import time_machine
 from django.db import connection, transaction
 from django.urls import reverse
 from django.utils import timezone
@@ -1069,6 +1070,12 @@ def test_rows_are_compact_dicts_on_first_soonest_first(world):
 
 class TestProviderGate:
     FRIDAY = dt.datetime(2026, 10, 16, 17, 30, tzinfo=IST)
+
+    @pytest.fixture(autouse=True)
+    def at_the_friday_tick(self):
+        """Every test runs at FRIDAY, so the week it plans is still ahead of the clock whatever today's date is."""
+        with time_machine.travel(self.FRIDAY):
+            yield
 
     def test_the_weekly_plan_is_skipped_with_a_set_up_note_and_recovers(self, world, monkeypatch, settings):
         install_fake_agency(monkeypatch)

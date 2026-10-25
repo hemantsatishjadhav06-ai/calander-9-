@@ -84,6 +84,10 @@ pytest>=9.0.3,<10.0
 pytest-django>=4.8,<4.13
 pytest-cov>=5.0,<6.0
 factory-boy>=3.3,<4.0
+# Freezes the clock for tests whose outcome depends on the date (plans for a
+# fixed week, quotas by days left in the month). It patches time at the C
+# level, so model defaults bound to timezone.now see the frozen time too.
+time-machine>=3.5,<4.0
 
 # Monitoring
 sentry-sdk[django]>=2.13,<3.0
