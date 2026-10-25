@@ -1,19 +1,24 @@
 // Golden path 10 (docs/specs/01-harness.md): change the brand colour and the timezone; the preview
 // and the calendar reflect both.
 //
-// A fixture makes a workspace with a blank timezone in its own organisation (default Asia/Dubai),
-// with a fresh owner and a fresh editor, and a post the owner approved in the dashboard and that is
-// scheduled three days ahead at 10:00 Dubai time. As the owner: on the brand page, change the
-// primary colour and save; the colour is stored, and the sample image's address (its ?v=) and its
-// bytes change. In the organisation settings, change the default timezone to Asia/Tokyo and save;
-// the workspace has no timezone of its own, so the calendar's week view moves the scheduled chip
-// from the 10:00 Dubai cell to the 15:00 Tokyo cell, while the post stays scheduled at the same
-// instant with its approval intact. The editor of that workspace sees the brand page read-only and a
-// direct save is refused; the organisation settings refuse the editor too.
+// Each test makes its own workspace with a fixture: a blank timezone in its own organisation
+// (default Asia/Dubai), a fresh owner and a fresh editor, and a post the owner approved in the
+// dashboard and that is scheduled three days ahead at 10:00 Dubai time. As the owner, on the brand
+// page: change the primary colour and save; the colour is stored, the reloaded page shows it, and
+// the sample image's address (its ?v=) and its bytes change. As the owner, in the organisation
+// settings: change the default timezone to Asia/Tokyo and save; the workspace has no timezone of its
+// own, so the calendar's week view moves the scheduled chip from the 10:00 Dubai cell to the 15:00
+// Tokyo cell, while the post stays scheduled at the same instant with its approval intact. The
+// editor of that workspace sees the brand page read-only and a direct save is refused; the
+// organisation settings refuse the editor too.
 //
 // No screen sets a workspace's own timezone today, so the organisation default is the one a person
 // can change. The calendar shows no brand colour today (only the cross-workspace calendar shows a
 // workspace dot); Phase 3 decides whether it should (spec, open questions).
+//
+// The brand page's hooks (brand-primary-color, brand-accent-color, brand-save and
+// brand-sample-image-<layout>) are the brand page's own; the week cell and chip hooks
+// (calendar-week-cell-<date>-<HHMM>, calendar-chip-<id>) are the calendar's.
 import { type BrowserContext, type Page } from '@playwright/test';
 
 import { expect, test } from '../support/test';
@@ -21,6 +26,9 @@ import { expect, test } from '../support/test';
 const FIRST_TIMEZONE = 'Asia/Dubai';
 const NEW_TIMEZONE = 'Asia/Tokyo';
 const NEW_PRIMARY = '#1f6b4f';
+/** The sample layout the test watches (apps/studio/design.TEMPLATES); every layout uses the primary colour. */
+const SAMPLE_LAYOUT = 'editorial';
+const FIXTURE = { timezone: FIRST_TIMEZONE, then_timezone: NEW_TIMEZONE, days_ahead: 3, hour: 10 };
 
 type Local = { date: string; time: string };
 
@@ -62,9 +70,9 @@ async function csrfToken(context: BrowserContext): Promise<string> {
   return cookie!.value;
 }
 
-/** The first sample image's address and the bytes it serves. */
+/** The watched sample image's address and the bytes it serves. */
 async function sample(page: Page): Promise<{ src: string; version: string; bytes: Buffer }> {
-  const src = await page.getByTestId('brand-sample-image').first().getAttribute('src');
+  const src = await page.getByTestId(`brand-sample-image-${SAMPLE_LAYOUT}`).getAttribute('src');
   expect(src, 'the sample image has an address').toBeTruthy();
   const url = new URL(src!, page.url());
   const response = await page.request.get(url.toString());
@@ -80,7 +88,59 @@ async function expectChipIn(page: Page, workspace: string, local: Local, platfor
   await expect(page.getByTestId(`calendar-chip-${platformPostId}`)).toHaveCount(1);
 }
 
-test('owner changes the brand colour and the organisation timezone; the sample and the calendar follow', async ({
+/** Wait for the form POST to `pathname` to answer with a redirect back to the same page. */
+function redirectedBack(page: Page, pathname: string) {
+  return page.waitForResponse(
+    (response) => response.request().method() === 'POST' && new URL(response.url()).pathname === pathname,
+  );
+}
+
+test('owner changes the brand colour; it is stored, the page shows it and the sample is drawn again', async ({
+  page,
+  as,
+  axe,
+  harness,
+  network,
+}) => {
+  const since = Date.now() / 1000;
+  const made = await harness.fixture<BrandWorkspace>('brand_timezone_workspace', FIXTURE);
+  const workspace = made.workspace_id;
+  const state = () => harness.probe<BrandState>('brand_timezone_state', { workspace_id: workspace });
+  const before = await state();
+  expect(before.brand.primary_color).not.toBe(NEW_PRIMARY.toUpperCase());
+
+  await as({ email: made.owner.email });
+  const brandPath = `/workspace/${workspace}/studio/brand/`;
+  const response = await page.goto(brandPath);
+  expect(response?.status()).toBe(200);
+  await axe(page, 'Brand profile (owner)');
+  const primary = page.getByTestId('brand-primary-color');
+  // The server drew the stored colour into the input (a typed value never changes this attribute).
+  await expect(primary).toHaveAttribute('value', before.brand.primary_color);
+  const first = await sample(page);
+
+  await primary.fill(NEW_PRIMARY);
+  const saved = redirectedBack(page, brandPath);
+  await page.getByTestId('brand-save').click();
+  const answer = await saved;
+  expect(answer.status()).toBe(302);
+  expect(new URL(answer.headers()['location'] ?? '', page.url()).pathname).toBe(brandPath);
+  expect((await state()).brand.primary_color).toBe(NEW_PRIMARY.toUpperCase());
+  // The reloaded page shows the stored colour (stored in capitals), not the one typed before saving.
+  await expect(primary).toHaveAttribute('value', NEW_PRIMARY.toUpperCase());
+  await axe(page, 'Brand profile saved (owner)');
+
+  // The sample image is drawn again in the new colour: a new address and different bytes.
+  const second = await sample(page);
+  expect(second.version).not.toBe(first.version);
+  expect(second.src).not.toBe(first.src);
+  expect(second.bytes.equals(first.bytes)).toBe(false);
+
+  expect(network.blocked).toEqual([]);
+  expect((await harness.probe<{ hosts: string[] }>('refused_network', { since })).hosts).toEqual([]);
+});
+
+test('owner changes the organisation timezone; the scheduled chip moves to the new local hour, still approved', async ({
   page,
   as,
   axe,
@@ -92,50 +152,36 @@ test('owner changes the brand colour and the organisation timezone; the sample a
     description: 'The calendar shows no brand colour today; Phase 3 decides whether it should.',
   });
   const since = Date.now() / 1000;
-  const made = await harness.fixture<BrandWorkspace>('brand_timezone_workspace', {
-    timezone: FIRST_TIMEZONE,
-    then_timezone: NEW_TIMEZONE,
-    days_ahead: 3,
-    hour: 10,
-  });
+  const made = await harness.fixture<BrandWorkspace>('brand_timezone_workspace', FIXTURE);
   const workspace = made.workspace_id;
   const state = () => harness.probe<BrandState>('brand_timezone_state', { workspace_id: workspace });
   const before = await state();
   expect(before.workspace).toEqual({ timezone: '', effective_timezone: FIRST_TIMEZONE });
   expect(before.platform_posts.map((pp) => pp.status)).toEqual(['scheduled']);
-  expect(before.brand.primary_color).not.toBe(NEW_PRIMARY.toUpperCase());
 
   await as({ email: made.owner.email });
-
-  // Brand page: change the primary colour and save.
-  const response = await page.goto(`/workspace/${workspace}/studio/brand/`);
-  expect(response?.status()).toBe(200);
-  await axe(page, 'Brand profile (owner)');
-  const first = await sample(page);
-  await page.getByTestId('brand-primary-color').fill(NEW_PRIMARY);
-  await page.getByTestId('brand-save').click();
-  await expect.poll(async () => (await state()).brand.primary_color).toBe(NEW_PRIMARY.toUpperCase());
-  await expect(page.getByTestId('brand-primary-color')).toHaveValue(NEW_PRIMARY);
-  await axe(page, 'Brand profile saved (owner)');
-
-  // The sample image is drawn again in the new colour: a new address and different bytes.
-  const second = await sample(page);
-  expect(second.version).not.toBe(first.version);
-  expect(second.src).not.toBe(first.src);
-  expect(second.bytes.equals(first.bytes)).toBe(false);
 
   // Before the timezone changes, the chip sits in the 10:00 Dubai cell.
   await expectChipIn(page, workspace, made.local_before, made.platform_post_id);
   await axe(page, `Calendar week in ${FIRST_TIMEZONE} (owner)`);
 
   // Organisation settings: change the default timezone and save.
-  const settings = await page.goto('/organizations/settings/');
+  const settingsPath = '/organizations/settings/';
+  const settings = await page.goto(settingsPath);
   expect(settings?.status()).toBe(200);
   await axe(page, 'Organisation settings (owner)');
-  await page.getByTestId('org-settings-timezone').selectOption(NEW_TIMEZONE);
+  const zone = page.getByTestId('org-settings-timezone');
+  const newZone = zone.getByRole('option', { name: NEW_TIMEZONE, exact: true }).first();
+  await expect(newZone).not.toHaveAttribute('selected');
+  await zone.selectOption(NEW_TIMEZONE);
+  const saved = redirectedBack(page, settingsPath);
   await page.getByTestId('org-settings-timezone-save').click();
-  await expect.poll(async () => (await state()).organisation.default_timezone).toBe(NEW_TIMEZONE);
-  await expect(page.getByTestId('org-settings-timezone')).toHaveValue(NEW_TIMEZONE);
+  const answer = await saved;
+  expect(answer.status()).toBe(302);
+  expect(new URL(answer.headers()['location'] ?? '', page.url()).pathname).toBe(settingsPath);
+  expect((await state()).organisation.default_timezone).toBe(NEW_TIMEZONE);
+  // The reloaded page marks the stored zone as selected (choosing an option never sets this attribute).
+  await expect(newZone).toHaveAttribute('selected', '');
   await axe(page, 'Organisation settings saved (owner)');
 
   const after = await state();
@@ -163,13 +209,10 @@ test('the editor sees the brand page read-only, and a direct save or timezone ch
   as,
   axe,
   harness,
+  network,
 }) => {
-  const made = await harness.fixture<BrandWorkspace>('brand_timezone_workspace', {
-    timezone: FIRST_TIMEZONE,
-    then_timezone: NEW_TIMEZONE,
-    days_ahead: 3,
-    hour: 10,
-  });
+  const since = Date.now() / 1000;
+  const made = await harness.fixture<BrandWorkspace>('brand_timezone_workspace', FIXTURE);
   const workspace = made.workspace_id;
   const state = () => harness.probe<BrandState>('brand_timezone_state', { workspace_id: workspace });
   const before = await state();
@@ -205,4 +248,7 @@ test('the editor sees the brand page read-only, and a direct save or timezone ch
   expect(after.brand.updated_at).toBe(before.brand.updated_at);
   expect(after.organisation.default_timezone).toBe(FIRST_TIMEZONE);
   expect(after.workspace.effective_timezone).toBe(FIRST_TIMEZONE);
+
+  expect(network.blocked).toEqual([]);
+  expect((await harness.probe<{ hosts: string[] }>('refused_network', { since })).hosts).toEqual([]);
 });
