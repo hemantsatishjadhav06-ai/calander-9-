@@ -343,27 +343,29 @@
                 <!-- Platform account pills -->
                 <div class="flex items-center gap-2 flex-wrap">
                     {% for account in social_accounts %}
-                    <label class="acct-pill"
+                    {# A toggle button, so the keyboard can reach and press it and it says whether it is selected; phrasing content only inside. #}
+                    <button type="button" class="acct-pill"
                            data-testid="compose-account-{{ account.id }}"
                            :class="{ 'selected': selectedAccounts.includes('{{ account.id }}') }"
+                           :aria-pressed="selectedAccounts.includes('{{ account.id }}') ? 'true' : 'false'"
                            @click="toggleAccount('{{ account.id }}')">
                         <span class="checkmark">
                             <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                         </span>
-                        <div class="relative flex-shrink-0">
+                        <span class="relative flex-shrink-0">
                             {% if account.avatar_url %}
                             <img src="{{ account.avatar_url }}" alt="{{ account.account_name|default:account.account_handle }}" class="w-7 h-7 rounded-full object-cover">
                             {% else %}
-                            <div class="w-7 h-7 rounded-full bg-ink-100 flex items-center justify-center text-ink-500">
+                            <span class="w-7 h-7 rounded-full bg-ink-100 flex items-center justify-center text-ink-500">
                                 {% include "partials/_platform_icon.html" with platform=account.platform size="sm" %}
-                            </div>
+                            </span>
                             {% endif %}
-                            <div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full flex items-center justify-center">
+                            <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full flex items-center justify-center">
                                 {% include "partials/_platform_icon.html" with platform=account.platform size="sm" %}
-                            </div>
-                        </div>
+                            </span>
+                        </span>
                         <span class="text-sm font-medium text-ink-700 truncate">{{ account.account_name|default:account.account_handle }}</span>
-                    </label>
+                    </button>
                     {% empty %}
                     {# The one empty state that matters most: with no channel there is nothing to publish to, so say where to fix that. #}
                     <div class="text-xs text-ink-500 leading-relaxed">
