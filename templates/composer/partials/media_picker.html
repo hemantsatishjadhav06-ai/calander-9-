@@ -7,6 +7,7 @@ Context: assets, workspace, post (optional).
 <div class="grid grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-4 gap-3">
     {% for asset in assets %}
     <div class="group relative rounded-[10px] overflow-hidden aspect-square cursor-pointer ring-1 ring-ink-200 hover:ring-ink-400 transition-shadow duration-150" role="button" tabindex="0" @keydown.enter.prevent="$el.click()"
+         data-testid="compose-media-picker-asset-{{ asset.id }}"
          {% if post %}
          hx-post="{% url 'composer:attach_media' workspace_id=workspace.id post_id=post.id %}"
          {% else %}
