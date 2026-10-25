@@ -11,9 +11,13 @@
 // the input each action needs to reach its lookup. For the owner, who may do everything in A, the
 // answer is the 404 of the workspace-scoped lookup, or for a few named views the answer that view
 // gives for a row A does not have (notFoundAnswers, each read in the view). A role refused first
-// answers 403. B's rows are read back to show that nothing moved. Two refusal pages are opened in the
-// browser and checked with axe. Requests go through page.request, which carries the browser
-// context's session.
+// answers 403. The URLs that find a row without a workspace in the path get the same sweep with B's
+// rows (the isolation_other_urls probe): the client portal's, the organisation's (members,
+// invitations, API keys, the shared library) and a person's notifications; the few left out are
+// reviewed below (OTHER_UNSWEPT). The client is swept twice: signed in, then in the portal, through
+// a fresh link, where the portal's own lookups are reached. B's rows are read back to show that
+// nothing moved. The refusal pages are opened in the browser and checked with axe. Requests go
+// through page.request, which carries the browser context's session.
 import type { APIResponse, Page } from '@playwright/test';
 
 import { expect, test } from '../support/test';
@@ -28,6 +32,8 @@ type UrlEntry = {
   resolves_to: string;
 };
 type Urls = { count: number; urls: UrlEntry[] };
+/** A URL without a workspace: a regular-expression route comes back with no path. */
+type OtherUrl = Omit<UrlEntry, 'path'> & { path: string | null };
 type BObjects = { workspace_id: string; workspace_name: string; objects: Record<string, string> };
 type Answer = { status: number; location: string; body: string };
 type Rule = (answer: Answer) => string | null;
@@ -47,6 +53,38 @@ const SAMPLE_PARTS: Record<string, string> = {
   'telegram:deactivate_chat:chat_id': 'A has no bot, so the view refuses (403) before any lookup',
   'telegram:disconnect_channel:channel_id': 'A has no bot, so the view refuses (403) before any lookup',
 };
+
+/**
+ * URLs that take a part but no workspace and are not swept, by the pattern's name (or its route when
+ * it has none), with the reason: the part is a credential or a name, not a row, or the URL is not
+ * opened with a session. Every other such URL takes only B's rows and is swept; a new one that takes
+ * something else fails here until isolation_b_objects makes its row or it is added, with its reason,
+ * after review.
+ */
+const OTHER_UNSWEPT: Record<string, string> = {
+  account_confirm_email: 'the key from a confirmation email is the credential, not a row',
+  account_reset_password_from_key: 'the key from a reset email is the credential, not a row',
+  'members:accept_invite': 'the invitation token is the credential, not a row',
+  'client_portal:magic_link_entry': 'the portal token is the credential, not a row (the client enters with one below)',
+  'notifications:unsubscribe': 'the signed unsubscribe token is the credential, not a row',
+  'social_accounts:oauth_callback': "a platform name on the provider's way back, not a row",
+  'telegram_webhooks:ingress': "Telegram's webhook: its secret header is the credential, not a session; B has no bot",
+  '^media/(?P<path>media_library/.*)$':
+    'public on purpose (config/urls.py, PUBLIC_MEDIA_PREFIXES): the platforms fetch library files anonymously',
+  '^media/(?P<path>avatars/.*)$': 'public on purpose (PUBLIC_MEDIA_PREFIXES): page chrome',
+  '^media/(?P<path>workspaces/icons/.*)$': 'public on purpose (PUBLIC_MEDIA_PREFIXES): page chrome',
+};
+
+/** The same, for every URL under a prefix. */
+const OTHER_UNSWEPT_PREFIXES: Record<string, string> = {
+  'admin/': 'the Django admin: staff accounts only, and no member of A is staff',
+  'api/v1/': 'the Agent API: an API key is its credential, not a session',
+  'onboarding/connect/': "a client's connection link: the token in the path is the credential, not a row",
+  '__e2e__/': "the harness's own steps (tests/e2e/server/urls.py), not the product",
+};
+
+/** Where the portal sends a signed-in person who has no portal session. */
+const SIGNED_OUT = '/portal/expired/?reason=signed_out';
 
 /** A one-pixel PNG, for the actions that take a file before they look anything up. */
 const PNG = Buffer.from(
@@ -145,6 +183,50 @@ function notFoundAnswers(a: string, urls: UrlEntry[], ids: string[]): Record<str
   };
 }
 
+/** Why a URL without a workspace is not swept, or null when it is. */
+function unswept(url: OtherUrl): string | null {
+  const prefix = Object.keys(OTHER_UNSWEPT_PREFIXES).find((start) => url.route.startsWith(start));
+  return OTHER_UNSWEPT[url.name || url.route] ?? (prefix ? OTHER_UNSWEPT_PREFIXES[prefix] : null);
+}
+
+/** The URLs without a workspace that are swept, after checking that the reviewed list is exact. */
+function otherSweep(urls: OtherUrl[]): UrlEntry[] {
+  const stale = [
+    ...Object.keys(OTHER_UNSWEPT).filter((key) => !urls.some((url) => (url.name || url.route) === key)),
+    ...Object.keys(OTHER_UNSWEPT_PREFIXES).filter((start) => !urls.some((url) => url.route.startsWith(start))),
+  ];
+  expect(stale, 'every reviewed exclusion still names a URL').toEqual([]);
+  const swept = urls.filter((url) => unswept(url) === null);
+  const unfilled = swept
+    .filter((url) => url.path === null || url.samples.length > 0)
+    .map((url) => `${url.name || url.route}: ${url.samples.join(', ')}`);
+  expect(unfilled, "every other URL without a workspace takes only B's rows").toEqual([]);
+  return swept as UrlEntry[];
+}
+
+/**
+ * What a URL without a workspace answers with B's row. In the portal, its own lookups are scoped to
+ * the portal session's workspace, A: 404; anything else is refused before any view: 403. Signed in
+ * without a portal session, the portal sends a person to its link page; a notice is only ever marked
+ * read for its own person, so B's owner's is "nothing done"; the organisation's lookups are scoped to
+ * A's organisation: 404 for the owner of A, or refused first (403) for a role that may not use them.
+ */
+function otherRule(role: (typeof ROLES)[number], inPortal: boolean): (url: UrlEntry) => Rule {
+  return (url) => {
+    const portal = url.name.startsWith('client_portal:');
+    if (inPortal) {
+      return portal ? status(404) : status(403);
+    }
+    if (portal) {
+      return redirectTo(SIGNED_OUT);
+    }
+    if (url.name === 'notifications:mark_as_read') {
+      return json({ ok: true });
+    }
+    return role === 'owner' ? status(404) : status(403, 404);
+  };
+}
+
 /** Views that answer people who may not use them with an empty partial, instead of a 403. */
 const EMPTY_WHEN_REFUSED = ['blog:team_panel'];
 
@@ -163,6 +245,15 @@ async function csrfToken(page: Page): Promise<string> {
   const token = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken')?.value;
   expect(token, 'the page set a CSRF cookie').toBeTruthy();
   return String(token);
+}
+
+/** Send a request with the browser context's session and this CSRF token, never following a redirect. */
+function sender(page: Page, token: string): (url: UrlEntry, method: Method) => Promise<APIResponse> {
+  const headers = { 'X-CSRFToken': token };
+  return (url, method) =>
+    method === 'GET'
+      ? page.request.get(url.path, { maxRedirects: 0 })
+      : page.request.post(url.path, { headers, multipart: FORM, maxRedirects: 0 });
 }
 
 /** Send every request, a few at a time; list each answer its URL's rule refuses or that carries B's name. */
@@ -211,15 +302,34 @@ for (const role of ROLES) {
     const { urls } = await harness.probe<Urls>('isolation_urls', { workspace_id: b.workspace_id, ...b.objects });
     expect(urls.length).toBeGreaterThanOrEqual(200);
     expect(urls.every((url) => url.path.includes(b.workspace_id))).toBe(true);
+    const other = await harness.probe<{ count: number; urls: OtherUrl[] }>('isolation_other_urls', b.objects);
+    const swept = otherSweep(other.urls);
+    const [approve, hold, teamMessages, member, shared, notice, revoke] = byName(swept, [
+      'client_portal:approve',
+      'client_portal:request_hold',
+      'client_portal:team_messages',
+      'members:update_role',
+      'media_library_org:shared_asset_detail',
+      'notifications:mark_as_read',
+      'api_keys:revoke',
+    ]);
+    expect(approve.path, "the portal's URLs carry B's post that waits for its client").toContain(
+      b.objects['client_portal:post_id'],
+    );
+    expect(hold.path).toContain(b.objects['client_portal:request_hold:post_id']);
+    expect(teamMessages.path).toContain(b.objects['client_portal:conversation_id']);
+    expect(member.path, "the organisation's URLs carry B's organisation's rows").toContain(
+      b.objects['members:membership_id'],
+    );
+    expect(shared.path).toContain(b.objects['media_library_org:asset_id']);
+    expect(notice.path).toContain(b.objects.notification_id);
+    expect(revoke.path).toContain(b.objects.key_id);
 
     await as(role);
     await page.goto('/');
     const token = await csrfToken(page);
     const headers = { 'X-CSRFToken': token };
-    const send = (url: UrlEntry, method: Method) =>
-      method === 'GET'
-        ? page.request.get(url.path, { maxRedirects: 0 })
-        : page.request.post(url.path, { headers, multipart: FORM, maxRedirects: 0 });
+    const send = sender(page, token);
     const before = await harness.probe('isolation_b_state', b.objects);
 
     // The token passes the CSRF check for a request shaped like the sweep's (the control first).
@@ -265,6 +375,8 @@ for (const role of ROLES) {
     await harness.fixture('reset_rate_limits');
     try {
       expect(await problems(everyMethod(objectUrls), send, marker, rule)).toEqual([]);
+      // And B's rows under the URLs without a workspace (the portal, the organisation, notifications).
+      expect(await problems(everyMethod(swept), send, marker, otherRule(role, false))).toEqual([]);
     } finally {
       await harness.fixture('reset_rate_limits');
     }
@@ -280,5 +392,40 @@ for (const role of ROLES) {
     const missing = await page.goto(detail.path);
     expect(missing?.status()).toBe(404);
     await axe(page, `${detail.name} with B's row under A (${role})`);
+
+    if (role !== 'client') {
+      return;
+    }
+    // The client's own way in: A's portal, through a fresh link. There the portal's lookups are
+    // reached, and are scoped to A (404 for B's rows); everything else is refused (403).
+    const link = await harness.fixture<{ url: string }>('magic_link', {
+      email: harness.ids.users.client.email,
+      workspace_id: a,
+    });
+    await page.goto(link.url);
+    await axe(page, 'Portal link (client)');
+    await page.getByRole('button', { name: 'Continue to portal' }).click();
+    await page.waitForURL((url) => url.pathname === '/portal/');
+    await axe(page, 'Portal (client)');
+    const portalToken = await csrfToken(page);
+    const portalControl = await page.request.post(`/portal/approvals/${crypto.randomUUID()}/approve/`, {
+      headers: { 'X-CSRFToken': portalToken },
+      multipart: FORM,
+      maxRedirects: 0,
+    });
+    expect(portalControl.status(), "the portal's token passes the CSRF check and reaches the lookup").toBe(404);
+    await harness.fixture('reset_rate_limits');
+    try {
+      const portalSend = sender(page, portalToken);
+      expect(await problems(everyMethod(swept), portalSend, marker, otherRule(role, true))).toEqual([]);
+    } finally {
+      await harness.fixture('reset_rate_limits');
+    }
+    expect(await harness.probe('isolation_b_state', b.objects), "B's rows are unchanged").toEqual(before);
+    // B's post in A's portal, as the client meets it.
+    const [thread] = byName(swept, ['client_portal:post_thread']);
+    const notInPortal = await page.goto(thread.path);
+    expect(notInPortal?.status()).toBe(404);
+    await axe(page, `B's post in A's portal (client)`);
   });
 }
