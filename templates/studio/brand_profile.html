@@ -20,7 +20,7 @@
             {% for template in templates %}
             <li>
                 <img src="{% url 'studio:brand_sample' workspace_id=workspace.id template=template %}?v={{ profile.updated_at|date:'U' }}"
-                     alt="Sample {{ template }} graphic" class="w-full h-auto rounded-[10px] bg-ink-50 shadow-[var(--shadow-creative)]" loading="lazy" data-testid="brand-sample-image">
+                     alt="Sample {{ template }} graphic" class="w-full h-auto rounded-[10px] bg-ink-50 shadow-[var(--shadow-creative)]" loading="lazy" data-testid="brand-sample-image-{{ template }}">
                 <p class="mt-1.5 text-xs text-ink-600 capitalize">{{ template }}{% if template == profile.default_template %} · default{% endif %}</p>
             </li>
             {% endfor %}
@@ -36,7 +36,7 @@
             <section aria-labelledby="voice-heading" class="ui-card sm:p-6">
                 <h2 id="voice-heading" class="ui-card-title mb-5">How it sounds</h2>
                 <div class="grid md:grid-cols-2 gap-x-4">
-                    <div data-testid="brand-name-field">{% include "blog/partials/field.html" with field=form.brand_name %}</div>
+                    {% include "blog/partials/field.html" with field=form.brand_name %}
                     {% include "blog/partials/field.html" with field=form.website %}
                     <div class="md:col-span-2">{% include "blog/partials/field.html" with field=form.about %}</div>
                     {% include "blog/partials/field.html" with field=form.audience %}
@@ -60,22 +60,8 @@
                 <h2 id="look-heading" class="ui-card-title mb-5">How it looks</h2>
                 <div class="grid md:grid-cols-2 gap-x-4">
                     <div class="flex gap-6">
-                        {% comment %}The two colour inputs are written out here, not by blog/partials/field.html, so each carries
-                        its own data-testid (brand-primary-color, brand-accent-color). Name, id, value and attributes are the
-                        widget's own; the wrapper, label and errors are the partial's.{% endcomment %}
-                        {% for field in form %}{% if field.name == 'primary_color' or field.name == 'accent_color' %}
-                        <div class="mb-5 max-lg:[&_input]:min-h-11 max-lg:[&_input]:text-base max-lg:[&_select]:min-h-11 max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base [&_input]:min-h-9 [&_select]:min-h-9">
-                            <div class="mb-1.5 flex items-baseline justify-between gap-3">
-                                <label for="{{ field.auto_id }}" class="ui-label !mb-0">{{ field.label }}{% if field.field.required %} <span class="text-danger-500" aria-hidden="true">*</span><span class="sr-only">(required)</span>{% endif %}</label>
-                            </div>
-                            <input type="color" name="{{ field.html_name }}" value="{{ field.value|default_if_none:'' }}" maxlength="7" class="{{ field.field.widget.attrs.class }}"{% if field.field.required %} required{% endif %}{% if field.errors %} aria-invalid="true" aria-describedby="{{ field.auto_id }}_errors"{% endif %} id="{{ field.auto_id }}" data-testid="brand-{{ field.name|cut:'_color' }}-color">
-                            {% if field.errors %}
-                            <div id="{{ field.auto_id }}_errors" role="alert" class="ui-error flex-col !gap-0.5">
-                                {% for error in field.errors %}<p>{{ error }}</p>{% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endif %}{% endfor %}
+                        {% include "studio/partials/brand_colour_field.html" with field=form.primary_color testid="brand-primary-color" %}
+                        {% include "studio/partials/brand_colour_field.html" with field=form.accent_color testid="brand-accent-color" %}
                     </div>
                     {% include "blog/partials/field.html" with field=form.display_font %}
                     {% include "blog/partials/field.html" with field=form.wordmark %}

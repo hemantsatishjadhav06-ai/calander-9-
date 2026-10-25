@@ -70,14 +70,23 @@ test("owner onboards a fresh workspace on today's pages, the equivalent of the o
     }
   });
 
-  // 1. Brand: the owner names the brand and saves it.
+  // 1. Brand: the owner names the brand and saves it. The save answers with a redirect to the brand
+  //    page, and the page it loads shows the saved name.
   const brandName = `Lakeview Homes ${tag}`;
-  await page.goto(`/workspace/${workspaceId}/studio/brand/`);
+  const brandPath = `/workspace/${workspaceId}/studio/brand/`;
+  await page.goto(brandPath);
   await axe(page, 'Brand profile (fresh workspace)');
-  const brandField = page.getByTestId('brand-name-field').getByRole('textbox');
+  const brandField = page.getByRole('textbox', { name: 'Brand name' });
   await brandField.fill(brandName);
+  const saved = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === brandPath);
+  const reloaded = page.waitForEvent('framenavigated', (frame) => frame === page.mainFrame());
   await page.getByTestId('brand-save').click();
-  await until(read, (s) => s.brand_name === brandName, 'the brand name is saved');
+  const savedResponse = await saved;
+  expect(savedResponse.status()).toBe(302);
+  expect(new URL(savedResponse.headers()['location'] ?? '', baseURL).pathname).toBe(brandPath);
+  await reloaded;
+  await page.waitForLoadState('load');
+  expect((await read()).brand_name).toBe(brandName);
   await expect(brandField).toHaveValue(brandName);
   await axe(page, 'Brand profile, saved');
 

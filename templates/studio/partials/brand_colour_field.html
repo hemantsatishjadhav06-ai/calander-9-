@@ -1,0 +1,17 @@
+{% comment %}One colour input of the brand page, with a data-testid (context: field, testid). blog/partials/field.html
+cannot add an attribute to a widget, so this is that partial's wrapper, label, help text and errors around the form's
+own widget, written out as Django renders it (name, id, value, type and every attribute the field and the form give
+it: maxlength, class, required, aria-invalid, aria-describedby), with only the data-testid added. The errors carry the
+id the widget's aria-describedby names. apps/studio/tests/test_brand_page_hooks.py pins all of it.{% endcomment %}
+<div class="mb-5 max-lg:[&_input]:min-h-11 max-lg:[&_input]:text-base max-lg:[&_select]:min-h-11 max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base [&_input]:min-h-9 [&_select]:min-h-9">
+    <div class="mb-1.5 flex items-baseline justify-between gap-3">
+        <label for="{{ field.auto_id }}" class="ui-label !mb-0">{{ field.label }}{% if field.field.required %} <span class="text-danger-500" aria-hidden="true">*</span><span class="sr-only">(required)</span>{% endif %}</label>
+    </div>
+    {% for widget in field.subwidgets %}<input type="{{ widget.data.type }}" name="{{ widget.data.name }}"{% if widget.data.value != None %} value="{{ widget.data.value|stringformat:'s' }}"{% endif %}{% for name, value in widget.data.attrs.items %}{% if value is not False %} {{ name }}{% if value is not True %}="{{ value|stringformat:'s' }}"{% endif %}{% endif %}{% endfor %} data-testid="{{ testid }}">{% endfor %}
+    {% if field.help_text %}<p id="{{ field.auto_id }}_helptext" class="ui-help">{{ field.help_text }}</p>{% endif %}
+    {% if field.errors %}
+    <div id="{{ field.auto_id }}_error" role="alert" class="ui-error flex-col !gap-0.5">
+        {% for error in field.errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+    {% endif %}
+</div>
