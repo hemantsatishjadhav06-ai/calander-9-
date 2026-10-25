@@ -178,6 +178,45 @@ def test_reset_is_refused_before_any_connection(monkeypatch, settings):
         server_main.reset_database()
 
 
+@pytest.mark.parametrize(
+    ("argv", "stale", "expected"),
+    [
+        # Values left in the shell by an earlier run (a Lighthouse server on another port) lose to the flags.
+        (
+            ["--port", "8155"],
+            {"E2E_STATIC": "manifest", "E2E_BASE_URL": "http://127.0.0.1:9999"},
+            {"E2E_STATIC": "", "E2E_BASE_URL": "http://127.0.0.1:8155"},
+        ),
+        (
+            ["--port", "8155"],
+            {"E2E_BASE_URL": "https://staging.e2e.invalid:8155"},
+            {"E2E_STATIC": "", "E2E_BASE_URL": "http://127.0.0.1:8155"},
+        ),
+        # A base URL for this very server (as playwright.config.ts passes it) is kept.
+        (
+            ["--port", "8155", "--static", "manifest"],
+            {"E2E_BASE_URL": "http://localhost:8155"},
+            {"E2E_STATIC": "manifest", "E2E_BASE_URL": "http://localhost:8155"},
+        ),
+    ],
+)
+def test_server_flags_win_over_a_stale_environment(monkeypatch, capsys, argv, stale, expected):
+    import django
+
+    from tests.e2e.server import __main__ as server_main
+
+    for name in ("E2E_PORT", "E2E_STATIC", "E2E_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in stale.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(django, "setup", lambda: None)  # these settings are already set up (and not e2e)
+
+    assert server_main.main([*argv, "--no-worker"]) == 2  # refused by the settings guard, after the environment
+    assert {name: os.environ.get(name) for name in expected} == expected
+    assert os.environ["E2E_PORT"] == "8155"
+    assert "config.settings.e2e" in capsys.readouterr().err
+
+
 def _server_env(**overrides: str) -> dict[str, str]:
     env = {
         k: v

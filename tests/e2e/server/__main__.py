@@ -8,7 +8,9 @@ worker thread (unless ``--no-worker``); then ``runserver`` on 127.0.0.1 without 
 fakes and the worker live in this one process).
 
 Environment: ``E2E_PORT`` (default 8150), ``DB_NAME`` (default ``brightbean_e2e``), and the usual
-``DB_USER``, ``DB_PASSWORD``, ``DB_HOST``, ``DB_PORT``.
+``DB_USER``, ``DB_PASSWORD``, ``DB_HOST``, ``DB_PORT``. The flags decide ``E2E_STATIC`` and
+``E2E_BASE_URL`` (kept only when it names this server's port), so a value left in the shell by an
+earlier run never changes this one.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from . import guard
 
@@ -59,13 +62,30 @@ def reset_database() -> None:
         connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    args = parse_args(argv)
+def _base_url(port: int, given: str | None) -> str:
+    """``E2E_BASE_URL`` when it names this server (http, loopback, ``port``); otherwise derived from ``port``."""
+    if given:
+        parts = urlsplit(given)
+        try:
+            given_port = parts.port
+        except ValueError:
+            given_port = None
+        if parts.scheme == "http" and parts.hostname in ("127.0.0.1", "localhost") and given_port == port:
+            return given.rstrip("/")
+    return f"http://127.0.0.1:{port}"
+
+
+def prepare_environment(args: argparse.Namespace) -> None:
+    """What the e2e settings read, from the flags: a value left in the shell by an earlier run never wins."""
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", guard.E2E_SETTINGS_MODULE)
     os.environ["E2E_PORT"] = str(args.port)
-    os.environ.setdefault("E2E_BASE_URL", f"http://127.0.0.1:{args.port}")
-    if args.static == "manifest":
-        os.environ["E2E_STATIC"] = "manifest"
+    os.environ["E2E_BASE_URL"] = _base_url(args.port, os.environ.get("E2E_BASE_URL"))
+    os.environ["E2E_STATIC"] = args.static or ""
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(argv)
+    prepare_environment(args)
 
     import django
 
