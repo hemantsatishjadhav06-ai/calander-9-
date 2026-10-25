@@ -887,8 +887,10 @@ def test_netguard_uninstall_restores_the_socket_module():
 
     original = (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo)
     netguard.install(allowed_ports=())
-    assert socket.getaddrinfo is not original[2]
-    netguard.uninstall()
+    try:
+        assert socket.getaddrinfo is not original[2]
+    finally:
+        netguard.uninstall()  # never leave the rest of the session behind a guard with no ports
     assert (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo) == original
 
 
