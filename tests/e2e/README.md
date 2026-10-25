@@ -115,13 +115,19 @@ test('…', async ({ page, harness, as, axe, network }) => {
 - **Sign-in:** only golden path 1 posts the login form (10 posts a minute per address; call
   `reset_login_limits` first). Everything else signs in with `as(...)`.
 - **Axe** on every screen a test reaches and on each dialog it opens; it fails on serious or critical
-  violations with the rule, impact, element and help page. Fix the template, not the check.
+  violations with the rule, impact, element and help page. It waits for running transitions first
+  (up to 3 s), so a menu that fades in is checked at its final colours. Fix the template, not the check.
 - **Outcomes in the database:** assert through probes, not only on the page.
 - **Network:** every browser request to another host is aborted (`network.blocked` lists them). A
-  test that needs an outside page (an OAuth authorize URL) installs `page.route(...)` first, which
-  takes precedence, and answers it with a redirect to the app's callback. On the server side, a test
-  probes `refused_network` with `since` set to its own start, never the server's whole lifetime (a
-  server kept running between runs remembers earlier ones). The whole run is checked once at its end
-  (`support/global-setup.ts`): anything the server tried to reach outside the machine during the run
-  fails it, with the host and where in the server it was tried.
+  route only ever sees the first URL of a redirect chain, so a server redirect to another host would
+  be followed for real: such a request is recorded in `network.escaped` and fails the test. A test
+  that needs an outside page (an OAuth authorize URL) routes the app's own URL that answers the 302
+  instead: `route.fetch({ maxRedirects: 0 })` sends it through the browser context (its cookies land
+  in the browser), the authorize URL and its `state` are read from the `location`, and the route
+  answers with a 200 page that moves on to the app's callback (`<meta http-equiv="refresh">`), never
+  with a 3xx, which WebKit cannot fulfil. `routeGoogle` in `golden/01-sign-in.spec.ts` is the model.
+  On the server side, a test probes `refused_network` with `since` set to its own start, never the
+  server's whole lifetime (a server kept running between runs remembers earlier ones). The whole run
+  is checked once at its end (`support/global-setup.ts`): anything the server tried to reach outside
+  the machine during the run fails it, with the host and where in the server it was tried.
 - **No retries, no `test.skip`/`test.fixme` to make a path green;** each test makes its own rows.

@@ -3,7 +3,8 @@
 //   harness   harness.fixture<T>(name, payload), harness.probe<T>(name, params), harness.ids
 //   as        await as('owner') or as({ email }) puts that person's session cookie in page.context()
 //   axe       await axe(page, label) runs WCAG 2.2 AA and fails on serious or critical violations
-//   network   network.blocked lists the browser requests the guard aborted in this test
+//   network   network.blocked lists the browser requests the guard aborted in this test; a redirect
+//             the browser followed off the server (network.escaped) fails the test at its end
 import { expect, test as base } from '@playwright/test';
 
 import { type AxeOptions, type AxeResults, checkAccessibility } from './axe';
@@ -56,8 +57,15 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   ],
 
   context: async ({ context, baseURL }, use) => {
-    guards.set(context, await guardNetwork(context, String(baseURL)));
+    const guard = await guardNetwork(context, String(baseURL));
+    guards.set(context, guard);
     await use(context);
+    if (guard.escaped.length > 0) {
+      throw new Error(
+        `The browser followed a redirect off the e2e server, which no route can stop: ${guard.escaped.join(', ')}. ` +
+          "Route the app's own URL that answers the redirect instead (tests/e2e/README.md, Network).",
+      );
+    }
   },
 
   network: async ({ context }, use) => {
