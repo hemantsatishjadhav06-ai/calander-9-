@@ -7,7 +7,8 @@ against (`tests/e2e/server/`, Python). Spec: [`docs/specs/01-harness.md`](../../
 tests/e2e/
   server/      python -m tests.e2e.server: web app + worker in one process, fakes, mocks, seed, fixtures
   support/     test.ts (test, expect and the fixtures below), harness.ts, axe.ts, network.ts,
-               global-setup.ts (the end-of-run network check)
+               poll.ts (until: read a probe until the worker is done), global-setup.ts (the end-of-run
+               network check)
   self/        the harness's own checks (axe helper, network guard, session fixture)
   golden/      the golden paths, one file each (NN-name.spec.ts)
   __screenshots__/   toHaveScreenshot baselines (none yet; Phase 3 takes them per screen)
@@ -111,6 +112,9 @@ test('…', async ({ page, harness, as, axe, network }) => {
 - **Selectors:** `data-testid` or `getByRole` with an accessible name. Never a CSS class, copy text or
   an Alpine attribute. A missing hook is added to the template next to the existing attributes:
   `data-testid="<area>-<thing>"`, kebab-case (`approvals-row-approve-schedule`, `home-thread-send`).
+  A hook that stands for a record ends in that record's key exactly as it is stored, underscores
+  included, so a spec builds it from the data it already has (`home-today-post-<brief id>`,
+  `setup-row-creation_mode`, `connect-platform-linkedin_company`).
   Existing `data-*` hooks that pytest asserts stay exactly as they are.
 - **Sign-in:** only golden path 1 posts the login form (10 posts a minute per address; call
   `reset_login_limits` first). Everything else signs in with `as(...)`.
@@ -118,8 +122,15 @@ test('…', async ({ page, harness, as, axe, network }) => {
   violations with the rule, impact, element and help page. Fix the template, not the check.
 - **Outcomes in the database:** assert through probes, not only on the page.
 - **Network:** every browser request to another host is aborted (`network.blocked` lists them). A
-  test that needs an outside page (an OAuth authorize URL) installs `page.route(...)` first, which
-  takes precedence, and answers it with a redirect to the app's callback. On the server side, a test
+  test that opens an outside page itself installs `page.route(...)` first, which takes precedence,
+  and answers it. Playwright routes only the first request of a redirect chain, so a hop the browser
+  makes by following a redirect (the app's 302 to an OAuth authorize page) reaches no route and
+  really goes out; the guard lists it in `network.blocked`, which fails the test. And WebKit refuses
+  `route.fulfill` with a 3xx status. So an OAuth step routes the app's own request instead (the
+  Connect or Sign in with Google POST), reads the app's redirect with
+  `route.fetch({ maxRedirects: 0 })` and checks the authorize URL, fulfils the request with a 200
+  page (the fetched headers without `location`), and then `page.goto`es the app's callback with the
+  `code` and the `state` the authorize URL carried (`golden/02-onboarding.spec.ts`). On the server side, a test
   probes `refused_network` with `since` set to its own start, never the server's whole lifetime (a
   server kept running between runs remembers earlier ones). The whole run is checked once at its end
   (`support/global-setup.ts`): anything the server tried to reach outside the machine during the run
