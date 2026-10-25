@@ -24,7 +24,8 @@ Context: week_days, week_slots, workspace.
         </div>
         {% for cell in day_cells %}
         <div class="border-r border-ink-200 last:border-r-0 p-1 cal-add-cell cal-drop {% if cell.posts or cell.slots %}has-posts{% endif %} {% if cell.day < today or cell.day == today and hour < current_hour %}cal-cell-past{% endif %}"
-             data-date="{{ cell.compose_date }}" data-time="{{ cell.compose_time }}">
+             data-date="{{ cell.compose_date }}" data-time="{{ cell.compose_time }}"
+             data-testid="calendar-week-cell-{{ cell.compose_date }}-{{ cell.compose_time|cut:':' }}">
             {% if cell.day > today or cell.day == today and hour >= current_hour %}
             <a aria-label="Create post" href="{% url 'composer:compose' workspace_id=workspace.id %}?scheduled_date={{ cell.compose_date }}&scheduled_time={{ cell.compose_time }}" class="cal-add-btn" title="Create post">
                 <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
