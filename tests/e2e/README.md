@@ -128,9 +128,10 @@ test('…', async ({ page, harness, as, axe, network }) => {
   really goes out; the guard lists it in `network.blocked`, which fails the test. And WebKit refuses
   `route.fulfill` with a 3xx status. So an OAuth step routes the app's own request instead (the
   Connect or Sign in with Google POST), reads the app's redirect with
-  `route.fetch({ maxRedirects: 0 })` and checks the authorize URL, fulfils the request with a 200
-  page (the fetched headers without `location`), and then `page.goto`es the app's callback with the
-  `code` and the `state` the authorize URL carried (`golden/02-onboarding.spec.ts`). On the server side, a test
+  `route.fetch({ maxRedirects: 0 })` and checks the authorize URL, fulfils the request with a plain
+  200 page (`route.fetch` shares the browser context's cookies, so whatever the app set is kept),
+  and then `page.goto`es the app's callback with the `code` and the `state` the authorize URL
+  carried (`golden/02-onboarding.spec.ts`). On the server side, a test
   probes `refused_network` with `since` set to its own start, never the server's whole lifetime (a
   server kept running between runs remembers earlier ones). The whole run is checked once at its end
   (`support/global-setup.ts`): anything the server tried to reach outside the machine during the run
