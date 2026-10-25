@@ -231,6 +231,21 @@ def test_server_command_refuses_a_database_host_off_this_machine():
     assert "Traceback" not in result.stderr
 
 
+def test_server_command_without_reset_says_so_when_the_database_is_missing():
+    missing = f"brightbean_missing_{os.getpid()}_{int(time.time())}_e2e"
+    result = subprocess.run(
+        [sys.executable, "-m", "tests.e2e.server", "--no-worker"],
+        cwd=REPO,
+        env=_server_env(DJANGO_SETTINGS_MODULE=E2E_SETTINGS, DB_NAME=missing),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 2, result.stderr[-2000:]
+    assert "--reset" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
 # ---------------------------------------------------------------------------
 # The settings module
 # ---------------------------------------------------------------------------
@@ -536,6 +551,26 @@ def test_ping_says_when_the_database_is_not_seeded(client, e2e_urls):
     response = client.get("/__e2e__/ping")
     assert response.status_code == 503
     assert response.json()["ok"] is False
+
+
+@pytest.mark.django_db
+def test_ping_says_when_the_database_is_missing_or_not_migrated(client, e2e_urls, monkeypatch):
+    from django.db import OperationalError, ProgrammingError
+
+    from apps.workspaces.models import Workspace
+    from tests.e2e.server import seed
+
+    for error in (OperationalError('database "brightbean_e2e" does not exist'), ProgrammingError("no such table")):
+
+        def unavailable(*args: Any, error: Exception = error, **kwargs: Any) -> Any:
+            raise error
+
+        monkeypatch.setattr(Workspace.objects, "get", unavailable)
+        with pytest.raises(seed.SeedMissingError, match="--reset"):
+            seed.ids()
+        response = client.get("/__e2e__/ping")
+        assert response.status_code == 503, type(error)
+        assert response.json()["ok"] is False
 
 
 @pytest.mark.django_db

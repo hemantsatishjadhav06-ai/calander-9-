@@ -184,7 +184,13 @@ def run() -> dict[str, Any]:
 
 
 def ids() -> dict[str, Any]:
-    """The seeded ids, read from the database (``SeedMissingError`` before ``--reset``)."""
+    """The seeded ids, read from the database (``SeedMissingError`` before ``--reset``).
+
+    A database that is missing, or that exists but is not migrated, is the same case as one that is
+    not seeded: the answer is ``--reset``, not a traceback (or a 500 from ``/__e2e__/ping``).
+    """
+    from django.db import DatabaseError
+
     from apps.accounts.models import User
     from apps.media_library.models import MediaAsset
     from apps.social_accounts.models import SocialAccount
@@ -201,6 +207,10 @@ def ids() -> dict[str, Any]:
         asset = MediaAsset.objects.get(workspace=ws_a, title=LIBRARY_ASSET_TITLE)
     except (Workspace.DoesNotExist, User.DoesNotExist, SocialAccount.DoesNotExist, MediaAsset.DoesNotExist) as exc:
         raise SeedMissingError("The e2e database is not seeded: start the server with --reset.") from exc
+    except DatabaseError as exc:
+        raise SeedMissingError(
+            f"The e2e database is missing or not migrated ({type(exc).__name__}): start the server with --reset."
+        ) from exc
     return {
         "workspace_a": str(ws_a.pk),
         "workspace_b": str(ws_b.pk),
