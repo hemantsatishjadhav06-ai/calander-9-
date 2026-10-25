@@ -16,9 +16,9 @@ from typing import Any
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET
 
 from . import guard, registry, seed
 
@@ -80,11 +80,13 @@ def ping(request: HttpRequest) -> HttpResponse:
 
 
 @harness_only
-@require_POST
 def run_fixture(request: HttpRequest, name: str) -> HttpResponse:
+    # The name first: an unknown name is a 404 whatever the method, a known one 405 to anything but POST.
     step = registry.get_fixture(name)
     if step is None:
         return _json({"error": f"No e2e fixture named {name!r}."}, status=404)
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
     try:
         payload = json.loads(request.body or b"{}")
     except ValueError:
@@ -95,10 +97,11 @@ def run_fixture(request: HttpRequest, name: str) -> HttpResponse:
 
 
 @harness_only
-@require_GET
 def run_probe(request: HttpRequest, name: str) -> HttpResponse:
     step = registry.get_probe(name)
     if step is None:
         return _json({"error": f"No e2e probe named {name!r}."}, status=404)
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
     params = {key: request.GET.get(key) for key in request.GET}
     return _run(step, params, atomic=False)

@@ -426,6 +426,9 @@ def test_unknown_names_bad_bodies_and_wrong_methods(client, e2e_urls):
 
     assert client.get("/__e2e__/fixture/session").status_code == 405
     assert client.post("/__e2e__/probe/refused_network").status_code == 405
+    # An unknown name is a 404 whatever the method; only a known name answers 405 to the wrong one.
+    assert client.get("/__e2e__/fixture/no_such_fixture").status_code == 404
+    assert client.post("/__e2e__/probe/no_such_probe").status_code == 404
 
 
 def test_every_step_module_registers_itself():
