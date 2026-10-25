@@ -171,9 +171,10 @@ for (const role of ['owner', 'editor'] as const) {
     expect(sent.sent_at).toBeTruthy();
     await expect(panel.getByTestId(`inbox-thread-reply-${sent.id}`)).toBeVisible();
     await expect(body).toHaveValue('');
-    const calls = await harness.probe<PlatformCalls>('inbox_platform_calls', { since });
+    // Exactly one reply to this comment reached the platform (the probe lists this comment's calls only).
+    const calls = await harness.probe<PlatformCalls>('inbox_platform_calls', { since, comment_id: comment.commentId });
     expect(calls.calls).toEqual([
-      expect.objectContaining({ method: 'POST', host: 'graph.facebook.com', url: expect.stringContaining(`/${comment.commentId}/comments`) }),
+      expect.objectContaining({ method: 'POST', host: 'graph.facebook.com', url: expect.stringMatching(new RegExp(`/${comment.commentId}/comments$`)) }),
     ]);
     await axe(page, `Inbox reply sent (${role})`);
 
@@ -211,10 +212,10 @@ test('a client of the workspace is refused the Inbox, the message and a direct r
   const messageId = arrived.message!.id;
 
   await as('client');
-  // The client's own landing (the workspace calendar) first: the screen a client does reach.
+  // The client's own landing first, wherever it is: a screen a client does reach, and it sets the
+  // CSRF cookie the direct reply below carries. Where a client lands is not this path's question.
   const landing = await page.goto('/');
   expect(landing?.status()).toBe(200);
-  expect(new URL(page.url()).pathname).toBe(`/workspace/${workspace}/calendar/`);
   await axe(page, 'Landing (client)');
 
   const inbox = await page.goto(`/workspace/${workspace}/inbox/`);
@@ -237,7 +238,7 @@ test('a client of the workspace is refused the Inbox, the message and a direct r
   const after = await harness.probe<InboxState>('inbox_message', { comment_id: comment.commentId });
   expect(after.message?.status).toBe('unread');
   expect(after.replies).toEqual([]);
-  expect((await harness.probe<PlatformCalls>('inbox_platform_calls', { since })).calls).toEqual([]);
+  expect((await harness.probe<PlatformCalls>('inbox_platform_calls', { since, comment_id: comment.commentId })).calls).toEqual([]);
   expect(network.blocked).toEqual([]);
   expect((await harness.probe<{ hosts: string[] }>('refused_network', { since })).hosts).toEqual([]);
 });

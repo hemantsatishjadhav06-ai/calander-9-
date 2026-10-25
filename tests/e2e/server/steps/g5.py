@@ -5,9 +5,10 @@ posts for the seeded Facebook page of workspace A. Its probes:
 
 - ``inbox_message`` (``?comment_id=``): the inbox message that comment became in workspace A, its
   replies (oldest first) and how many "new inbox message" notifications each person got for it.
-- ``inbox_platform_calls`` (``?since=<epoch>``): the Facebook calls the mock transport answered
-  since then (method, host and path), so a test can see the reply reached the platform once, or not
-  at all.
+- ``inbox_platform_calls`` (``?comment_id=&since=<epoch>``): the Facebook calls the mock transport
+  answered since then for that one comment (a reply to it, ``POST /<comment_id>/comments``; method,
+  host and path), so a test can see its reply reached the platform once, or not at all, whatever
+  another test sent in the same window.
 
 Path 10's fixture, ``brand_timezone_workspace``, makes a workspace with a blank timezone in its own
 organisation (default ``timezone``, Asia/Dubai unless given), with a fresh owner and a fresh editor
@@ -23,6 +24,7 @@ and the gate's fingerprint of it now.
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections import Counter
 from datetime import UTC, datetime, time, timedelta
@@ -32,6 +34,9 @@ from zoneinfo import ZoneInfo, available_timezones
 
 from .. import mocks, seed
 from ..registry import PayloadError, fixture, optional_number, optional_str, probe, require_number, require_str
+
+# A path segment the mock records as it is (it redacts one with a colon, or of 40 characters and more).
+_PLAIN_SEGMENT = re.compile(r"[A-Za-z0-9_\-.~]{1,39}")
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -125,15 +130,19 @@ def inbox_message(params: dict[str, Any]) -> dict[str, Any]:
 
 @probe("inbox_platform_calls")
 def inbox_platform_calls(params: dict[str, Any]) -> dict[str, Any]:
-    """The Facebook calls the mock transport answered since ``since`` (method, host, path)."""
+    """The Facebook calls the mock answered since ``since`` for one comment (method, host, path)."""
     from providers import facebook
 
+    comment_id = require_str(params, "comment_id")
+    # Any other id could never be found in the record, so "no calls" for it would prove nothing.
+    if not _PLAIN_SEGMENT.fullmatch(comment_id):
+        raise PayloadError("'comment_id' must be up to 39 letters, digits, '-', '_', '.' or '~'.")
     since = optional_number(params, "since")
     host = urlsplit(facebook.BASE_URL).hostname
     calls = [
         {"method": str(item["method"]), "host": str(item["host"]), "url": str(item["url"])}
         for item in mocks.answered(since)
-        if item.get("host") == host
+        if item.get("host") == host and urlsplit(str(item["url"])).path.endswith(f"/{comment_id}/comments")
     ]
     return {"calls": calls}
 
