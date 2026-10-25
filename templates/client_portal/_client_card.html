@@ -7,7 +7,7 @@ through the team thread: the client's change request is recorded first, then the
 A post waiting for the client opens expanded, so its actions are visible at once; decided posts start closed.
 {% endcomment %}
 {% load tz approval_extras %}
-<article class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs"
+<article class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" data-testid="portal-card"
      x-data="{ open: {% if post.client_pending %}true{% else %}false{% endif %}, panel: null, comment: '' }">
     <div class="cursor-pointer p-5 max-sm:p-4" @click="open = !open">
         <div class="mb-3 flex flex-wrap items-center gap-2">
@@ -82,7 +82,7 @@ A post waiting for the client opens expanded, so its actions are visible at once
 
         <div class="flex flex-wrap items-center gap-2 border-t border-ink-200 bg-ink-25 px-5 py-4 max-sm:px-4">
             {% if post.client_pending %}
-            <button hx-post="{% url 'client_portal:approve' post_id=post.id %}" hx-swap="none"
+            <button hx-post="{% url 'client_portal:approve' post_id=post.id %}" hx-swap="none" data-testid="portal-card-approve"
                     class="ui-btn ui-btn-tinted max-sm:flex-1">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
                 Approve

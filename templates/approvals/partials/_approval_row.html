@@ -6,6 +6,7 @@ schedules the exact proposed time, and only a person can press either.
 {% endcomment %}
 {% load tz approval_extras %}
 <div class="bg-white border border-ink-200 rounded-xl shadow-xs transition-colors hover:border-ink-300"
+     data-testid="approvals-row"
      x-data="{ expanded: false, panel: null, comment: '' }">
     <div class="flex flex-wrap sm:flex-nowrap items-start gap-3 p-4">
         {% if can_approve %}
@@ -136,16 +137,20 @@ schedules the exact proposed time, and only a person can press either.
         <div class="flex flex-wrap items-center justify-end gap-1.5 w-full sm:w-auto sm:flex-shrink-0">
             {% if post.proposed_publish_at or post.scheduled_at %}
             <button type="button" hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-vals='{"schedule": "1"}' hx-swap="none" hx-disabled-elt="this"
+                    data-testid="approvals-row-approve-schedule"
                     title="Approve this exact content and schedule it for the proposed time"
                     class="ui-btn ui-btn-tinted ui-btn-sm max-sm:flex-1">Approve &amp; schedule</button>
             <button type="button" hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-swap="none" hx-disabled-elt="this"
+                    data-testid="approvals-row-approve"
                     title="Approve without scheduling it"
                     class="ui-btn ui-btn-ghost ui-btn-sm">Approve</button>
             {% else %}
             <button type="button" hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-swap="none" hx-disabled-elt="this"
+                    data-testid="approvals-row-approve"
                     class="ui-btn ui-btn-tinted ui-btn-sm max-sm:flex-1">Approve</button>
             {% endif %}
             <button type="button" @click="panel = panel ? null : 'changes'" :aria-expanded="(!!panel).toString()"
+                    data-testid="approvals-row-review"
                     class="ui-btn ui-btn-ghost ui-btn-sm"
                     :class="panel && 'bg-ink-100 text-ink-900'">Review</button>
         </div>
@@ -172,14 +177,14 @@ schedules the exact proposed time, and only a person can press either.
     <div x-show="panel" x-cloak class="px-4 pb-4 anim-collapse">
         <div class="pt-4 border-t border-ink-200">
             <div class="ui-segmented mb-3" role="group" aria-label="Review outcome">
-                <button type="button" @click="panel = 'changes'" class="ui-segment" :class="panel === 'changes' && 'is-active'" :aria-pressed="(panel === 'changes').toString()">Request changes</button>
+                <button type="button" @click="panel = 'changes'" data-testid="approvals-row-request-changes" class="ui-segment" :class="panel === 'changes' && 'is-active'" :aria-pressed="(panel === 'changes').toString()">Request changes</button>
                 <button type="button" @click="panel = 'reject'" class="ui-segment" :class="panel === 'reject' && 'is-active'" :aria-pressed="(panel === 'reject').toString()">Reject</button>
             </div>
-            <textarea id="review-comment-{{ post.id }}" name="comment" x-model="comment" rows="2" aria-label="Review comment"
+            <textarea id="review-comment-{{ post.id }}" name="comment" x-model="comment" rows="2" aria-label="Review comment" data-testid="approvals-row-review-comment"
                       :placeholder="panel === 'reject' ? 'Reason for rejection (required), shared with the creator…' : 'What needs to change? (required)…'"
                       class="ui-input resize-none"></textarea>
             <div class="flex flex-wrap items-center gap-2 mt-3">
-                <button type="button" x-show="panel === 'changes'"
+                <button type="button" x-show="panel === 'changes'" data-testid="approvals-row-send-back"
                         hx-post="{% url 'approvals:request_changes' workspace_id=workspace.id post_id=post.id %}"
                         hx-include="#review-comment-{{ post.id }}" hx-swap="none" :disabled="!comment.trim()"
                         class="ui-btn ui-btn-primary ui-btn-sm">Send back for changes</button>

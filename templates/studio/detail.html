@@ -14,7 +14,7 @@
         <div class="min-w-0 max-w-3xl">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
                 {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
-                <span class="text-xs text-ink-500 tabular-nums">Revision {{ brief.revision }}{% if brief.author %} · by {{ brief.author.display_name }}{% endif %} · {{ brief.created_at|date:"j M Y, H:i" }}</span>
+                <span class="text-xs text-ink-500 tabular-nums" data-testid="studio-detail-revision">Revision {{ brief.revision }}{% if brief.author %} · by {{ brief.author.display_name }}{% endif %} · {{ brief.created_at|date:"j M Y, H:i" }}</span>
             </div>
             <h1 class="ui-page-title break-words">{{ brief.title }}</h1>
             <p class="mt-1.5 text-body-lg text-ink-600 break-words"><span class="font-medium text-ink-800">From the idea:</span> {{ brief.idea }}</p>
@@ -333,12 +333,12 @@
             <section aria-labelledby="changes-heading" class="ui-card">
                 <h2 id="changes-heading" class="ui-card-title">Send it back with notes</h2>
                 <p class="ui-card-subtitle mb-3">Goes straight to the copywriter and art director.</p>
-                <form method="post" action="{% url 'studio:request_changes' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+                <form method="post" action="{% url 'studio:request_changes' workspace_id=workspace.id brief_id=brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true" data-testid="studio-revise-form">
                     {% csrf_token %}
                     <label for="{{ feedback_form.feedback.id_for_label }}" class="sr-only">{{ feedback_form.feedback.label }}</label>
                     {{ feedback_form.feedback }}
                     <label class="flex items-center gap-2 mt-2 min-h-8 max-lg:min-h-11 text-[13px] text-ink-800 cursor-pointer">{{ feedback_form.new_picture }} {{ feedback_form.new_picture.label }}</label>
-                    <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="mt-3 ui-btn ui-btn-secondary">Send to the team</button>
+                    <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" data-testid="studio-revise-send" class="mt-3 ui-btn ui-btn-secondary">Send to the team</button>
                 </form>
                 <form method="post" action="{% url 'studio:new_angles' workspace_id=workspace.id brief_id=brief.id %}" class="mt-3">
                     {% csrf_token %}
