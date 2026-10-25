@@ -4,10 +4,12 @@ Path 1 posts the real login form and goes through allauth's Google flow; these s
 profile Google would return, make a fresh member of workspace A for the "existing email" case, and
 read back the sessions and accounts the sign-in left in the database.
 
-Path 11 asks the URL resolver for every pattern that takes a ``workspace_id`` (so a new page is
-covered the day it is added), with the methods each view accepts; makes one row of every kind those
-URLs name in workspace B; reads those rows back so a test can show that a refused request changed
-nothing; and clears the views' rate-limit counters around the sweep that posts every action once.
+Path 11 asks the URL resolver for every pattern that takes a ``workspace_id``, and for every other
+pattern that takes a part (the client portal, the organisation's members, shared library, API keys
+and invitations, a person's notifications), so a new page is covered the day it is added, with the
+methods each view accepts; makes one row of every kind those URLs name in workspace B; reads those
+rows back so a test can show that a refused request changed nothing; and clears the views'
+rate-limit counters around the sweeps that post every action once.
 """
 
 from __future__ import annotations
@@ -195,12 +197,17 @@ _SAMPLES = {"uuid": "00000000-0000-4000-8000-0000000000ff", "int": "1", "str": "
 _PART = re.compile(r"<(?:(?P<converter>[^>:]+):)?(?P<name>[^>]+)>")
 
 #: The rows :func:`isolation_b_objects` makes in workspace B, by the key a URL part is filled from,
-#: with each model's path to its workspace. A key is a part name (``asset_id``), or a namespace or a
-#: URL name and the part, where the same part names another kind of row (``blog:post_id`` is an
-#: article, ``inbox:saved_reply_edit:reply_id`` a saved reply); the most specific key wins.
+#: with each model's path to workspace B (through the organisation for the organisation's own rows:
+#: its memberships, invitations and shared library). A key is a part name (``asset_id``), or a
+#: namespace or a URL name and the part, where the same part names another kind of row
+#: (``blog:post_id`` is an article, ``inbox:saved_reply_edit:reply_id`` a saved reply,
+#: ``members:membership_id`` an organisation membership); the most specific key wins. One model has
+#: one path, so the counts in :func:`isolation_b_state` are by model.
 _B_ROWS: dict[str, tuple[str, str]] = {
     "account_id": ("social_accounts.SocialAccount", "workspace"),
     "post_id": ("composer.Post", "workspace"),
+    "client_portal:post_id": ("composer.Post", "workspace"),
+    "client_portal:request_hold:post_id": ("composer.Post", "workspace"),
     "platform_post_id": ("composer.PlatformPost", "post__workspace"),
     "media_id": ("composer.PostMedia", "post__workspace"),
     "idea_id": ("composer.Idea", "workspace"),
@@ -217,10 +224,15 @@ _B_ROWS: dict[str, tuple[str, str]] = {
     "reply_id": ("inbox.InboxReply", "inbox_message__workspace"),
     "inbox:saved_reply_edit:reply_id": ("inbox.SavedReply", "workspace"),
     "inbox:saved_reply_delete:reply_id": ("inbox.SavedReply", "workspace"),
-    "asset_id": ("media_library.MediaAsset", "workspace"),
+    "asset_id": ("media_library.MediaAsset", "organization__workspaces"),
+    "media_library_org:asset_id": ("media_library.MediaAsset", "organization__workspaces"),
     "version_id": ("media_library.MediaAssetVersion", "media_asset__workspace"),
     "folder_id": ("media_library.MediaFolder", "workspace"),
     "membership_id": ("members.WorkspaceMembership", "workspace"),
+    "members:membership_id": ("members.OrgMembership", "organization__workspaces"),
+    "invitation_id": ("members.Invitation", "organization__workspaces"),
+    "key_id": ("api_keys.ApiKey", "workspace"),
+    "notification_id": ("notifications.Notification", "user__workspace_memberships__workspace"),
     "link_id": ("onboarding.ConnectionLink", "workspace"),
     "blog:post_id": ("blog.BlogPost", "workspace"),
     "blog_post_id": ("blog.BlogPost", "workspace"),
@@ -231,6 +243,7 @@ _B_ROWS: dict[str, tuple[str, str]] = {
     "concept_id": ("studio.StudioConcept", "brief__workspace"),
     "insight_id": ("studio.CreativeInsight", "workspace"),
     "conversation_id": ("studio.Conversation", "workspace"),
+    "client_portal:conversation_id": ("studio.Conversation", "workspace"),
     "routine_id": ("studio.Routine", "workspace"),
 }
 
@@ -245,17 +258,40 @@ _B_CHILDREN: tuple[tuple[str, str], ...] = (
 )
 
 
-def _routes(patterns: list[Any], prefix: str = "", namespace: str = "") -> list[tuple[str, str]]:
-    """``(route, name)`` for every pattern under ``patterns``, with include prefixes joined."""
-    found: list[tuple[str, str]] = []
+def _b_kinds() -> dict[str, str]:
+    """Every kind of row :func:`isolation_b_state` counts and fingerprints in B, with its path to B."""
+    kinds: dict[str, str] = {}
+    for label, path in [*_B_ROWS.values(), *_B_CHILDREN]:
+        if kinds.setdefault(label, path) != path:
+            raise PayloadError(f"{label} has two paths to workspace B ({kinds[label]}, {path}); give it one.")
+    return kinds
+
+
+#: The parts of a regular-expression route, which ``_PART`` does not read.
+_GROUP = re.compile(r"\(\?P<(?P<name>\w+)>")
+
+
+def _routes(patterns: list[Any], prefix: str = "", namespace: str = "") -> list[tuple[str, str, Any]]:
+    """``(route, name, view)`` for every pattern under ``patterns``, with include prefixes joined."""
+    found: list[tuple[str, str, Any]] = []
     for pattern in patterns:
         if isinstance(pattern, URLResolver):
             inner = ":".join(part for part in (namespace, pattern.namespace) if part)
             found += _routes(pattern.url_patterns, prefix + str(pattern.pattern), inner)
         elif isinstance(pattern, URLPattern):
             name = f"{namespace}:{pattern.name}" if namespace and pattern.name else pattern.name or ""
-            found.append((prefix + str(pattern.pattern), name))
+            found.append((prefix + str(pattern.pattern), name, pattern.callback))
     return found
+
+
+def _is_regex(route: str) -> bool:
+    return route.startswith("^") or "(?P<" in route
+
+
+def _part_names(route: str) -> list[str]:
+    """The names of the parts a route takes, in order."""
+    found = _GROUP if _is_regex(route) else _PART
+    return [match["name"] for match in found.finditer(route)]
 
 
 def _methods(view: Any) -> list[str] | None:
@@ -293,6 +329,58 @@ def _object_key(objects: dict[str, str], name: str, part: str) -> str | None:
     return next((key for key in keys if key in objects), None)
 
 
+def _require_known(objects: dict[str, str]) -> None:
+    """Refuse a key that fills no part of any URL (a typo would otherwise leave a row unswept)."""
+    used: set[str] = set()
+    for route, name, _view in _routes(get_resolver().url_patterns):
+        for part in _part_names(route):
+            key = None if part == "workspace_id" else _object_key(objects, name, part)
+            if key is not None:
+                used.add(key)
+    unknown = sorted(set(objects) - used)
+    if unknown:
+        raise PayloadError(f"No URL takes {', '.join(unknown)}.")
+
+
+def _filled(route: str, name: str, view: Any, objects: dict[str, str], workspace_id: str | None) -> dict[str, Any]:
+    """One URL of the sweep: its path with the test's objects in it, and what was left at a sample.
+
+    A regular-expression route is not filled (``path`` is ``None``); its parts come back as samples.
+    """
+    entry: dict[str, Any] = {"name": name, "route": route}
+    if _is_regex(route):
+        parts = _part_names(route)
+        return {**entry, "path": None, "objects": [], "samples": parts, "methods": _methods(view), "resolves_to": None}
+    pieces: list[str] = []
+    filled: list[str] = []
+    samples: list[str] = []
+    end = 0
+    for match in _PART.finditer(route):
+        pieces.append(route[end : match.start()])
+        end = match.end()
+        part = match["name"]
+        if part == "workspace_id" and workspace_id is not None:
+            pieces.append(workspace_id)
+            continue
+        key = _object_key(objects, name, part)
+        if key is None:
+            pieces.append(_SAMPLES.get(match["converter"] or "str", "e2e"))
+            samples.append(part)
+        else:
+            pieces.append(objects[key])
+            filled.append(part)
+    path = "/" + "".join(pieces) + route[end:]
+    resolved = resolve(path)
+    return {
+        **entry,
+        "path": path,
+        "objects": filled,
+        "samples": samples,
+        "methods": _methods(resolved.func),
+        "resolves_to": resolved.view_name,
+    }
+
+
 @probe("isolation_urls")
 def isolation_urls(params: dict[str, Any]) -> dict[str, Any]:
     """Every URL pattern that takes a ``workspace_id``, filled in: ``?workspace_id=&<key>=<id>...``.
@@ -300,53 +388,42 @@ def isolation_urls(params: dict[str, Any]) -> dict[str, Any]:
     Each other part of the path takes the test's id for it (``post_id``, or a more specific key such
     as ``blog:post_id``; see ``_B_ROWS``) and a sample of its type otherwise. Each URL comes back
     with its pattern's name, the parts that were the test's own objects (``objects``), the parts left
-    at a sample (``samples``), and the methods its view accepts (``methods``, ``None`` for any).
+    at a sample (``samples``), and the methods its view accepts (``methods``, ``None`` for any). A key
+    no URL takes is refused; one that only :func:`isolation_other_urls` takes is accepted, so a test
+    sends the same objects to both.
     """
     workspace_id = require_str(params, "workspace_id")
     objects = {key: str(value) for key, value in params.items() if key != "workspace_id"}
+    _require_known(objects)
     urls = []
-    used: set[str] = set()
-    for route, name in _routes(get_resolver().url_patterns):
-        parts = list(_PART.finditer(route))
-        if "workspace_id" not in {part["name"] for part in parts}:
+    for route, name, view in _routes(get_resolver().url_patterns):
+        if "workspace_id" not in _part_names(route):
             continue
-        if route.startswith("^") or "(?P<" in route:
+        if _is_regex(route):
             raise PayloadError(f"The pattern {name or route!r} is a regular expression; teach this probe to fill it.")
-        pieces: list[str] = []
-        filled: list[str] = []
-        samples: list[str] = []
-        end = 0
-        for match in parts:
-            pieces.append(route[end : match.start()])
-            end = match.end()
-            part = match["name"]
-            if part == "workspace_id":
-                pieces.append(workspace_id)
-                continue
-            key = _object_key(objects, name, part)
-            if key is None:
-                pieces.append(_SAMPLES.get(match["converter"] or "str", "e2e"))
-                samples.append(part)
-            else:
-                pieces.append(objects[key])
-                filled.append(part)
-                used.add(key)
-        path = "/" + "".join(pieces) + route[end:]
-        resolved = resolve(path)
-        urls.append(
-            {
-                "name": name,
-                "route": route,
-                "path": path,
-                "objects": filled,
-                "samples": samples,
-                "methods": _methods(resolved.func),
-                "resolves_to": resolved.view_name,
-            }
-        )
-    unknown = sorted(set(objects) - used)
-    if unknown:
-        raise PayloadError(f"No workspace URL takes {', '.join(unknown)}.")
+        urls.append(_filled(route, name, view, objects, workspace_id))
+    return {"count": len(urls), "urls": urls}
+
+
+@probe("isolation_other_urls")
+def isolation_other_urls(params: dict[str, Any]) -> dict[str, Any]:
+    """Every URL pattern that takes a part but no ``workspace_id``, filled in: ``?<key>=<id>...``.
+
+    The URLs that find a row without a workspace in the path: the client portal's (the workspace is
+    the portal session's), the organisation's (members, invitations, API keys, the shared library),
+    a person's notifications, and the rest (tokens, callbacks, the admin, the public media), so a
+    test can sweep the first and review why each of the rest is left out. Parts are filled as in
+    :func:`isolation_urls`; a regular-expression route comes back with ``path`` ``None`` and its
+    parts as ``samples``.
+    """
+    objects = {key: str(value) for key, value in params.items()}
+    _require_known(objects)
+    urls = []
+    for route, name, view in _routes(get_resolver().url_patterns):
+        parts = _part_names(route)
+        if not parts or "workspace_id" in parts:
+            continue
+        urls.append(_filled(route, name, view, objects, None))
     return {"count": len(urls), "urls": urls}
 
 
@@ -360,17 +437,23 @@ def _tiny_png() -> bytes:
 
 @fixture("isolation_b_objects")
 def isolation_b_objects(payload: dict[str, Any]) -> dict[str, Any]:
-    """One row of every kind a workspace URL names, in workspace B (see ``_B_ROWS``).
+    """One row of every kind a URL names, in workspace B or its organisation (see ``_B_ROWS``).
 
     Each row is made the way B's own people would leave it (an account with its queue and slots, a
     post waiting for review with a comment, a library image, a comment in the inbox with a draft
     reply, an article, finished jobs, a thread, a paused routine, a client) and carries B's name
     where it has text, so a page that showed one to a member of A would be caught by its words.
-    Nothing here is due to run or to publish, so the worker leaves the rows as they are. Returns
-    ``{"workspace_id", "workspace_name", "objects": {key: id}}``.
+    The portal's rows are in the states its actions take (a post the client is asked to sign off,
+    an approved one the client may hold, a client thread with a message from B's team), and the
+    organisation's are its own (the client's organisation membership, an open invitation, an API
+    key, a shared library image, a notice for B's owner), so a lookup that lost its scope would find
+    and act on them. Nothing here is due to run or to publish, so the worker leaves the rows as they
+    are. Returns ``{"workspace_id", "workspace_name", "objects": {key: id}}``.
     """
     from django.core.files.uploadedfile import SimpleUploadedFile
 
+    from apps.api_keys.models import ApiKey
+    from apps.approvals import gate
     from apps.approvals.models import PostComment
     from apps.blog.models import BlogPost, BlogSite
     from apps.calendar.models import CustomCalendarEvent, PostingSlot, Queue, QueueEntry
@@ -380,10 +463,19 @@ def isolation_b_objects(payload: dict[str, Any]) -> dict[str, Any]:
     from apps.media_library.models import MediaAssetVersion, MediaFolder
     from apps.media_library.services import create_asset
     from apps.media_library.tasks import process_media_asset
-    from apps.members.models import OrgMembership, WorkspaceMembership
+    from apps.members.models import Invitation, OrgMembership, WorkspaceMembership
+    from apps.notifications.models import EventType, Notification
     from apps.onboarding.models import ConnectionLink
     from apps.social_accounts.models import SocialAccount
-    from apps.studio.models import AgencyJob, Conversation, CreativeInsight, Routine, StudioBrief, StudioConcept
+    from apps.studio.models import (
+        AgencyJob,
+        Conversation,
+        CreativeInsight,
+        Message,
+        Routine,
+        StudioBrief,
+        StudioConcept,
+    )
     from apps.workspaces.models import Workspace
 
     workspace = Workspace.objects.get(pk=seed.WORKSPACE_B_ID)
@@ -469,7 +561,7 @@ def isolation_b_objects(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
     client = _person(f"client-b-{tag}@e2e.test", f"{name} client")
-    OrgMembership.objects.create(user=client, organization=organization, org_role="member")
+    client_in_org = OrgMembership.objects.create(user=client, organization=organization, org_role="member")
     membership = WorkspaceMembership.objects.create(
         user=client, workspace=workspace, workspace_role=WorkspaceMembership.WorkspaceRole.CLIENT
     )
@@ -511,9 +603,69 @@ def isolation_b_objects(payload: dict[str, Any]) -> dict[str, Any]:
         enabled=False,
     )
 
+    # The portal's rows: a post B's team approved and sent to its client, an approved one the client
+    # may hold, and the client thread about the first, with a message from B's team.
+    portal_post = Post.objects.create(
+        workspace=workspace, author=author, title=f"{name} sign-off {tag}", caption=f"{name} sign-off {tag}"
+    )
+    held_post = Post.objects.create(
+        workspace=workspace, author=author, title=f"{name} approved {tag}", caption=f"{name} approved {tag}"
+    )
+    for stage_post, status in (
+        (portal_post, PlatformPost.Status.PENDING_CLIENT),
+        (held_post, PlatformPost.Status.APPROVED),
+    ):
+        stamped = PlatformPost.objects.create(post=stage_post, social_account=account, status=status)
+        # Approved in B's dashboard: the gate's fingerprint, so revalidation leaves the stage as it is.
+        PlatformPost.objects.filter(pk=stamped.pk).update(
+            approved_fingerprint=gate.fingerprint(stamped), approved_by=author, approved_at=now
+        )
+    client_thread = Conversation.objects.create(
+        workspace=workspace,
+        audience=Conversation.Audience.CLIENT,
+        post=portal_post,
+        title=f"{name} sign-off thread {tag}",
+        created_by=client,
+    )
+    Message.objects.create(
+        conversation=client_thread,
+        author=author,
+        author_kind=Message.AuthorKind.STAFF,
+        body=f"{name} would like your sign-off {tag}",
+    )
+
+    # The organisation's own rows, which its URLs find without a workspace in the path.
+    invitation = Invitation.objects.create(
+        organization=organization,
+        email=f"invitee-b-{tag}@e2e.test",
+        invited_by=author,
+        expires_at=now + timedelta(days=7),
+    )
+    api_key = ApiKey.objects.create(
+        workspace=workspace,
+        issued_by=author,
+        name=f"{name} bot {tag}",
+        lookup_prefix=f"e2e{tag}",
+        token_hash=hashlib.sha256(f"e2e-not-a-key-{tag}".encode()).hexdigest(),
+    )
+    api_key.social_accounts.add(account)
+    shared_file = SimpleUploadedFile(f"bayside-shared-{tag}.png", _tiny_png(), content_type="image/png")
+    shared_asset = create_asset(
+        organization, None, shared_file, author, title=f"{name} shared photo {tag}", alt_text=f"{name}"
+    )
+    process_media_asset.now(str(shared_asset.id))
+    notice = Notification.objects.create(
+        user=author,
+        event_type=EventType.TEAM_MEMBER_INVITED,
+        title=f"{name} invited a teammate {tag}",
+        body=f"{name} {tag}",
+    )
+
     rows = {
         "account_id": account,
         "post_id": post,
+        "client_portal:post_id": portal_post,
+        "client_portal:request_hold:post_id": held_post,
         "platform_post_id": platform_post,
         "media_id": media,
         "idea_id": idea,
@@ -531,9 +683,14 @@ def isolation_b_objects(payload: dict[str, Any]) -> dict[str, Any]:
         "inbox:saved_reply_edit:reply_id": saved_reply,
         "inbox:saved_reply_delete:reply_id": saved_reply,
         "asset_id": asset,
+        "media_library_org:asset_id": shared_asset,
         "version_id": version,
         "folder_id": folder,
         "membership_id": membership,
+        "members:membership_id": client_in_org,
+        "invitation_id": invitation,
+        "key_id": api_key,
+        "notification_id": notice,
         "link_id": link,
         "blog:post_id": article,
         "blog_post_id": article,
@@ -544,6 +701,7 @@ def isolation_b_objects(payload: dict[str, Any]) -> dict[str, Any]:
         "concept_id": concept,
         "insight_id": insight,
         "conversation_id": conversation,
+        "client_portal:conversation_id": client_thread,
         "routine_id": routine,
     }
     missing = sorted(set(_B_ROWS) ^ set(rows))
@@ -565,10 +723,12 @@ def _digest(value: Any) -> str:
 def isolation_b_state(params: dict[str, Any]) -> dict[str, Any]:
     """B's rows as they are now: ``?<key>=<id>...``, the ``objects`` :func:`isolation_b_objects` made.
 
-    Every column of every row, as a fingerprint (so a credential column is never echoed), and how many
-    rows of each kind B has, including the ones a request would add under B's rows (an approval, a
-    note, a message, a run, a portal link). A test reads it before and after its refused requests;
-    anything that moved is a request that got through.
+    ``rows``: every column of every one of those rows, as a fingerprint (so a credential column is
+    never echoed). ``counts`` and ``digests``: how many rows of each kind B has, and a fingerprint of
+    all of them, including the kinds a request would add under B's rows (an approval, a note, a
+    message, a run, a portal link), so a change to a row no URL names (a post's channel moving to
+    another stage) shows too. A test reads it before and after its refused requests; anything that
+    moved is a request that got through.
     """
     from django.apps import apps
 
@@ -581,18 +741,23 @@ def isolation_b_state(params: dict[str, Any]) -> dict[str, Any]:
         row = model._base_manager.filter(pk=require_str(params, key)).values().first()
         rows[key] = {column: _digest(value) for column, value in row.items()} if row else None
     counts: dict[str, int] = {}
-    for label, path in sorted({*_B_ROWS.values(), *_B_CHILDREN}):
-        counts[label] = apps.get_model(label)._base_manager.filter(**{path: seed.WORKSPACE_B_ID}).count()
-    return {"rows": rows, "counts": counts}
+    digests: dict[str, str] = {}
+    for label, path in sorted(_b_kinds().items()):
+        kind = apps.get_model(label)._base_manager.filter(**{path: seed.WORKSPACE_B_ID}).order_by("pk")
+        values = list(kind.values())
+        counts[label] = len(values)
+        digests[label] = _digest(values)
+    return {"rows": rows, "counts": counts, "digests": digests}
 
 
 @fixture("reset_rate_limits")
 def reset_rate_limits(payload: dict[str, Any]) -> dict[str, Any]:
     """Forget every view's rate-limit counters (django-ratelimit's, in the server's own cache).
 
-    Path 11 posts each action under A once, the rate-limited ones included; it calls this before and
-    after, so it is never refused for an earlier test's requests and leaves everyone's allowance as
-    it found it. The login limits have their own fixture (``reset_login_limits``).
+    Path 11 posts each action under A, and each of the portal's and the organisation's, once, the
+    rate-limited ones included; it calls this before and after, so it is never refused for an
+    earlier test's requests and leaves everyone's allowance as it found it. The login limits have
+    their own fixture (``reset_login_limits``).
     """
     from django.core.cache import caches
     from django.core.cache.backends.locmem import LocMemCache
