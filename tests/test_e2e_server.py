@@ -289,6 +289,19 @@ def test_server_command_without_reset_says_so_when_the_database_is_missing():
 # The settings module
 # ---------------------------------------------------------------------------
 
+#: Secret settings ``base`` reads that a developer's ``.env`` or shell may hold; the e2e server has none.
+SECRET_SETTINGS = (
+    "EMAIL_HOST_PASSWORD",
+    "WEBHOOK_SECRET",
+    "RESEND_WEBHOOK_SECRET",
+    "YOUTUBE_WEBHOOK_SECRET",
+    "FACEBOOK_WEBHOOK_VERIFY_TOKEN",
+    "INSTAGRAM_LOGIN_WEBHOOK_VERIFY_TOKEN",
+    "GMAIL_REFRESH_TOKEN",
+    "BLOG_GITHUB_TOKEN",
+    "STUDIO_SHARED_SECRET",
+)
+
 _SETTINGS_SCRIPT = """
 import json
 import django
@@ -321,7 +334,44 @@ print(json.dumps({
     "signup": settings.SIGNUP_MODE,
     "sentry": settings.SENTRY_DSN,
     "intelligence": settings.INTELLIGENCE_ENABLED,
+    "agency_max_active_briefs": settings.AGENCY_MAX_ACTIVE_BRIEFS,
+    "studio_web_search": settings.STUDIO_WEB_SEARCH,
+    "studio_effort": settings.STUDIO_EFFORT,
+    "email_sending": settings.EMAIL_SENDING_ENABLED,
+    "telegram_managed_bots": settings.TELEGRAM_MANAGED_BOTS_ENABLED,
+    "launched_platforms": settings.LAUNCHED_PLATFORMS,
+    "secrets": {name: getattr(settings, name, "") for name in __SECRETS__},
 }))
+""".replace("__SECRETS__", repr(SECRET_SETTINGS))
+
+#: What the e2e settings take from the environment on purpose: the database to use (``DB_*``) and,
+#: as in ``test.py``, a ``SECRET_KEY`` and salt when one is set. Everything else ``base`` reads is pinned.
+E2E_ENVIRONMENT_KNOBS = frozenset(
+    {"DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST", "DB_PORT", "SECRET_KEY", "ENCRYPTION_KEY_SALT"}
+)
+
+_RECORD_SCRIPT = """
+import json
+
+import environ
+
+read = set()
+_get_value = environ.Env.get_value
+
+
+def get_value(self, var, *args, **kwargs):
+    read.add(var)
+    return _get_value(self, var, *args, **kwargs)
+
+
+environ.Env.get_value = get_value
+
+import django
+
+django.setup()
+from config.settings import e2e
+
+print(json.dumps({"read": sorted(read), "pinned": sorted(e2e.E2E_PINNED_ENVIRONMENT)}))
 """
 
 
@@ -362,6 +412,48 @@ def test_e2e_settings_are_production_like_and_self_contained():
     assert values["signup"] == "open"
     assert values["sentry"] == ""
     assert values["intelligence"] is False
+
+
+def test_e2e_settings_ignore_switches_and_secrets_a_developer_environment_holds():
+    # What a developer's .env or exported dev.env may hold; CI has none of it, and the e2e server must
+    # behave the same on both, with no secret of the developer's in its settings.
+    leaked = "e2e-leak-check-not-a-secret"
+    values = _e2e_settings(
+        AGENCY_MAX_ACTIVE_BRIEFS="1",
+        STUDIO_WEB_SEARCH="true",
+        STUDIO_EFFORT="high",
+        EMAIL_SENDING_ENABLED="false",
+        TELEGRAM_MANAGED_BOTS_ENABLED="false",
+        LAUNCHED_PLATFORMS="x",
+        EMAIL_BACKEND_TYPE="smtp",
+        **{name: leaked for name in SECRET_SETTINGS},
+    )
+    assert values["agency_max_active_briefs"] == 3
+    assert values["studio_web_search"] is False
+    assert values["studio_effort"] == ""
+    assert values["email_sending"] is True
+    assert values["telegram_managed_bots"] is True
+    assert values["launched_platforms"] == ["bluesky", "mastodon", "devto"]
+    assert values["mail"] == "django.core.mail.backends.locmem.EmailBackend"
+    assert values["secrets"] == {name: "" for name in SECRET_SETTINGS}
+
+
+def test_e2e_settings_pin_every_variable_base_reads():
+    result = subprocess.run(
+        [sys.executable, "-c", _RECORD_SCRIPT],
+        cwd=REPO,
+        env=_server_env(DJANGO_SETTINGS_MODULE=E2E_SETTINGS),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    values = json.loads(result.stdout.strip().splitlines()[-1])
+    assert len(values["read"]) > 50
+    unpinned = set(values["read"]) - set(values["pinned"]) - E2E_ENVIRONMENT_KNOBS
+    assert not unpinned, (
+        f"base reads these, so a .env could change the e2e server: pin them in config/settings/e2e.py: {sorted(unpinned)}"
+    )
 
 
 def test_e2e_settings_follow_the_environment_the_server_sets():
