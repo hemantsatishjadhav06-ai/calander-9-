@@ -1,6 +1,7 @@
 // Nothing leaves the machine from the browser either: every request to a host other than the e2e
-// server is aborted, unless the test routed it first (the OAuth authorize pages), and the server's
-// own guard has refused nothing.
+// server is aborted, unless the test routed it first (the OAuth authorize pages). On the server side,
+// the refused-network probe answers for a window of time, so each check covers its own test only;
+// the whole run is checked once, at its end, by support/global-setup.ts.
 import { expect, test } from '../support/test';
 
 test('a navigation to a host other than the server is aborted', async ({ page, network, browserName }) => {
@@ -48,8 +49,13 @@ test('the server answers the harness ping with the seeded ids', async ({ harness
   expect(await ping.json()).toMatchObject({ ok: true, ids: { workspace_a: harness.ids.workspace_a } });
 });
 
-test("the server's socket guard and provider mock have refused nothing", async ({ harness }) => {
-  const refused = await harness.probe<{ hosts: string[] }>('refused_network');
+test("the refused-network probe answers for this test's own window", async ({ harness }) => {
+  const since = Date.now() / 1000;
 
-  expect(refused.hosts).toEqual([]);
+  const refused = await harness.probe<{ hosts: string[]; refused: unknown[]; unanswered: unknown[] }>(
+    'refused_network',
+    { since },
+  );
+
+  expect(refused).toEqual({ hosts: [], refused: [], unanswered: [] });
 });

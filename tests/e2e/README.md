@@ -6,7 +6,8 @@ against (`tests/e2e/server/`, Python). Spec: [`docs/specs/01-harness.md`](../../
 ```
 tests/e2e/
   server/      python -m tests.e2e.server: web app + worker in one process, fakes, mocks, seed, fixtures
-  support/     test.ts (test, expect and the fixtures below), harness.ts, axe.ts, network.ts
+  support/     test.ts (test, expect and the fixtures below), harness.ts, axe.ts, network.ts,
+               global-setup.ts (the end-of-run network check)
   self/        the harness's own checks (axe helper, network guard, session fixture)
   golden/      the golden paths, one file each (NN-name.spec.ts)
   __screenshots__/   toHaveScreenshot baselines (none yet; Phase 3 takes them per screen)
@@ -94,11 +95,12 @@ In a spec, import from `../support/test`:
 import { expect, test } from '../support/test';
 
 test('…', async ({ page, harness, as, axe, network }) => {
+  const since = Date.now() / 1000;                       // this test's window for refused_network
   await as('editor');                                    // or as({ email }); the session cookie, no form
   const brief = await harness.fixture<{ id: string }>('my_fixture', { title: 'x' });
   await page.goto(`/workspace/${harness.ids.workspace_a}/studio/`);
   await axe(page, 'Home (editor)');                      // every screen; axe(page, label, { include: '[role="dialog"]' }) for a dialog
-  expect((await harness.probe<{ hosts: string[] }>('refused_network')).hosts).toEqual([]);
+  expect((await harness.probe<{ hosts: string[] }>('refused_network', { since })).hosts).toEqual([]);
 });
 ```
 
@@ -115,5 +117,9 @@ test('…', async ({ page, harness, as, axe, network }) => {
 - **Outcomes in the database:** assert through probes, not only on the page.
 - **Network:** every browser request to another host is aborted (`network.blocked` lists them). A
   test that needs an outside page (an OAuth authorize URL) installs `page.route(...)` first, which
-  takes precedence, and answers it with a redirect to the app's callback.
+  takes precedence, and answers it with a redirect to the app's callback. On the server side, a test
+  probes `refused_network` with `since` set to its own start, never the server's whole lifetime (a
+  server kept running between runs remembers earlier ones). The whole run is checked once at its end
+  (`support/global-setup.ts`): anything the server tried to reach outside the machine during the run
+  fails it, with the host and where in the server it was tried.
 - **No retries, no `test.skip`/`test.fixme` to make a path green;** each test makes its own rows.

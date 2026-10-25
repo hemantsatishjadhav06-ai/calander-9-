@@ -23,6 +23,8 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   forbidOnly: !!process.env.CI,
+  // Fails the run when the server tried to reach outside the machine during it (spec R2).
+  globalSetup: './tests/e2e/support/global-setup.ts',
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}-{projectName}{ext}',
   expect: {
