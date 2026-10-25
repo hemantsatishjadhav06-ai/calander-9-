@@ -1,11 +1,11 @@
 // Golden path 1: sign in with email, then with Google, and land on Home.
 //
 // The login form is the real one (rate limited: reset_login_limits first). Google is answered in the
-// browser: the app's redirect to Google's authorize page is replaced by the redirect Google would send
-// back, to the app's callback with the state the app sent (see routeGoogle), and the server side of
-// the exchange returns the profile the test registered for that code (tests/e2e/server/mocks.py). The
-// browser never asks any host but the server. The outcome is read from the database: whose session it
-// is, and which account and workspace a Google sign-in left behind.
+// browser: the app's redirect to Google's authorize page is replaced by a page that goes where Google
+// would send the browser back, the app's callback with the state the app sent (see routeGoogle), and
+// the server side of the exchange returns the profile the test registered for that code
+// (tests/e2e/server/mocks.py). The browser never asks any host but the server. The outcome is read
+// from the database: whose session it is, and which account and workspace a Google sign-in left behind.
 import type { Page } from '@playwright/test';
 
 import type { Harness } from '../support/harness';
@@ -30,8 +30,6 @@ type GoogleRoute = { authorize: URL[]; hosts: Set<string> };
 
 const LOGIN = '/accounts/login/';
 const CALLBACK = '/accounts/google/login/callback/';
-/** Below this width the sidebar, and the account menu in it, sits in a drawer behind the menu button. */
-const DRAWER_BELOW = 1024;
 
 test.beforeEach(async ({ harness }) => {
   await harness.fixture('reset_login_limits');
@@ -55,10 +53,12 @@ async function browserSession(page: Page, harness: Harness, cookieName: string):
  *
  * Playwright calls a route handler only for the first URL of a redirect chain, so a route on
  * accounts.google.com never sees the app's 302 there, and the browser would follow it to the real
- * host. The route is on the app's own POST instead: it is sent as is, the 302 it answers is read
- * (Google's authorize URL, with the state), and the browser receives the callback redirect in its
- * place, with the cookies the app set. Every host the browser asks for is recorded, redirects
- * included, so a test can show that nothing but the server was reached.
+ * host. The route is on the app's own POST instead. route.fetch sends it as is, through the browser
+ * context, so the session cookie the app sets with it lands in the browser; the 302 it answers is
+ * read (Google's authorize URL, with the state). The browser then gets a page that moves straight on
+ * to the callback, not a redirect: WebKit cannot fulfil a navigation with a 3xx status. Every host the
+ * browser asks for is recorded, redirects included, so a test can show that nothing but the server
+ * was reached.
  */
 async function routeGoogle(page: Page, code: string, baseURL: string): Promise<GoogleRoute> {
   const seen: GoogleRoute = { authorize: [], hosts: new Set() };
@@ -72,7 +72,12 @@ async function routeGoogle(page: Page, code: string, baseURL: string): Promise<G
       const callback = new URL(CALLBACK, baseURL);
       callback.searchParams.set('code', code);
       callback.searchParams.set('state', authorize.searchParams.get('state') ?? '');
-      await route.fulfill({ response, headers: { ...response.headers(), location: callback.toString() } });
+      const target = callback.toString().replaceAll('&', '&amp;');
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: `<!doctype html><title>Back from Google</title><meta http-equiv="refresh" content="0;url=${target}">`,
+      });
     },
   );
   return seen;
@@ -125,8 +130,10 @@ test('signing out from the account menu ends the session', async ({ page, harnes
   const owner = await harness.probe<Account>('user_account', { email: harness.ids.users.owner.email });
 
   await page.goto(home);
-  if ((page.viewportSize()?.width ?? 0) < DRAWER_BELOW) {
-    await page.getByRole('button', { name: 'Toggle menu' }).click();
+  // On a narrow screen the sidebar, and the account menu in it, sits in a drawer behind this button.
+  const drawer = page.getByRole('button', { name: 'Toggle menu' });
+  if (await drawer.isVisible()) {
+    await drawer.click();
   }
   // The account menu's button is named by the person it belongs to.
   await page.getByRole('button', { name: owner.name }).click();
@@ -173,8 +180,11 @@ test('a new Google user accepts the terms and lands on Home of their own new wor
   const [workspace] = account.workspaces;
   expect(workspace.role).toBe('owner');
   expect([harness.ids.workspace_a, harness.ids.workspace_b]).not.toContain(workspace.id);
-  // The new organisation takes the browser's timezone (the login page sends it).
-  expect(account.organisations).toEqual([{ id: expect.any(String), role: 'owner', timezone: harness.ids.timezone }]);
+  // The new organisation takes the browser's timezone (the login page sends it), which is not the
+  // product's default, so the check fails if the browser's timezone were ignored.
+  const browserTimezone = String(testInfo.project.use.timezoneId);
+  expect(browserTimezone).not.toBe('UTC');
+  expect(account.organisations).toEqual([{ id: expect.any(String), role: 'owner', timezone: browserTimezone }]);
   expect(new URL(page.url()).pathname).toBe(`/workspace/${workspace.id}/studio/`);
   await expect(page.getByRole('region', { name: 'Today' })).toBeVisible();
   await axe(page, 'Home (new Google user)');
