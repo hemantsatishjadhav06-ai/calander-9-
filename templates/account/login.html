@@ -19,12 +19,15 @@
             {% url 'account_login' as login_url %}
             <form method="post" action="{{ login_url }}">
                 {% csrf_token %}
-                {% include "account/_form_errors.html" %}
+                <div data-testid="login-errors">{% include "account/_form_errors.html" %}</div>
                 {{ redirect_field }}
 
                 {% for field in form %}
                 {% if field.field.widget.input_type != "checkbox" %}
+                {# The test hook wraps the shared field partial; the email field's form name is "login". #}
+                <div data-testid="login-{% if field.name == 'login' %}email{% else %}{{ field.name }}{% endif %}">
                 {% include "account/_field.html" with hide_help=True %}
+                </div>
                 {% endif %}
                 {% endfor %}
 
@@ -40,7 +43,7 @@
                     <a href="{% url 'account_reset_password' %}" class="link-inline ml-auto inline-flex min-h-6 items-center text-sm max-lg:min-h-11">Forgot your password?</a>
                 </div>
 
-                <button type="submit" class="ui-btn ui-btn-primary ui-btn-lg w-full">Sign in</button>
+                <button type="submit" class="ui-btn ui-btn-primary ui-btn-lg w-full" data-testid="login-submit">Sign in</button>
             </form>
             {% endif %}
         </div>
