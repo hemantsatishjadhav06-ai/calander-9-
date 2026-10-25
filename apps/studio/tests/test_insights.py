@@ -262,6 +262,17 @@ def assert_nothing_approved(workspace):
     assert statuses <= {"draft", "pending_review", "changes_requested", "published"}, statuses
 
 
+def next_monday() -> date:
+    """Next week's Monday in the ``world`` workspace's zone (Asia/Kolkata), worked out as the product does.
+
+    The plan tests used to name the week of 19 October 2026; once it had passed, a plan for it found
+    no free time. They name next week instead, whenever they run.
+    """
+    from apps.workspaces.models import Workspace
+
+    return autopilot.next_week_start(Workspace(timezone="Asia/Kolkata"))
+
+
 def plan_job(world, **input_):
     week_start = autopilot.next_week_start(world.workspace)
     return engine.create(

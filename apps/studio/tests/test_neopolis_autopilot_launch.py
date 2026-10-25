@@ -1,7 +1,7 @@
 """Real Neopolis planning/feed/recovery paths, with paid providers replaced by fakes."""
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timedelta
+from datetime import datetime, time, timedelta
 from threading import Barrier
 from time import sleep
 from zoneinfo import ZoneInfo
@@ -14,11 +14,12 @@ from apps.composer.models import PlatformPost
 from apps.studio import autopilot, budget, engine, pipeline, services
 from apps.studio.models import AgencyJob, AgencySettings, AutopilotWeek, StudioBrief
 from apps.studio.tests.conftest import make_brief, run_all
-from apps.studio.tests.test_insights import agency_settings, drive, install_fake_agency, overspend
+from apps.studio.tests.test_insights import agency_settings, drive, install_fake_agency, next_monday, overspend
 
 pytestmark = pytest.mark.django_db(transaction=True)
-FRIDAY = datetime(2026, 10, 16, 17, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
-MONDAY = date(2026, 10, 19)
+# Next week's Monday from today, in the workspace's zone, and the Friday evening before it.
+MONDAY = next_monday()
+FRIDAY = datetime.combine(MONDAY - timedelta(days=3), time(17, 30), tzinfo=ZoneInfo("Asia/Kolkata"))
 
 
 @pytest.fixture
