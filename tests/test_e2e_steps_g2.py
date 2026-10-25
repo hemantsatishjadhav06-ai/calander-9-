@@ -1,8 +1,10 @@
 """The e2e steps for golden paths 2 and 3 (tests/e2e/server/steps/g2.py), under ``config.settings.test``.
 
-The fixtures change rows, so what they touch is pinned here: ``discard_open_briefs`` discards only
-the named workspace's open drafts, and ``onboarding_workspace`` makes a workspace with nothing but
-its owner. The probes follow a request from the person's message to the brief it started.
+The fixtures make fresh rows, so what they make is pinned here: ``team_workspace`` is a workspace of
+its own set up like the seeded workspace A (owner, editor and client, Instagram and LinkedIn, the
+brand profile, verified facts, the agency settings, a library image), and ``onboarding_workspace`` a
+workspace with nothing but its owner. The probes follow a request from the person's message to the
+brief it started.
 """
 
 from __future__ import annotations
@@ -52,32 +54,94 @@ def _brief(workspace_id: str, email: str, status: str, **fields: Any):
 
 
 @pytest.mark.django_db
-def test_discard_open_briefs_discards_only_that_workspaces_open_drafts(client, e2e_urls, seeded):
-    from apps.studio.models import StudioBrief
+def test_team_workspace_is_a_fresh_workspace_set_up_like_the_seeded_one(client, e2e_urls, seeded):
+    from apps.calendar.models import Queue
+    from apps.media_library.models import MediaAsset
+    from apps.members.models import OrgMembership, WorkspaceMembership
+    from apps.social_accounts.models import SocialAccount
+    from apps.studio.models import AgencySettings, BrandClaim, BrandProfile, StudioBrief
+    from apps.workspaces.models import Workspace
+    from tests.e2e.server import seed
 
-    status = StudioBrief.Status
-    open_a = [_brief(WORKSPACE_A, "owner@e2e.test", value) for value in (status.READY, status.WORKING, status.PLANNED)]
-    approved_a = _brief(WORKSPACE_A, "owner@e2e.test", status.APPROVED)
-    ready_b = _brief(WORKSPACE_B, "owner-b@e2e.test", status.READY)
+    rows_in_a = {
+        "members": WorkspaceMembership.objects.filter(workspace_id=WORKSPACE_A).count(),
+        "accounts": SocialAccount.objects.filter(workspace_id=WORKSPACE_A).count(),
+        "claims": BrandClaim.objects.filter(workspace_id=WORKSPACE_A).count(),
+        "assets": MediaAsset.objects.filter(workspace_id=WORKSPACE_A).count(),
+    }
 
-    response = _fixture(client, "discard_open_briefs", {"workspace_id": WORKSPACE_A})
+    first = _fixture(client, "team_workspace", {})
+    second = _fixture(client, "team_workspace", {}).json()
 
-    assert response.status_code == 200
-    assert response.json() == {"discarded": 3, "kept": 0}
-    for brief in open_a:
-        brief.refresh_from_db()
-        assert brief.status == status.DISCARDED
-    approved_a.refresh_from_db()
-    ready_b.refresh_from_db()
-    assert approved_a.status == status.APPROVED
-    assert ready_b.status == status.READY
+    assert first.status_code == 200
+    team = first.json()
+    assert team["workspace_id"] != second["workspace_id"]
+    assert {person["email"] for person in team["users"].values()}.isdisjoint(
+        person["email"] for person in second["users"].values()
+    )
+    workspace = Workspace.objects.get(pk=team["workspace_id"])
+    assert workspace.name == team["workspace_name"]
+    assert workspace.timezone == seed.TIMEZONE
+    assert workspace.approval_workflow_mode == Workspace.ApprovalWorkflowMode.REQUIRED_INTERNAL
+    assert workspace.require_dashboard_approval is True
+    assert workspace.organization_id not in {uuid.UUID(seeded["organisation_a"]), uuid.UUID(seeded["organisation_b"])}
+
+    members = {
+        str(user_id): role
+        for user_id, role in WorkspaceMembership.objects.filter(workspace=workspace).values_list(
+            "user_id", "workspace_role"
+        )
+    }
+    assert members == {team["users"][role]["id"]: role for role in ("owner", "editor", "client")}
+    org_roles = dict(
+        OrgMembership.objects.filter(organization_id=workspace.organization_id).values_list("user_id", "org_role")
+    )
+    assert {str(user_id): role for user_id, role in org_roles.items()} == {
+        team["users"]["owner"]["id"]: "owner",
+        team["users"]["editor"]["id"]: "member",
+        team["users"]["client"]["id"]: "member",
+    }
+    for role in ("owner", "editor", "client"):
+        session = _fixture(client, "session", {"email": team["users"][role]["email"]})
+        assert session.status_code == 200
+
+    accounts = SocialAccount.objects.filter(workspace=workspace).order_by("platform")
+    assert [(account.platform, account.connection_status) for account in accounts] == [
+        ("instagram", "connected"),
+        ("linkedin_company", "connected"),
+    ]
+    assert {account.platform: str(account.pk) for account in accounts} == {
+        platform: row["id"] for platform, row in team["accounts"].items()
+    }
+    assert Queue.objects.filter(social_account__in=accounts).count() == 2
+
+    agency = AgencySettings.objects.get(workspace=workspace)
+    assert str(agency.lead_id) == team["users"]["owner"]["id"]
+    assert agency.autopilot_enabled is False
+    assert agency.creation_mode == AgencySettings.CreationMode.CONFIRM
+    assert set(agency.accounts.all()) == set(accounts)
+    profile = BrandProfile.objects.get(workspace=workspace)
+    assert profile.audience and profile.voice and profile.default_cta
+    claims = BrandClaim.objects.filter(workspace=workspace)
+    assert sorted(claims.values_list("claim", flat=True)) == sorted(claim for _category, claim in seed.FACTS)
+    assert all(claim.verified_at is not None for claim in claims)
+    assert MediaAsset.objects.filter(workspace=workspace, title=seed.LIBRARY_ASSET_TITLE).count() == 1
+    assert not StudioBrief.objects.filter(workspace=workspace).exists()
+
+    # The seeded workspace A is left as it was.
+    assert rows_in_a == {
+        "members": WorkspaceMembership.objects.filter(workspace_id=WORKSPACE_A).count(),
+        "accounts": SocialAccount.objects.filter(workspace_id=WORKSPACE_A).count(),
+        "claims": BrandClaim.objects.filter(workspace_id=WORKSPACE_A).count(),
+        "assets": MediaAsset.objects.filter(workspace_id=WORKSPACE_A).count(),
+    }
 
 
 @pytest.mark.django_db
-def test_discard_open_briefs_refuses_a_bad_or_unknown_workspace(client, e2e_urls, seeded):
-    assert _fixture(client, "discard_open_briefs", {"workspace_id": "not-a-uuid"}).status_code == 400
-    unknown = _fixture(client, "discard_open_briefs", {"workspace_id": "00000000-0000-4000-8000-0000000000ff"})
-    assert unknown.status_code == 400
+def test_team_workspace_takes_no_options(client, e2e_urls, seeded):
+    response = _fixture(client, "team_workspace", {"workspace_id": WORKSPACE_A})
+
+    assert response.status_code == 400
 
 
 @pytest.mark.django_db

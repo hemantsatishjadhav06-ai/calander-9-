@@ -1,7 +1,7 @@
 """Steps for golden paths 2 and 3: asking the team from Home, and onboarding a fresh workspace.
 
-Fixtures: ``discard_open_briefs`` (a workspace's drafts left by earlier tests are discarded, as a
-person would discard them, so Today lists this test's own) and ``onboarding_workspace`` (a fresh
+Fixtures: ``team_workspace`` (a workspace of its own, set up like the seeded workspace A, so what
+other tests leave in A never reaches this test's Today card) and ``onboarding_workspace`` (a fresh
 organisation and workspace with only its owner: no accounts, no lead, no agency settings).
 
 Probes: ``home_request`` (one request typed in a workspace's team thread, followed through the
@@ -12,6 +12,7 @@ the onboarding steps leave on a workspace: the brand name, its accounts, the lea
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from typing import Any
 
 from .. import seed
@@ -41,32 +42,102 @@ def _email(user: Any) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-@fixture("discard_open_briefs")
-def discard_open_briefs(payload: dict[str, Any]) -> dict[str, Any]:
-    """Discard the workspace's drafts that are planned, in the works or waiting for review.
+@fixture("team_workspace")
+def team_workspace(payload: dict[str, Any]) -> dict[str, Any]:
+    """A workspace of its own, set up like the seeded workspace A (``{}`` -> its ids and people).
 
-    Today shows the first three drafts waiting, earliest proposed time first, and the scheduler gives
-    each new draft the next free slot; drafts earlier tests left would push this test's own off the
-    card. They are discarded the way a person discards them (``services.discard``); a draft that was
-    approved or has a delivery to resolve is left as it is (it is not waiting anyway).
+    Its own organisation; an owner (the lead and an approver), an editor and a client, each with a
+    fresh address; connected Instagram and LinkedIn company accounts with their queues; the brand
+    profile, the verified facts, the agency settings (autopilot off, the brief shown first) and a
+    library image, as :func:`seed.run` makes them. Today's card and the scheduler's free slots then
+    hold only what this test makes, whatever other tests left in workspace A.
     """
-    from apps.studio import services
-    from apps.studio.models import StudioBrief
+    from django.utils import timezone
+
+    from apps.calendar.services import create_default_queue_and_slots
+    from apps.members.models import OrgMembership, WorkspaceMembership
+    from apps.organizations.models import Organization
+    from apps.social_accounts.models import SocialAccount
+    from apps.studio.brand_defaults import ensure_profile
+    from apps.studio.models import AgencySettings, BrandClaim
     from apps.workspaces.models import Workspace
 
-    workspace_id = _uuid(payload, "workspace_id")
-    if not Workspace.objects.filter(pk=workspace_id).exists():
-        raise PayloadError(f"No workspace {workspace_id}.")
-    open_statuses = (StudioBrief.Status.PLANNED, *StudioBrief.ACTIVE_STATUSES, StudioBrief.Status.READY)
-    discarded, kept = 0, 0
-    for brief in StudioBrief.objects.filter(workspace_id=workspace_id, status__in=open_statuses):
-        try:
-            services.discard(brief)
-        except services.StudioActionError:
-            kept += 1
-        else:
-            discarded += 1
-    return {"discarded": discarded, "kept": kept}
+    if payload:
+        raise PayloadError("team_workspace takes no options: send {}.")
+    suffix = uuid.uuid4().hex[:8]
+    now = timezone.now()
+    org = Organization.objects.create(name=f"Team {suffix}", default_timezone=seed.TIMEZONE)
+    workspace = Workspace.objects.create(
+        organization=org,
+        name=f"Kokapet {suffix}",
+        timezone=seed.TIMEZONE,
+        approval_workflow_mode=Workspace.ApprovalWorkflowMode.REQUIRED_INTERNAL,
+        require_dashboard_approval=True,
+    )
+    people = {}
+    for role, name, org_role in (
+        ("owner", "Tara Owner", OrgMembership.OrgRole.OWNER),
+        ("editor", "Ezra Editor", OrgMembership.OrgRole.MEMBER),
+        ("client", "Chandra Client", OrgMembership.OrgRole.MEMBER),
+    ):
+        person = seed._person(f"{role}-{suffix}@team.e2e.test", name)
+        OrgMembership.objects.create(user=person, organization=org, org_role=org_role)
+        WorkspaceMembership.objects.create(user=person, workspace=workspace, workspace_role=role)
+        person.last_workspace_id = workspace.pk
+        person.save(update_fields=["last_workspace_id"])
+        people[role] = person
+
+    accounts = {}
+    for platform in ("instagram", "linkedin_company"):
+        name, handle, platform_id = seed.ACCOUNTS[platform]
+        account = SocialAccount(
+            workspace=workspace,
+            platform=platform,
+            account_platform_id=f"{platform_id}-{suffix}",
+            account_name=name,
+            account_handle=handle,
+            connection_status=SocialAccount.ConnectionStatus.CONNECTED,
+            oauth_access_token=f"e2e-token-{platform}-{suffix}",
+            follower_count=1500,
+        )
+        # Connected long ago, as in the seed: no first-connect analytics backfill (only the mock would answer).
+        account.__dict__["_skip_analytics_backfill"] = True
+        account.save()
+        create_default_queue_and_slots(account)
+        accounts[platform] = account
+
+    owner = people["owner"]
+    profile = ensure_profile(workspace)
+    profile.audience = "Families buying their first home in West Hyderabad"
+    profile.voice = "Warm, plain and specific. No hype."
+    profile.default_cta = "WhatsApp the sales office for the availability list"
+    profile.save()
+    for category, claim in seed.FACTS:
+        BrandClaim.objects.create(
+            workspace=workspace,
+            category=category,
+            claim=claim,
+            source_note="Confirmed by the sales office",
+            verified_by=owner,
+            verified_at=now,
+            valid_until=(now + timedelta(days=90)).date(),
+        )
+    agency, _created = AgencySettings.objects.get_or_create(workspace=workspace)
+    agency.lead = owner
+    agency.autopilot_enabled = False
+    agency.creation_mode = AgencySettings.CreationMode.CONFIRM
+    agency.save()
+    agency.accounts.set(accounts.values())
+    seed._library_image(org, workspace, owner)
+    return {
+        "workspace_id": str(workspace.pk),
+        "workspace_name": workspace.name,
+        "users": {role: {"id": str(person.pk), "email": person.email} for role, person in people.items()},
+        "accounts": {
+            platform: {"id": str(account.pk), "platform_id": account.account_platform_id, "name": account.account_name}
+            for platform, account in accounts.items()
+        },
+    }
 
 
 @fixture("onboarding_workspace")
