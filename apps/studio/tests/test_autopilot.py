@@ -6,6 +6,7 @@ import zoneinfo
 from datetime import date, datetime, timedelta
 
 import pytest
+import time_machine
 from django.urls import reverse
 from django.utils import timezone
 
@@ -32,6 +33,13 @@ IST = zoneinfo.ZoneInfo("Asia/Kolkata")
 #: A Friday after the plan hour (Friday 16:00 by default), and the Monday it plans for.
 FRIDAY_EVENING = datetime(2026, 10, 16, 17, 30, tzinfo=IST)
 NEXT_MONDAY = date(2026, 10, 19)
+
+
+@pytest.fixture(autouse=True)
+def at_the_friday_tick():
+    """Every test runs at FRIDAY_EVENING, so NEXT_MONDAY's week is still ahead of the clock whatever today's date is."""
+    with time_machine.travel(FRIDAY_EVENING):
+        yield
 
 
 def _url(name, world, **kwargs):
