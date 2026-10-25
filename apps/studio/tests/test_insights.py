@@ -11,8 +11,10 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
+import time_machine
 from django.utils import timezone
 
 from apps.composer.models import PlatformPost, Post, PostMedia
@@ -488,6 +490,8 @@ def test_without_web_search_the_scout_says_dates_may_be_uncertain(world, agency)
     assert agency.calls["trend_scout"][0]["research"] is None
 
 
+# Early in the month, so this week's share of the month's quota is the same whatever today's date is.
+@time_machine.travel(datetime(2026, 10, 5, 10, 0, tzinfo=ZoneInfo("Asia/Kolkata")))
 def test_the_plan_queues_the_months_articles_for_the_seo_team(world, agency):
     from apps.blog.models import BlogSite
 
@@ -503,7 +507,7 @@ def test_the_plan_queues_the_months_articles_for_the_seo_team(world, agency):
 
     job = drive(plan_job(world))
 
-    children = list(AgencyJob.objects.filter(parent=job, kind="blog"))
+    children = list(AgencyJob.objects.filter(parent=job, kind="blog").order_by("created_at", "pk"))
     assert 1 <= len(children) <= 2
     child = children[0]
     assert child.input == {
