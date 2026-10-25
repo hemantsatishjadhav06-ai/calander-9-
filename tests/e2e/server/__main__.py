@@ -1,14 +1,17 @@
 """Start the e2e server: ``python -m tests.e2e.server [--reset] [--port N] [--no-worker] [--static manifest]``.
 
 In order: the settings and database guards (``config.settings.e2e`` only, a database named ``*_e2e``
-on this machine only, refused before a single statement runs); the fakes, the provider mock and the socket guard;
+on this machine only, by ``DB_HOST`` and by every libpq variable that could move it, refused before a
+single statement runs); the fakes, the provider mock and the socket guard;
 with ``--reset``, the database dropped and re-created, migrated and seeded; with ``--static
 manifest``, ``collectstatic`` into ``e2e_media/static`` for the compressed manifest storage; the
 worker thread (unless ``--no-worker``); then ``runserver`` on 127.0.0.1 without the reloader (the
 fakes and the worker live in this one process).
 
 Environment: ``E2E_PORT`` (default 8150), ``DB_NAME`` (default ``brightbean_e2e``), and the usual
-``DB_USER``, ``DB_PASSWORD``, ``DB_HOST``, ``DB_PORT``. The flags decide ``E2E_STATIC`` and
+``DB_USER``, ``DB_PASSWORD``, ``DB_HOST``, ``DB_PORT``; libpq's ``PGHOSTADDR`` and ``PGSERVICE``,
+and a ``PGHOST`` off this machine while ``DB_HOST`` is empty, are refused, because libpq would take
+the database's address from them. The flags decide ``E2E_STATIC`` and
 ``E2E_BASE_URL`` (kept only when it names this server's port), so a value left in the shell by an
 earlier run never changes this one.
 """
@@ -50,6 +53,7 @@ def reset_database() -> None:
     name = database["NAME"]
     guard.assert_e2e_database(name)
     guard.assert_local_database_host(database.get("HOST"))
+    guard.assert_local_libpq_environment(database.get("HOST"))
     params = {
         "dbname": "postgres",
         "user": database.get("USER"),
@@ -97,6 +101,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         guard.assert_e2e_settings()
         guard.assert_e2e_database(settings.DATABASES["default"]["NAME"])
         guard.assert_local_database_host(settings.DATABASES["default"].get("HOST"))
+        # After django.setup(): base has loaded .env into the environment libpq reads.
+        guard.assert_local_libpq_environment(settings.DATABASES["default"].get("HOST"))
     except guard.GuardError as exc:
         print(f"e2e server: {exc}", file=sys.stderr)
         return 2

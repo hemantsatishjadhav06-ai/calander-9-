@@ -150,6 +150,59 @@ def test_database_host_guard_allows_this_machine_only():
             guard.assert_local_database_host(host)
 
 
+@pytest.mark.parametrize(
+    ("host", "environ"),
+    [
+        ("localhost", {}),
+        # An explicit DB_HOST wins over PGHOST, so a shell set up for psql against another server is fine.
+        ("localhost", {"PGHOST": "192.0.2.1"}),
+        ("/var/run/postgresql", {"PGHOST": "db.e2e.invalid"}),
+        # With DB_HOST empty, libpq takes the host from PGHOST: this machine only.
+        ("", {}),
+        ("", {"PGHOST": "localhost"}),
+        ("", {"PGHOST": "/var/run/postgresql"}),
+        # libpq ignores an empty PGHOSTADDR; PGSERVICEFILE alone names no service.
+        ("localhost", {"PGHOSTADDR": "", "PGSERVICEFILE": "/nonexistent/pg_service.conf"}),
+    ],
+)
+def test_libpq_environment_guard_allows_a_connection_that_stays_here(host, environ):
+    from tests.e2e.server import guard
+
+    guard.assert_local_libpq_environment(host, environ)
+
+
+@pytest.mark.parametrize(
+    ("host", "environ", "named"),
+    [
+        # libpq connects to PGHOSTADDR whatever host it is given.
+        ("localhost", {"PGHOSTADDR": "192.0.2.1"}, "PGHOSTADDR"),
+        ("/var/run/postgresql", {"PGHOSTADDR": "127.0.0.1"}, "PGHOSTADDR"),
+        # A service entry can carry its own host or address.
+        ("localhost", {"PGSERVICE": "e2e_remote"}, "PGSERVICE"),
+        # With DB_HOST empty, Django and reset_database leave the host out and libpq reads PGHOST.
+        ("", {"PGHOST": "192.0.2.1"}, "PGHOST"),
+        ("", {"PGHOST": "db.e2e.invalid"}, "PGHOST"),
+        ("", {"PGHOST": "localhost,192.0.2.1"}, "PGHOST"),
+    ],
+)
+def test_libpq_environment_guard_refuses_variables_that_send_the_connection_elsewhere(host, environ, named):
+    from tests.e2e.server import guard
+
+    with pytest.raises(guard.GuardError, match=named):
+        guard.assert_local_libpq_environment(host, environ)
+
+
+def test_host_guards_refuse_a_socket_directory_followed_by_another_host():
+    # libpq splits a host on commas and tries each in turn: a socket path first does not keep it here.
+    from tests.e2e.server import guard
+
+    for host in ("/var/run/postgresql,192.0.2.1", "/tmp,db.e2e.invalid"):
+        with pytest.raises(guard.GuardError):
+            guard.assert_local_database_host(host)
+        with pytest.raises(guard.GuardError, match="PGHOST"):
+            guard.assert_local_libpq_environment("", {"PGHOST": host})
+
+
 def test_settings_guard_refuses_the_test_settings():
     from tests.e2e.server import guard
 
@@ -175,6 +228,33 @@ def test_reset_is_refused_before_any_connection(monkeypatch, settings):
     settings.SETTINGS_MODULE = E2E_SETTINGS
     assert not settings.DATABASES["default"]["NAME"].endswith("_e2e")
     with pytest.raises(guard.GuardError):
+        server_main.reset_database()
+
+
+@pytest.mark.parametrize(
+    ("host", "variable", "value"),
+    [("localhost", "PGHOSTADDR", "192.0.2.1"), ("", "PGHOST", "192.0.2.1"), ("localhost", "PGSERVICE", "e2e_remote")],
+)
+def test_reset_is_refused_before_any_connection_when_libpq_would_go_elsewhere(
+    monkeypatch, settings, host, variable, value
+):
+    import psycopg
+
+    from tests.e2e.server import __main__ as server_main
+    from tests.e2e.server import guard
+
+    def no_connection(*args, **kwargs):
+        raise AssertionError("reset_database connected although the libpq guard should have refused")
+
+    monkeypatch.setattr(psycopg, "connect", no_connection)
+    settings.SETTINGS_MODULE = E2E_SETTINGS
+    # Replaced, not edited in place: the test database's connection keeps its own settings.
+    database = {**django_settings.DATABASES["default"], "NAME": "brightbean_libpq_e2e", "HOST": host}
+    monkeypatch.setattr(django_settings, "DATABASES", {"default": database})
+    for name in ("PGHOST", "PGHOSTADDR", "PGSERVICE"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(variable, value)
+    with pytest.raises(guard.GuardError, match=variable):
         server_main.reset_database()
 
 
@@ -268,6 +348,42 @@ def test_server_command_refuses_a_database_host_off_this_machine():
     assert result.returncode == 2, result.stderr[-2000:]
     assert "db.e2e.invalid" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("db_host", "variable", "value"),
+    [
+        # libpq connects to PGHOSTADDR whatever DB_HOST says, and in C, where the socket guard cannot see it.
+        ("localhost", "PGHOSTADDR", "192.0.2.1"),
+        # DB_HOST empty is a local socket only while PGHOST does not name another machine.
+        ("", "PGHOST", "192.0.2.1"),
+        ("localhost", "PGSERVICE", "e2e_remote"),
+    ],
+)
+def test_server_command_refuses_libpq_variables_that_send_the_database_elsewhere(db_host, variable, value):
+    env = _server_env(
+        DJANGO_SETTINGS_MODULE=E2E_SETTINGS,
+        DB_NAME="brightbean_libpqcheck_e2e",
+        DB_HOST=db_host,
+        # Bounds a regression to seconds instead of a hang on an address that answers nothing.
+        PGCONNECT_TIMEOUT="3",
+    )
+    for name in ("PGHOST", "PGHOSTADDR", "PGSERVICE"):
+        env.pop(name, None)
+    env[variable] = value
+    result = subprocess.run(
+        [sys.executable, "-m", "tests.e2e.server", "--reset", "--no-worker"],
+        cwd=REPO,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 2, result.stderr[-2000:]
+    assert variable in result.stderr
+    assert "Traceback" not in result.stderr
+    assert "connection to server" not in result.stderr
+    assert "[e2e]" not in result.stdout  # refused before the fakes, the guard or a single statement
 
 
 def test_server_command_without_reset_says_so_when_the_database_is_missing():

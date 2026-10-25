@@ -5,8 +5,11 @@ Installed by ``__main__`` before the seed runs, it replaces ``socket.socket.conn
 allowed port (the database, the server itself) goes through; every other connection, whatever host
 or port, and every name lookup outside the machine is refused and recorded, with a short stack tail,
 for the ``refused_network`` probe. The database driver resolves its host through ``getaddrinfo``
-and then connects in C, so the database's host name may be *looked up* by name; ``__main__`` refuses
-to start unless that host is this machine.
+and then connects in C, so the database's host name may be *looked up* by name, and this guard never
+sees where libpq actually connects. ``__main__`` therefore refuses to start, before the first
+statement, unless that destination is this machine: ``DB_HOST`` loopback or a local socket, and no
+libpq variable that would move it (``PGHOSTADDR``, ``PGSERVICE``, or ``PGHOST`` while ``DB_HOST``
+is empty; see ``guard.assert_local_libpq_environment``).
 """
 
 from __future__ import annotations
