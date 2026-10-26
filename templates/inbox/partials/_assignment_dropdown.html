@@ -1,7 +1,7 @@
 <!-- Assignment menu -->
 <div x-data="{ assignOpen: false }" class="relative">
     <button type="button" aria-haspopup="true" :aria-expanded="assignOpen" @click="assignOpen = !assignOpen"
-            class="ui-btn ui-btn-ghost ui-btn-sm !px-2"
+            class="ui-btn ui-btn-ghost ui-btn-sm !px-2" data-testid="inbox-assign-toggle"
             {% if message.assigned_to %}aria-label="Assigned to {{ message.assigned_to.get_short_name|default:message.assigned_to.email }}. Change"{% endif %}>
         {% if message.assigned_to %}
         <span class="grid size-5 flex-shrink-0 place-items-center rounded-full bg-ink-900 text-[11px] font-semibold text-white" aria-hidden="true">
@@ -35,13 +35,14 @@
                 hx-target="#inbox-detail-panel"
                 hx-swap="innerHTML"
                 @click="assignOpen = false"
-                class="ui-menu-item {% if message.assigned_to and message.assigned_to.id == membership.user.id %}font-semibold{% endif %}">
+                class="ui-menu-item {% if message.assigned_to and message.assigned_to.id == membership.user.id %}font-semibold{% endif %}"
+                data-testid="inbox-assignee-{{ membership.user.id }}">
             <span class="grid size-5 flex-shrink-0 place-items-center rounded-full bg-ink-100 text-[11px] font-semibold text-ink-700" aria-hidden="true">
                 {{ membership.user.email|make_list|first|upper }}
             </span>
             <span class="flex-1 truncate">{{ membership.user.get_short_name|default:membership.user.email }}</span>
             {% if message.assigned_to and message.assigned_to.id == membership.user.id %}
-            <svg aria-label="Assigned" class="!text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            <svg aria-label="Assigned" data-testid="inbox-assignee-current" class="!text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
             {% endif %}
         </button>
         {% endfor %}

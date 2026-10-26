@@ -1,5 +1,5 @@
 {% load humanize %}
-<div class="flex justify-end">
+<div class="flex justify-end" data-testid="inbox-thread-reply-{{ reply.id }}">
     <div class="max-w-[85%] min-w-0">
         <p class="mb-1 text-right text-caption text-ink-500">
             <span class="font-medium text-ink-700">{{ reply.author.get_short_name|default:reply.author.email }}</span>
