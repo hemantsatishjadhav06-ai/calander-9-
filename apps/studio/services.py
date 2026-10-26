@@ -97,6 +97,27 @@ def reopen(brief: StudioBrief) -> bool:
     return can_revise(brief)
 
 
+def reopen_sent_back(brief: StudioBrief) -> bool:
+    """Reopen an approved brief only when a reviewer withdrew its approval. True when it was reopened.
+
+    A reviewer asking for changes or rejecting the post (at the client stage, say) clears the
+    approval on the way (``gate.CLEARING_STATUSES``); then :func:`reopen` may hand the brief back
+    to the team. Any other way back to a revisable status keeps the brief approved and closed:
+    unscheduling on the calendar, for one, moves a channel back to draft with its approval kept.
+    """
+    if brief.status != StudioBrief.Status.APPROVED or brief.post_id is None:
+        return False
+    from apps.approvals import gate
+    from apps.composer.models import PlatformPost
+
+    if not post_statuses(brief) & gate.CLEARING_STATUSES:
+        return False
+    if PlatformPost.objects.filter(post_id=brief.post_id).exclude(approved_fingerprint="").exists():
+        return False
+    reopen(brief)
+    return brief.status == StudioBrief.Status.READY
+
+
 def create_brief(
     workspace,
     author,

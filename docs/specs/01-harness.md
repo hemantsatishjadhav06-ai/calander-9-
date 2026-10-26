@@ -132,10 +132,13 @@ Telegram host; a test that tries a real provider call fails loudly.
 
 **R3. A seeded world.** On `--reset` the server seeds: an organisation with workspace A (fixed
 UUID, Asia/Kolkata, `required_internal`, dashboard approval required) and workspace B (fixed UUID,
-another owner), a two-stage workspace for paths 6 and 8, the users owner, manager, editor and client
-of A (terms accepted, landing on A, no auto-created "My Workspace"), connected LinkedIn company and
-Instagram accounts, the brand profile, verified facts, agency settings with the owner as lead, a
-library image, and the Facebook account path 9 needs.
+another owner), the users owner, manager, editor and client of A (terms accepted, landing on A, no
+auto-created "My Workspace"), connected LinkedIn company and Instagram accounts, the brand profile,
+verified facts, agency settings with the owner as lead, a library image, and the Facebook account
+path 9 needs. The two-stage workspace paths 6 and 8 run on is not seeded: as `phase-1.md` Task 4
+says, each of those tests makes its own with a fixture (`two_stage_brief`, `client_stage_post` in
+`tests/e2e/server/steps/g4.py`: its own organisation, owner, client, LinkedIn account, brand and
+agency settings), so neither depends on what another test did to a shared one.
 
 **R4. Named fixtures and probes, no arbitrary code.** The harness serves
 `/__e2e__/fixture/<name>` (POST, creates fresh rows for one test and returns their ids) and

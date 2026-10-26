@@ -46,7 +46,7 @@
             <!-- Desktop tabs -->
             <nav aria-label="Client portal" class="ui-tabs -mb-px hidden border-b-0 lg:flex">
                 <a href="{% url 'client_portal:dashboard' %}" class="ui-tab" {% if url_name == 'dashboard' %}aria-current="page"{% endif %}>Home</a>
-                <a href="{% url 'client_portal:approval_queue' %}" class="ui-tab" {% if url_name == 'approval_queue' %}aria-current="page"{% endif %}>Approvals</a>
+                <a href="{% url 'client_portal:approval_queue' %}" class="ui-tab" data-testid="portal-nav-approvals" {% if url_name == 'approval_queue' %}aria-current="page"{% endif %}>Approvals</a>
                 <a href="{% url 'client_portal:team' %}" class="ui-tab [&>span:empty]:hidden" {% if url_name == 'team' %}aria-current="page"{% endif %}>
                     Talk to the team
                     <span id="team-unread-desktop" hx-get="{% url 'client_portal:team_unread' %}" hx-trigger="load" hx-swap="outerHTML"></span>
@@ -60,7 +60,7 @@
             <!-- Phone and tablet tabs (scroll sideways) -->
             <nav aria-label="Client portal" class="ui-tabs -mx-4 -mb-px gap-5 border-b-0 px-4 sm:-mx-6 sm:px-6 lg:hidden">
                 <a href="{% url 'client_portal:dashboard' %}" class="ui-tab h-11 flex-shrink-0" {% if url_name == 'dashboard' %}aria-current="page"{% endif %}>Home</a>
-                <a href="{% url 'client_portal:approval_queue' %}" class="ui-tab h-11 flex-shrink-0" {% if url_name == 'approval_queue' %}aria-current="page"{% endif %}>Approvals</a>
+                <a href="{% url 'client_portal:approval_queue' %}" class="ui-tab h-11 flex-shrink-0" data-testid="portal-nav-approvals" {% if url_name == 'approval_queue' %}aria-current="page"{% endif %}>Approvals</a>
                 <a href="{% url 'client_portal:team' %}" class="ui-tab h-11 flex-shrink-0 [&>span:empty]:hidden" {% if url_name == 'team' %}aria-current="page"{% endif %}>
                     Talk to the team
                     <span id="team-unread-mobile"></span>
