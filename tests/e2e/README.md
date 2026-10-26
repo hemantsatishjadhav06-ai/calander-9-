@@ -7,7 +7,8 @@ against (`tests/e2e/server/`, Python). Spec: [`docs/specs/01-harness.md`](../../
 tests/e2e/
   server/      python -m tests.e2e.server: web app + worker in one process, fakes, mocks, seed, fixtures
   support/     test.ts (test, expect and the fixtures below), harness.ts, axe.ts, network.ts,
-               poll.ts (until: read a probe until the worker is done), global-setup.ts (the end-of-run
+               poll.ts (until: read a probe until the worker is done), settled.ts (wait for a swap or a
+               fade to finish), global-setup.ts (the end-of-run
                network check)
   self/        the harness's own checks (axe helper, network guard, session fixture)
   golden/      the golden paths, one file each (NN-name.spec.ts)
@@ -121,6 +122,12 @@ test('…', async ({ page, harness, as, axe, network }) => {
 - **Axe** on every screen a test reaches and on each dialog it opens; it fails on serious or critical
   violations with the rule, impact, element and help page. It waits for running transitions first
   (up to 3 s), so a menu that fades in is checked at its final colours. Fix the template, not the check.
+  axe counts opacity in colour contrast, so after an htmx swap, a toast or a dialog that fades in, a
+  test can also `await settled(locator, 'what')` (`support/settled.ts`): the element and its
+  ancestors fully opaque and no finite animation still running.
+- **After an action, wait for its answer:** register `page.waitForResponse(...)` before the click or
+  drop, check its status, then probe once. A view that writes in several statements answers only
+  when all are done; polling a probe can catch the first write alone.
 - **Outcomes in the database:** assert through probes, not only on the page.
 - **Network:** every browser request to another host is aborted (`network.blocked` lists them). A
   route only ever sees the first URL of a redirect chain, so a server redirect to another host would

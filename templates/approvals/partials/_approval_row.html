@@ -6,12 +6,13 @@ schedules the exact proposed time, and only a person can press either.
 {% endcomment %}
 {% load tz approval_extras %}
 <div class="bg-white border border-ink-200 rounded-xl shadow-xs transition-colors hover:border-ink-300"
+     data-testid="approvals-row-{{ post.id }}"
      x-data="{ expanded: false, panel: null, comment: '' }">
     <div class="flex flex-wrap sm:flex-nowrap items-start gap-3 p-4">
         {% if can_approve %}
         {% if post.is_actionable %}
         <label class="-m-2 p-2 flex-shrink-0 cursor-pointer self-start mt-2">
-            <input type="checkbox" :value="'{{ post.id }}'" x-model="selectedPosts" aria-label="Select post"
+            <input type="checkbox" :value="'{{ post.id }}'" x-model="selectedPosts" aria-label="Select post" data-testid="approvals-row-select"
                    class="ui-checkbox block cursor-pointer">
         </label>
         {% else %}
@@ -55,7 +56,7 @@ schedules the exact proposed time, and only a person can press either.
             <div class="mt-1.5 flex items-center gap-2 text-xs text-ink-500">
                 <span>By {{ post.author.display_name|default:"Unknown" }}</span>
                 <span aria-hidden="true" class="text-ink-400">·</span>
-                <button type="button" @click="expanded = !expanded" :aria-expanded="expanded.toString()"
+                <button type="button" @click="expanded = !expanded" :aria-expanded="expanded.toString()" data-testid="approvals-row-details"
                         class="relative inline-flex items-center gap-0.5 font-medium text-ink-600 hover:text-ink-900 rounded min-h-6 max-lg:before:absolute max-lg:before:inset-x-0 max-lg:before:-inset-y-2.5">
                     <span x-text="expanded ? 'Hide details' : 'Details'">Details</span>
                     <svg class="w-3 h-3 transition-transform duration-200" :class="expanded && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
@@ -121,7 +122,7 @@ schedules the exact proposed time, and only a person can press either.
                 </div>
                 {% endif %}
                 {% if post.versions.all|length >= 2 %}
-                <button type="button" hx-get="{% url 'approvals:version_diff' workspace_id=workspace.id post_id=post.id %}"
+                <button type="button" hx-get="{% url 'approvals:version_diff' workspace_id=workspace.id post_id=post.id %}" data-testid="approvals-row-view-changes"
                         hx-target="#diff-modal-body" hx-swap="innerHTML" @click="diffOpen = true"
                         class="ui-link inline-flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path d="M12 3v12"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6a3 3 0 003 3h6"/></svg>
@@ -136,30 +137,33 @@ schedules the exact proposed time, and only a person can press either.
         <div class="flex flex-wrap items-center justify-end gap-1.5 w-full sm:w-auto sm:flex-shrink-0">
             {% if post.proposed_publish_at or post.scheduled_at %}
             <button type="button" hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-vals='{"schedule": "1"}' hx-swap="none" hx-disabled-elt="this"
+                    data-testid="approvals-row-approve-schedule"
                     title="Approve this exact content and schedule it for the proposed time"
                     class="ui-btn ui-btn-tinted ui-btn-sm max-sm:flex-1">Approve &amp; schedule</button>
             <button type="button" hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-swap="none" hx-disabled-elt="this"
+                    data-testid="approvals-row-approve"
                     title="Approve without scheduling it"
                     class="ui-btn ui-btn-ghost ui-btn-sm">Approve</button>
             {% else %}
             <button type="button" hx-post="{% url 'approvals:approve' workspace_id=workspace.id post_id=post.id %}" hx-swap="none" hx-disabled-elt="this"
+                    data-testid="approvals-row-approve"
                     class="ui-btn ui-btn-tinted ui-btn-sm max-sm:flex-1">Approve</button>
             {% endif %}
-            <button type="button" @click="panel = panel ? null : 'changes'" :aria-expanded="(!!panel).toString()"
+            <button type="button" @click="panel = panel ? null : 'changes'" :aria-expanded="(!!panel).toString()" data-testid="approvals-row-review"
                     class="ui-btn ui-btn-ghost ui-btn-sm"
                     :class="panel && 'bg-ink-100 text-ink-900'">Review</button>
         </div>
         {% elif post.status == 'changes_requested' or post.status == 'rejected' or post.status == 'approved' %}
         <div class="flex items-center gap-1.5 flex-shrink-0 max-sm:w-full max-sm:justify-end">
             {# The brand tint is kept for approving; editing is an ordinary act. #}
-            <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=post.id %}"
+            <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=post.id %}" data-testid="approvals-row-edit"
                class="ui-btn ui-btn-secondary ui-btn-sm">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit
             </a>
         </div>
         {% elif post.status == 'on_hold' and can_approve %}
         <div class="flex items-center gap-1.5 flex-shrink-0 max-sm:w-full max-sm:justify-end">
-            <button type="button" hx-post="{% url 'approvals:resume' workspace_id=workspace.id post_id=post.id %}" hx-swap="none"
+            <button type="button" hx-post="{% url 'approvals:resume' workspace_id=workspace.id post_id=post.id %}" hx-swap="none" data-testid="approvals-row-resume"
                     class="ui-btn ui-btn-secondary ui-btn-sm">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> Resume
             </button>
@@ -172,22 +176,22 @@ schedules the exact proposed time, and only a person can press either.
     <div x-show="panel" x-cloak class="px-4 pb-4 anim-collapse">
         <div class="pt-4 border-t border-ink-200">
             <div class="ui-segmented mb-3" role="group" aria-label="Review outcome">
-                <button type="button" @click="panel = 'changes'" class="ui-segment" :class="panel === 'changes' && 'is-active'" :aria-pressed="(panel === 'changes').toString()">Request changes</button>
-                <button type="button" @click="panel = 'reject'" class="ui-segment" :class="panel === 'reject' && 'is-active'" :aria-pressed="(panel === 'reject').toString()">Reject</button>
+                <button type="button" @click="panel = 'changes'" data-testid="approvals-row-request-changes" class="ui-segment" :class="panel === 'changes' && 'is-active'" :aria-pressed="(panel === 'changes').toString()">Request changes</button>
+                <button type="button" @click="panel = 'reject'" data-testid="approvals-row-reject" class="ui-segment" :class="panel === 'reject' && 'is-active'" :aria-pressed="(panel === 'reject').toString()">Reject</button>
             </div>
-            <textarea id="review-comment-{{ post.id }}" name="comment" x-model="comment" rows="2" aria-label="Review comment"
+            <textarea id="review-comment-{{ post.id }}" name="comment" x-model="comment" rows="2" aria-label="Review comment" data-testid="approvals-row-review-comment"
                       :placeholder="panel === 'reject' ? 'Reason for rejection (required), shared with the creator…' : 'What needs to change? (required)…'"
                       class="ui-input resize-none"></textarea>
             <div class="flex flex-wrap items-center gap-2 mt-3">
-                <button type="button" x-show="panel === 'changes'"
+                <button type="button" x-show="panel === 'changes'" data-testid="approvals-row-send-back"
                         hx-post="{% url 'approvals:request_changes' workspace_id=workspace.id post_id=post.id %}"
                         hx-include="#review-comment-{{ post.id }}" hx-swap="none" :disabled="!comment.trim()"
                         class="ui-btn ui-btn-primary ui-btn-sm">Send back for changes</button>
-                <button type="button" x-show="panel === 'reject'"
+                <button type="button" x-show="panel === 'reject'" data-testid="approvals-row-reject-post"
                         hx-post="{% url 'approvals:reject' workspace_id=workspace.id post_id=post.id %}"
                         hx-include="#review-comment-{{ post.id }}" hx-swap="none" :disabled="!comment.trim()"
                         class="ui-btn ui-btn-danger ui-btn-sm disabled:bg-ink-100 disabled:text-ink-500 disabled:shadow-none">Reject post</button>
-                <button type="button" @click="panel = null; comment = ''" class="ui-btn ui-btn-ghost ui-btn-sm">Cancel</button>
+                <button type="button" @click="panel = null; comment = ''" data-testid="approvals-row-cancel" class="ui-btn ui-btn-ghost ui-btn-sm">Cancel</button>
                 <span x-show="!comment.trim()" class="text-xs text-ink-500 sm:ml-auto">A comment is required</span>
             </div>
         </div>

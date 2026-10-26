@@ -12,6 +12,7 @@ tear down the toast.
      hx-trigger="approvalAction from:body, bulkActionComplete from:body"
      hx-get="{% url 'calendar:publish_tab_approvals' workspace_id=workspace.id %}?approval_status={{ status_filter }}{% if approval_filter_qs %}&{{ approval_filter_qs }}{% endif %}"
      hx-target="#tab-content" hx-swap="innerHTML"
+     data-testid="approvals-list"
      {% if is_htmx %}class="tab-slide-in"{% endif %}>
 
     {# filter chips: selected is ink, never the accent #}
