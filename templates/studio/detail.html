@@ -19,7 +19,7 @@
             <h1 class="ui-page-title break-words">{{ brief.title }}</h1>
             <p class="mt-1.5 text-body-lg text-ink-600 break-words"><span class="font-medium text-ink-800">From the idea:</span> {{ brief.idea }}</p>
             {% if brief.get_origin_display and brief.origin != 'manual' %}<p class="text-[13px] text-ink-500 mt-1">{{ brief.get_origin_display }}{% if brief.requested_by %} — asked for by {{ brief.requested_by.display_name }}{% endif %}</p>{% endif %}
-            {% if brief.feedback and brief.revision > 1 %}<p class="text-sm text-ink-600 mt-1 break-words"><span class="font-medium text-ink-800">Latest notes to the team:</span> {{ brief.feedback }}</p>{% endif %}
+            {% if brief.feedback and brief.revision > 1 %}<p class="text-sm text-ink-600 mt-1 break-words" data-testid="studio-detail-notes"><span class="font-medium text-ink-800">Latest notes to the team:</span> {{ brief.feedback }}</p>{% endif %}
         </div>
         {% if post %}
         <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=post.id %}" class="ui-btn ui-btn-secondary">Open in composer</a>
@@ -27,7 +27,7 @@
     </div>
 
     {% if brief.is_active %}
-    <div class="max-w-2xl">
+    <div class="max-w-2xl" data-testid="studio-detail-progress">
         {% include "studio/partials/progress.html" %}
         {% if can_discard %}
         <form method="post" action="{% url 'studio:discard' workspace_id=workspace.id brief_id=brief.id %}" class="mt-4">

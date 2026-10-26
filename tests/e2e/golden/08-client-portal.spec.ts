@@ -52,6 +52,8 @@ type TwoStageState = {
 
 type MagicLinkState = { exists: boolean; is_consumed: boolean; last_used_at: string | null; email: string | null };
 
+type WorkerStatus = { alive: boolean; ran: number; idle_polls: number; error: string; paused: boolean };
+
 /** Everything the client's sign-off must leave alone or leave behind, checked after it and at the end. */
 function expectClientStageOnly(state: TwoStageState, made: ClientStagePost) {
   expect(state.platform_posts.map((row) => row.id)).toEqual(made.platform_posts.map((row) => row.id));
@@ -126,6 +128,9 @@ test('a client signs off in the portal through a magic link: approved for the cl
     )
     .toBe(true);
   expectClientStageOnly(after!, made);
+  // The worker's count of polls that found nothing due, read once the sign-off is stored.
+  const atSignOff = await harness.probe<WorkerStatus>('worker');
+  expect(atSignOff).toMatchObject({ alive: true, paused: false, error: '' });
 
   // The list refreshes: nothing waits for the client, and the post is under Decided without Approve.
   await expect(page.getByTestId('portal-approvals-pending')).toHaveCount(0);
@@ -139,7 +144,16 @@ test('a client signs off in the portal through a magic link: approved for the cl
   expect([403, 404]).toContain(studio?.status());
   await axe(page, 'Agency page refused to the portal session');
 
-  // Still approved and nothing more, after the worker had its chance to run.
+  // Still approved and nothing more once the worker has run everything the sign-off made due. Two
+  // more idle polls than at the sign-off: the first may have started before the sign-off was stored,
+  // the second started after it, so any task the sign-off queued has run by then.
+  await expect
+    .poll(async () => (await harness.probe<WorkerStatus>('worker')).idle_polls, {
+      message: 'the worker runs what the sign-off made due and finds nothing more',
+      timeout: 30_000,
+    })
+    .toBeGreaterThanOrEqual(atSignOff.idle_polls + 2);
+  expect(await harness.probe<WorkerStatus>('worker')).toMatchObject({ alive: true, error: '' });
   expectClientStageOnly(await probe(), made);
 
   expect(network.blocked).toEqual([]);

@@ -55,7 +55,11 @@ type TwoStageState = {
 const FEEDBACK = 'Say the site visits run every Saturday, and drop the word luxury.';
 const NOTES = 'Lead with the Saturday site visits and mention the free parking.';
 
-/** Poll the post's rows until `ready` says so (the worker runs the team in the background). */
+/**
+ * Poll the post's rows until `ready` says so (the worker runs the team in the background). On a
+ * timeout the error carries the last state read, so a failure in the worker's pipeline shows where
+ * the post stopped (statuses, the brief's stage, its revision) without a rerun.
+ */
 async function stateWhen(
   probe: () => Promise<TwoStageState>,
   ready: (state: TwoStageState) => boolean,
@@ -63,15 +67,19 @@ async function stateWhen(
   timeout = 60_000,
 ): Promise<TwoStageState> {
   let last: TwoStageState | undefined;
-  await expect
-    .poll(
-      async () => {
-        last = await probe();
-        return ready(last);
-      },
-      { message, timeout, intervals: [250, 500, 1000] },
-    )
-    .toBe(true);
+  try {
+    await expect
+      .poll(
+        async () => {
+          last = await probe();
+          return ready(last);
+        },
+        { message, timeout, intervals: [250, 500, 1000] },
+      )
+      .toBe(true);
+  } catch (error) {
+    throw new Error(`${message}: not reached. Last state: ${JSON.stringify(last, null, 2)}`, { cause: error });
+  }
   return last!;
 }
 
@@ -79,13 +87,21 @@ const statuses = (state: TwoStageState) => state.platform_posts.map((row) => row
 const allAre = (state: TwoStageState, status: string) =>
   state.platform_posts.length > 0 && state.platform_posts.every((row) => row.status === status);
 
-async function openApprovals(page: Page, workspace: string) {
+/** The Approvals list and this post's row on it (the row's hook carries the post id). */
+async function openApprovals(page: Page, workspace: string, postId: string) {
   const response = await page.goto(`/workspace/${workspace}/calendar/?mode=list&tab=approvals`);
   expect(response?.status()).toBe(200);
-  const row = page.getByTestId('approvals-row');
+  const row = page.getByTestId(`approvals-row-${postId}`);
   await expect(row).toHaveCount(1);
   return row;
 }
+
+// The agent delay is a setting of the server the whole suite shares. Put it back after this test
+// even when the test times out (a `finally` inside the test does not run then), so the next path
+// does not inherit two seconds per agent turn.
+test.afterEach(async ({ harness }) => {
+  await harness.fixture('set_agent_delay', { seconds: 0 });
+});
 
 test('the owner sends an internally approved post back with feedback, and the team makes revision 2 with no approval on it', async ({
   page,
@@ -96,6 +112,8 @@ test('the owner sends an internally approved post back with feedback, and the te
 }) => {
   test.setTimeout(180_000);
   const since = Date.now() / 1000;
+  // A delay an earlier failed test left behind would slow this team's first post as well.
+  await harness.fixture('set_agent_delay', { seconds: 0 });
   const world = await harness.fixture<TwoStageBrief>('two_stage_brief');
   const workspace = world.workspace_id;
   const probe = () => harness.probe<TwoStageState>('two_stage_state', { brief_id: world.brief_id });
@@ -110,11 +128,13 @@ test('the owner sends an internally approved post back with feedback, and the te
   expect(made.platform_posts).toHaveLength(1);
   expect(made.platform_posts[0].platform).toBe(world.account.platform);
   expect(made.platform_posts[0].approved_fingerprint).toBe('');
+  const postId = made.brief!.post_id!;
+  expect(postId).toBe(made.post?.id);
 
   await as({ email: world.owner.email });
 
   // 1. The owner approves it on the Approvals list: the internal stage, with the fingerprint stamped.
-  let row = await openApprovals(page, workspace);
+  let row = await openApprovals(page, workspace, postId);
   await axe(page, 'Approvals list, waiting for review (owner, two-stage)');
   await row.getByTestId('approvals-row-approve').click();
   const withClient = await stateWhen(probe, (state) => allAre(state, 'pending_client'), 'the post goes to the client');
@@ -140,7 +160,7 @@ test('the owner sends an internally approved post back with feedback, and the te
   await axe(page, 'Post page, with the client (owner)');
 
   // 2. From the same Approvals row: Review, Request changes, the feedback, Send back for changes.
-  row = await openApprovals(page, workspace);
+  row = await openApprovals(page, workspace, postId);
   await axe(page, 'Approvals list, with the client (owner)');
   await row.getByTestId('approvals-row-review').click();
   await row.getByTestId('approvals-row-request-changes').click();
@@ -172,41 +192,44 @@ test('the owner sends an internally approved post back with feedback, and the te
   await revise.getByRole('textbox', { name: 'What should change?' }).fill(NOTES);
 
   // Slow the team a little (each agent turn takes 2 s), so the page that shows them at work stays
-  // put while axe reads it; it reloads itself once the team is done.
+  // put while axe reads it; it reloads itself once the team is done. test.afterEach puts it back.
   await harness.fixture('set_agent_delay', { seconds: 2 });
-  try {
-    await page.getByTestId('studio-revise-send').click();
-    // The form posts and comes back to the post page, which now shows the team at work on revision 2.
-    await expect(page.getByTestId('studio-detail-revision')).toHaveText(/Revision 2\b/);
-    await expect(page).toHaveURL(detailUrl);
-    await axe(page, 'Post page, the team at work on revision 2 (owner)');
-
-    const revised = await stateWhen(
-      probe,
-      (state) => state.brief?.revision === 2 && state.brief.status === 'ready' && allAre(state, 'pending_review'),
-      'the team makes revision 2 and sends it for approval',
-      120_000,
-    );
-    expect(revised.brief?.feedback).toBe(NOTES);
-    expect(revised.platform_posts.map((row) => row.id)).toEqual([approvedRow.id]);
-    for (const platformPost of revised.platform_posts) {
-      expect(platformPost.approved_fingerprint).toBe('');
-      expect(platformPost.approved_by).toBeNull();
-      expect(platformPost.approved_at).toBeNull();
-      expect(platformPost.scheduled_at).toBeNull();
-      expect(platformPost.published_at).toBeNull();
-    }
-    // The only approval ever given is the withdrawn internal one; nothing went out.
-    expect(revised.actions.filter((action) => action.action === 'approved')).toHaveLength(1);
-    expect(revised.publish_logs).toBe(0);
-    expect(statuses(revised)).toEqual(['pending_review']);
-  } finally {
-    await harness.fixture('set_agent_delay', { seconds: 0 });
-  }
-
-  // The page refreshes itself when the team is done: Revision 2, ready for approval again.
-  await expect(page.getByTestId('studio-revise-form')).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('studio-revise-send').click();
+  // The form posts and comes back to the post page, which now shows the team at work on revision 2,
+  // with the notes it was sent.
+  await expect(page).toHaveURL(detailUrl);
+  await expect(page.getByTestId('studio-detail-progress')).toBeVisible();
   await expect(page.getByTestId('studio-detail-revision')).toHaveText(/Revision 2\b/);
+  await expect(page.getByTestId('studio-detail-notes')).toContainText(NOTES);
+  await expect(page.getByTestId('studio-revise-form')).toHaveCount(0);
+  await axe(page, 'Post page, the team at work on revision 2 (owner)');
+
+  const revised = await stateWhen(
+    probe,
+    (state) => state.brief?.revision === 2 && state.brief.status === 'ready' && allAre(state, 'pending_review'),
+    'the team makes revision 2 and sends it for approval',
+    120_000,
+  );
+  await harness.fixture('set_agent_delay', { seconds: 0 });
+  expect(revised.brief?.feedback).toBe(NOTES);
+  expect(revised.platform_posts.map((row) => row.id)).toEqual([approvedRow.id]);
+  for (const platformPost of revised.platform_posts) {
+    expect(platformPost.approved_fingerprint).toBe('');
+    expect(platformPost.approved_by).toBeNull();
+    expect(platformPost.approved_at).toBeNull();
+    expect(platformPost.scheduled_at).toBeNull();
+    expect(platformPost.published_at).toBeNull();
+  }
+  // The only approval ever given is the withdrawn internal one; nothing went out.
+  expect(revised.actions.filter((action) => action.action === 'approved')).toHaveLength(1);
+  expect(revised.publish_logs).toBe(0);
+  expect(statuses(revised)).toEqual(['pending_review']);
+
+  // The page refreshes itself when the team is done: Revision 2 with the notes, ready for approval again.
+  await expect(page.getByTestId('studio-revise-form')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('studio-detail-progress')).toHaveCount(0);
+  await expect(page.getByTestId('studio-detail-revision')).toHaveText(/Revision 2\b/);
+  await expect(page.getByTestId('studio-detail-notes')).toContainText(NOTES);
   await axe(page, 'Post page, revision 2 ready for approval (owner)');
 
   expect(network.blocked).toEqual([]);
