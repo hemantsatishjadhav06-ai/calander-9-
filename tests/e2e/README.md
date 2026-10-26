@@ -7,7 +7,8 @@ against (`tests/e2e/server/`, Python). Spec: [`docs/specs/01-harness.md`](../../
 tests/e2e/
   server/      python -m tests.e2e.server: web app + worker in one process, fakes, mocks, seed, fixtures
   support/     test.ts (test, expect and the fixtures below), harness.ts, axe.ts, network.ts,
-               global-setup.ts (the end-of-run network check)
+               poll.ts (until: read a probe until the worker is done), global-setup.ts (the end-of-run
+               network check)
   self/        the harness's own checks (axe helper, network guard, session fixture)
   golden/      the golden paths, one file each (NN-name.spec.ts)
   __screenshots__/   toHaveScreenshot baselines (none yet; Phase 3 takes them per screen)
@@ -111,6 +112,9 @@ test('…', async ({ page, harness, as, axe, network }) => {
 - **Selectors:** `data-testid` or `getByRole` with an accessible name. Never a CSS class, copy text or
   an Alpine attribute. A missing hook is added to the template next to the existing attributes:
   `data-testid="<area>-<thing>"`, kebab-case (`approvals-row-approve-schedule`, `home-thread-send`).
+  A hook that stands for a record ends in that record's key exactly as it is stored, underscores
+  included, so a spec builds it from the data it already has (`home-today-post-<brief id>`,
+  `setup-row-creation_mode`, `connect-platform-linkedin_company`).
   Existing `data-*` hooks that pytest asserts stay exactly as they are.
 - **Sign-in:** only golden path 1 posts the login form (10 posts a minute per address; call
   `reset_login_limits` first). Everything else signs in with `as(...)`.
@@ -120,12 +124,13 @@ test('…', async ({ page, harness, as, axe, network }) => {
 - **Outcomes in the database:** assert through probes, not only on the page.
 - **Network:** every browser request to another host is aborted (`network.blocked` lists them). A
   route only ever sees the first URL of a redirect chain, so a server redirect to another host would
-  be followed for real: such a request is recorded in `network.escaped` and fails the test. A test
-  that needs an outside page (an OAuth authorize URL) routes the app's own URL that answers the 302
-  instead: `route.fetch({ maxRedirects: 0 })` sends it through the browser context (its cookies land
-  in the browser), the authorize URL and its `state` are read from the `location`, and the route
-  answers with a 200 page that moves on to the app's callback (`<meta http-equiv="refresh">`), never
-  with a 3xx, which WebKit cannot fulfil. `routeGoogle` in `golden/01-sign-in.spec.ts` is the model.
+  be followed for real: such a request is recorded in `network.escaped` and fails the test at its end
+  (`support/test.ts`). WebKit also refuses `route.fulfill` with a 3xx status. So a test that needs an
+  outside page (an OAuth authorize URL) routes the app's own request that answers the 302 instead:
+  `route.fetch({ maxRedirects: 0 })` sends it through the browser context (its cookies land in the
+  browser), the authorize URL and its `state` are read from the `location`, and the route answers
+  with a plain 200 page; the test then reaches the app's callback with the `code` and the `state`
+  (`routeGoogle` in `golden/01-sign-in.spec.ts`, the X connection in `golden/02-onboarding.spec.ts`).
   On the server side, a test probes `refused_network` with `since` set to its own start, never the
   server's whole lifetime (a server kept running between runs remembers earlier ones). The whole run
   is checked once at its end (`support/global-setup.ts`): anything the server tried to reach outside

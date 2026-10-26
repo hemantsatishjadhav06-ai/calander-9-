@@ -15,7 +15,7 @@ without a pointer must be able to reach it to scroll it.
      class="mt-4 space-y-4 {% if thread.full_page %}max-h-[60vh]{% else %}max-h-96{% endif %} overflow-y-auto pr-1 -mr-1 rounded-lg"
      {% if thread.polling and thread.messages_url %}hx-get="{{ thread.messages_url }}" hx-trigger="{{ thread.poll_interval }}" hx-sync="closest [data-agency-thread]:drop" hx-target="this" hx-select="unset" hx-swap="outerHTML"{% endif %}>
     {% for m in thread.messages %}
-    <div data-thread-message-id="{{ m.pk }}">
+    <div data-thread-message-id="{{ m.pk }}" data-testid="thread-message-{{ m.pk }}">
     {% if m.author_kind == 'system' %}
     {% if m.is_internal %}
     <p class="rounded-xl border border-dashed border-ink-400 bg-ink-25 px-3.5 py-2 text-xs text-ink-700 break-words">
