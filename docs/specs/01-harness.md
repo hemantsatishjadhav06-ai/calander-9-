@@ -186,18 +186,29 @@ and reads the budgets from the `assert` section of `.lighthouserc.json`, in Ligh
 The `@lhci/cli` package is not used: version 0.15.1 (the latest) pins Lighthouse 12 and brings 13
 high-severity advisories (`tmp`, `extract-zip`, `basic-ftp`, an old `puppeteer-core`) into the
 lockfile, which would fail the audit in R10; Lighthouse 13.5.0 with Playwright and axe audits at 0.
-Budgets from section 5:
-performance ≥ 0.90; LCP ≤ 2,500 ms; CLS ≤ 0.1; TBT ≤ 200 ms, standing in for INP, which Lighthouse
-cannot measure on a page load; scripts ≤ 150,000 bytes transferred (decimal kilobytes, the stricter
-reading of "150 KB"). Served by gunicorn with `collectstatic` and the compressed manifest storage, so
-the transfer sizes are what production sends. Signed in through a session fixture, not the form.
-The median numbers per URL and budget are printed in the job log; reports are never uploaded to
-public storage.
-*Acceptance:* every budget is an error. If the old UI misses a budget, Phase 1 fixes it when the fix
-changes nothing a person sees (for example, loading Chart.js and SortableJS only on the pages that
-use them, which takes about 84 KB off every other page). A budget that still cannot be met without a
-redesign is set to *warn* for that URL only, named in the CHANGELOG, and becomes that screen's gate
-in Phase 3.
+Budgets from section 5: performance ≥ 0.90; LCP ≤ 2,500 ms; CLS ≤ 0.1; measured lab
+INP upper bound ≤ 200 ms; gzip JavaScript ≤ 150,000 bytes (decimal kilobytes, the stricter
+reading of "150 KB"). The script-transfer limit is also 150,000 bytes. Gzip totals include inline
+scripts. The e2e server uses `runserver` with `--static manifest --no-worker`: `collectstatic`
+builds the compressed manifest and WhiteNoise serves it, bypassing Django's development static
+handler. It does not use gunicorn. Authentication comes from a session fixture, not the form.
+
+**Measurement clarification, 26 Oct 2026:** the original R9 used TBT ≤ 200 ms as a stand-in because
+Lighthouse navigation cannot measure INP. The implemented runner instead drives real inputs,
+observes Event Timing at 4× CPU slowdown, and enforces the 200 ms lab INP upper bound. It includes
+the first emoji-picker opening, search and insertion, so deferring that work does not remove it
+from the interaction measurement. TBT remains a navigation diagnostic; it is not an INP surrogate
+or an additional interaction gate. This synthetic measurement does not establish field p75 INP.
+The earlier TBT-gated run and its failures remain in the changelog/evidence; the section 5 targets
+are unchanged.
+
+The median numbers per URL and budget are printed in the job log, with TBT labelled diagnostic;
+reports are never uploaded to public storage. Missing metrics, missing real interactions,
+unexpected redirects or an external network attempt fail the run.
+*Acceptance:* every section 5 budget is an error. If the old UI misses one, Phase 1 first fixes
+work that changes nothing a person sees (for example, loading Chart.js and SortableJS only where
+used). The 26 Oct continuation supersedes the original per-URL *warn* fallback: no required
+budget is downgraded to a warning. Any unresolved budget is reported as a failed gate.
 
 **R10. CI jobs.** In `.github/workflows/ci.yml`, with the existing pinned actions and the runner's
 own PostgreSQL:

@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block page_vendor_scripts %}
+<script src="{% static 'js/vendor/Sortable.min.js' %}" defer></script>
+{% endblock %}
+
 {% block title %}Publish - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
 {% block page_header %}

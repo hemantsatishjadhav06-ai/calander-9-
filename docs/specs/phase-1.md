@@ -33,7 +33,7 @@ kept outside the repository; the facts this plan relies on are below.
 | Calendar drag | `templates/calendar/calendar.html:500-583` (`initCalendarDnD`, `rescheduleChip(platformPostId, newDatetime)`); endpoint `apps/calendar/views.py:1145-1235` `reschedule_post` |
 | Playwright projects | the probe config: `{...devices['iPhone 13'], ...(process.env.CI ? {} : {browserName: 'chromium'})}`; Desktop Chrome and Pixel 7 as is |
 | Axe | `new AxeBuilder({ page }).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']).analyze()` |
-| Lighthouse budgets | assertion keys verified against the LHCI source: `categories:performance` minScore, `largest-contentful-paint`, `cumulative-layout-shift`, `total-blocking-time` maxNumericValue, `resource-summary:script:size` (reads `transferSize`) |
+| Lighthouse budgets | `categories:performance` minScore, `largest-contentful-paint`, `cumulative-layout-shift`, `resource-summary:script:size` (transfer bytes); `smbean.interactionToNextPaintMaxMs` gates real-input Event Timing and `smbean.javascriptGzipMaxBytes` includes inline scripts. TBT is reported only as a navigation diagnostic (R9 clarification, 26 Oct). |
 | CI Postgres | `.github/workflows/ci.yml:112-118` (the runner's own PostgreSQL 16) |
 
 **Versions (pinned exactly):** `@playwright/test` 1.56.1 and `playwright-core` 1.56.1 (via
@@ -209,13 +209,19 @@ Files: `.lighthouserc.json`, `tests/lighthouse/run.mjs`, possibly `templates/bas
 analytics and calendar templates (only if a budget forces it).
 
 1. Red: the runner against the e2e server started with `--static manifest --no-worker` reports each
-   URL's median performance, LCP, CLS, TBT and script bytes against the budgets.
+   URL's median performance, LCP, CLS, measured lab INP and script bytes against section 5. The
+   harness uses `runserver` plus WhiteNoise's collected compressed manifest, not gunicorn.
+   Observe real inputs with Event Timing at 4× CPU slowdown; missing metrics or interactions fail.
+   The initial R9 proposal used TBT as an INP substitute; the 26 Oct implementation supersedes it
+   with measured lab INP ≤ 200 ms. Report TBT as a navigation diagnostic, not a second gate.
 2. Green: if a budget fails, first the fixes that change nothing a person sees (Chart.js only where
    the analytics chart is, SortableJS only on the calendar; each move checked with the paths that
-   use them and the pages' pytest tests). A budget still failing is set to `warn` for that URL only,
-   with the reason in the CHANGELOG.
+   use them and the pages' pytest tests). Include the first deferred emoji-picker interaction in
+   the lab INP measurement. No section 5 threshold changes and no per-URL `warn` fallback: an
+   unresolved required budget fails the gate.
 3. Verify: three runs, median; the printed table; reports written under `.lighthouseci/`
-   (gitignored).
+   (gitignored). Gzip JavaScript includes inline scripts. Distinguish these synthetic lab results
+   from field p75 INP, and preserve failed earlier runs as evidence rather than overwriting them.
 
 ## Task 6 — CI jobs (R10, R11)
 

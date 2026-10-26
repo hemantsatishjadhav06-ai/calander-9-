@@ -1,5 +1,9 @@
 {% extends "base.html" %}
-{% load analytics_extras %}
+{% load analytics_extras static %}
+
+{% block page_vendor_scripts %}
+<script src="{% static 'js/vendor/chart.umd.js' %}"></script>
+{% endblock %}
 
 {% block title %}Analytics — {{ active_account.account_name }} — {{ SITE_NAME }}{% endblock %}
 

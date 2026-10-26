@@ -6,38 +6,64 @@ Where each phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md) stands, and what is l
 | Phase | State |
 |---|---|
 | 0 · Agree the cut | **Done.** Spec approved, gate passed, released to production (24 Oct, main `6d9cf1d`). |
-| 1 · Test harness first | **About three quarters done**, on PR #17 (branch `claude/trusting-dijkstra-m7nul1`). |
+| 1 · Test harness first | **Completion and full verification in progress**, on open PR #17 (branch `claude/trusting-dijkstra-m7nul1`); gate not yet passed. |
 | 2 · Cut and merge, no restyling | Not started. |
 | 3 · Rebuild the nine screens | Not started. |
 | 4 · Standards | Not started (two pieces landed early: dependency audits and `compilemessages` in CI). |
 | 5 · Platform connections | Not started; most of it waits on the owner's developer apps. |
 | 6 · Beta release | Not started. |
 
-## Phase 1 — left to do
+## Phase 1 — completion and verification
 
-Done: the dependency bump and audits in CI (`pip-audit` 0, `npm audit` 0 high, `compilemessages`),
-the e2e server, Playwright on three devices with axe, all 12 golden paths written (11 run, path 12
-is the declared pending TOTP test), the defects they found fixed, and the date-dependent tests
-repaired. Left:
+The 26 Oct continuation is limited to finishing and verifying Phase 1. PR #17
+is not authorized to merge or release, and Phases 2–6 have not started. The
+starting PR head is `4b697579d25a5ddf71d1dc015ab28f2a26e7620b`; its tree is
+identical to GitHub's test merge `9582e28226b0fdd23f9fa51f11e2a219fa45bbc5`
+against main `6d9cf1d450282e295a779dcdbdea5252d7e8c3d2`. This establishes the
+combined tree to test, not a completed merge. The later documentation-only
+commit `35f30cd` records the preceding session's final paths 6 and 8 review;
+it does not change the application or test tree. Commit `2f14e96` preserves
+that session's subsequent test receipt and redirect self-check fix.
 
-1. **Lighthouse**: `.lighthouserc.json` with the section 5 budgets and `tests/lighthouse/run.mjs`
-   (Lighthouse 13.5.0 is installed; `@lhci/cli` is not used, see `01-harness.md` R9). Measure Home,
-   Approvals and Calendar; if the 150 KB script budget fails, load Chart.js and SortableJS only on
-   the pages that use them.
-2. **CI jobs**: *E2E (Playwright)* (with `npx playwright install --with-deps chromium webkit`, so the
-   iPhone 13 project runs on WebKit for the first time there) and *Lighthouse CI*.
-3. **Review leftover**: group 1's open point (path 11 sends workspace-B ids in URL paths only, not
-   in form bodies or query strings, and skips the Agent API). Every group's last verification and
-   review otherwise passed.
-4. **P1 items**: a CSP header test; the client variant of path 6; the manager variant of path 5.
-5. **Docs**: `CLAUDE.md` *Run and test* and the "CI runs exactly these" sentence (e2e, Lighthouse,
-   audits, `compilemessages`, gitleaks); `CONTRIBUTING.md`.
-6. **Gate**: CI green with all new jobs; the 12 e2e tests on the old UI (11 pass, 1 pending until
-   Phase 4, reported as such); then merge PR #17 and release.
-7. **Owner**: a branch ruleset on `main` requiring the CI checks (GitHub → Settings → Rules →
-   Rulesets → New branch ruleset → target `main` → require a pull request and the status checks
-   *Lint (ruff)*, *Type check (mypy)*, *Test (pytest)*, *Agency UI state tests*, *Docker build*,
-   *Secret scan (gitleaks)*, *Dependency audit*, and later *E2E (Playwright)* and *Lighthouse CI*).
+Implemented: the dependency bump and audit checks, translation compilation,
+the local e2e server, Playwright and axe, Lighthouse config/runner, the E2E
+and Lighthouse CI jobs, and all three remaining tests (CSP response header,
+client changes and manager approval). `CLAUDE.md` and `CONTRIBUTING.md` now
+describe each test layer and how to run it.
+
+This continuation's original full pytest baseline passed **5,530 tests with
+1 explicit Redis-only skip**. The original 126 browser cases produced
+**120 passes, 3 redirect self-check failures and 3 pending TOTP cases**.
+All eleven implemented golden paths passed across the three devices,
+including actual WebKit. After correcting the self-check, the focused run
+of paths 6, 7 and 8, the new role variants and the redirect self-check passed
+**21/21** on all three devices. These are baseline and focused results,
+not the final Phase 1 gate; full receipts are in `CHANGELOG.md`.
+
+Remaining for the gate:
+
+1. **Full verification after fixes:** final pytest with coverage at least
+   main's 87%, three consecutive complete browser runs with zero failures,
+   and final PR CI with every job green. Keep the Phase 4 TOTP cases pending.
+2. **Performance:** the nine recorded audits pass re-evaluation against the
+   clarified section 5 contract on Home, Approvals and Calendar. This is not
+   a new navigation run; final PR CI must collect fresh measurements.
+   Real-input lab INP replaces R9's old TBT stand-in; TBT stays diagnostic.
+   No section 5 budget is relaxed, and lab timing is not field p75 INP.
+   The new emoji-picker regression remains quarantined under
+   [issue #18](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/18)
+   until its focus-readiness fix passes stability verification.
+3. **Isolation review:** finish the added coverage of workspace-B IDs in
+   form bodies, query strings and the Agent API; the original invariant
+   tests remain in place.
+4. **Gate record:** quote section 6 exactly, record final commands, tested
+   commit and CI URL, then **stop**. No merge, release or Phase 2 is authorized.
+
+The owner manages the `main` branch ruleset separately. Required job names
+are **Lint (ruff)**, **Type check (mypy)**, **Test (pytest)**, **Agency UI state
+tests**, **Docker build**, **Secret scan (gitleaks)**, **Dependency audit**,
+**E2E (Playwright)** and **Lighthouse CI**. That owner task does not pause
+this verification.
 
 ## Phases 2–6 — left to do
 
@@ -74,7 +100,7 @@ that works on a phone.
 stakeholder update; the rollback trigger written down (any failed `run_publish_cycle` for 5 minutes
 → redeploy the previous image). Gate: the definition of done in section 8.
 
-## Needs the owner
+## Owner-managed work (does not block this Phase 1 continuation)
 
 - **GitHub**: the branch ruleset above (admin rights).
 - **Developer apps and credentials** (Phase 5, also blocking `live_verify`): an X app at

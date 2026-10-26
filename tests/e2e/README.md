@@ -23,8 +23,9 @@ Needs PostgreSQL 16 on `localhost:5432` (`postgres`/`postgres`), the `.venv`, No
 ```bash
 (cd theme/static_src && npm ci && npm run build)
 npm ci --ignore-scripts
-npx playwright install chromium webkit         # here: export PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+npx playwright install --with-deps chromium webkit
 npm run test:e2e                               # starts the server (--reset) and runs every project
+CI=1 npm run test:e2e                          # also use this locally to exercise actual WebKit
 npx playwright test tests/e2e/self --project=pixel-7
 ```
 
@@ -45,9 +46,17 @@ send the connection elsewhere whatever `DB_HOST` says (`PGHOSTADDR`, `PGSERVICE`
 this machine while `DB_HOST` is empty), before it runs a statement. Two runs at once need their own port and database
 (`E2E_PORT=8162 DB_NAME=brightbean_g2_e2e`). No `.env` or `dev.env` is needed.
 
-**iPhone 13.** CI runs the `iphone-13` project on WebKit. WebKit cannot be downloaded in the agents'
-sandbox (the Playwright CDN is refused), so a local run uses Chromium with the iPhone 13 viewport,
-scale and touch, and prints one line saying so.
+**iPhone 13.** `CI=1` runs the `iphone-13` project on WebKit; install both browsers and their system
+libraries (`npx playwright install --with-deps chromium webkit`) before a gate run. The default
+non-CI configuration retains the original Chromium fallback with the iPhone viewport, scale and
+touch, and prints that limitation. It is useful for development where WebKit is unavailable but
+does not establish WebKit coverage. `CI=1` also refuses to reuse an existing server: use a separate
+`E2E_PORT` and `DB_NAME` if another run is active.
+
+Phase 1 also checks the manager's approval and the client's request for changes in
+`golden/05-06-role-variants.spec.ts`, and foreign IDs in form bodies and query strings in
+`golden/11-isolation-inputs.spec.ts`. The existing invariant golden paths are retained unchanged.
+Golden path 12 is the single declared pending scenario until Phase 4 (one pending case per device).
 
 ## What the server does
 
@@ -110,8 +119,9 @@ test('…', async ({ page, harness, as, axe, network }) => {
 
 ## Rules for specs
 
-- **Selectors:** `data-testid` or `getByRole` with an accessible name. Never a CSS class, copy text or
-  an Alpine attribute. A missing hook is added to the template next to the existing attributes:
+- **Selectors:** all new tests use `data-testid` only. Never a CSS class, copy text or
+  an Alpine attribute. Existing invariant golden paths retain their original role selectors under
+  the instruction not to edit those tests. A missing hook is added to the template next to the existing attributes:
   `data-testid="<area>-<thing>"`, kebab-case (`approvals-row-approve-schedule`, `home-thread-send`).
   A hook that stands for a record ends in that record's key exactly as it is stored, underscores
   included, so a spec builds it from the data it already has (`home-today-post-<brief id>`,
@@ -143,3 +153,5 @@ test('…', async ({ page, harness, as, axe, network }) => {
   is checked once at its end (`support/global-setup.ts`): anything the server tried to reach outside
   the machine during the run fails it, with the host and where in the server it was tried.
 - **No retries, no `test.skip`/`test.fixme` to make a path green;** each test makes its own rows.
+  A genuinely flaky test is quarantined with a tracking issue, not retried in CI. Gate evidence
+  reports quarantined, failing and unrun cases separately from passes.

@@ -1,12 +1,12 @@
 // Playwright routes only the first request of a redirect chain, so the guard's route never sees a
 // hop the browser makes by following a redirect to another host: that request really goes out. The
-// guard records it in network.escaped, and the context fixture fails any test that ends with one
-// (support/test.ts). This check asserts the record, then empties it so the test itself can pass.
+// guard lists it in network.escaped, and the shared context fixture fails the test at teardown.
 // Both servers here are tiny ones on loopback, on ports that are not the e2e server's, so nothing
 // leaves the machine; the first is routed on to the network by the test, as an OAuth spec might.
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import { guardNetwork } from '../support/network';
 import { expect, test } from '../support/test';
 
 async function listen(handler: http.RequestListener): Promise<{ server: http.Server; origin: string }> {
@@ -15,7 +15,12 @@ async function listen(handler: http.RequestListener): Promise<{ server: http.Ser
   return { server, origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}` };
 }
 
-test('a redirect hop to another host, which no route sees, is recorded as escaped', async ({ page, network }) => {
+test('a redirect hop to another host is recorded as escaped, not falsely reported as blocked', async ({ browser, baseURL }) => {
+  // This deliberately exercises an escaped hop between two local servers. Give the guard its own
+  // context so the shared fixture can continue rejecting every escape in the real golden paths.
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const network = await guardNetwork(context, String(baseURL));
+  const page = await context.newPage();
   const reached: string[] = [];
   const elsewhere = await listen((request, response) => {
     reached.push(request.url ?? '');
@@ -29,12 +34,12 @@ test('a redirect hop to another host, which no route sees, is recorded as escape
 
     await page.goto(`${redirector.origin}/start`).catch(() => null);
 
-    // The hop was not aborted (it reached the other server), and the guard records it as escaped.
+    // The hop was not aborted (it reached the other server), and the guard lists it.
     expect(reached).toEqual(['/after-the-hop?code=e2e']);
+    expect(network.blocked).toEqual([]);
     expect(network.escaped).toEqual([`${elsewhere.origin}/after-the-hop`]);
-    // Proven; empty it so the end-of-test check (which would fail any other test here) lets this one pass.
-    network.escaped.length = 0;
   } finally {
+    await context.close();
     redirector.server.close();
     elsewhere.server.close();
   }

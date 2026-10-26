@@ -1,0 +1,31 @@
+{
+  "ci": {
+    "collect": {
+      "url": [
+        "/workspace/00000000-0000-4000-8000-00000000000a/studio/",
+        "/workspace/00000000-0000-4000-8000-00000000000a/calendar/?mode=list&tab=approvals",
+        "/workspace/00000000-0000-4000-8000-00000000000a/calendar/?mode=calendar&view=month"
+      ],
+      "numberOfRuns": 3,
+      "settings": {
+        "formFactor": "mobile",
+        "onlyCategories": ["performance"],
+        "throttlingMethod": "simulate"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", {"minScore": 0.9}],
+        "largest-contentful-paint": ["error", {"maxNumericValue": 2500}],
+        "cumulative-layout-shift": ["error", {"maxNumericValue": 0.1}],
+        "resource-summary:script:size": ["error", {"maxNumericValue": 150000}]
+      }
+    }
+  },
+  "smbean": {
+    "interactionToNextPaintMaxMs": 200,
+    "javascriptGzipMaxBytes": 150000,
+    "reportedMetrics": ["total-blocking-time"],
+    "interactionMeasurement": "Lab Event Timing on real inputs at 4x CPU slowdown; not field p75 INP. TBT is a navigation diagnostic, not a substitute for measured INP."
+  }
+}

@@ -36,6 +36,9 @@ jobs:
       - name: Run UI state tests
         run: npm run test:ui
 
+      - name: Test performance budget enforcement
+        run: node --test tests/lighthouse/*.test.mjs
+
   lint:
     name: Lint (ruff)
     runs-on: ubuntu-latest
@@ -140,6 +143,9 @@ jobs:
       # seeded data (see apps/inbox/tests/test_reply_lifecycle_migrations.py).
       - name: makemigrations --check
         run: python manage.py makemigrations --check --dry-run
+
+      - name: Check design tokens
+        run: python tools/recolor.py --check
 
       - name: pytest
         run: pytest --cov=apps --cov-report=term-missing
@@ -265,3 +271,116 @@ jobs:
       - name: npm audit (theme)
         working-directory: theme/static_src
         run: npm audit --audit-level=high
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "1"
+      DB_HOST: "127.0.0.1"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: smbean_browser_e2e
+      E2E_PORT: "8150"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install locked Python dependencies
+        run: pip install --require-hashes -r requirements.lock
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            theme/static_src/package-lock.json
+      - name: Install locked browser dependencies and build CSS
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix theme/static_src
+          npm run build --prefix theme/static_src
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+      - name: Run every browser project (no retries)
+        run: npm run test:e2e
+
+  lighthouse:
+    name: Lighthouse CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: "1"
+      DB_HOST: "127.0.0.1"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: smbean_lighthouse_e2e
+      E2E_PORT: "8151"
+      LIGHTHOUSE_BASE_URL: http://127.0.0.1:8151
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install locked Python dependencies
+        run: pip install --require-hashes -r requirements.lock
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            theme/static_src/package-lock.json
+      - name: Install locked browser dependencies and build CSS
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix theme/static_src
+          npm run build --prefix theme/static_src
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Measure mobile performance and interactions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tests.e2e.server --reset --no-worker --static manifest --port "$E2E_PORT" > /tmp/lighthouse-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 120); do
+            if curl --fail --silent "$LIGHTHOUSE_BASE_URL/health/" >/dev/null && curl --fail --silent "$LIGHTHOUSE_BASE_URL/__e2e__/ping" >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lighthouse-server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          curl --fail --silent "$LIGHTHOUSE_BASE_URL/health/" >/dev/null
+          curl --fail --silent "$LIGHTHOUSE_BASE_URL/__e2e__/ping" >/dev/null
+          node tests/lighthouse/run.mjs
