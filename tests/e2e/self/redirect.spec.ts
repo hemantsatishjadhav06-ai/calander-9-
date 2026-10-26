@@ -1,6 +1,7 @@
 // Playwright routes only the first request of a redirect chain, so the guard's route never sees a
 // hop the browser makes by following a redirect to another host: that request really goes out. The
-// guard lists it in network.blocked all the same, so a test that checks network.blocked fails on it.
+// guard records it in network.escaped, and the context fixture fails any test that ends with one
+// (support/test.ts). This check asserts the record, then empties it so the test itself can pass.
 // Both servers here are tiny ones on loopback, on ports that are not the e2e server's, so nothing
 // leaves the machine; the first is routed on to the network by the test, as an OAuth spec might.
 import http from 'node:http';
@@ -14,7 +15,7 @@ async function listen(handler: http.RequestListener): Promise<{ server: http.Ser
   return { server, origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}` };
 }
 
-test('a redirect hop to another host, which no route sees, is listed as blocked', async ({ page, network }) => {
+test('a redirect hop to another host, which no route sees, is recorded as escaped', async ({ page, network }) => {
   const reached: string[] = [];
   const elsewhere = await listen((request, response) => {
     reached.push(request.url ?? '');
@@ -28,9 +29,11 @@ test('a redirect hop to another host, which no route sees, is listed as blocked'
 
     await page.goto(`${redirector.origin}/start`).catch(() => null);
 
-    // The hop was not aborted (it reached the other server), and the guard lists it.
+    // The hop was not aborted (it reached the other server), and the guard records it as escaped.
     expect(reached).toEqual(['/after-the-hop?code=e2e']);
-    expect(network.blocked).toEqual([`${elsewhere.origin}/after-the-hop`]);
+    expect(network.escaped).toEqual([`${elsewhere.origin}/after-the-hop`]);
+    // Proven; empty it so the end-of-test check (which would fail any other test here) lets this one pass.
+    network.escaped.length = 0;
   } finally {
     redirector.server.close();
     elsewhere.server.close();

@@ -61,6 +61,12 @@ phase gate (section 6) said. Newest first.
   `test_insights.py::test_the_plan_queues_the_months_articles_for_the_seo_team` failed in the last
   week of every month because of query order; it now reads oldest first.
 
+**Checked on the merged branch** (26 Oct): full pytest `5530 passed, 1 skipped` (17 min); CI on
+PR #17 green on all seven checks; e2e on all three projects `120 passed, 3 skipped` (path 12, the
+declared pending test) and 3 failed: the harness's own redirect self-check, broken by merging two
+groups' versions of the browser network guard. It now asserts the `escaped` record the kept guard
+makes; `tests/e2e/self` 36/36 on three projects.
+
 **Not done yet in Phase 1** (left when the session's credits ran out, 26 Oct): Lighthouse with the
 section 5 budgets (`.lighthouserc.json`, `tests/lighthouse/run.mjs`; the package is installed); the
 **E2E (Playwright)** and **Lighthouse CI** jobs in `ci.yml`; the P1 items (CSP header test, the
