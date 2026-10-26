@@ -681,6 +681,11 @@ def test_seed_queues_no_platform_work(seeded):
 
 @pytest.mark.django_db
 def test_seed_password_signs_in_through_the_form(seeded):
+    from django.core.cache import cache
+
+    # The login limit counts every login post from this address in the process's local-memory cache,
+    # so earlier tests in the same run (apps/accounts) may have used it up.
+    cache.clear()
     response = Client().post(
         "/accounts/login/", {"login": seeded["users"]["owner"]["email"], "password": seeded["password"]}
     )
