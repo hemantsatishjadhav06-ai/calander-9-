@@ -65,9 +65,8 @@ phase gate (section 6) said. Newest first.
 section 5 budgets (`.lighthouserc.json`, `tests/lighthouse/run.mjs`; the package is installed); the
 **E2E (Playwright)** and **Lighthouse CI** jobs in `ci.yml`; the P1 items (CSP header test, the
 client variant of path 6, the manager variant of path 5); `CLAUDE.md` and `CONTRIBUTING.md` (the e2e,
-Lighthouse, audit and `compilemessages` commands, and the "CI runs exactly these" sentence); a
-second review of group 4 after its last fixes (its final verification did not report); group 1's
-open review point (path 11 sweeps workspace-B ids in URL paths only, not in form bodies or query
+Lighthouse, audit and `compilemessages` commands, and the "CI runs exactly these" sentence); group
+1's open review point (path 11 sweeps workspace-B ids in URL paths only, not in form bodies or query
 strings, and leaves out the Agent API); the gate itself; and the owner's branch ruleset making CI
 required on `main` (R11: needs GitHub admin rights).
 

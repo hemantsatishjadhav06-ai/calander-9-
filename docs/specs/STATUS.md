@@ -26,9 +26,9 @@ repaired. Left:
    the pages that use them.
 2. **CI jobs**: *E2E (Playwright)* (with `npx playwright install --with-deps chromium webkit`, so the
    iPhone 13 project runs on WebKit for the first time there) and *Lighthouse CI*.
-3. **Review leftovers**: a final review of group 4 (paths 6 and 8) after its last fixes; group 1's
-   open point (path 11 sends workspace-B ids in URL paths only, not in form bodies or query strings,
-   and skips the Agent API).
+3. **Review leftover**: group 1's open point (path 11 sends workspace-B ids in URL paths only, not
+   in form bodies or query strings, and skips the Agent API). Every group's last verification and
+   review otherwise passed.
 4. **P1 items**: a CSP header test; the client variant of path 6; the manager variant of path 5.
 5. **Docs**: `CLAUDE.md` *Run and test* and the "CI runs exactly these" sentence (e2e, Lighthouse,
    audits, `compilemessages`, gitleaks); `CONTRIBUTING.md`.
