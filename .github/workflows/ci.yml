@@ -148,7 +148,17 @@ jobs:
         run: python tools/recolor.py --check
 
       - name: pytest
-        run: pytest --cov=apps --cov-report=term-missing
+        run: pytest --cov=apps --cov-report=term-missing --cov-report=json:pytest-coverage.json --junitxml=pytest-results.xml
+
+      - name: Retain Python gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pytest-evidence
+          path: |
+            pytest-coverage.json
+            pytest-results.xml
+          retention-days: 7
 
   build:
     name: Docker build
@@ -319,6 +329,16 @@ jobs:
       - name: Run every browser project (no retries)
         run: npm run test:e2e
 
+      - name: Retain browser reports and failure traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-evidence
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   lighthouse:
     name: Lighthouse CI
     runs-on: ubuntu-latest
@@ -384,3 +404,12 @@ jobs:
           curl --fail --silent "$LIGHTHOUSE_BASE_URL/health/" >/dev/null
           curl --fail --silent "$LIGHTHOUSE_BASE_URL/__e2e__/ping" >/dev/null
           node tests/lighthouse/run.mjs
+
+      - name: Retain every performance measurement
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lighthouse-evidence
+          path: .lighthouseci/
+          include-hidden-files: true
+          retention-days: 7

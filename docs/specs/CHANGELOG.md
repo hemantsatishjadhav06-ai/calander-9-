@@ -3,6 +3,54 @@
 One entry per phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md): the date, what changed, and what the
 phase gate (section 6) said. Newest first.
 
+## 28 Oct 2026 — Phase 1: finish the performance and stability gate (in progress)
+
+Resumed the same open PR #17 from `d1dcb1463ed37dd0f99a94b0c5774adbc4d3cd7b`.
+[Its CI run](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/40292861255)
+finished with eight jobs passing and Lighthouse failing: Calendar Performance
+89 against 90. Pytest passed 5,536 with one Redis-only skip; browser tests
+passed 135 with six skips (three TOTP, three emoji quarantine). Coverage was
+41,069/47,313 statements, 86.802781%, above main's 41,054/47,301, 86.793091%;
+both reports display 87%.
+
+**Change.** Closed shared filters now mount their option controls only when
+opened. The new browser regression first failed with 35 mounted controls
+where zero were expected, before changing the panel wrapper. Existing
+selection models and handlers are retained. The regression exercises keyboard
+opening/selection, single and multiple selections, clearing, reopening and
+axe. First timezone-filter opening, selection and reopening are also included
+in the Lighthouse real-input measurement so deferred work stays under the
+200 ms lab interaction budget. No thresholds or invariant tests changed.
+
+CI now retains Python coverage/JUnit results, browser reports/failure traces,
+and all Lighthouse reports as seven-day artifacts, including failed runs.
+
+**Fresh local measurements** (three mobile audits per page; configured median):
+
+| Page | Performance | LCP (ms) | Lab INP upper bound (ms) | CLS | JavaScript gzip (bytes) |
+|---|---:|---:|---:|---:|---:|
+| Home | 96 | 1,886 | 120 | 0.07843 | 68,862 |
+| Approvals | 95 | 2,197 | 120 | 0.00628 | 78,689 |
+| Calendar | 92 | 2,431 | 120 | 0.00672 | 78,688 |
+
+All configured medians pass. Calendar's individual LCP samples were 2,342,
+2,431 and 2,592 ms; the third sample exceeds 2.5 seconds and is retained in
+the report. This local pass does not replace fresh CI. Lab INP is not field
+p75 INP. The 17 Lighthouse enforcement/lifecycle tests and 21 focused Python
+rendering, CSP, accessibility and analytics tests pass. The focused browser run
+passed all 18 cases on Desktop Chrome, actual WebKit and Pixel 7, including
+golden paths 6, 7 and 8, the repaired emoji picker and the new filter regression;
+zero skips or flaky cases (197.2 seconds).
+
+**Gate, exactly as written in `BETA_PLAN.md` section 6:**
+
+> CI green with all new jobs; 12 e2e tests pass on the old UI.
+
+**Result: pending.** Fresh final-source pytest, three consecutive full browser
+runs including the repaired emoji case, normal CI after quarantine removal,
+and final gate documentation remain. Golden path 12 stays pending until
+Phase 4 under the owner's explicit exception. No merge, release or Phase 2.
+
 ## 26 Oct 2026 — Phase 1: complete and verify the harness (in progress)
 
 **Scope.** Finish PR #17 and run its gate. The owner explicitly reserved merging,

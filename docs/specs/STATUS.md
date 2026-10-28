@@ -1,7 +1,7 @@
 # Beta plan status
 
 Where each phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md) stands, and what is left. Updated
-26 Oct 2026. The detail of what changed and what each gate said is in [`CHANGELOG.md`](CHANGELOG.md).
+28 Oct 2026. The detail of what changed and what each gate said is in [`CHANGELOG.md`](CHANGELOG.md).
 
 | Phase | State |
 |---|---|
@@ -40,24 +40,30 @@ of paths 6, 7 and 8, the new role variants and the redirect self-check passed
 **21/21** on all three devices. These are baseline and focused results,
 not the final Phase 1 gate; full receipts are in `CHANGELOG.md`.
 
+The completed CI run on `d1dcb146` passed 5,536 Python cases (one Redis-only
+skip) and 135 browser cases (three TOTP and three quarantined emoji skips).
+Eight jobs passed; Calendar Lighthouse Performance 89 failed the 90 budget.
+On 28 Oct, a red browser regression demonstrated eager closed-filter option
+bindings. The shared filter now mounts options on opening, with unchanged
+selection logic and new keyboard/single/multiple-selection coverage. Fresh
+local Lighthouse medians pass (Home 96, Approvals 95, Calendar 92); the
+first filter opening remains in the 200 ms measured interaction budget.
+
 Remaining for the gate:
 
-1. **Full verification after fixes:** final pytest with coverage at least
-   main's 87%, three consecutive complete browser runs with zero failures,
-   and final PR CI with every job green. Keep the Phase 4 TOTP cases pending.
-2. **Performance:** the nine recorded audits pass re-evaluation against the
-   clarified section 5 contract on Home, Approvals and Calendar. This is not
-   a new navigation run; final PR CI must collect fresh measurements.
-   Real-input lab INP replaces R9's old TBT stand-in; TBT stays diagnostic.
-   No section 5 budget is relaxed, and lab timing is not field p75 INP.
-   The new emoji-picker regression remains quarantined under
-   [issue #18](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/18)
-   until its focus-readiness fix passes stability verification.
-3. **Isolation review:** finish the added coverage of workspace-B IDs in
-   form bodies, query strings and the Agent API; the original invariant
-   tests remain in place.
-4. **Gate record:** quote section 6 exactly, record final commands, tested
-   commit and CI URL, then **stop**. No merge, release or Phase 2 is authorized.
+1. Final-source full pytest with coverage at least main's exact ratio
+   (41,054/47,301 statements; 87% when displayed), three consecutive complete
+   browser runs with the repaired emoji case included, and all nine CI jobs
+   green after removing its quarantine. TOTP stays pending for Phase 4.
+2. Fresh CI performance measurements with every section 5 budget unchanged.
+   All samples and the configured medians are retained as CI artifacts.
+3. Gate record: quote section 6 exactly and record final commands, tested
+   commit and CI URL, then stop. No merge, release or Phase 2 is authorized.
+
+The added isolation tests cover workspace-B IDs in form bodies and query
+strings; existing Agent API tests cover the corresponding foreign-resource
+inputs. Independent review found no missing isolation blocker. The original
+invariant tests and the three known issues below remain unchanged.
 
 The owner manages the `main` branch ruleset separately. Required job names
 are **Lint (ruff)**, **Type check (mypy)**, **Test (pytest)**, **Agency UI state

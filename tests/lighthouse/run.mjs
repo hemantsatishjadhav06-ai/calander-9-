@@ -97,6 +97,20 @@ async function measureInteractions(page, name, reviewId) {
       });
       window.__smbeanTiming.observer.observe({ type: 'event', buffered: false, durationThreshold: 16 });
     });
+    if (name !== 'home') {
+      // Closed filters defer their option bindings. Measure the first opening,
+      // a real selection and reopening at the same CPU slowdown as other inputs.
+      const timezone = page.getByTestId(name === 'calendar' ? 'ui-select-calendarFilters.tz' : 'ui-select-displayTimezone');
+      const toggle = timezone.getByTestId('ui-select-toggle');
+      await toggle.click();
+      await timezone.getByTestId('ui-select-option-UTC').waitFor({ state: 'visible' });
+      const filtered = page.waitForResponse((response) => response.url().startsWith(origin) && new URL(response.url()).searchParams.get('tz') === 'UTC');
+      await timezone.getByTestId('ui-select-option-UTC').click();
+      if (!(await filtered).ok()) throw new Error('Timezone filter failed.');
+      await toggle.click();
+      await timezone.getByTestId('ui-select-option-UTC').waitFor({ state: 'visible' });
+      await toggle.press('Escape');
+    }
     if (name === 'home') {
       const composer = page.getByTestId('thread-composer-body');
       await composer.click();

@@ -96,12 +96,17 @@ the local configuration uses Chromium with the iPhone viewport and touch
 settings, which does not establish Safari coverage. Traces and screenshots
 are kept on failure under `test-results/`; the HTML report is in
 `playwright-report/`. See [the e2e guide](tests/e2e/README.md) for the named
-fixtures, probes, socket guard and session setup.
+fixtures, probes, socket guard and session setup. CI retains browser reports and
+failure traces as `playwright-evidence` for seven days, including failed runs.
 
 Every path runs axe against the screens it reaches; serious and critical
 violations fail. Path 12 is the only declared pending golden path: TOTP is
 implemented in Phase 4. Count those cases as pending, never passing. Visual
 baselines are a Phase 3 task, not an existing Phase 1 guarantee.
+
+CI also retains full Python JUnit results and JSON coverage as `pytest-evidence`.
+Lighthouse reports and measurements are retained as `lighthouse-evidence`; review
+all three samples as well as the configured median when diagnosing a budget failure.
 
 #### Lighthouse
 
