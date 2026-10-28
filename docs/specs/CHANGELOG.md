@@ -72,6 +72,25 @@ is explicitly partial and is not used as gate evidence. All these results
 predate compression. Final-source CI and three consecutive browser runs
 remain required after the transport fix.
 
+**Compression measurements:** the fresh local nine-audit run on
+`2aba8b5402a93fecc5e97952f158c83e51a27463` passed all budgets, with Calendar
+Performance 98 and median LCP 1,441 ms. Independent
+[CI run 40662855077](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/40662855077)
+also passed Lighthouse: Home 95 / LCP 2,349 ms / lab INP 128 ms;
+Approvals 97 / 1,359 ms / 120 ms; Calendar 96 / 1,654 ms / 104 ms.
+Calendar's HTML transfer fell to approximately 39 KB, from 203 KB.
+All nine CI reports were verified, including mobile/CPU settings, gzip bytes,
+CLS, real inputs and artifact integrity. The application change has margin
+under the unchanged budgets.
+
+That CI run found a typing defect in the new test's import of a private Django
+CSRF helper. The test now exercises the public `CsrfViewMiddleware` contract:
+the actual decoded token/cookie pair is accepted and an invalid token gets 403,
+without invoking application actions. Five response tests and full mypy
+(954 files) pass. No application code changed for this test correction.
+Final CI after this correction and the three full browser stability runs are
+still pending; the interrupted or superseded runs are not counted as passes.
+
 **Gate, exactly as written in `BETA_PLAN.md` section 6:**
 
 > CI green with all new jobs; 12 e2e tests pass on the old UI.

@@ -5,9 +5,10 @@ import re
 from unittest.mock import patch
 
 import pytest
-from django.middleware.csrf import _does_token_match
+from django.http import HttpResponse
+from django.middleware.csrf import CsrfViewMiddleware
 from django.shortcuts import render
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 
 from apps.members.models import WorkspaceMembership
@@ -62,7 +63,24 @@ def test_calendar_compresses_exact_rendered_page_with_nonce_csrf_and_cookie_vary
     csrf_match = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', html)
     assert csrf_match
     csrf = csrf_match.group(1)
-    assert _does_token_match(csrf, client.cookies["csrftoken"].value)
+
+    def check_token(token):
+        # Exercise the public request-processing contract, using the token from
+        # the decoded page and its real response cookie. The probe never calls
+        # an application action or changes any rows.
+        request = RequestFactory().post(
+            "/csrf-probe/",
+            {"csrfmiddlewaretoken": token},
+            HTTP_COOKIE=f"csrftoken={client.cookies['csrftoken'].value}",
+        )
+        middleware = CsrfViewMiddleware(lambda request: HttpResponse())
+        middleware.process_request(request)
+        return middleware.process_view(request, lambda request: HttpResponse(), (), {})
+
+    assert check_token(csrf) is None
+    rejected = check_token("invalid")
+    assert rejected is not None
+    assert rejected.status_code == 403
 
 
 @pytest.mark.django_db
