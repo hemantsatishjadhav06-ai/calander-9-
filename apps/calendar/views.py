@@ -12,6 +12,7 @@ from django.db.models import Count as DbCount
 from django.db.models import QuerySet
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.gzip import gzip_page
 from django.views.decorators.http import require_POST
 
 from apps.approvals.gate import ApprovalRequired
@@ -681,6 +682,7 @@ def _get_tab_context(request, workspace, tab: str) -> dict:
 
 
 @login_required
+@gzip_page
 def calendar_view(request, workspace_id):
     """Main publish page - renders calendar or list mode."""
     workspace = _get_workspace(request, workspace_id)

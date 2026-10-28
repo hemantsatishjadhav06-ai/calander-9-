@@ -42,6 +42,36 @@ passed all 18 cases on Desktop Chrome, actual WebKit and Pixel 7, including
 golden paths 6, 7 and 8, the repaired emoji picker and the new filter regression;
 zero skips or flaky cases (197.2 seconds).
 
+**Independent CI after the filter change:** commit
+`59a2c9cb4eb1de5ad23a004f8fd6cbd79dd09e38`,
+[run 40660336344](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/40660336344),
+failed Calendar again: Performance 89 and median LCP 2,889 ms. Home and
+Approvals passed. All nine reports were retained and independently checked;
+no sample or threshold was discarded. Calendar sent 203,197 bytes of
+uncompressed HTML, with 132 KiB of estimated compression savings. The next
+scoped fix targets response transport, not a relaxed gate. The three-run
+browser stability sequence is paused after its current first run until that
+fix is tested; earlier measurements remain historical evidence.
+
+**Response transport fix.** Calendar now uses Django's `gzip_page` beneath
+`login_required`. Both Calendar and its Approvals list retain the same markup,
+permissions, security headers, nonce and CSRF handling; clients without gzip
+receive plain HTML and HTMX requests retain fragments. Django's randomized
+compression padding remains enabled; no shared response cache is added.
+The five new response regressions produced four expected failures and one
+boundary pass before the decorator, then five passes after it. No existing
+invariant test was edited.
+
+Before this change, CI on `59a2c9c` completed the full pytest suite with
+5,536 passes, one Redis-only skip and 86.807009% coverage. Its complete local
+browser run passed 141 cases with only three deferred TOTP cases and no
+flaky outcomes, including the repaired emoji test on all three devices
+(895.3 seconds). Because CI had verified the same full Python suite, the
+duplicate local run was stopped after 3,998 passes; its interrupted receipt
+is explicitly partial and is not used as gate evidence. All these results
+predate compression. Final-source CI and three consecutive browser runs
+remain required after the transport fix.
+
 **Gate, exactly as written in `BETA_PLAN.md` section 6:**
 
 > CI green with all new jobs; 12 e2e tests pass on the old UI.

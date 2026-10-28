@@ -49,6 +49,14 @@ selection logic and new keyboard/single/multiple-selection coverage. Fresh
 local Lighthouse medians pass (Home 96, Approvals 95, Calendar 92); the
 first filter opening remains in the 200 ms measured interaction budget.
 
+CI on `59a2c9c` still failed Calendar (Performance 89, median LCP 2,889 ms),
+while the other eight jobs passed. Its full Python suite passed 5,536 cases
+with one skip and 86.807009% coverage; one full local browser run passed
+141 with only three deferred TOTP cases. Those results precede the next fix:
+Calendar-only response compression, guarded by five new red-to-green tests
+for markup, CSP/CSRF, negotiation, fragments and access boundaries. Fresh
+performance and full final-source verification are pending.
+
 Remaining for the gate:
 
 1. Final-source full pytest with coverage at least main's exact ratio
