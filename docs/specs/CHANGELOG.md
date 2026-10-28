@@ -91,6 +91,37 @@ without invoking application actions. Five response tests and full mypy
 Final CI after this correction and the three full browser stability runs are
 still pending; the interrupted or superseded runs are not counted as passes.
 
+**Stability failure retained:** CI run
+[40663804886](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/40663804886)
+on `b5a04f05fa75ddf340306cd99f5f1485e3c2afcc` passed all nine jobs. However,
+the first local stability run failed with 140 passed, three TOTP skips and
+one WebKit onboarding navigation failure (831.5 seconds). The sequence
+stopped before runs two and three; no failed test was retried. The mocked
+OAuth POST response arrived before WebKit committed that document, so its
+late commit interrupted the synthetic callback navigation. The same path
+had passed the preceding full run. This flake is tracked in
+[issue #19](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19).
+The original golden-path file and its invariant assertions remain unchanged.
+A bounded harness synchronization repair and fresh full stability evidence
+are required; green CI alone is not recorded as the completed Phase 1 gate.
+
+**Mocked-navigation repair:** the shared browser fixture now waits for a
+local mocked HTML POST document to commit before starting a subsequent explicit
+navigation. It preserves route-handler identity and propagates failed/missing
+commits and ordinary navigation errors; it never retries a callback. Real form
+submissions, GET and AJAX navigation behavior are unchanged, and intentional
+cancellation tests can opt out. Original golden path 2 is byte-for-byte intact.
+Ten Node checks cover ordering, failure/timeout/cleanup and API compatibility;
+the initial no-op implementation produced four expected failures before repair.
+The controlled real-browser ordering/error check and original onboarding path
+passed all six focused cases across Desktop Chrome, WebKit and Pixel 7.
+
+Issue #19 remains visibly quarantined through the shared fixture while its
+explicit verification opt-in includes it in stability runs. Issue #18's emoji
+case likewise remains enabled in those runs. Normal CI must include both after
+three consecutive complete suites; neither quarantine is a gate pass.
+CI now applies to every pull request, retaining the existing main-push trigger.
+
 **Gate, exactly as written in `BETA_PLAN.md` section 6:**
 
 > CI green with all new jobs; 12 e2e tests pass on the old UI.

@@ -32,7 +32,7 @@ machine need different `DB_NAME`s.
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/mypy apps/ config/ providers/ tests/ --ignore-missing-imports
 .venv/bin/python manage.py makemigrations --check --dry-run    # a model change needs its migration
-npm ci --ignore-scripts && npm run test:ui                     # tests/js/*.test.cjs (the thread's state machine)
+npm ci --ignore-scripts && npm run test:ui                     # tests/js/*.test.cjs (thread state and browser mock synchronization)
 (cd theme/static_src && npm ci && npm run build)               # compiles theme/static/css/dist/styles.css (built in Docker, never committed); rebuild after changing classes
 .venv/bin/python tools/recolor.py --check                       # no old palette class or mapped hex left (see Design system)
 .venv/bin/python manage.py runserver                            # the web app
@@ -100,7 +100,8 @@ CI (`.github/workflows/ci.yml`) runs **Agency UI state tests**, **Lint (ruff)**,
 **Type check (mypy)**, **Test (pytest)** (full Postgres suite with coverage,
 migration check and `compilemessages`), **Docker build**, **Secret scan
 (gitleaks)**, **Dependency audit**, **E2E (Playwright)** and **Lighthouse CI**
-on pull requests to `main`. Pre-commit hooks provide an earlier subset;
+on every pull request and on pushes to `main`. Pre-commit hooks provide an
+earlier subset;
 passing them does not replace the full CI gate. At the Phase 1 gate, run the
 full pytest suite and three consecutive complete browser runs, report the
 pending TOTP cases separately, and record the tested SHA and CI run in
@@ -385,7 +386,8 @@ Inbound — a new command or button:
   axe checks, harness self-checks and the twelve golden paths on three devices.
 - `tests/lighthouse/` and `.lighthouserc.json` — authenticated mobile
   performance measurements and budgets for Home, Approvals and Calendar.
-- `tests/js/` — fast Node tests of the thread's UI state.
+- `tests/js/` — fast Node tests of the thread's UI state and mocked browser
+  navigation synchronization.
 
 ## Documents
 

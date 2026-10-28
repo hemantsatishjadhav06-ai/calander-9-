@@ -58,6 +58,23 @@ Phase 1 also checks the manager's approval and the client's request for changes 
 `golden/11-isolation-inputs.spec.ts`. The existing invariant golden paths are retained unchanged.
 Golden path 12 is the single declared pending scenario until Phase 4 (one pending case per device).
 
+**Mock document navigation.** The page fixture waits for the document commit of a local,
+explicitly fulfilled HTML POST navigation before a later `page.goto`. WebKit can expose the
+response headers before that commit; immediately navigating to a mock OAuth callback otherwise
+races the unfinished form navigation. This boundary has a 10-second deadline and propagates
+failures. It never retries a navigation and does not change real requests, GETs, XHRs, subframes,
+or the external-network guard. A future test that intentionally cancels such a mock navigation
+can opt out with `test.use({ mockedNavigationBarrier: false })`. The helper's deterministic
+contract tests run in `npm run test:ui`; `self/mock-navigation.spec.ts` verifies ordering and
+ordinary failed navigation in each browser. The invariant onboarding golden path stays unchanged.
+
+Temporary stability verification includes the emoji scenario ([issue #18](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/18))
+and the WebKit onboarding scenario ([issue #19](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19))
+with `E2E_VERIFY_EMOJI_QUARANTINE=1 E2E_VERIFY_ONBOARDING_QUARANTINE=1 CI=1 npm run test:e2e`.
+Their default quarantines remain visible as skipped cases until three complete consecutive
+stability runs pass, followed by a normal CI run after removing the quarantines. They are never
+counted as passing merely because a normal CI run skipped them.
+
 ## What the server does
 
 One process, because the fakes are module attributes shared by the request threads and the worker:

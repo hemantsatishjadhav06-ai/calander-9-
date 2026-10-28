@@ -57,6 +57,14 @@ Calendar-only response compression, guarded by five new red-to-green tests
 for markup, CSP/CSRF, negotiation, fragments and access boundaries. Fresh
 performance and full final-source verification are pending.
 
+CI on `b5a04f0` passed all nine jobs, including Lighthouse after compression
+and the public-CSRF-test typing repair. The first local full stability run
+still found one intermittent WebKit mocked-OAuth navigation race in golden
+path 2 (140 passed, three TOTP skips, one failure). The sequence stopped;
+[issue #19](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19)
+tracks its quarantine and harness repair. The invariant test remains unchanged.
+This blocks gate completion alongside the emoji stability requirement.
+
 Remaining for the gate:
 
 1. Final-source full pytest with coverage at least main's exact ratio

@@ -63,7 +63,7 @@ concurrent suites. SQLite cannot exercise the row-locking tests.
 | Layer | Command | What a pass establishes |
 |---|---|---|
 | Unit and integration | `.venv/bin/pytest --cov=apps --cov-report=term-missing` | Full backend suite, including approval, isolation, privacy, provider mocks and task invariants |
-| UI state | `npm run test:ui` | The thread's JavaScript state transitions |
+| UI state | `npm run test:ui` | The thread's JavaScript state transitions and mocked browser navigation synchronization |
 | Template accessibility | `.venv/bin/pytest apps/common/tests/test_a11y_sweep.py` | HTML-level labels, dialogs and contrast conventions |
 | Palette | `.venv/bin/python tools/recolor.py --check` | No mapped old palette classes or hex values remain |
 | Browser and axe | `CI=1 npm run test:e2e` | Golden paths and accessibility checks on Desktop Chrome, iPhone 13 and Pixel 7 |
@@ -189,7 +189,7 @@ ruff check --fix .
 ruff format .
 ```
 
-CI runs **Agency UI state tests**, **Lint (ruff)**, **Type check (mypy)**, **Test (pytest)** (with migration checks and `compilemessages`), **Docker build**, **Secret scan (gitleaks)**, **Dependency audit**, **E2E (Playwright)** and **Lighthouse CI** on every pull request to `main`. The owner manages the required-check ruleset separately. Never commit real API keys, tokens, or passwords. Put them in your local `.env` (which is gitignored) and reference them by name in `.env.example`.
+CI runs **Agency UI state tests**, **Lint (ruff)**, **Type check (mypy)**, **Test (pytest)** (with migration checks and `compilemessages`), **Docker build**, **Secret scan (gitleaks)**, **Dependency audit**, **E2E (Playwright)** and **Lighthouse CI** on every pull request and on pushes to `main`. The owner manages the required-check ruleset separately. Never commit real API keys, tokens, or passwords. Put them in your local `.env` (which is gitignored) and reference them by name in `.env.example`.
 
 ## Submitting Changes
 
