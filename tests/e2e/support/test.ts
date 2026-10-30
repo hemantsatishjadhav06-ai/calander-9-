@@ -26,6 +26,7 @@ type TestFixtures = {
   network: NetworkGuard;
   onboardingQuarantine: void;
   handoffQuarantine: void;
+  calendarQuarantine: void;
   mockedNavigationBarrier: boolean;
 };
 
@@ -65,6 +66,18 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           /^(owner|editor) asks the team for a post on Home,/.test(testInfo.title) &&
           process.env.E2E_VERIFY_HANDOFF_QUARANTINE !== '1',
         'Quarantined while atomic draft handoff is repaired and verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/20',
+      );
+      await use();
+    },
+    { auto: true },
+  ],
+
+  calendarQuarantine: [
+    async ({}, use, testInfo) => {
+      testInfo.skip(
+        testInfo.file.endsWith('/self/ui-select.spec.ts') &&
+          process.env.E2E_VERIFY_CALENDAR_QUARANTINE !== '1',
+        'Quarantined while calendar keyboard access is repaired and verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21',
       );
       await use();
     },

@@ -3,7 +3,8 @@ Week view - 7 columns, hourly rows.
 Context: week_days, week_slots, workspace.
 {% endcomment %}
 
-<div class="overflow-auto tab-slide-in" style="max-height: calc(100vh - 220px);" data-testid="calendar-week-grid">
+<div class="overflow-auto tab-slide-in" style="max-height: calc(100vh - 220px);" data-testid="calendar-week-grid"
+     tabindex="0" role="region" aria-label="Calendar week">
   <div class="min-w-[760px]">
     <!-- Day headers -->
     <div class="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-ink-200 sticky top-0 bg-ink-25 z-10">

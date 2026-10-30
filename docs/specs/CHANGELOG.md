@@ -56,6 +56,34 @@ measuring anything. Those two jobs now explicitly use supported Ubuntu 24.04;
 browser versions, dependency validation, zero retries and budgets are unchanged.
 This is a workflow-only repair; it does not change the browser-tested app.
 
+**Focused browser verification:** original paths 3, 6 and 8 passed all 18
+cases on Desktop Chrome, real WebKit and Pixel 7 (236.02 seconds), with no
+skips, failures or retries. Their assertions are unchanged.
+
+**Accessibility blocker retained:** the first full stability attempt at
+`e1a62a4e715812180024a973fa0a6ebb05e736e7` found a serious axe
+`scrollable-region-focusable` violation in the Calendar week grid, through
+the existing filter self-test. The capped scroll region lacked keyboard access
+when its content provided no focusable controls. [Issue #21](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21)
+tracks the scoped repair and quarantine. The failed attempt was stopped:
+61 actual passes, one genuine failure, one interrupted case, one executed
+TOTP skip and 83 unrun cases. It is not a complete run or a gate pass.
+The parallel local pytest attempt was also stopped before changing the
+template; its partial coverage/results are not used as final gate evidence.
+Source remained unchanged throughout those interrupted attempts.
+
+**Keyboard repair:** a new isolated past-week browser regression reproduced
+the serious axe finding before the template change. The week grid now has
+`tabindex="0"`, a region role and the accessible name "Calendar week". Its
+layout, posts and actions are unchanged. The regression verifies Tab entry,
+PageDown, horizontal arrow scrolling where needed, and axe before/after.
+It and the unchanged filter test plus original paths 6 and 8 passed all 12
+focused cases across the three real browser projects (179.61 seconds; no
+skips, flaky cases or retries). The template accessibility sweep, CSP header
+and response-compression tests passed all 11 cases. The complete browser
+inventory is now 150 cases: 147 implemented cases and three deferred TOTP cases.
+All four quarantine scenarios must be included in fresh stability runs.
+
 **Gate, exactly as written in `BETA_PLAN.md` section 6:**
 
 > CI green with all new jobs; 12 e2e tests pass on the old UI.

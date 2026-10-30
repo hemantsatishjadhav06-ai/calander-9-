@@ -74,6 +74,17 @@ tracks the atomic handoff repair and quarantine. One full local browser pass
 (144 passed, three TOTP cases pending) predates that repair; the sequence was
 paused before its second run and does not satisfy the stability gate.
 
+The handoff fix passed 129 focused Python cases and 18 focused browser cases
+(original paths 3, 6 and 8 across all devices). CI's browser jobs are now pinned
+to supported Ubuntu 24.04 after `ubuntu-latest` moved to unsupported 26.04.
+The first full stability attempt then exposed a serious Calendar keyboard
+scrolling defect; [issue #21](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21)
+tracks its deterministic regression and template fix. The interrupted attempts
+are recorded separately in the changelog, not counted as complete gate runs.
+The keyboard fix passed all 12 focused browser cases (including unchanged
+paths 6 and 8) and 11 accessibility/CSP/compression Python cases. Fresh full
+stability verification now covers 150 cases, with only three TOTP cases pending.
+
 Remaining for the gate:
 
 1. Final-source full pytest with coverage at least main's exact ratio
