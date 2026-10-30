@@ -283,7 +283,8 @@ jobs:
 
   e2e:
     name: E2E (Playwright)
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 supports this image; ubuntu-latest moved to 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       CI: "1"
@@ -340,7 +341,8 @@ jobs:
 
   lighthouse:
     name: Lighthouse CI
-    runs-on: ubuntu-latest
+    # Keep browser installation on the image supported by the locked version.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       CI: "1"

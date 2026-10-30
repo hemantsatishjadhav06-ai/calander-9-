@@ -48,6 +48,14 @@ approval-workflow cases (61.72 seconds). Full mypy passed 955 files, Ruff
 passed, all 40 UI state tests and all 17 Lighthouse enforcement tests passed.
 The focused browser paths and final full gate are still pending.
 
+**CI runner compatibility:** [run 41078517196](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41078517196)
+on `a3197ec4eb3ba2f99113473d89bec9a5c0b3a214` exposed an infrastructure change:
+`ubuntu-latest` now selects Ubuntu 26.04, which locked Playwright 1.56.1 does
+not support. E2E and Lighthouse failed during browser installation, before
+measuring anything. Those two jobs now explicitly use supported Ubuntu 24.04;
+browser versions, dependency validation, zero retries and budgets are unchanged.
+This is a workflow-only repair; it does not change the browser-tested app.
+
 **Gate, exactly as written in `BETA_PLAN.md` section 6:**
 
 > CI green with all new jobs; 12 e2e tests pass on the old UI.
