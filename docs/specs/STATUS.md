@@ -1,7 +1,7 @@
 # Beta plan status
 
 Where each phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md) stands, and what is left. Updated
-28 Oct 2026. The detail of what changed and what each gate said is in [`CHANGELOG.md`](CHANGELOG.md).
+30 Oct 2026. The detail of what changed and what each gate said is in [`CHANGELOG.md`](CHANGELOG.md).
 
 | Phase | State |
 |---|---|
@@ -63,14 +63,23 @@ still found one intermittent WebKit mocked-OAuth navigation race in golden
 path 2 (140 passed, three TOTP skips, one failure). The sequence stopped;
 [issue #19](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19)
 tracks its quarantine and harness repair. The invariant test remains unchanged.
-This blocks gate completion alongside the emoji stability requirement.
+The bounded mocked-navigation repair is now present; its verification and the
+emoji stability requirement still need three consecutive complete runs.
+
+On resuming 30 Oct, PR #17 remained at `52892bca`. Its CI passed eight jobs,
+including 5,541 Python cases with one Redis-only skip and all performance
+budgets. E2E failed golden path 3: READY became visible before the platform
+posts entered review. [Issue #20](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/20)
+tracks the atomic handoff repair and quarantine. One full local browser pass
+(144 passed, three TOTP cases pending) predates that repair; the sequence was
+paused before its second run and does not satisfy the stability gate.
 
 Remaining for the gate:
 
 1. Final-source full pytest with coverage at least main's exact ratio
    (41,054/47,301 statements; 87% when displayed), three consecutive complete
-   browser runs with the repaired emoji case included, and all nine CI jobs
-   green after removing its quarantine. TOTP stays pending for Phase 4.
+   browser runs with all repaired quarantined cases included, and all nine CI
+   jobs green after removing the quarantines. TOTP stays pending for Phase 4.
 2. Fresh CI performance measurements with every section 5 budget unchanged.
    All samples and the configured medians are retained as CI artifacts.
 3. Gate record: quote section 6 exactly and record final commands, tested

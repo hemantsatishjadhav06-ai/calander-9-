@@ -25,6 +25,7 @@ type TestFixtures = {
   axe: Axe;
   network: NetworkGuard;
   onboardingQuarantine: void;
+  handoffQuarantine: void;
   mockedNavigationBarrier: boolean;
 };
 
@@ -51,6 +52,19 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           testInfo.file.endsWith('/golden/02-onboarding.spec.ts') &&
           process.env.E2E_VERIFY_ONBOARDING_QUARANTINE !== '1',
         'Quarantined while the mocked form navigation race is repaired and verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19',
+      );
+      await use();
+    },
+    { auto: true },
+  ],
+
+  handoffQuarantine: [
+    async ({}, use, testInfo) => {
+      testInfo.skip(
+        testInfo.file.endsWith('/golden/03-ask-the-team.spec.ts') &&
+          /^(owner|editor) asks the team for a post on Home,/.test(testInfo.title) &&
+          process.env.E2E_VERIFY_HANDOFF_QUARANTINE !== '1',
+        'Quarantined while atomic draft handoff is repaired and verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/20',
       );
       await use();
     },

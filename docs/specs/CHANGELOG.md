@@ -3,6 +3,60 @@
 One entry per phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md): the date, what changed, and what the
 phase gate (section 6) said. Newest first.
 
+## 30 Oct 2026 — Phase 1: atomic review handoff and final verification (in progress)
+
+Resumed the existing draft PR #17 at
+`52892bca85347521166453a61e36025066cc6e30`; both the remote branch and main
+were unchanged. The interrupted turn left only a new, uncommitted transaction
+regression file, which was preserved. No merge, release or Phase 2 is authorized.
+
+**Starting evidence:** [CI run 40667942809](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/40667942809)
+passed eight jobs, including 5,541 Python cases with one Redis-only skip
+(209 subtests reported separately), coverage 41,162/47,406 statements
+(86.828671%, above main's 86.793091%), and all mobile performance budgets.
+Its browser job failed: 139 passed, seven explicitly deferred/quarantined,
+one failure, zero retries. Golden path 3 observed a READY/DONE brief while
+both platform posts were still drafts. The producer committed readiness before
+submitting those posts for review. [Issue #20](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/20)
+tracks this application race and its temporary quarantine; its invariant test
+will remain unchanged.
+
+One local full run on that commit passed 144 cases with only three deferred
+TOTP cases (863.65 seconds). The sequence was intentionally paused before
+run two because of the CI failure; this is not three consecutive passes or a
+completed gate. Fresh evidence is required after the handoff repair.
+
+**Repair:** handoff now locks the brief, post and platform posts in the same
+order as revision/discard, then commits the draft, review submission and READY
+state together. A failed or unmoved channel rolls the whole handoff back.
+Reviewer notifications run after that transaction exits in the autocommit
+background step; ordinary callers retain the approval service's synchronous
+default. No broad notification or approval policy changed. No final READY write
+can overwrite a human decision made when the notification arrives.
+
+New transaction tests first exposed three failures (visibility and two rollback
+cases), then two additional failures for skipped channel transitions. They use
+an independent database connection to observe committed state, and cover stale
+revisions, discard, review trust and immediate human approval. The new retry
+assertion was corrected to respect the existing revision-bound review guard:
+an old review cannot authorize a new revision; request changes and re-review
+before submitting again. The original invariant tests remain untouched.
+
+The focused Python run passed 129 cases, including all nine new transaction
+regressions and the existing pipeline, verified-claim, retry/scheduling and
+approval-workflow cases (61.72 seconds). Full mypy passed 955 files, Ruff
+passed, all 40 UI state tests and all 17 Lighthouse enforcement tests passed.
+The focused browser paths and final full gate are still pending.
+
+**Gate, exactly as written in `BETA_PLAN.md` section 6:**
+
+> CI green with all new jobs; 12 e2e tests pass on the old UI.
+
+**Result: pending.** The handoff repair, final-source full pytest and three
+complete consecutive browser runs with every quarantined case enabled,
+quarantine removal and normal CI remain required. Golden path 12 stays
+pending until Phase 4 under the owner's explicit exception.
+
 ## 28 Oct 2026 — Phase 1: finish the performance and stability gate (in progress)
 
 Resumed the same open PR #17 from `d1dcb1463ed37dd0f99a94b0c5774adbc4d3cd7b`.
