@@ -1,5 +1,6 @@
 import { expect, test } from '../support/test';
 import { settled } from '../support/settled';
+import { scrollWithKey } from '../support/scroll';
 
 test('an empty past calendar week is reachable and scrollable with the keyboard', async ({ page, harness, as, axe }) => {
   const workspace = await harness.fixture<{
@@ -19,11 +20,11 @@ test('an empty past calendar week is reachable and scrollable with the keyboard'
   await timezoneToggle.focus();
   await timezoneToggle.press('Tab');
   await expect(grid).toBeFocused();
-  await grid.press('PageDown');
+  await scrollWithKey(grid, 'PageDown');
   await expect.poll(() => grid.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
   if (await grid.evaluate((element) => element.scrollWidth > element.clientWidth)) {
-    await grid.press('ArrowRight');
+    await scrollWithKey(grid, 'ArrowRight');
     await expect.poll(() => grid.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
   }
   await axe(page, 'Calendar week after keyboard scrolling');

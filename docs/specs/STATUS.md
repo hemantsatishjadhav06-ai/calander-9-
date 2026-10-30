@@ -85,6 +85,20 @@ The keyboard fix passed all 12 focused browser cases (including unchanged
 paths 6 and 8) and 11 accessibility/CSP/compression Python cases. Fresh full
 stability verification now covers 150 cases, with only three TOTP cases pending.
 
+At `ac164ef`, full CI pytest passed 5,550 cases with one Redis-only skip,
+coverage above main, and every performance budget passed. Two full local
+browser runs passed 147 cases each with three TOTP cases pending. CI exposed
+an overlapping-scroll race in the new Pixel 7 keyboard test; issue
+[#22](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/22) tracks
+waiting for native scroll completion without repeating input or weakening
+movement assertions. The third local attempt was stopped before completion.
+A fresh full stability sequence and normal CI are still required.
+The native-event helper has passed controlled ordering checks on Chromium and
+WebKit; it preserves one keypress per axis, the movement assertions and a bounded
+failure path. Focused verification and fresh complete suites are in progress.
+The focused run has now passed all 12 cases across the three device projects
+(175.36 seconds). The fresh three-run sequence and normal CI remain pending.
+
 Remaining for the gate:
 
 1. Final-source full pytest with coverage at least main's exact ratio

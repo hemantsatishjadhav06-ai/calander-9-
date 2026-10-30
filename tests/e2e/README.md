@@ -71,13 +71,19 @@ ordinary failed navigation in each browser. The invariant onboarding golden path
 Temporary stability verification includes the emoji scenario ([issue #18](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/18)),
 the WebKit onboarding scenario ([issue #19](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19)),
 the owner/editor draft handoff scenarios on all three devices ([issue #20](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/20)),
-and Calendar filter accessibility ([issue #21](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21))
-with `E2E_VERIFY_EMOJI_QUARANTINE=1 E2E_VERIFY_ONBOARDING_QUARANTINE=1 E2E_VERIFY_HANDOFF_QUARANTINE=1 E2E_VERIFY_CALENDAR_QUARANTINE=1 CI=1 npm run test:e2e`.
+Calendar filter accessibility ([issue #21](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21)),
+and Pixel 7 keyboard scroll completion ([issue #22](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/22))
+with `E2E_VERIFY_EMOJI_QUARANTINE=1 E2E_VERIFY_ONBOARDING_QUARANTINE=1 E2E_VERIFY_HANDOFF_QUARANTINE=1 E2E_VERIFY_CALENDAR_QUARANTINE=1 E2E_VERIFY_KEYBOARD_QUARANTINE=1 CI=1 npm run test:e2e`.
 The client refusal scenarios remain active. The original golden-path assertions are unchanged.
-The new isolated past-week keyboard regression stays active in normal CI.
+The isolated past-week keyboard regression remains active on Desktop Chrome and WebKit.
 Their default quarantines remain visible as skipped cases until three complete consecutive
 stability runs pass, followed by a normal CI run after removing the quarantines. They are never
 counted as passing merely because a normal CI run skipped them.
+
+Keyboard scrolling uses `support/scroll.ts`: install a bounded native `scrollend` listener,
+send one key, then await completion before scrolling on the other axis. The movement assertions
+remain separate; starting to move is not evidence that the previous native animation has finished.
+The helper neither sleeps nor repeats input, and it removes listeners and timers on completion or failure.
 
 ## What the server does
 

@@ -84,6 +84,46 @@ and response-compression tests passed all 11 cases. The complete browser
 inventory is now 150 cases: 147 implemented cases and three deferred TOTP cases.
 All four quarantine scenarios must be included in fresh stability runs.
 
+**Full verification at `ac164ef3815ba3c3b18f3baa725b9466e50be81d`:**
+[CI run 41081319505](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41081319505)
+passed eight jobs. Full pytest passed 5,550 cases with one Redis-only skip
+and 209 subtests reported separately; exact coverage was 41,176/47,416
+statements (86.839885%), above main. All Lighthouse budgets passed: Home
+Performance 96 / LCP 2,145 ms / measured lab INP 136 ms; Approvals
+96 / 1,348 ms / 128 ms; Calendar 96 / 1,317 ms / 112 ms. CLS and gzip
+JavaScript also passed. The complete artifacts were digest-verified.
+
+The CI browser job failed only the new Pixel 7 keyboard test: 133 passed,
+16 explicitly skipped, one failure, zero retries. Its horizontal movement
+assertion found `scrollLeft` still zero. The trace shows PageDown's vertical
+scroll still moving (489 → 529 → 541) around the ArrowRight keypress.
+Waiting for movement to start did not wait for it to finish.
+[Issue #22](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/22)
+tracks this harness synchronization repair and its temporary quarantine.
+
+Two complete local suites on the same unchanged source each passed 147
+cases with only three TOTP cases pending, zero failures/flaky outcomes/retries
+(983.15 and 990.10 seconds). The third attempt was stopped for the repair:
+40 passed, one interrupted, one executed TOTP skip and 108 unrun cases.
+Those two passes remain historical evidence; a fresh three-run sequence is
+required after correcting the keyboard synchronization. No invariant assertion
+or performance budget is relaxed.
+
+**Native-scroll synchronization:** a controlled check reproduced the ordering
+defect before the repair: PageDown and ArrowRight were sent without an intervening
+`scrollend`. That local probe did not always reproduce zero horizontal movement;
+CI provides the actual failing movement assertion. The new test helper installs
+and acknowledges a native listener before sending one key, waits for completion
+with a five-second failure bound, and cleans up its listener/timer. The repaired
+controlled checks pass on Chromium and WebKit with the order key → end → key →
+end and exactly one keypress per axis. Both movement assertions remain intact;
+there are no sleeps, input retries or application changes for this repair.
+Focused verification then passed all 12 cases across the three projects
+(175.36 seconds), including Pixel 7's unchanged horizontal assertion,
+the existing filter checks and original golden paths 6 and 8. Five explicit
+verification flags now include every quarantined scenario in the fresh
+150-case stability sequence; no quarantine skip counts as a pass.
+
 **Gate, exactly as written in `BETA_PLAN.md` section 6:**
 
 > CI green with all new jobs; 12 e2e tests pass on the old UI.

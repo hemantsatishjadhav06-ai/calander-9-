@@ -27,6 +27,7 @@ type TestFixtures = {
   onboardingQuarantine: void;
   handoffQuarantine: void;
   calendarQuarantine: void;
+  keyboardQuarantine: void;
   mockedNavigationBarrier: boolean;
 };
 
@@ -78,6 +79,19 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         testInfo.file.endsWith('/self/ui-select.spec.ts') &&
           process.env.E2E_VERIFY_CALENDAR_QUARANTINE !== '1',
         'Quarantined while calendar keyboard access is repaired and verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21',
+      );
+      await use();
+    },
+    { auto: true },
+  ],
+
+  keyboardQuarantine: [
+    async ({}, use, testInfo) => {
+      testInfo.skip(
+        testInfo.project.name === 'pixel-7' &&
+          testInfo.file.endsWith('/self/calendar-keyboard.spec.ts') &&
+          process.env.E2E_VERIFY_KEYBOARD_QUARANTINE !== '1',
+        'Quarantined while native keyboard scroll completion is verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/22',
       );
       await use();
     },
