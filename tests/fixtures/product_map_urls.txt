@@ -1,0 +1,135 @@
+# The URL gate's frozen list: docs/specs/02-cut-and-merge.md R9, read by tests/test_product_map_urls.py.
+#
+# Every URL name and path docs/PRODUCT_MAP.md listed at the start of Phase 2 (the map as of commit
+# 38f4eab, unchanged at fd94517 when this list was taken), in the map's order, plus the pages the map
+# names only in prose (marked "prose"; docs/specs/phase-2-code-map.md, AREA productmap). Taken before
+# T13 rewrote the map, so every old link keeps being tested. Never remove an entry; when the map gains
+# a URL, add it here (the test fails until you do).
+#
+# One entry per line, then its marks, then "# why" wherever the owner's answer is not a plain 200:
+#   app:name                 a URL name; workspace_id is filled with workspace A when the pattern takes it
+#   app:name?query           ... with the query string the map gives it
+#   app:name kwarg=<object>  ... with another part filled from an object the test makes in workspace A:
+#                            brief, job, conversation, token (a client's magic link), connection (a bot)
+#   /path/                   a path as the map writes it; W/ stands for /workspace/<workspace id>/,
+#                            <brief id> and the like for the same objects, and a trailing … is dropped
+# Marks (a 301/302 to a page that answers 200 is always accepted and needs none):
+#   405      the view takes POST only, so a GET answers 405 by design
+#   403      refused to the owner by design
+#   portal   needs a client's portal session: the owner is sent to the portal's sign-in page
+#   skip     not a URL; listed so that every token of the map is accounted for
+
+# Preamble
+/workspace/<workspace id>/  skip  # the prefix every workspace page sits under, not a page of its own
+app:name  skip  # the map's notation for a URL name
+
+# Where things are on the screen: signing in, and the sidebar footer
+/  # 302 to the person's landing page (Home for the owner)
+accounts:settings  # prose: "your account", from the sidebar footer
+
+# Home
+studio:index
+W/studio/
+studio:create  405  # POST only: an idea typed on Home
+
+# Set up
+studio:setup
+W/studio/setup/
+
+# Routines
+studio:routines  # 301 to Activity's routines section (D4); its POST handlers stay
+W/studio/routines/  # the same 301
+
+# Team; a job
+studio:team  # the name moved to /studio/activity/ (D4)
+W/studio/team/  # 301 to Activity (D4)
+studio:job job_id=<job>
+studio:team_board
+
+# Settings hub and its pages
+studio:settings_hub  # 301 to Settings, Brand tab (D5)
+W/studio/settings/  # the same 301
+studio:brand
+studio:trust  # with the advanced_settings switch on, 301 to Settings, Advanced tab (D5, D6)
+studio:memory  # with the advanced_settings switch on, 301 to Settings, Advanced tab (D5, D6)
+studio:outcomes
+studio:autopilot
+telegram:settings
+
+# A post
+studio:detail brief_id=<brief>
+W/studio/<brief id>/
+
+# The team thread page
+studio:thread
+W/studio/thread/
+
+# Approvals, the Calendar's list view
+calendar:calendar?mode=list&tab=approvals
+W/calendar/?mode=list&tab=approvals
+
+# Calendar
+calendar:calendar
+W/calendar/
+calendar:queue_list
+calendar:posting_slots
+
+# Inbox
+inbox:feed
+W/inbox/
+
+# Blog & SEO
+blog:list
+W/blog/
+blog:write
+
+# Analytics
+analytics:index  # 302 to the first connected account's analytics
+W/analytics/  # the same 302
+
+# Notifications
+notifications:list
+/notifications/
+notifications:preferences  # prose: "under preferences"
+
+# More
+composer:create_landing
+composer:drafts_list
+composer:template_list  # prose: Templates
+composer:category_list  # prose: Categories
+composer:csv_upload  # prose: Import CSV
+media_library:index
+
+# Workspace settings
+workspaces:settings  # 301 to Settings, Brand tab (D5)
+workspaces:approvals_settings
+client_portal_admin:client_list  # prose: Clients; 301 to Settings, Team & clients tab (D5)
+social_accounts:list  # prose: Social accounts; 301 to Settings, Accounts tab (D5)
+members:list  # prose: Members
+
+# Telegram
+W/agency/telegram/
+/webhooks/telegram/<connection id>/  405  # Telegram's webhook ingress takes POST only
+
+# Client portal
+/portal/…  portal  # the portal's dashboard; 302 to its sign-in page without a portal session
+client_portal:magic_link_entry token=<token>
+client_portal:team  portal  # Talk to the team
+client_portal:dashboard  portal  # prose: the dashboard
+client_portal:approval_queue  portal  # prose: Approvals
+client_portal:published  portal  # prose: Published
+client_portal:activity  portal  # prose: Activity
+client_portal:reports  portal  # prose: Reports
+client_portal:telegram  portal  # prose: Telegram
+
+# Older entry points that still work
+studio:workflow  # 302 to Home
+studio:workflow_create  405  # POST only
+studio:workflow_resume conversation_id=<conversation>  405  # the map writes it without its namespace; POST only
+studio:workflow_status  # the map writes it without its namespace
+
+# How work flows
+studio:thread_stop_brief conversation_id=<conversation> brief_id=<brief>  405  # prose: Stop on the brief card; POST only
+studio:inbox_draft  405  # prose: Draft replies with the team; POST only
+/routines  skip  # a Telegram command, not a URL
+/mute  skip  # a Telegram command, not a URL
