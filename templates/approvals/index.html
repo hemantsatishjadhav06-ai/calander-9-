@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% comment %}
+The Approvals screen (spec D3): the Calendar list's Approvals tab on a page of its own.
+The list is calendar/partials/publish_approvals.html, unchanged: it refreshes itself
+through calendar:publish_tab_approvals into #tab-content, and every refresh carries the
+Publish tab bar's four counts out of band, so this page keeps hidden targets for them.
+The filters and their publishList() scope are the Calendar list's own partials.
+{% endcomment %}
+
+{% block title %}Approvals - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{% block page_header %}
+<div class="w-full max-w-[1180px] mx-auto mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+    <div class="min-w-0">
+        <h1 class="ui-page-title">Approvals</h1>
+        <p class="ui-page-status">{% if can_approve %}Review each post, then approve it or ask for changes.{% else %}Posts waiting for a decision. An approver acts on them.{% endif %}</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+@layer components {
+    {% include "calendar/partials/_publish_filter_styles.html" %}
+}
+    {% include "calendar/partials/_publish_list_styles.html" %}
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="publishList()" class="flex-1 flex flex-col w-full max-w-[1180px] mx-auto">
+    <div class="flex flex-wrap items-end justify-end gap-x-6 gap-y-3 border-b border-ink-200">
+        {% include "calendar/partials/_publish_filters.html" %}
+    </div>
+    {# Targets for the Publish tab bar's out-of-band counts; this page shows no tab bar. #}
+    <div hidden><span id="tabcount-queue"></span><span id="tabcount-drafts"></span><span id="tabcount-approvals"></span><span id="tabcount-sent"></span></div>
+
+    <div id="tab-content" class="mt-6 flex-1 [&>*]:w-full">
+        {% include "calendar/partials/publish_approvals.html" %}
+    </div>
+</div>
+{# Toast host: outside #tab-content so an approval action's list refresh doesn't tear down the toast #}
+{% include "approvals/partials/_toasts.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ request.csp_nonce }}">
+{% include "calendar/partials/_publish_list_script.html" %}
+</script>
+{% endblock %}
