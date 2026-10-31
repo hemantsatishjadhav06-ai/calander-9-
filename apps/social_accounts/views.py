@@ -173,27 +173,29 @@ def _resolve_mastodon_extra_creds(session_data):
 # ------------------------------------------------------------------
 
 
-@login_required
-@require_permission("manage_social_accounts")
-def account_list(request, workspace_id):
-    """List connected social accounts for a workspace."""
+def account_list_context(request, workspace_id) -> dict:
+    """What the accounts list shows: this page and Settings → Accounts read the same values."""
     accounts = (
         SocialAccount.objects.for_workspace(workspace_id)
         .prefetch_related("posting_slots")
         .order_by("platform", "account_name")
     )
-    configured_platforms = _get_configured_platforms(request.org.id)
+    return {
+        "accounts": accounts,
+        "workspace_id": workspace_id,
+        "configured_platforms": _get_configured_platforms(request.org.id),
+        "platform_choices": PlatformCredential.Platform.choices,
+    }
 
+
+@login_required
+@require_permission("manage_social_accounts")
+def account_list(request, workspace_id):
+    """List connected social accounts for a workspace."""
     return render(
         request,
         "social_accounts/list.html",
-        {
-            "accounts": accounts,
-            "workspace_id": workspace_id,
-            "configured_platforms": configured_platforms,
-            "platform_choices": PlatformCredential.Platform.choices,
-            "settings_active": "social_accounts",
-        },
+        {**account_list_context(request, workspace_id), "settings_active": "social_accounts"},
     )
 
 

@@ -111,6 +111,8 @@ urlpatterns = [
     ),
     # Approval Workflow (Stream F)
     path("workspace/<uuid:workspace_id>/", include("apps.approvals.urls")),
+    # Settings: one screen with a tab per settings page (?tab=), ahead of the client admin below it.
+    path("workspace/<uuid:workspace_id>/settings/", include("apps.studio.urls_settings")),
     # Client Portal Admin (workspace settings)
     path("workspace/<uuid:workspace_id>/settings/clients/", include("apps.client_portal.urls_admin")),
     # Media Library

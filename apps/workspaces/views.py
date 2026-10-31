@@ -183,10 +183,7 @@ def approvals_settings(request, workspace_id):
     if not membership:
         raise Http404
 
-    is_owner_or_manager = membership.workspace_role in (
-        WorkspaceMembership.WorkspaceRole.OWNER,
-        WorkspaceMembership.WorkspaceRole.MANAGER,
-    )
+    is_owner_or_manager = can_manage_approvals(membership)
 
     if request.method == "POST":
         if not is_owner_or_manager:
@@ -217,11 +214,23 @@ def approvals_settings(request, workspace_id):
     return render(
         request,
         "workspaces/approvals_settings.html",
-        {
-            "workspace": workspace,
-            "settings_active": "approvals",
-            "is_owner_or_manager": is_owner_or_manager,
-            "is_owner": membership.workspace_role == WorkspaceMembership.WorkspaceRole.OWNER,
-            "approval_modes": Workspace.ApprovalWorkflowMode,
-        },
+        {**approvals_settings_context(workspace, membership), "settings_active": "approvals"},
     )
+
+
+def can_manage_approvals(membership) -> bool:
+    """Who may change the approval workflow: a workspace owner or manager."""
+    return membership.workspace_role in (
+        WorkspaceMembership.WorkspaceRole.OWNER,
+        WorkspaceMembership.WorkspaceRole.MANAGER,
+    )
+
+
+def approvals_settings_context(workspace, membership) -> dict:
+    """What the approvals form shows: this page and Settings → Approvals read the same values."""
+    return {
+        "workspace": workspace,
+        "is_owner_or_manager": can_manage_approvals(membership),
+        "is_owner": membership.workspace_role == WorkspaceMembership.WorkspaceRole.OWNER,
+        "approval_modes": Workspace.ApprovalWorkflowMode,
+    }
