@@ -3,6 +3,57 @@
 One entry per phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md): the date, what changed, and what the
 phase gate (section 6) said. Newest first.
 
+## 31 Oct 2026 — Phase 1: quarantines removed, gate passed
+
+Resumed PR #17 at `d197897` (all nine CI jobs green, four harness races and the
+emoji scenario still quarantined). No merge, release or Phase 2 work had happened.
+
+**Quarantines removed** (`3e12c00`): the emoji picker (#18), WebKit onboarding
+(#19), the owner/editor draft handoff (#20), Calendar filter accessibility (#21)
+and Pixel 7 keyboard scroll completion (#22) run in every suite again. CI on
+`3e12c00` passed all nine jobs.
+
+**A real defect the restored cases found** (`5e242dc`, `0d9f7a9`): the first full
+local run on `3e12c00` failed the emoji picker on the iPhone 13 viewport. On a
+phone the sidebar is a modal drawer with its own focus trap; opening New idea from
+it left the drawer open behind the dialog, and the drawer's trap pulled focus back
+from the dialog's title (in 2 of 4 Pixel 7 probes focus ended on the dialog's
+Close button). Red first: `tests/e2e/self/phone-menu-focus.spec.ts` failed on
+iPhone 13 and Pixel 7. The fix closes the drawer before the dialog opens and gives
+the title `autofocus`, which the dialog's trap uses as its initial focus. A first
+attempt (`5e242dc`) also replaced the drawer's own focus hand-back; CI showed that
+hand-back did not land in WebKit, so `0d9f7a9` restores the drawer's original close
+behaviour exactly (as `test_shell_a11y` pins it) and keeps only the fix.
+
+**Gate evidence on `0d9f7a9fe2b086fb6f705515cc1f3e1122d018fa`:**
+
+- [CI run 41196779114](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41196779114):
+  all nine jobs passed. Full pytest **5,551 passed, 1 Redis-only skip**, 209
+  subtests; coverage **41,174/47,416 statements (86.8357%)**, above main's
+  41,054/47,301 (86.7931%). Browsers (WebKit for iPhone 13, zero retries): **150
+  passed, 3 skipped** — the three golden path 12 (TOTP) cases, declared pending
+  until Phase 4. Lighthouse mobile medians, budgets unchanged: Home 98 / LCP
+  1,789 ms / lab INP 96 ms; Approvals 99 / 1,396 ms / 72 ms; Calendar 99 /
+  1,547 ms / 64 ms; CLS ≤ 0.07; gzip JavaScript 69–79 KB.
+- Three consecutive complete local browser runs on the same commit (`npx playwright
+  test`, Chromium for all three projects; WebKit cannot be downloaded in this
+  environment, so iPhone 13 ran on Chromium's iPhone emulation and is not Safari
+  evidence): **run 1** 150 passed, 3 skipped (TOTP), 0 failed (1,202 s);
+  **run 2** 150 passed, 3 skipped, 0 failed (1,202 s); **run 3** 150 passed, 3
+  skipped, 0 failed (1,252 s). Zero retries, nothing quarantined.
+- Re-running the CI workflow from this session is refused (403), so the WebKit
+  evidence is the CI run above plus the CI run on the commit that records this gate
+  (same application and test tree).
+
+**Gate, exactly as written in `BETA_PLAN.md` section 6:**
+
+> CI green with all new jobs; 12 e2e tests pass on the old UI.
+
+**Result: passed**, with golden path 12 pending under the owner's exception until
+Phase 4 (TOTP), reported separately and never counted as passing. "Make CI required
+on `main`" is a repository setting only the owner can change. The owner authorized
+merge and release on 31 Oct.
+
 ## 30 Oct 2026 — Phase 1: atomic review handoff and final verification (in progress)
 
 Resumed the existing draft PR #17 at

@@ -1,17 +1,31 @@
 # Beta plan status
 
 Where each phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md) stands, and what is left. Updated
-30 Oct 2026. The detail of what changed and what each gate said is in [`CHANGELOG.md`](CHANGELOG.md).
+31 Oct 2026. The detail of what changed and what each gate said is in [`CHANGELOG.md`](CHANGELOG.md).
 
 | Phase | State |
 |---|---|
 | 0 · Agree the cut | **Done.** Spec approved, gate passed, released to production (24 Oct, main `6d9cf1d`). |
-| 1 · Test harness first | **Completion and full verification in progress**, on open PR #17 (branch `claude/trusting-dijkstra-m7nul1`); gate not yet passed. |
-| 2 · Cut and merge, no restyling | Not started. |
+| 1 · Test harness first | **Gate passed** on `0d9f7a9` (31 Oct): CI green on all nine jobs, three consecutive complete browser runs, TOTP pending for Phase 4. Merge and release authorized by the owner; release waits for production to be back online. |
+| 2 · Cut and merge, no restyling | **In progress**: spec `02-cut-and-merge.md`, plan `phase-2.md` and code map written; tasks T1–T2 done. |
 | 3 · Rebuild the nine screens | Not started. |
 | 4 · Standards | Not started (two pieces landed early: dependency audits and `compilemessages` in CI). |
 | 5 · Platform connections | Not started; most of it waits on the owner's developer apps. |
 | 6 · Beta release | Not started. |
+
+## Phase 1 — gate passed (31 Oct)
+
+On `0d9f7a9` the five quarantines are gone and every browser case runs. CI run
+41196779114 passed all nine jobs (pytest 5,551 passed, one Redis-only skip,
+coverage 86.84% above main's 86.79%; browsers 150 passed with WebKit, 3 TOTP
+pending; Lighthouse Home 98, Approvals 99, Calendar 99). Three consecutive local
+runs passed 150 each (Chromium for all projects). The restored emoji case exposed a
+real phone-menu focus bug, fixed red-first. Details in `CHANGELOG.md`.
+
+**Production is offline** since about 06:22 UTC on 31 Oct: Railway shows the web,
+worker, Postgres and Redis services stopped and the Phase 0 deployments removed;
+the data volumes are still attached. The cause (billing or an account restriction)
+is with the owner. Releasing Phase 1 waits for it.
 
 ## Phase 1 — completion and verification
 
