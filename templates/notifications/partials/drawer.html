@@ -22,6 +22,7 @@
         {% for n in notifications %}
         <li
             id="notif-{{ n.id }}"
+            data-testid="notifications-item-{{ n.id }}"
             class="group relative transition-colors duration-150 hover:bg-ink-25"
         >
             <a

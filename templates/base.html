@@ -731,7 +731,7 @@
             {% endif %}
 
             <!-- Navigation: the places from apps/common/navigation.build_nav, then Settings, the gear, at the bottom. -->
-            <nav class="sidebar-nav flex-1 overflow-y-auto pt-1 pb-3 px-3 flex flex-col gap-0.5" :class="sidebarCollapsed ? 'px-2' : 'px-3'" aria-label="Main">
+            <nav class="sidebar-nav flex-1 overflow-y-auto pt-1 pb-3 px-3 flex flex-col gap-0.5" :class="sidebarCollapsed ? 'px-2' : 'px-3'" aria-label="Main" data-testid="sidebar-nav">
                 {% block sidebar_nav %}{% spaceless %}
                 {% for item in nav.items %}
                 <a href="{{ item.url }}" data-testid="nav-{{ item.key }}" class="sidebar-nav-item{% if item.active %} active{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}

@@ -27,7 +27,7 @@ nothing swaps nothing, and only meaningful changes are announced in #team-live-a
         {% include "components/agency_tabs.html" %}
     </div>
 
-    <div id="team-board" data-live-board data-no-error-toast
+    <div id="team-board" data-live-board data-no-error-toast data-testid="activity-board"
          hx-get="{% url 'studio:team_board' workspace_id=workspace.id %}"
          hx-trigger="every 5s [document.visibilityState === 'visible']"
          hx-swap="innerHTML">
@@ -38,7 +38,7 @@ nothing swaps nothing, and only meaningful changes are announced in #team-live-a
     {# ---- Routines: the standing instructions and three presets, for people who may create posts ---- #}
     {% if routines_section %}
     {% with section=routines_section %}
-    <section id="routines" aria-labelledby="activity-routines-heading" class="mt-6 scroll-mt-6" data-activity-routines>
+    <section id="routines" aria-labelledby="activity-routines-heading" class="mt-6 scroll-mt-6" data-activity-routines data-testid="activity-routines">
         <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-3">
             <h2 id="activity-routines-heading" class="text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Routines</h2>
             <p class="text-[13px] text-ink-600">Your team runs them on time ({{ section.tzname }}); every post still waits for your approval.</p>

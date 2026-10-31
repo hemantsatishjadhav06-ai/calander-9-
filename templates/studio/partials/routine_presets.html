@@ -7,7 +7,7 @@ Context: workspace, suggestions (a list of the presets with their key).
     <h2 id="suggestions-heading" class="text-h3 text-ink-950">Start with one of these</h2>
     <ul class="mt-2 divide-y divide-ink-200">
         {% for item in suggestions %}
-        <li class="flex items-start justify-between gap-3 py-3 last:pb-0">
+        <li class="flex items-start justify-between gap-3 py-3 last:pb-0" data-testid="routine-preset-{{ item.key }}">
             <div class="min-w-0">
                 <p class="text-sm font-semibold text-ink-900">{{ item.title }}</p>
                 <p class="text-[13px]/[18px] text-ink-600">{{ item.blurb }}</p>

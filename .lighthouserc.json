@@ -3,7 +3,7 @@
     "collect": {
       "url": [
         "/workspace/00000000-0000-4000-8000-00000000000a/studio/",
-        "/workspace/00000000-0000-4000-8000-00000000000a/calendar/?mode=list&tab=approvals",
+        "/workspace/00000000-0000-4000-8000-00000000000a/approvals/",
         "/workspace/00000000-0000-4000-8000-00000000000a/calendar/?mode=calendar&view=month"
       ],
       "numberOfRuns": 3,

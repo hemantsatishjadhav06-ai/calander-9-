@@ -31,6 +31,17 @@ test('configuration enforces the exact section 5 budgets with three mobile runs'
   assert.equal(config.smbean.javascriptGzipMaxBytes, 150000);
 });
 
+test('measures Home, the Approvals screen and the Calendar, in the runner\'s order', () => {
+  // run.mjs pairs these by position with home-today, approvals-list and calendar-shell. Approvals is
+  // its own screen (spec D10), never the Calendar's tab and never an address that redirects.
+  const workspace = '/workspace/00000000-0000-4000-8000-00000000000a';
+  assert.deepEqual(config.ci.collect.url, [
+    `${workspace}/studio/`,
+    `${workspace}/approvals/`,
+    `${workspace}/calendar/?mode=calendar&view=month`,
+  ]);
+});
+
 test('cannot turn a budget into a warning or silently omit it', () => {
   const warned = structuredClone(config);
   warned.ci.assert.assertions['categories:performance'][0] = 'warn';

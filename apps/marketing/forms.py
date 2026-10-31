@@ -36,7 +36,9 @@ class RequestInviteForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, token in self.AUTOCOMPLETE.items():
-            self.fields[name].widget.attrs.update({"class": "mk-input", "autocomplete": token})
+            self.fields[name].widget.attrs.update(
+                {"class": "mk-input", "autocomplete": token, "data-testid": f"request-invite-{name}"}
+            )
 
     def clean_name(self) -> str:
         return _one_line(self.cleaned_data["name"])

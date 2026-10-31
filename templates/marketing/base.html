@@ -36,9 +36,9 @@
             <span>{{ site_name }}</span>
         </a>
         <nav id="marketing-navigation" class="mk-nav" aria-label="Primary">
-            <a href="{% url 'marketing:home' %}" {% if page_key == 'home' %}class="is-active" aria-current="page"{% endif %}>Home</a>
-            <a href="{% url 'marketing:how_it_works' %}" {% if page_key == 'how_it_works' %}class="is-active" aria-current="page"{% endif %}>How it works</a>
-            <a href="{% url 'marketing:request_invite' %}" {% if page_key == 'request_invite' %}class="is-active" aria-current="page"{% endif %}>Request invite</a>
+            <a data-testid="marketing-nav-home" href="{% url 'marketing:home' %}" {% if page_key == 'home' %}class="is-active" aria-current="page"{% endif %}>Home</a>
+            <a data-testid="marketing-nav-how_it_works" href="{% url 'marketing:how_it_works' %}" {% if page_key == 'how_it_works' %}class="is-active" aria-current="page"{% endif %}>How it works</a>
+            <a data-testid="marketing-nav-request_invite" href="{% url 'marketing:request_invite' %}" {% if page_key == 'request_invite' %}class="is-active" aria-current="page"{% endif %}>Request invite</a>
             <div class="mk-nav__mobile-cta">
                 <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
                 {% if SIGNUP_OPEN %}<a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">Create account</a>{% else %}<a class="mk-btn mk-btn--primary" href="{% url 'marketing:request_invite' %}">Request invite</a>{% endif %}
@@ -47,7 +47,7 @@
         <div class="mk-header__actions">
             <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
             {% if SIGNUP_OPEN %}<a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">Create account</a>{% else %}<a class="mk-btn mk-btn--primary" href="{% url 'marketing:request_invite' %}">Request invite</a>{% endif %}
-            <button class="mk-nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="marketing-navigation" aria-label="Toggle navigation"><span></span></button>
+            <button class="mk-nav-toggle" type="button" data-nav-toggle data-testid="marketing-nav-toggle" aria-expanded="false" aria-controls="marketing-navigation" aria-label="Toggle navigation"><span></span></button>
         </div>
     </div>
 </header>
