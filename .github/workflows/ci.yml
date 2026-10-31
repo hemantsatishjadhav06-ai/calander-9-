@@ -3,8 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  pull_request: {}
 
 # Principle of least privilege: default to read-only for every job.
 # Individual jobs can opt into more permissions if needed.
@@ -35,6 +34,9 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Run UI state tests
         run: npm run test:ui
+
+      - name: Test performance budget enforcement
+        run: node --test tests/lighthouse/*.test.mjs
 
   lint:
     name: Lint (ruff)
@@ -126,6 +128,14 @@ jobs:
       - name: Install dependencies
         run: pip install --require-hashes -r requirements.lock
 
+      # The translation catalogues must compile. msgfmt comes from gettext,
+      # which the runner image does not promise, so it is installed here.
+      - name: compilemessages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gettext
+          python manage.py compilemessages --ignore=.venv --ignore=node_modules
+
       # Catches a model change whose migration was never generated. The
       # companion hazard — a migration that is fine against an empty table but
       # fails on one with rows — is covered by tests that apply migrations over
@@ -133,8 +143,21 @@ jobs:
       - name: makemigrations --check
         run: python manage.py makemigrations --check --dry-run
 
+      - name: Check design tokens
+        run: python tools/recolor.py --check
+
       - name: pytest
-        run: pytest --cov=apps --cov-report=term-missing
+        run: pytest --cov=apps --cov-report=term-missing --cov-report=json:pytest-coverage.json --junitxml=pytest-results.xml
+
+      - name: Retain Python gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pytest-evidence
+          path: |
+            pytest-coverage.json
+            pytest-results.xml
+          retention-days: 7
 
   build:
     name: Docker build
@@ -221,3 +244,173 @@ jobs:
 
       - name: Run gitleaks
         run: gitleaks detect --source . --redact --verbose --no-banner
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install pip-audit
+        run: pip install "pip-audit==2.10.1"
+
+      # Audits the hashed lock as written; nothing from it is installed.
+      - name: pip-audit
+        run: pip-audit -r requirements.lock --disable-pip --require-hashes --progress-spinner off
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      # npm audit reads each lockfile; no install is needed.
+      - name: npm audit (root)
+        run: npm audit --audit-level=high
+
+      - name: npm audit (theme)
+        working-directory: theme/static_src
+        run: npm audit --audit-level=high
+
+  e2e:
+    name: E2E (Playwright)
+    # Playwright 1.56.1 supports this image; ubuntu-latest moved to 26.04.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: "1"
+      DB_HOST: "127.0.0.1"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: smbean_browser_e2e
+      E2E_PORT: "8150"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install locked Python dependencies
+        run: pip install --require-hashes -r requirements.lock
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            theme/static_src/package-lock.json
+      - name: Install locked browser dependencies and build CSS
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix theme/static_src
+          npm run build --prefix theme/static_src
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+      - name: Run every browser project (no retries)
+        run: npm run test:e2e
+
+      - name: Retain browser reports and failure traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-evidence
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  lighthouse:
+    name: Lighthouse CI
+    # Keep browser installation on the image supported by the locked version.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: "1"
+      DB_HOST: "127.0.0.1"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: smbean_lighthouse_e2e
+      E2E_PORT: "8151"
+      LIGHTHOUSE_BASE_URL: http://127.0.0.1:8151
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install locked Python dependencies
+        run: pip install --require-hashes -r requirements.lock
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            theme/static_src/package-lock.json
+      - name: Install locked browser dependencies and build CSS
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix theme/static_src
+          npm run build --prefix theme/static_src
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Measure mobile performance and interactions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tests.e2e.server --reset --no-worker --static manifest --port "$E2E_PORT" > /tmp/lighthouse-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 120); do
+            if curl --fail --silent "$LIGHTHOUSE_BASE_URL/health/" >/dev/null && curl --fail --silent "$LIGHTHOUSE_BASE_URL/__e2e__/ping" >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lighthouse-server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          curl --fail --silent "$LIGHTHOUSE_BASE_URL/health/" >/dev/null
+          curl --fail --silent "$LIGHTHOUSE_BASE_URL/__e2e__/ping" >/dev/null
+          node tests/lighthouse/run.mjs
+
+      - name: Retain every performance measurement
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lighthouse-evidence
+          path: .lighthouseci/
+          include-hidden-files: true
+          retention-days: 7

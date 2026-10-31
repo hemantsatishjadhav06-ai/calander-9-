@@ -42,7 +42,7 @@ Send renders as a secondary button, and on a post or article page (whose decisio
         {% endif %}
         <div class="rounded-xl border border-ink-400 bg-white px-3 pt-3 pb-2.5 transition-[border-color,box-shadow] duration-150 focus-within:border-brand-600 focus-within:shadow-[0_0_0_1px_var(--focus-ring)]">
             <label for="{{ thread.dom_id }}-body" class="sr-only">Your message to the team</label>
-            <textarea id="{{ thread.dom_id }}-body" name="body" rows="2" maxlength="4000" required
+            <textarea id="{{ thread.dom_id }}-body" name="body" rows="2" maxlength="4000" required data-testid="thread-composer-body"
                       placeholder="{{ thread.placeholder }}"
                       class="block w-full min-w-0 min-h-12 max-h-48 resize-none [field-sizing:content] border-0 bg-transparent p-0 text-body-lg text-ink-900 placeholder:text-ink-500 focus-visible:shadow-none">{{ thread.body }}</textarea>
             <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -87,7 +87,7 @@ Send renders as a secondary button, and on a post or article page (whose decisio
                     <span>{{ thread.internal_label }}</span>
                 </label>
                 {% endif %}
-                <button type="submit"
+                <button type="submit" data-testid="thread-composer-send"
                         class="ml-auto ui-btn ui-btn-sm {% if 'thread-brief-' in thread.dom_id or 'thread-blog-' in thread.dom_id %}ui-btn-secondary{% else %}ui-btn-primary group-has-[[data-confirm-brief]]/thread:bg-white group-has-[[data-confirm-brief]]/thread:text-ink-900 group-has-[[data-confirm-brief]]/thread:shadow-[inset_0_0_0_1px_var(--ink-300),var(--shadow-xs)] group-has-[[data-confirm-brief]]/thread:hover:bg-ink-25{% endif %}">Send</button>
             </div>
         </div>

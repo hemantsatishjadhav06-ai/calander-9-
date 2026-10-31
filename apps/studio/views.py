@@ -448,6 +448,9 @@ def _brief_thread(request, brief):
 def detail(request, workspace_id, brief_id):
     workspace, brief = _get_brief(request, workspace_id, brief_id)
     services.sync_status(brief)
+    # Changes asked for after the internal approval (at the client stage) put every channel back
+    # in the team's hands: offer the revision instead of calling the post approved.
+    services.reopen_sent_back(brief)
     return render(request, "studio/detail.html", _detail_context(request, workspace, brief))
 
 

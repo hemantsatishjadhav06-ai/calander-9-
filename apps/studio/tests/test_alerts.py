@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import date
-
 import pytest
 
 from apps.notifications.models import Notification
 from apps.studio import alerts, autopilot, chat, engine
 from apps.studio.models import AgencySettings, AutopilotWeek, Conversation, Message
-from apps.studio.tests.test_insights import agency_settings, assert_nothing_approved, drive, install_fake_agency
+from apps.studio.tests.test_insights import (
+    agency_settings,
+    assert_nothing_approved,
+    drive,
+    install_fake_agency,
+    next_monday,
+)
 
-NEXT_MONDAY = date(2026, 10, 26)
+#: Next week's Monday from today, in the workspace's zone (the cycle stops settling weeks three weeks old).
+NEXT_MONDAY = next_monday()
 
 
 @pytest.fixture
@@ -82,7 +87,7 @@ def test_week_failed_alerts_once_per_reason(world):
     assert alerts.week_failed(week) == 2
     assert alerts.week_failed(week) == 0
     note = _alerts(user=world.owner).get()
-    assert "the week of 26 Oct" in note.title and note.data["action_url"].endswith("/autopilot/")
+    assert f"the week of {NEXT_MONDAY:%d %b}" in note.title and note.data["action_url"].endswith("/autopilot/")
     AutopilotWeek.objects.filter(pk=week.pk).update(note="Two drafts were not prepared.")
     assert alerts.week_failed(week) == 2 and _alerts().count() == 4
     AutopilotWeek.objects.filter(pk=week.pk).update(status="planned")

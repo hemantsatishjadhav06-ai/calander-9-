@@ -20,7 +20,7 @@
             {% for template in templates %}
             <li>
                 <img src="{% url 'studio:brand_sample' workspace_id=workspace.id template=template %}?v={{ profile.updated_at|date:'U' }}"
-                     alt="Sample {{ template }} graphic" class="w-full h-auto rounded-[10px] bg-ink-50 shadow-[var(--shadow-creative)]" loading="lazy">
+                     alt="Sample {{ template }} graphic" class="w-full h-auto rounded-[10px] bg-ink-50 shadow-[var(--shadow-creative)]" loading="lazy" data-testid="brand-sample-image-{{ template }}">
                 <p class="mt-1.5 text-xs text-ink-600 capitalize">{{ template }}{% if template == profile.default_template %} · default{% endif %}</p>
             </li>
             {% endfor %}
@@ -60,8 +60,8 @@
                 <h2 id="look-heading" class="ui-card-title mb-5">How it looks</h2>
                 <div class="grid md:grid-cols-2 gap-x-4">
                     <div class="flex gap-6">
-                        {% include "blog/partials/field.html" with field=form.primary_color %}
-                        {% include "blog/partials/field.html" with field=form.accent_color %}
+                        {% include "studio/partials/brand_colour_field.html" with field=form.primary_color testid="brand-primary-color" %}
+                        {% include "studio/partials/brand_colour_field.html" with field=form.accent_color testid="brand-accent-color" %}
                     </div>
                     {% include "blog/partials/field.html" with field=form.display_font %}
                     {% include "blog/partials/field.html" with field=form.wordmark %}
@@ -76,7 +76,7 @@
 
             {% if can_edit %}
             <div class="flex flex-wrap items-center gap-2">
-                <button type="submit" class="ui-btn ui-btn-primary max-sm:w-full">Save brand profile</button>
+                <button type="submit" class="ui-btn ui-btn-primary max-sm:w-full" data-testid="brand-save">Save brand profile</button>
                 <a href="{% url 'studio:index' workspace_id=workspace.id %}" class="ui-btn ui-btn-ghost max-sm:w-full">Cancel</a>
             </div>
             {% endif %}

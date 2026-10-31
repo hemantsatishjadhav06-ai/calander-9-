@@ -4,6 +4,7 @@ Toolbar: nav arrows + period + Today + Month/Week/Day | right: filter dropdowns.
 {% endcomment %}
 
 <div class="flex-1 flex flex-col"
+     data-testid="calendar-shell"
      x-data="{ ...calendarApp(), showEventForm: false, viewOpen: false }"
      @calendar-refresh.window="htmx.trigger('#calendar-content', 'refresh')"
      hx-trigger="calendarRefresh from:body"
@@ -42,11 +43,11 @@ Toolbar: nav arrows + period + Today + Month/Week/Day | right: filter dropdowns.
 
         <!-- Month / Week / Day -->
         <nav class="ui-segmented" aria-label="Calendar range">
-            <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=month&date={{ target_date|date:'Y-m-d' }}"
+            <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=month&date={{ target_date|date:'Y-m-d' }}" data-testid="calendar-view-month"
                class="ui-segment no-underline"{% if view_type == 'month' %} aria-current="page"{% endif %}>Month</a>
-            <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=week&date={{ target_date|date:'Y-m-d' }}"
+            <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=week&date={{ target_date|date:'Y-m-d' }}" data-testid="calendar-view-week"
                class="ui-segment no-underline"{% if view_type == 'week' %} aria-current="page"{% endif %}>Week</a>
-            <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=day&date={{ target_date|date:'Y-m-d' }}"
+            <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=day&date={{ target_date|date:'Y-m-d' }}" data-testid="calendar-view-day"
                class="ui-segment no-underline"{% if view_type == 'day' %} aria-current="page"{% endif %}>Day</a>
         </nav>
 

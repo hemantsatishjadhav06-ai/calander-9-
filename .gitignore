@@ -45,6 +45,8 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+pytest-coverage.json
+pytest-results.xml
 *.cover
 *.py.cover
 .hypothesis/
@@ -211,6 +213,11 @@ media/
 test_media/
 node_modules/
 theme/static/css/dist/
+# End-to-end and Lighthouse runs (tests/e2e/README.md)
+test-results/
+playwright-report/
+.lighthouseci/
+e2e_media/
 *.sqlite3
 /.claude/worktrees
 .DS_Store

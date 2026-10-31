@@ -31,7 +31,8 @@
                         <input type="checkbox"
                                name="agree"
                                id="id_agree"
-                               class="ui-checkbox mt-0.5 flex-shrink-0 cursor-pointer">
+                               class="ui-checkbox mt-0.5 flex-shrink-0 cursor-pointer"
+                               data-testid="accept-terms-agree">
                         <span class="text-sm text-ink-900">
                             I agree to the
                             <a href="{{ LEGAL_TERMS_URL }}" target="_blank" rel="noopener" class="link-inline font-medium">Terms of Service</a>
@@ -40,7 +41,7 @@
                         </span>
                     </label>
 
-                    <button type="submit" class="ui-btn ui-btn-primary ui-btn-lg w-full">Continue</button>
+                    <button type="submit" class="ui-btn ui-btn-primary ui-btn-lg w-full" data-testid="accept-terms-continue">Continue</button>
                 </form>
             </div>
         </div>

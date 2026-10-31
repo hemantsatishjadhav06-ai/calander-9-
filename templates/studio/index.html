@@ -21,7 +21,7 @@
     <div class="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_372px] lg:items-start">
         <aside class="lg:col-start-2 lg:row-start-1 min-w-0 flex flex-col gap-6">
             {# ---- Today ---- #}
-            <section aria-labelledby="today-heading" class="ui-card" data-home-today
+            <section aria-labelledby="today-heading" class="ui-card" data-home-today data-testid="home-today"
                      x-data="{ open: {% if today.waiting_count %}true{% else %}window.matchMedia('(min-width: 1024px)').matches{% endif %} }">
                 <div class="flex items-start gap-2">
                     <div class="min-w-0 flex-1">
@@ -51,9 +51,9 @@
                 <div id="today-body" x-show="open">
                     {% if today.waiting %}
                     <h3 class="ui-group-label">Waiting for you</h3>
-                    <ul class="divide-y divide-ink-200">
+                    <ul class="divide-y divide-ink-200" data-testid="home-today-waiting">
                         {% for item in today.waiting %}
-                        <li class="flex gap-3 py-3">
+                        <li class="flex gap-3 py-3" data-testid="{% if item.kind == 'post' %}home-today-post-{{ item.brief.pk }}{% else %}home-today-article-{{ item.blog_post.pk }}{% endif %}">
                             {% if item.kind == 'post' %}
                             <div class="ui-thumb overflow-hidden">{% if item.brief.graphic %}<img src="{% if item.brief.graphic.thumbnail %}{{ item.brief.graphic.thumbnail.url }}{% else %}{{ item.brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">{% endif %}</div>
                             <div class="flex-1 min-w-0">
@@ -63,10 +63,10 @@
                                     {% if can_approve and item.proposed_in_future %}
                                     <form method="post" action="{% url 'studio:approve' workspace_id=workspace.id brief_id=item.brief.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
                                         {% csrf_token %}<input type="hidden" name="mode" value="proposed">
-                                        <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn ui-btn-sm ui-btn-tinted">Approve &amp; schedule<span class="sr-only"> {{ item.title }} for {{ item.proposed|timezone:tzname|date:"D j M, H:i" }}</span></button>
+                                        <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn ui-btn-sm ui-btn-tinted" data-testid="home-today-approve-schedule">Approve &amp; schedule<span class="sr-only"> {{ item.title }} for {{ item.proposed|timezone:tzname|date:"D j M, H:i" }}</span></button>
                                     </form>
                                     {% endif %}
-                                    <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=item.brief.id %}" class="ui-btn ui-btn-sm ui-btn-ghost">Review<span class="sr-only"> {{ item.title }}</span></a>
+                                    <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=item.brief.id %}" class="ui-btn ui-btn-sm ui-btn-ghost" data-testid="home-today-review">Review<span class="sr-only"> {{ item.title }}</span></a>
                                 </div>
                             </div>
                             {% else %}
@@ -139,7 +139,7 @@
 
         <div class="lg:col-start-1 lg:row-start-1 min-w-0 flex flex-col gap-10">
             {# ---- The conversation ---- #}
-            <div class="agency-home-thread" data-home-thread>
+            <div class="agency-home-thread" data-home-thread data-testid="home-thread">
                 {% if thread %}
                 {% include thread.template with thread=thread %}
                 {% else %}

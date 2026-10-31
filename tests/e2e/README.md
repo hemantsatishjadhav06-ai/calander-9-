@@ -1,0 +1,182 @@
+# End-to-end tests
+
+Playwright specs (TypeScript) that drive a real browser through the product, and the server they run
+against (`tests/e2e/server/`, Python). Spec: [`docs/specs/01-harness.md`](../../docs/specs/01-harness.md).
+
+```
+tests/e2e/
+  server/      python -m tests.e2e.server: web app + worker in one process, fakes, mocks, seed, fixtures
+  support/     test.ts (test, expect and the fixtures below), harness.ts, axe.ts, network.ts,
+               poll.ts (until: read a probe until the worker is done), settled.ts (wait for a swap or a
+               fade to finish), global-setup.ts (the end-of-run
+               network check)
+  self/        the harness's own checks (axe helper, network guard, session fixture)
+  golden/      the golden paths, one file each (NN-name.spec.ts)
+  __screenshots__/   toHaveScreenshot baselines (none yet; Phase 3 takes them per screen)
+```
+
+## Running
+
+Needs PostgreSQL 16 on `localhost:5432` (`postgres`/`postgres`), the `.venv`, Node 22 and the built CSS
+(`theme/static/css/dist/styles.css` is not committed):
+
+```bash
+(cd theme/static_src && npm ci && npm run build)
+npm ci --ignore-scripts
+npx playwright install --with-deps chromium webkit
+npm run test:e2e                               # starts the server (--reset) and runs every project
+CI=1 npm run test:e2e                          # also use this locally to exercise actual WebKit
+npx playwright test tests/e2e/self --project=pixel-7
+```
+
+`playwright.config.ts` starts `python -m tests.e2e.server --reset --port $E2E_PORT` (the `.venv`
+Python, or `E2E_PYTHON`) and waits for `/health/`. Outside CI it reuses a server already listening on
+that port, so you can keep one running in another terminal:
+
+```bash
+.venv/bin/python -m tests.e2e.server --reset            # drop, migrate and seed brightbean_e2e, then serve :8150
+.venv/bin/python -m tests.e2e.server --port 8160        # serve the existing database
+.venv/bin/python -m tests.e2e.server --reset --no-worker --static manifest   # for Lighthouse
+```
+
+Environment: `E2E_PORT` (default 8150) and `DB_NAME` (default `brightbean_e2e`). The server refuses
+any settings module but `config.settings.e2e`, any database whose name does not end in `_e2e`, any
+`DB_HOST` that is not this machine (loopback or a local socket), and any libpq variable that would
+send the connection elsewhere whatever `DB_HOST` says (`PGHOSTADDR`, `PGSERVICE`, or a `PGHOST` off
+this machine while `DB_HOST` is empty), before it runs a statement. Two runs at once need their own port and database
+(`E2E_PORT=8162 DB_NAME=brightbean_g2_e2e`). No `.env` or `dev.env` is needed.
+
+**iPhone 13.** `CI=1` runs the `iphone-13` project on WebKit; install both browsers and their system
+libraries (`npx playwright install --with-deps chromium webkit`) before a gate run. The default
+non-CI configuration retains the original Chromium fallback with the iPhone viewport, scale and
+touch, and prints that limitation. It is useful for development where WebKit is unavailable but
+does not establish WebKit coverage. `CI=1` also refuses to reuse an existing server: use a separate
+`E2E_PORT` and `DB_NAME` if another run is active.
+
+Phase 1 also checks the manager's approval and the client's request for changes in
+`golden/05-06-role-variants.spec.ts`, and foreign IDs in form bodies and query strings in
+`golden/11-isolation-inputs.spec.ts`. The existing invariant golden paths are retained unchanged.
+Golden path 12 is the single declared pending scenario until Phase 4 (one pending case per device).
+
+**Mock document navigation.** The page fixture waits for the document commit of a local,
+explicitly fulfilled HTML POST navigation before a later `page.goto`. WebKit can expose the
+response headers before that commit; immediately navigating to a mock OAuth callback otherwise
+races the unfinished form navigation. This boundary has a 10-second deadline and propagates
+failures. It never retries a navigation and does not change real requests, GETs, XHRs, subframes,
+or the external-network guard. A future test that intentionally cancels such a mock navigation
+can opt out with `test.use({ mockedNavigationBarrier: false })`. The helper's deterministic
+contract tests run in `npm run test:ui`; `self/mock-navigation.spec.ts` verifies ordering and
+ordinary failed navigation in each browser. The invariant onboarding golden path stays unchanged.
+
+No browser case is quarantined. The five scenarios that were quarantined while their repairs
+were verified run in every suite again: the emoji picker ([issue #18](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/18)),
+WebKit onboarding ([issue #19](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19)),
+the owner/editor draft handoff on all three devices ([issue #20](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/20)),
+Calendar filter accessibility ([issue #21](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21))
+and Pixel 7 keyboard scroll completion ([issue #22](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/22)).
+`docs/specs/CHANGELOG.md` records the consecutive complete runs that cleared them. The original
+golden-path assertions are unchanged. Golden path 12 (TOTP) stays declared pending until Phase 4
+and is never counted as passing.
+
+Keyboard scrolling uses `support/scroll.ts`: install a bounded native `scrollend` listener,
+send one key, then await completion before scrolling on the other axis. The movement assertions
+remain separate; starting to move is not evidence that the previous native animation has finished.
+The helper neither sleeps nor repeats input, and it removes listeners and timers on completion or failure.
+
+## What the server does
+
+One process, because the fakes are module attributes shared by the request threads and the worker:
+
+- **Fakes** (`fakes.py`): the creative team is the suite's `FakeTeam`; the account manager reads the
+  request and answers `ChatAnswer` (new post with the channels and the key message named, routine,
+  change, plain answer); every other agent turn gets a schema-valid answer; the model clients, web
+  research and the source fetcher refuse. The real queue and worker run every stage.
+- **Mocks** (`mocks.py`): every `httpx` client goes through a `MockTransport` that answers the X token
+  exchange and `/2/users/me`, and a Facebook comment reply; everything else is refused and recorded.
+  Google sign-in is answered by the authorization `code` (`mocks.register_google_profile`).
+- **Socket guard** (`netguard.py`): loopback to the database and the server only; every other
+  connection and name lookup is refused and recorded.
+- **Worker** (`worker.py`): `run_worker`'s loop in a thread, without the platform polls (inbox sync,
+  analytics sync, health checks), which could only reach the mock's refusal.
+- **Seed** (`seed.py`): workspace A `00000000-0000-4000-8000-00000000000a` ("Neopolis", Asia/Kolkata,
+  internal approval in the dashboard) with `owner@`, `manager@`, `editor@` and `client@e2e.test`,
+  connected LinkedIn company, Instagram and Facebook accounts, brand profile, verified facts, agency
+  settings (owner as lead, autopilot off, the brief shown first) and a library image; workspace B
+  `…0b` ("Bayside Holdings") in its own organisation with `owner-b@e2e.test`.
+
+## Fixtures and probes
+
+A test never runs code on the server. It calls named, typed steps:
+
+| HTTP | Answer |
+|---|---|
+| `GET /__e2e__/ping` | `{"ok": true, "ids": {...}}` (the seed's ids; 503 before `--reset`) |
+| `POST /__e2e__/fixture/<name>` with a JSON object | the fixture's JSON; creates fresh rows for one test |
+| `GET /__e2e__/probe/<name>?k=v` | the probe's JSON; reads the rows a test asserts on |
+
+Unknown name: 404, whatever the method; a known name with the wrong method: 405. Bad payload: 400
+`{"error": ...}`. A fixture body that is not `application/json`: 415. Not loopback, or a request a
+browser marks as coming from another site (`Origin` or `Sec-Fetch-Site`): 403. Any settings module but
+`config.settings.e2e`: 404, and `config/urls.py` never mounts them (only `tests/e2e/server/urls.py`).
+
+A step is `(payload: dict[str, Any]) -> dict[str, Any]`, registered with `@fixture(name)` or
+`@probe(name)` from `tests/e2e/server/registry.py`, in a module under `tests/e2e/server/steps/`. Every
+module there is imported automatically, so a group adds `steps/<area>.py` and touches no shared list.
+Raise `registry.PayloadError` for a bad payload. Fixtures run in a transaction. Built-ins
+(`steps/core.py`): fixtures `session` (`{"role"}` or `{"email"}` → session cookie),
+`reset_login_limits`, `set_agent_delay` (`{"seconds"}`), `magic_link` (`{"email", "workspace_id"}` →
+`{"url"}`); probes `refused_network` (`?since=<epoch>`) and `worker`.
+
+In a spec, import from `../support/test`:
+
+```ts
+import { expect, test } from '../support/test';
+
+test('…', async ({ page, harness, as, axe, network }) => {
+  const since = Date.now() / 1000;                       // this test's window for refused_network
+  await as('editor');                                    // or as({ email }); the session cookie, no form
+  const brief = await harness.fixture<{ id: string }>('my_fixture', { title: 'x' });
+  await page.goto(`/workspace/${harness.ids.workspace_a}/studio/`);
+  await axe(page, 'Home (editor)');                      // every screen; axe(page, label, { include: '[role="dialog"]' }) for a dialog
+  expect((await harness.probe<{ hosts: string[] }>('refused_network', { since })).hosts).toEqual([]);
+});
+```
+
+## Rules for specs
+
+- **Selectors:** all new tests use `data-testid` only. Never a CSS class, copy text or
+  an Alpine attribute. Existing invariant golden paths retain their original role selectors under
+  the instruction not to edit those tests. A missing hook is added to the template next to the existing attributes:
+  `data-testid="<area>-<thing>"`, kebab-case (`approvals-row-approve-schedule`, `home-thread-send`).
+  A hook that stands for a record ends in that record's key exactly as it is stored, underscores
+  included, so a spec builds it from the data it already has (`home-today-post-<brief id>`,
+  `setup-row-creation_mode`, `connect-platform-linkedin_company`).
+  Existing `data-*` hooks that pytest asserts stay exactly as they are.
+- **Sign-in:** only golden path 1 posts the login form (10 posts a minute per address; call
+  `reset_login_limits` first). Everything else signs in with `as(...)`.
+- **Axe** on every screen a test reaches and on each dialog it opens; it fails on serious or critical
+  violations with the rule, impact, element and help page. It waits for running transitions first
+  (up to 3 s), so a menu that fades in is checked at its final colours. Fix the template, not the check.
+  axe counts opacity in colour contrast, so after an htmx swap, a toast or a dialog that fades in, a
+  test can also `await settled(locator, 'what')` (`support/settled.ts`): the element and its
+  ancestors fully opaque and no finite animation still running.
+- **After an action, wait for its answer:** register `page.waitForResponse(...)` before the click or
+  drop, check its status, then probe once. A view that writes in several statements answers only
+  when all are done; polling a probe can catch the first write alone.
+- **Outcomes in the database:** assert through probes, not only on the page.
+- **Network:** every browser request to another host is aborted (`network.blocked` lists them). A
+  route only ever sees the first URL of a redirect chain, so a server redirect to another host would
+  be followed for real: such a request is recorded in `network.escaped` and fails the test at its end
+  (`support/test.ts`). WebKit also refuses `route.fulfill` with a 3xx status. So a test that needs an
+  outside page (an OAuth authorize URL) routes the app's own request that answers the 302 instead:
+  `route.fetch({ maxRedirects: 0 })` sends it through the browser context (its cookies land in the
+  browser), the authorize URL and its `state` are read from the `location`, and the route answers
+  with a plain 200 page; the test then reaches the app's callback with the `code` and the `state`
+  (`routeGoogle` in `golden/01-sign-in.spec.ts`, the X connection in `golden/02-onboarding.spec.ts`).
+  On the server side, a test probes `refused_network` with `since` set to its own start, never the
+  server's whole lifetime (a server kept running between runs remembers earlier ones). The whole run
+  is checked once at its end (`support/global-setup.ts`): anything the server tried to reach outside
+  the machine during the run fails it, with the host and where in the server it was tried.
+- **No retries, no `test.skip`/`test.fixme` to make a path green;** each test makes its own rows.
+  A genuinely flaky test is quarantined with a tracking issue, not retried in CI. Gate evidence
+  reports quarantined, failing and unrun cases separately from passes.

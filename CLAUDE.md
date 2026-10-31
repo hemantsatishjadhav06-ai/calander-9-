@@ -32,17 +32,81 @@ machine need different `DB_NAME`s.
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/mypy apps/ config/ providers/ tests/ --ignore-missing-imports
 .venv/bin/python manage.py makemigrations --check --dry-run    # a model change needs its migration
-npm ci --ignore-scripts && npm run test:ui                     # tests/js/*.test.cjs (the thread's state machine)
+npm ci --ignore-scripts && npm run test:ui                     # tests/js/*.test.cjs (thread state and browser mock synchronization)
 (cd theme/static_src && npm ci && npm run build)               # compiles theme/static/css/dist/styles.css (built in Docker, never committed); rebuild after changing classes
 .venv/bin/python tools/recolor.py --check                       # no old palette class or mapped hex left (see Design system)
 .venv/bin/python manage.py runserver                            # the web app
 .venv/bin/python manage.py run_worker                           # the one worker: publishing, agency, Telegram
 ```
 
-CI (`.github/workflows/ci.yml`) runs exactly these: UI tests, `ruff check` and
-`ruff format --check`, mypy, `makemigrations --check --dry-run`, pytest with
-coverage on Postgres, then the Docker build. The pre-commit hooks mirror them
-(`CONTRIBUTING.md`).
+**Browser tests and accessibility.** Build the CSS and install the root lock
+first, then install the two browser engines:
+
+```bash
+npx playwright install --with-deps chromium webkit
+CI=1 npm run test:e2e
+CI=1 npx playwright test tests/e2e/golden/06-request-changes.spec.ts tests/e2e/golden/08-client-portal.spec.ts
+```
+
+The runner starts `tests/e2e/server` (real web app and worker, faked team,
+mocked providers, blocked external network) in its own local `*_e2e` database.
+It resets that test database before the run. `E2E_PORT` and `DB_NAME` must be
+unique for concurrent runs. `CI=1` uses WebKit for iPhone 13 and refuses to
+reuse an existing server; Desktop Chrome and Pixel 7 use Chromium. A local
+run without `CI=1` currently uses Chromium's iPhone emulation and must not be
+reported as Safari coverage. See `tests/e2e/README.md` for fixtures and probes.
+
+Axe runs inside the browser paths with the WCAG 2.2 AA tags: serious or
+critical findings fail. Golden path 12 (TOTP) is declared pending until
+Phase 4 and is never counted as passing. Visual-regression baselines start
+in Phase 3; a screenshot update needs a `visual:` commit and its before/after
+pair. Use `data-testid` selectors in e2e, leave invariant tests unchanged, and
+observe a failing test before changing behaviour. A flaky test needs an
+issue and quarantine; CI has zero retries.
+
+**Performance.** In a separate terminal, start the manifest-static test server
+on its own database and port, then run the Lighthouse runner against it:
+
+```bash
+DB_NAME=brightbean_lighthouse_e2e .venv/bin/python -m tests.e2e.server --reset --no-worker --static manifest --port 8151
+# In another terminal, with the server ready:
+LIGHTHOUSE_BASE_URL=http://127.0.0.1:8151 node tests/lighthouse/run.mjs
+```
+
+The server collects static files and serves their compressed manifest through
+WhiteNoise. Mobile Home, Approvals and Calendar are measured three times;
+`.lighthouserc.json` holds the budgets. The runner records reports under
+`.lighthouseci/<timestamp>/` (or `LIGHTHOUSE_OUTPUT_DIR`). Navigation
+Lighthouse measures performance, LCP, CLS, TBT and script transfer size. The
+runner separately measures real-input Event Timing at 4× CPU slowdown,
+checks the lab INP upper bound against 200 ms, and counts gzip JavaScript
+including inline code. TBT is retained as a navigation diagnostic, not used
+as an INP substitute or a second interaction gate. The real-input measurement
+does not establish field p75 INP.
+Run the budget parser's own tests with `node --test tests/lighthouse/*.test.mjs`.
+
+**Audits and catalogues.** These require `pip-audit` 2.10.1 and GNU gettext's
+`msgfmt` in addition to the toolchain above:
+
+```bash
+pip-audit -r requirements.lock --disable-pip --require-hashes --progress-spinner off
+npm audit --audit-level=high
+(cd theme/static_src && npm audit --audit-level=high)
+DJANGO_SETTINGS_MODULE=config.settings.test .venv/bin/python manage.py compilemessages --ignore=.venv --ignore=node_modules
+gitleaks detect --source . --redact --no-banner
+```
+
+CI (`.github/workflows/ci.yml`) runs **Agency UI state tests**, **Lint (ruff)**,
+**Type check (mypy)**, **Test (pytest)** (full Postgres suite with coverage,
+migration check and `compilemessages`), **Docker build**, **Secret scan
+(gitleaks)**, **Dependency audit**, **E2E (Playwright)** and **Lighthouse CI**
+on every pull request and on pushes to `main`. Pre-commit hooks provide an
+earlier subset;
+passing them does not replace the full CI gate. At the Phase 1 gate, run the
+full pytest suite and three consecutive complete browser runs, report the
+pending TOTP cases separately, and record the tested SHA and CI run in
+`docs/specs/CHANGELOG.md`. Do not merge, release or begin the next phase until
+the owner authorizes it.
 
 Tests never reach a provider: `conftest.py` makes the model client, the second
 provider's client and the source fetcher refuse. Fake the team
@@ -312,6 +376,18 @@ Inbound — a new command or button:
 3. Tests in `apps/telegram/tests/` with mocked Bot API responses: the happy
    path, a stale or foreign binding refused, and nothing sent twice for the
    same `source_key`.
+
+### Test harness (`tests/`)
+
+- `tests/e2e/server/` — isolated settings guards, local database reset, seed,
+  fake team, HTTP mocks, background worker and named fixture/probe endpoints.
+  These endpoints are never mounted by the production URL configuration.
+- `tests/e2e/support/`, `self/`, `golden/` — Playwright fixtures, network and
+  axe checks, harness self-checks and the twelve golden paths on three devices.
+- `tests/lighthouse/` and `.lighthouserc.json` — authenticated mobile
+  performance measurements and budgets for Home, Approvals and Calendar.
+- `tests/js/` — fast Node tests of the thread's UI state and mocked browser
+  navigation synchronization.
 
 ## Documents
 

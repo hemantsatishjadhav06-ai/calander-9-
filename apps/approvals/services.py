@@ -115,8 +115,25 @@ def _notify_reviewers(workspace, actor, *, post, event_type, title, body):
 # ---------------------------------------------------------------------------
 
 
-def submit_for_review(target, user, workspace):
-    """Submit a post (or single platform post) for internal review."""
+def notify_review_submission(post, user, workspace):
+    """Tell reviewers about a submission after its state has been committed."""
+    _notify_reviewers(
+        workspace,
+        user,
+        post=post,
+        event_type=EventType.POST_SUBMITTED,
+        title="Post submitted for review",
+        body=f'{user.display_name} submitted a post for your review: "{post.caption_snippet}"',
+    )
+
+
+def submit_for_review(target, user, workspace, *, notify_reviewers=True):
+    """Submit a post (or single platform post) for internal review.
+
+    A caller combining this transition with other state can suppress the
+    notification, then call ``notify_review_submission`` after its transaction.
+    The default keeps the existing synchronous notification behavior.
+    """
     post, targets, is_bundled = _resolve_targets(
         target, eligible_from_states={"draft", "changes_requested", "rejected"}
     )
@@ -141,15 +158,8 @@ def submit_for_review(target, user, workspace):
             defaults={"reminder_count": 0, "last_reminder_at": None, "escalated": False},
         )
 
-    # Notify all reviewers (members with approve_posts permission)
-    _notify_reviewers(
-        workspace,
-        user,
-        post=post,
-        event_type=EventType.POST_SUBMITTED,
-        title="Post submitted for review",
-        body=f'{user.display_name} submitted a post for your review: "{post.caption_snippet}"',
-    )
+    if notify_reviewers:
+        notify_review_submission(post, user, workspace)
 
     return post
 

@@ -37,7 +37,7 @@ from apps.studio.models import (
 from apps.studio.roles import client as client_roles
 from apps.studio.tests.conftest import run_all
 from apps.studio.tests.test_chat import FakeAccountManager, assert_nothing_approved, drive
-from apps.studio.tests.test_insights import agency_settings, install_fake_agency, overspend
+from apps.studio.tests.test_insights import agency_settings, install_fake_agency, next_monday, overspend
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
 LONDON = zoneinfo.ZoneInfo("Europe/London")
@@ -1068,7 +1068,8 @@ def test_rows_are_compact_dicts_on_first_soonest_first(world):
 
 
 class TestProviderGate:
-    FRIDAY = dt.datetime(2026, 10, 16, 17, 30, tzinfo=IST)
+    #: The Friday evening before next week's Monday (workspace time), whenever this runs.
+    FRIDAY = dt.datetime.combine(next_monday() - dt.timedelta(days=3), dt.time(17, 30), tzinfo=IST)
 
     def test_the_weekly_plan_is_skipped_with_a_set_up_note_and_recovers(self, world, monkeypatch, settings):
         install_fake_agency(monkeypatch)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import zoneinfo
-from datetime import date, datetime, timedelta
+from datetime import datetime, time, timedelta
 
 import pytest
 from django.urls import reverse
@@ -19,6 +19,7 @@ from apps.studio.tests.test_insights import (
     assert_nothing_approved,
     drive,
     install_fake_agency,
+    next_monday,
     overspend,
 )
 
@@ -29,9 +30,10 @@ def agency(monkeypatch):
 
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
-#: A Friday after the plan hour (Friday 16:00 by default), and the Monday it plans for.
-FRIDAY_EVENING = datetime(2026, 10, 16, 17, 30, tzinfo=IST)
-NEXT_MONDAY = date(2026, 10, 19)
+#: Next week's Monday from today, in the workspace's zone, and the Friday before it after the
+#: plan hour (Friday 16:00 by default): a tick that Friday plans that Monday.
+NEXT_MONDAY = next_monday()
+FRIDAY_EVENING = datetime.combine(NEXT_MONDAY - timedelta(days=3), time(17, 30), tzinfo=IST)
 
 
 def _url(name, world, **kwargs):
@@ -60,7 +62,7 @@ def test_the_tick_plans_next_week_once(world, agency):
     week = AutopilotWeek.objects.get(workspace=world.workspace)
     assert week.week_start == NEXT_MONDAY and week.status == AutopilotWeek.Status.PLANNING
     job = week.job
-    assert job.kind == "plan" and job.input["week_start"] == "2026-10-19" and job.input["week_id"] == str(week.pk)
+    assert job.kind == "plan" and job.input["week_start"] == str(NEXT_MONDAY) and job.input["week_id"] == str(week.pk)
     assert job.requested_by == world.owner and job.input["posts"] == 3
 
 

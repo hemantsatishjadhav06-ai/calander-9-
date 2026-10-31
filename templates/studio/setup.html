@@ -17,7 +17,7 @@
     {# Only the first unfinished step's action is solid; every other step's action is secondary. #}
     <ol class="ui-card p-0 overflow-hidden divide-y divide-ink-200" data-setup-rows>
         {% for row in rows %}
-        <li class="flex flex-wrap sm:flex-nowrap items-start gap-x-4 gap-y-3 px-4 sm:px-5 py-4" data-setup-row="{{ row.key }}" data-setup-state="{{ row.state }}">
+        <li class="flex flex-wrap sm:flex-nowrap items-start gap-x-4 gap-y-3 px-4 sm:px-5 py-4" data-setup-row="{{ row.key }}" data-setup-state="{{ row.state }}" data-testid="setup-row-{{ row.key }}">
             <span class="mt-px flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center
                 {% if row.state == 'done' %}bg-success-500 text-white{% elif row.state == 'attention' %}bg-white text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]{% else %}bg-white text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]{% endif %}" aria-hidden="true">
                 {% if row.state == 'done' %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>{% elif row.state == 'attention' %}<span class="text-xs font-bold">!</span>{% else %}<span class="text-xs font-semibold tabular-nums">{{ forloop.counter }}</span>{% endif %}
@@ -36,10 +36,10 @@
                 <form method="post" action="{{ row.action.url }}" x-data="{ busy: false }" x-on:submit="busy = true">
                     {% csrf_token %}
                     {% for name, value in row.action.fields.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
-                    <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn {% if row.state == 'done' %}ui-btn-secondary{% else %}{{ setup_tone }}{% endif %} w-full sm:w-auto">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></button>
+                    <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn {% if row.state == 'done' %}ui-btn-secondary{% else %}{{ setup_tone }}{% endif %} w-full sm:w-auto" data-testid="setup-action-{{ row.key }}">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></button>
                 </form>
                 {% else %}
-                <a href="{{ row.action.url }}" class="ui-btn {% if row.state == 'done' %}ui-btn-secondary{% else %}{{ setup_tone }}{% endif %} w-full sm:w-auto">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></a>
+                <a href="{{ row.action.url }}" class="ui-btn {% if row.state == 'done' %}ui-btn-secondary{% else %}{{ setup_tone }}{% endif %} w-full sm:w-auto" data-testid="setup-action-{{ row.key }}">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></a>
                 {% endif %}
             </div>
             {% endif %}

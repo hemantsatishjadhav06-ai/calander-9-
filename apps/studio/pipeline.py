@@ -1119,9 +1119,24 @@ def step_handoff(brief: StudioBrief) -> None:
     proposed = brief.proposed_publish_at or propose_time(brief, accounts)
 
     with transaction.atomic():
-        post = Post.objects.select_for_update().filter(pk=brief.post_id).first() if brief.post_id else None
+        # Match discard/revision lock order and re-check the stage before
+        # touching the post. A late producer must not replace a person's work.
+        current = (
+            StudioBrief.objects.select_for_update()
+            .filter(
+                pk=brief.pk,
+                revision=brief.revision,
+                status=StudioBrief.Status.WORKING,
+                stage=StudioBrief.Stage.HANDOFF,
+            )
+            .first()
+        )
+        if current is None:
+            raise _StaleStepError
+        post = Post.objects.select_for_update().filter(pk=current.post_id).first() if current.post_id else None
+        channels = list(post.platform_posts.select_for_update().order_by("pk")) if post is not None else []
         if post is not None:
-            statuses = set(post.platform_posts.values_list("status", flat=True))
+            statuses = {pp.status for pp in channels}
             if statuses - REVISABLE_STATUSES:
                 _fail_run(run, "Post already approved or scheduled.")
                 raise StudioError(
@@ -1158,7 +1173,7 @@ def step_handoff(brief: StudioBrief) -> None:
         PostMedia.objects.create(
             post=post, media_asset=graphic, position=0, alt_text=(post_copy.get("alt_text") or "")[:1000]
         )
-        existing = {pp.social_account_id: pp for pp in post.platform_posts.all()}
+        existing = {pp.social_account_id: pp for pp in channels}
         for account in accounts:
             caption_override, comment_override = account_overrides(account, caption, post_copy)
             pp = existing.pop(account.pk, None)
@@ -1178,6 +1193,11 @@ def step_handoff(brief: StudioBrief) -> None:
             if pp.status in REVISABLE_STATUSES:
                 pp.delete()
         _save_version(post, brief.author)
+        submitted = approval_services.submit_for_review(post, brief.author, brief.workspace, notify_reviewers=False)
+        if post.platform_posts.exclude(status=PlatformPost.Status.PENDING_REVIEW).exists():
+            raise StudioError("The post could not be sent for review. Request changes so the team can review it again.")
+        # READY and every channel's pending-review state become visible
+        # together. This also keeps the human approval trust check active.
         _save(
             brief,
             post=post,
@@ -1187,8 +1207,10 @@ def step_handoff(brief: StudioBrief) -> None:
             finished_at=timezone.now(),
         )
 
-    if post.platform_posts.filter(status__in=("draft", "changes_requested", "rejected")).exists():
-        approval_services.submit_for_review(post, brief.author, brief.workspace)
+    # The background step runs in autocommit. Deliver only after the handoff
+    # transaction exits, retaining the service's synchronous notification API.
+    if submitted:
+        approval_services.notify_review_submission(post, brief.author, brief.workspace)
     _notify_author(brief, post)
     names = ", ".join(sorted({a.account_name or a.get_platform_display() for a in accounts}))
     _end(run, summary=f"Sent it for approval as a draft for {names}.", output={"post_id": str(post.pk)}, model="")

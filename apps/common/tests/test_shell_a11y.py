@@ -3,6 +3,9 @@
 - Below 1024px the closed sidebar drawer was only moved off-screen, so twelve invisible controls sat
   in the tab order before the menu button, and opening it left focus behind the overlay. Closed, it
   is now inert; open, it is a modal dialog that traps focus and hands it back on close.
+- Opening New idea from the open phone drawer left the drawer's trap active behind the dialog, so it
+  pulled focus back from the dialog's title. Opening New idea now closes the drawer first, and the
+  title carries autofocus, which the dialog's trap uses as its initial focus.
 - The workspace switcher and the New menu closed only on an outside click; Escape now closes them and
   returns focus to their button (and only stops the event while a menu is open, so Escape still
   closes the phone drawer).
@@ -53,6 +56,14 @@ class ShellA11yTests(TestCase):
         self.assertIn("isDesktop: window.matchMedia('(min-width: 1024px)').matches", self.html)
         toggle = self._tag('aria-label="Toggle menu"')
         self.assertIn('aria-controls="app-sidebar"', toggle)
+
+    def test_new_idea_closes_the_phone_drawer_before_taking_focus(self):
+        start = self.html.index("openCreateModal() {")
+        body = self.html[start : self.html.index("closeCreateModal() {", start)]
+        self.assertLess(body.index("this.mobileMenuOpen = false;"), body.index("this.showCreateModal = true;"))
+        self.assertIn("this.$refs.sidebarIdeaTitle.focus()", body)
+        title = self._tag('data-testid="idea-title"')
+        self.assertIn("autofocus", title)
 
     def test_menus_close_on_escape_and_return_focus(self):
         self.assertIn(

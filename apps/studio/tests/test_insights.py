@@ -262,6 +262,17 @@ def assert_nothing_approved(workspace):
     assert statuses <= {"draft", "pending_review", "changes_requested", "published"}, statuses
 
 
+def next_monday() -> date:
+    """Next week's Monday in the ``world`` workspace's zone (Asia/Kolkata), worked out as the product does.
+
+    The plan tests used to name the week of 19 October 2026; once it had passed, a plan for it found
+    no free time. They name next week instead, whenever they run.
+    """
+    from apps.workspaces.models import Workspace
+
+    return autopilot.next_week_start(Workspace(timezone="Asia/Kolkata"))
+
+
 def plan_job(world, **input_):
     week_start = autopilot.next_week_start(world.workspace)
     return engine.create(
@@ -503,7 +514,9 @@ def test_the_plan_queues_the_months_articles_for_the_seo_team(world, agency):
 
     job = drive(plan_job(world))
 
-    children = list(AgencyJob.objects.filter(parent=job, kind="blog"))
+    # Oldest first: in a month's last week the plan queues both articles, and the default
+    # ordering (newest first) would put Guide 1 ahead of Guide 0.
+    children = list(AgencyJob.objects.filter(parent=job, kind="blog").order_by("created_at"))
     assert 1 <= len(children) <= 2
     child = children[0]
     assert child.input == {
