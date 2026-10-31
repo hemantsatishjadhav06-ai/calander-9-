@@ -146,6 +146,21 @@ def test_a_client_facing_role_is_refused_verified_facts_before_any_redirect(clie
 # --- Verified facts and Creative memory follow the switch ---------------------------
 
 
+@pytest.mark.parametrize(("name", "who"), [("studio:trust", "viewer"), ("studio:memory", "editor")])
+def test_a_move_that_follows_the_switch_is_never_cached(client, world, name, who):
+    """A browser keeps a 301 for good unless told otherwise; this one lasts only while the switch is on,
+    so it says so, and the page comes back the moment the switch is turned off."""
+    _advanced_on(world)
+    client.force_login(getattr(world, who))
+
+    response = client.get(_url(name, world))
+
+    assert response.status_code == 301
+    assert "no-store" in response["Cache-Control"] and "private" in response["Cache-Control"]
+    _advanced_on(world, False)
+    assert client.get(_url(name, world)).status_code == 200
+
+
 @pytest.mark.parametrize(("name", "who"), [("studio:trust", "owner"), ("studio:memory", "owner")])
 def test_with_advanced_settings_off_the_power_pages_keep_rendering(client, world, name, who):
     _advanced_on(world, False)

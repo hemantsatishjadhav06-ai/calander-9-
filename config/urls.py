@@ -81,8 +81,8 @@ urlpatterns = [
     path("webhooks/", include("apps.common.webhook_urls")),
     path("webhooks/telegram/", include("apps.telegram.urls_webhooks")),
     # Agent API (Phase 2) — programmatic access for external AI agents.
-    # Authenticated via scoped bearer tokens issued from the Organization
-    # → API Keys page. OpenAPI docs at /api/v1/docs. ``agent_api.urls``
+    # Authenticated via scoped bearer tokens issued from the API keys page
+    # (Settings → Advanced → Developers). OpenAPI docs at /api/v1/docs. ``agent_api.urls``
     # is Ninja's (patterns, app_namespace, instance_namespace) tuple,
     # which Django's path() handles natively.
     path("api/v1/", agent_api.urls),

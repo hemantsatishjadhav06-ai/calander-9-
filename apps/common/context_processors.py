@@ -1,7 +1,6 @@
 """Context processors for sidebar and global template data."""
 
 from django.conf import settings
-from django.db.models import Count, Q
 from django.utils.functional import SimpleLazyObject
 
 from apps.common.features import features_for, request_features
@@ -57,8 +56,8 @@ def sidebar_context(request):
 
     Provides:
         sidebar_workspaces: list of workspace objects the user belongs to
-        sidebar_channels: connected social accounts for the current workspace
-        sidebar_connectable_platforms: platforms available to connect
+        sidebar_unread_inbox_count, sidebar_pending_approvals: the badges
+        sidebar_idea_columns, sidebar_idea_tags: the quick-create idea modal
         features: the current workspace's switches (``features_for``), read
             once per request and only when a template asks; every default,
             without a lookup, when there is no workspace
@@ -67,7 +66,7 @@ def sidebar_context(request):
         return {}
 
     from apps.members.models import WorkspaceMembership
-    from apps.social_accounts.models import AnalyticsPlatformConfig, PlatformVisibility, SocialAccount
+    from apps.social_accounts.models import AnalyticsPlatformConfig
 
     analytics_enabled_platforms = AnalyticsPlatformConfig.enabled_platforms()
 
@@ -82,59 +81,7 @@ def sidebar_context(request):
     )
     sidebar_workspaces = [wm.workspace for wm in workspace_memberships]
 
-    # Connected channels for the current workspace
-    sidebar_channels = []
-    sidebar_unhealthy_channels = []
-    sidebar_connectable_platforms = []
-
     workspace = getattr(request, "workspace", None)
-
-    if workspace:
-        from apps.composer.models import PlatformPost
-
-        sidebar_channels = list(
-            SocialAccount.objects.for_workspace(workspace.id)
-            .filter(connection_status=SocialAccount.ConnectionStatus.CONNECTED)
-            .annotate(
-                queued_post_count=Count(
-                    "platform_posts",
-                    filter=Q(platform_posts__status=PlatformPost.Status.SCHEDULED),
-                )
-            )
-            .order_by("platform", "account_name")
-        )
-
-        sidebar_unhealthy_channels = list(
-            SocialAccount.objects.for_workspace(workspace.id)
-            .filter(
-                connection_status__in=[
-                    SocialAccount.ConnectionStatus.DISCONNECTED,
-                    SocialAccount.ConnectionStatus.ERROR,
-                    SocialAccount.ConnectionStatus.TOKEN_EXPIRING,
-                ]
-            )
-            .order_by("platform", "account_name")
-        )
-
-        # Connectable platforms: not yet connected in this workspace AND
-        # actually connectable — credentials configured, or a platform that
-        # needs none. This used to list every known platform so the sidebar
-        # "always surfaces what can be connected"; on a fresh install that
-        # meant advertising Instagram, LinkedIn and TikTok, the three whose
-        # connect cards render a dead "Not Configured" pill. Same helper the
-        # connect page uses, so the two cannot disagree.
-        from apps.social_accounts.views import _get_configured_platforms
-
-        connected_platforms = {ch.platform for ch in sidebar_channels}
-        configured_platforms = _get_configured_platforms(workspace.organization_id)
-        sidebar_connectable_platforms = sorted(
-            (
-                (p, label)
-                for p, label in PlatformVisibility.visible_choices()
-                if p not in connected_platforms and p in configured_platforms
-            ),
-            key=_connect_suggestion_rank,
-        )
 
     # Unread inbox count for sidebar badge
     sidebar_unread_inbox_count = 0
@@ -184,47 +131,9 @@ def sidebar_context(request):
         "features": features,
         "sidebar_workspaces": sidebar_workspaces,
         "can_create_workspace": can_create_workspace,
-        "sidebar_channels": sidebar_channels,
-        "sidebar_unhealthy_channels": sidebar_unhealthy_channels,
-        "sidebar_connectable_platforms": sidebar_connectable_platforms,
         "sidebar_unread_inbox_count": sidebar_unread_inbox_count,
         "sidebar_pending_approvals": sidebar_pending_approvals,
         "sidebar_idea_columns": sidebar_idea_columns,
         "sidebar_idea_tags": sidebar_idea_tags,
         "analytics_enabled_platforms": analytics_enabled_platforms,
     }
-
-
-# Display order for the sidebar's connect shortcuts, most-asked-for first.
-# The template shows only the first three, and ``Platform.choices`` is ordered
-# for the publish pipeline — leaving it to decide would put Facebook, Instagram
-# and Instagram (Direct) in all three slots and push LinkedIn/TikTok/YouTube
-# out of sight.
-#
-# Unlike the hand-maintained list this replaced, this is a *ranking*, not the
-# set: a platform missing from here still appears (ranked last), so a new
-# platform can never be silently hidden from the sidebar again.
-_CONNECT_SUGGESTION_ORDER: tuple[str, ...] = (
-    "instagram",
-    "linkedin_company",
-    "tiktok",
-    "youtube",
-    "facebook",
-    "linkedin_personal",
-    "threads",
-    "x",
-    "pinterest",
-    "instagram_login",
-    "google_business",
-    "bluesky",
-    "mastodon",
-    "devto",
-)
-
-
-def _connect_suggestion_rank(choice):
-    platform, _label = choice
-    try:
-        return (0, _CONNECT_SUGGESTION_ORDER.index(platform))
-    except ValueError:
-        return (1, 0)

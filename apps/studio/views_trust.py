@@ -87,7 +87,7 @@ def verified_facts(request, workspace_id):
     # The page lives in Settings → Advanced while the advanced_settings switch shows it there (spec D1,
     # D6); otherwise it keeps rendering here, so the direct links to it keep working.
     if settings_links.is_page_view(request) and request_features(request)["advanced_settings"]:
-        return settings_links.moved(request, workspace.pk, "advanced", anchor="verified-facts")
+        return settings_links.moved(request, workspace.pk, "advanced", anchor="verified-facts", cacheable=False)
     editable = can_verify(request, workspace)
     selected = selected_claim(request, workspace) if request.method == "GET" else None
     form = BrandClaimForm(workspace=workspace, instance=selected)

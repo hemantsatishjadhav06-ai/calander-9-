@@ -353,6 +353,26 @@ def test_a_foreign_or_malformed_claim_is_refused_in_advanced(client, world):
     assert _get(client, world.owner, world, "advanced", claim="not-a-claim").status_code == 400
 
 
+def test_the_facts_section_hands_its_form_over_as_claim_form_only(world):
+    """Advanced has several forms, so the facts form is ``claim_form``; no bare ``form`` is left behind."""
+    from django.test import RequestFactory
+
+    from apps.studio.forms_trust import BrandClaimForm
+    from apps.studio.views_settings import _facts
+
+    claim = make_claim(world)
+    request = RequestFactory().get(_settings(world, "advanced", claim=claim.pk))
+    request.user = world.owner
+    request.workspace = world.workspace
+    request.workspace_membership = WorkspaceMembership.objects.get(user=world.owner, workspace=world.workspace)
+
+    context = _facts(request, world.workspace)
+
+    assert "form" not in context
+    assert isinstance(context["claim_form"], BrandClaimForm)
+    assert context["claim_form"].instance == claim == context["selected_claim"]
+
+
 @pytest.mark.parametrize("where", ["page", "advanced"])
 def test_verified_facts_and_advanced_open_a_claim_by_one_rule(client, world, where):
     """``?claim=`` is read once for both: a claim of this workspace opens, another's is 404, a malformed

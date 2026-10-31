@@ -24,7 +24,7 @@
             <div class="reveal">
                 <span class="mk-eyebrow">Authentication</span>
                 <h2 class="mk-h2" style="margin-bottom: 14px;">Workspace-scoped keys</h2>
-                <p class="mk-lead">Issue a key from <strong>Organisation → API Keys</strong>. Each key belongs to one workspace, can be allow-listed to specific social accounts, and carries a subset of the issuer's own permissions. Revocation is immediate.</p>
+                <p class="mk-lead">Issue a key from <strong>Settings → Advanced → Developers</strong>. Each key belongs to one workspace, can be allow-listed to specific social accounts, and carries a subset of the issuer's own permissions. Revocation is immediate.</p>
                 <ul class="mk-bullets" style="margin-top: 22px;">
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Permissions:</strong> <code>create_posts</code>, <code>publish_directly</code>, <code>upload_media</code>, <code>view_analytics</code>, <code>use_inbox</code>, <code>reply_from_inbox</code>. Missing one returns <code>403</code>.</span></li>
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Idempotency:</strong> post creation, media uploads and inbox replies accept an <code>idempotency_key</code> (or <code>Idempotency-Key</code> header) for safe retries.</span></li>
@@ -173,7 +173,7 @@ registers itself, and asks you to sign in.</pre></div>
     <div class="mk-container">
         <div class="mk-cta reveal">
             <h2 class="mk-h2">Issue a key and make your first call.</h2>
-            <p class="mk-lead">Keys live under Organisation → API Keys once you have an account.</p>
+            <p class="mk-lead">Keys live under Settings → Advanced → Developers once you have an account.</p>
             <div class="mk-btn-row">
                 <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% if SIGNUP_OPEN %}{% url 'account_signup' %}{% else %}{% url 'marketing:request_invite' %}{% endif %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request invite{% endif %}</a>
                 <a class="mk-btn mk-btn--ghost mk-btn--lg" href="/api/v1/docs">Open the API docs</a>

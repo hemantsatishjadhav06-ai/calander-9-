@@ -202,7 +202,9 @@ def _facts(request, workspace) -> dict:
         editable=can_verify(request, workspace),
         claim_url=lambda claim: tab_url(workspace.pk, "advanced", query={"claim": str(claim)}, anchor="verified-facts"),
     )
-    return {**facts, "claim_form": facts.pop("form")}
+    # Advanced has several forms: this one is ``claim_form``, and no bare ``form`` is left behind.
+    facts["claim_form"] = facts.pop("form")
+    return facts
 
 
 def _advanced(request, workspace) -> dict:

@@ -23,7 +23,7 @@
                 <ul class="mk-bullets" style="margin: 0 0 26px;">
                     <li>{% include "marketing/_icon.html" with name="check" %}<span>{% if SIGNUP_OPEN %}Sign up with email or Google{% else %}Hosted access by invitation{% endif %}</span></li>
                     <li>{% include "marketing/_icon.html" with name="check" %}<span>Unlimited workspaces, members and channels</span></li>
-                    <li>{% include "marketing/_icon.html" with name="check" %}<span>API keys and MCP available from the organisation settings</span></li>
+                    <li>{% include "marketing/_icon.html" with name="check" %}<span>API keys and MCP available from Settings → Advanced → Developers</span></li>
                 </ul>
                 <div class="mk-btn-row">
                     <a class="mk-btn mk-btn--primary" href="{% if SIGNUP_OPEN %}{% url 'account_signup' %}{% else %}{% url 'marketing:request_invite' %}{% endif %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request invite{% endif %} {% include "marketing/_icon.html" with name="arrow" %}</a>

@@ -139,7 +139,7 @@ def memory(request, workspace_id):
     # The page lives in Settings → Advanced while the advanced_settings switch shows it there (spec D1,
     # D6); otherwise it keeps rendering here, so the thread's link to it keeps working.
     if request_features(request)["advanced_settings"]:
-        return settings_links.moved(request, workspace.pk, "advanced", anchor="creative-memory")
+        return settings_links.moved(request, workspace.pk, "advanced", anchor="creative-memory", cacheable=False)
     return render(request, "studio/memory.html", memory_context(request, workspace))
 
 
