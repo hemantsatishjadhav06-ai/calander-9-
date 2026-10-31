@@ -483,6 +483,7 @@
                         <label class="text-[13px] font-semibold text-ink-900"
                                x-text="captionLabel">Caption</label>
                         <div class="flex items-center gap-2 relative">
+                            {% if features.templates %}{# Hidden with the templates switch (spec D6). #}
                             {% if post and is_edit %}
                             <div x-data="{ showSaveTemplate: false }">
                                 <button type="button" @click="showSaveTemplate = !showSaveTemplate"
@@ -530,6 +531,7 @@
                                  hx-swap="innerHTML">
                                 <div class="p-4 text-center text-xs text-ink-500">Loading templates…</div>
                             </div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="caption-wrap">
@@ -1240,6 +1242,7 @@
                 <hr class="border-ink-200">
 
                 <!-- Tags (dropdown with search & create) -->
+                {% if features.templates %}
                 <div class="relative" x-data="{
                     tags: {{ post.tags|json_attr }},
                     tagDropdownOpen: false,
@@ -1379,6 +1382,10 @@
                         </div>
                     </template>
                 </div>
+                {% else %}
+                {# Tags are hidden with the templates switch (spec D6); the post keeps the ones it has. #}
+                <input type="hidden" name="tags" value="{% if post.tags %}{{ post.tags|join:',' }}{% endif %}">
+                {% endif %}
 
                 <!-- Internal Notes (hidden from client/viewer roles) -->
                 {% if can_view_internal_notes %}
@@ -1477,6 +1484,7 @@
                                     </div>
                                 </button>
 
+                                {% if features.queues %}{# Queue order: hidden with the queues switch (spec D6). #}
                                 <!-- Prioritise -->
                                 <button type="button" data-mode="add_to_queue_priority" data-label="Prioritise" data-action-label="Prioritise"
                                         data-icon="priority"
@@ -1489,6 +1497,7 @@
                                         <div class="text-xs text-ink-600 mt-0.5">Goes to the top of the queue</div>
                                     </div>
                                 </button>
+                                {% endif %}
 
                                 <!-- Now -->
                                 <button type="button" data-mode="publish_now" data-label="Now" data-action-label="Publish now"

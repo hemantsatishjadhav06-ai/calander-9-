@@ -36,6 +36,10 @@ def connection_link(db, workspace):
 class TestConnectionLinkPkce:
     def test_oauth_start_generates_and_forwards_verifier(self, client, workspace, connection_link):
         from apps.credentials.models import PlatformCredential
+        from apps.studio.models import AgencySettings
+
+        # TikTok is offered for new connections only with its switch on (test_feature_switches.py: off).
+        AgencySettings.objects.update_or_create(workspace=workspace, defaults={"features": {"extra_providers": True}})
 
         PlatformCredential.objects.create(
             organization=workspace.organization,

@@ -12,6 +12,7 @@ from decimal import Decimal
 from django import forms
 
 from apps.blog.models import BlogSite
+from apps.common.features import feature_enabled
 from apps.social_accounts.models import SocialAccount
 
 from .forms import _FIELD, STUDIO_PLATFORMS
@@ -174,9 +175,24 @@ class AgencySettingsForm(forms.ModelForm):
             "inbox_drafts_enabled": forms.CheckboxInput(attrs={"class": _CHECK}),
         }
 
-    def __init__(self, *args, workspace, **kwargs):
+    #: The fields the ``blog`` switch takes off the form.
+    BLOG_FIELDS = ("blog_posts_per_month", "blog_site")
+
+    def __init__(self, *args, workspace, blog=None, **kwargs):
+        """*blog* is the workspace's ``blog`` switch; views pass the request's copy, else it is read here.
+
+        With blog off the article quota and website are not on the form, so a save neither shows,
+        changes nor rejects the stored values and the planner keeps using them. A submission that
+        carries them anyway (a page from before the switch went off) is checked as it always was.
+        """
         super().__init__(*args, **kwargs)
         self.workspace = workspace
+        if blog is None:
+            blog = feature_enabled(workspace, "blog")
+        if not blog and not any(name in self.data for name in self.BLOG_FIELDS):
+            for name in self.BLOG_FIELDS:
+                del self.fields[name]
+        self.shows_blog = "blog_posts_per_month" in self.fields
         self.fields["accounts"].queryset = SocialAccount.objects.filter(
             workspace=workspace, platform__in=STUDIO_PLATFORMS
         ).order_by("platform", "account_name")
@@ -184,10 +200,11 @@ class AgencySettingsForm(forms.ModelForm):
             f"{a.get_platform_display()} — {a.account_name or a.account_handle}"
             + (" (needs reconnecting)" if a.needs_reconnect else "")
         )
-        self.fields["blog_site"].queryset = BlogSite.objects.filter(workspace=workspace, is_enabled=True).order_by(
-            "name"
-        )
-        self.fields["blog_site"].widget.attrs["class"] = _FIELD
+        if self.shows_blog:
+            self.fields["blog_site"].queryset = BlogSite.objects.filter(workspace=workspace, is_enabled=True).order_by(
+                "name"
+            )
+            self.fields["blog_site"].widget.attrs["class"] = _FIELD
         self.lead_objects = {str(user.pk): user for user, _role in eligible_leads(workspace)}
         self.fields["lead"].choices = [("", "Choose an owner or manager")] + [
             (str(user.pk), f"{user.name or user.email} ({role.lower()})") for user, role in eligible_leads(workspace)

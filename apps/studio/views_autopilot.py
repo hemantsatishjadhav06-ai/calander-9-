@@ -21,6 +21,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
 
+from apps.common.features import request_features
 from apps.members.decorators import require_permission
 
 from . import autopilot, budget, chat, dashboard, llm, reports
@@ -111,7 +112,9 @@ def form_context(request, workspace, form=None) -> dict:
             leads = {str(user.pk) for user, _role in eligible_leads(workspace)}
             if str(request.user.pk) in leads:
                 initial["lead"] = str(request.user.pk)
-        form = AgencySettingsForm(instance=row, workspace=workspace, initial=initial)
+        form = AgencySettingsForm(
+            instance=row, workspace=workspace, initial=initial, blog=request_features(request)["blog"]
+        )
     next_plan = next_plan_at(row) if row.pk and row.autopilot_enabled else None
     return {
         "workspace": workspace,
@@ -154,7 +157,12 @@ def settings_page(request, workspace_id):
     if request.method == "POST":
         if not _perms(request).get("manage_workspace_settings", False):
             raise PermissionDenied("Only someone who manages this workspace's settings can change autopilot.")
-        form = AgencySettingsForm(request.POST, instance=_settings_row(workspace), workspace=workspace)
+        form = AgencySettingsForm(
+            request.POST,
+            instance=_settings_row(workspace),
+            workspace=workspace,
+            blog=request_features(request)["blog"],
+        )
         if not form.is_valid():
             return render(request, "studio/autopilot.html", _context(request, workspace, form), status=400)
         row = form.save()

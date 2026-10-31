@@ -169,6 +169,10 @@ def test_an_owner_sees_the_same_rows_as_the_calendar_tab(client, world, query):
 
 
 def test_the_page_includes_the_tab_partial_with_its_refresh_and_filters(client, world):
+    from apps.studio.models import AgencySettings
+
+    # The tag filter shows with the templates switch on (off: apps/calendar/test_feature_switches.py).
+    AgencySettings.objects.update_or_create(workspace=world.workspace, defaults={"features": {"templates": True}})
     world.post("pending_review")
     client.force_login(world.owner)
 

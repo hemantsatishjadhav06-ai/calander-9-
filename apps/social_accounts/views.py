@@ -21,12 +21,14 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from django_ratelimit.decorators import ratelimit
 
+from apps.common.features import request_features
 from apps.common.validators import is_safe_url as _is_safe_url
 from apps.credentials.models import PlatformCredential, derive_is_configured
 from apps.members.decorators import require_permission
 from apps.studio import settings_links
 from apps.workspaces.models import Workspace
 
+from .availability import unavailable_message, withheld_platforms
 from .models import MastodonAppRegistration, PlatformVisibility, SocialAccount
 from .oauth_aliases import from_url_slug, redirect_uri_from_request, to_url_slug
 from .oauth_pkce import issue_pkce_verifier, pkce_kwargs
@@ -215,9 +217,16 @@ def account_list(request, workspace_id):
 @require_permission("manage_social_accounts")
 @ratelimit(key="user", rate="20/m", method="POST", block=True)
 def connect_platform(request, workspace_id):
-    """GET: show platform grid. POST: initiate OAuth flow."""
+    """GET: show platform grid. POST: initiate OAuth flow.
+
+    The grid and the POST share one list: the site's visible platforms less those
+    the workspace's ``extra_providers`` switch withholds from new connections.
+    """
     configured_platforms = _get_configured_platforms(request.org.id)
-    visible_platform_choices = _get_visible_platform_choices()
+    withheld = withheld_platforms(request.workspace, request_features(request))
+    visible_platform_choices = [
+        (value, label) for value, label in _get_visible_platform_choices() if value not in withheld
+    ]
 
     if request.method == "GET":
         return render(
@@ -574,6 +583,24 @@ def select_account(request):
     return redirect("calendar:calendar", workspace_id=workspace_id)
 
 
+def _refuse_new_connection(request, workspace_id, platform, template):
+    """The connect form's page in words, without the form, when the switch withholds *platform*.
+
+    ``None`` when the workspace may connect it: the switch is on, or the workspace
+    already has an account there (reconnecting comes through this same form). A GET
+    still answers 200 with the sentence; a submission is refused with 403 before any
+    platform is contacted.
+    """
+    if platform not in withheld_platforms(request.workspace, request_features(request)):
+        return None
+    return render(
+        request,
+        template,
+        {"workspace_id": workspace_id, "unavailable": unavailable_message(platform)},
+        status=403 if request.method == "POST" else 200,
+    )
+
+
 # ------------------------------------------------------------------
 # Bluesky Connect (session-based, no OAuth)
 # ------------------------------------------------------------------
@@ -583,6 +610,11 @@ def select_account(request):
 @require_permission("manage_social_accounts")
 def connect_bluesky(request, workspace_id):
     """Connect a Bluesky account via handle + app password."""
+    refused = _refuse_new_connection(
+        request, workspace_id, PlatformCredential.Platform.BLUESKY, "social_accounts/bluesky_connect.html"
+    )
+    if refused is not None:
+        return refused
     if request.method == "GET":
         return render(
             request,
@@ -641,6 +673,11 @@ def connect_bluesky(request, workspace_id):
 @require_permission("manage_social_accounts")
 def connect_devto(request, workspace_id):
     """Connect a DEV.to account via a personal API key."""
+    refused = _refuse_new_connection(
+        request, workspace_id, PlatformCredential.Platform.DEVTO, "social_accounts/devto_connect.html"
+    )
+    if refused is not None:
+        return refused
     if request.method == "GET":
         return render(
             request,
@@ -685,6 +722,11 @@ def connect_devto(request, workspace_id):
 @require_permission("manage_social_accounts")
 def connect_mastodon(request, workspace_id):
     """Connect a Mastodon account via instance URL + OAuth."""
+    refused = _refuse_new_connection(
+        request, workspace_id, PlatformCredential.Platform.MASTODON, "social_accounts/mastodon_connect.html"
+    )
+    if refused is not None:
+        return refused
     if request.method == "GET":
         return render(
             request,

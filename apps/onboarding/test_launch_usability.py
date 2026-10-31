@@ -12,6 +12,13 @@ from providers.types import AccountProfile
 from .models import ConnectionLink, ConnectionLinkUsage
 
 
+def _extra_providers_on(workspace):
+    """DEV.to offered for new connections (its switch on); test_feature_switches.py covers it off."""
+    from apps.studio.models import AgencySettings
+
+    AgencySettings.objects.update_or_create(workspace=workspace, defaults={"features": {"extra_providers": True}})
+
+
 @pytest.mark.django_db
 @pytest.mark.parametrize("signed_in", [False, True])
 def test_public_connection_flow_is_visible_to_signed_in_visitors(client, user, signed_in):
@@ -82,6 +89,7 @@ def test_public_connections_are_rate_limited_before_contacting_provider(client, 
 @pytest.mark.django_db
 def test_client_connects_devto_with_their_own_api_key(client, user):
     workspace = user.workspace_memberships.first().workspace
+    _extra_providers_on(workspace)
     link = ConnectionLink.objects.create(workspace=workspace, expires_at=timezone.now() + timedelta(days=1))
     provider = MagicMock()
     provider.get_profile.return_value = AccountProfile(platform_id="devto-1", name="Client", handle="client")
@@ -100,6 +108,7 @@ def test_client_connects_devto_with_their_own_api_key(client, user):
 @pytest.mark.parametrize("api_key", ["", "invalid-key"])
 def test_devto_connection_errors_are_shown_without_creating_accounts(client, user, api_key):
     workspace = user.workspace_memberships.first().workspace
+    _extra_providers_on(workspace)
     link = ConnectionLink.objects.create(workspace=workspace, expires_at=timezone.now() + timedelta(days=1))
     provider = MagicMock()
     provider.get_profile.side_effect = ValueError("Invalid key")
@@ -113,6 +122,7 @@ def test_devto_connection_errors_are_shown_without_creating_accounts(client, use
 @pytest.mark.django_db
 def test_devto_connection_is_not_routed_into_oauth(client, user):
     workspace = user.workspace_memberships.first().workspace
+    _extra_providers_on(workspace)
     link = ConnectionLink.objects.create(workspace=workspace, expires_at=timezone.now() + timedelta(days=1))
     page = client.get(reverse("onboarding:connection_page", args=[link.token]))
     assert reverse("onboarding:connection_devto", args=[link.token]) in page.content.decode()

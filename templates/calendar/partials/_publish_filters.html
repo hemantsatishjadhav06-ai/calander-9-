@@ -7,8 +7,8 @@ reloads #tab-content. Shared by publish_list_shell.html and approvals/index.html
             <!-- Channels filter (multi-select) -->
             {% ui_select model="selectedChannels" options=channels_with_posts multiple=True onchange="reloadTab()" placeholder="Channels" icon="channel" label_field="display_label" icon_field="platform" %}
 
-            <!-- Tags filter -->
-            {% ui_select model="activeTag" options=all_tags onchange="reloadTab()" placeholder="All tags" icon="tag" %}
+            <!-- Tags filter: hidden with the templates switch (spec D6) -->
+            {% if features.templates %}{% ui_select model="activeTag" options=all_tags onchange="reloadTab()" placeholder="All tags" icon="tag" %}{% endif %}
 
             <!-- Timezone dropdown (always set, so it never looks like an active filter) -->
             <div class="cal-tz-filter flex-shrink-0">{% ui_select model="displayTimezone" options=timezone_options onchange="reloadTab()" placeholder="Timezone" icon="clock" %}</div>
