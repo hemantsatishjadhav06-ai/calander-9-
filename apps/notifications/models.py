@@ -27,6 +27,7 @@ class EventType(models.TextChoices):
     AUTOPILOT_PLANNED = "autopilot_planned", "Autopilot planned the week"
     AGENCY_ALERT = "agency_alert", "The team needs you"
     DAILY_BRIEFING = "daily_briefing", "Your morning briefing"
+    INVITE_REQUESTED = "invite_requested", "Invite requested"
 
 
 class Channel(models.TextChoices):

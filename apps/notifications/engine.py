@@ -144,7 +144,14 @@ DEFAULT_CHANNELS: dict[str, dict[str, bool]] = {
     EventType.AUTOPILOT_PLANNED: {Channel.IN_APP: True, Channel.EMAIL: True},
     EventType.AGENCY_ALERT: {Channel.IN_APP: True, Channel.EMAIL: True},
     EventType.DAILY_BRIEFING: {Channel.IN_APP: True, Channel.EMAIL: False},
+    EventType.INVITE_REQUESTED: {Channel.IN_APP: True, Channel.EMAIL: True},
 }
+
+# Sent only to platform operators (active staff), never chosen by a person, so
+# they stay out of the preference matrix and the history filter. Saving the
+# matrix must not write a disabled row for them either: the form has no
+# checkbox to post, and a missing checkbox reads as "off".
+OPERATOR_ONLY_EVENTS = frozenset({EventType.INVITE_REQUESTED})
 
 # Event types considered non-critical (suppressed during quiet hours).
 NON_CRITICAL_EVENTS = {

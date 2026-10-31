@@ -42,14 +42,18 @@ def robots_txt(request):
 
 
 def sitemap_xml(request):
-    """The four public pages, so crawlers do not have to guess at them.
+    """The linked public pages, so crawlers do not have to guess at them.
+
+    Home, How it works and Request invite, then the legal pages. The pages
+    kept only for old links (Features, Platforms, Developers, Get started) are
+    ``noindex`` and left out; ``/pricing/`` redirects to Request invite.
 
     Hand-rolled rather than django.contrib.sitemaps: the public surface is a
     fixed handful of URLs with no model behind them, and the framework would
     add an app, a template loader path and a Site lookup to emit the same
     nine lines.
     """
-    paths = ["/", "/pricing/", "/terms/", "/privacy/", "/support/"]
+    paths = ["/", "/how-it-works/", "/request-invite/", "/terms/", "/privacy/", "/support/"]
     urls = "".join(f"<url><loc>{escape(request.build_absolute_uri(p))}</loc></url>" for p in paths)
     body = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
     return HttpResponse(body, content_type="application/xml")

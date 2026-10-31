@@ -1,9 +1,11 @@
 """Public marketing pages.
 
-These are the pages a visitor sees before signing in: what the product does,
-how it works, which platforms it connects to, the API / MCP surface, and how
-to get started. They are plain server-rendered templates with no per-request
-database work.
+Three pages are linked during the invite-only beta: Home, How it works and
+Request invite. Features, Platforms, Developers and Get started keep rendering
+for old links and bookmarks, but nothing links to them and they carry
+``noindex``; ``/pricing/`` answers 301 to Request invite. The pages are plain
+server-rendered templates with no per-request database work, except the
+Request invite form's POST.
 
 ``home`` doubles as the site root. An anonymous visitor gets the landing
 page; a signed-in user is handed to ``apps.accounts.views.dashboard`` exactly
@@ -11,12 +13,30 @@ as before, so ``LOGIN_REDIRECT_URL = "/"`` and every ``redirect("dashboard")``
 in the app keep their behaviour.
 """
 
-from django.conf import settings
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
-from django.views.decorators.http import require_GET
+import logging
 
+from django.conf import settings
+from django.core.mail import EmailMessage
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_GET, require_http_methods
+from django_ratelimit.decorators import ratelimit
+
+from apps.accounts.models import User
 from apps.accounts.views import dashboard
+from apps.common.mail import send_or_raise
+from apps.common.net import ratelimit_client_ip
+from apps.notifications.engine import notify
+from apps.notifications.models import EventType
+
+from .forms import RequestInviteForm
+
+logger = logging.getLogger(__name__)
+
+# Per client IP, counted on POST only. Generous enough for an agency's whole
+# office behind one address, small enough that a script cannot fill the
+# operators' inboxes (each request mails every operator).
+REQUEST_INVITE_RATE = "10/h"
 
 # The open-source codebase this product is built on. Shown in the footer
 # because the AGPL-3.0 licence asks derived works to keep that notice visible.
@@ -172,7 +192,17 @@ NETWORKS = [
 ]
 
 
-def _page(request: HttpRequest, template: str, *, key: str, title: str, description: str, **extra) -> HttpResponse:
+def _page(
+    request: HttpRequest,
+    template: str,
+    *,
+    key: str,
+    title: str,
+    description: str,
+    noindex: bool = False,
+    status: int = 200,
+    **extra,
+) -> HttpResponse:
     launched = set(getattr(settings, "LAUNCHED_PLATFORMS", []))
     context = {
         "site_name": getattr(settings, "SITE_NAME", "SM Bean"),
@@ -187,9 +217,11 @@ def _page(request: HttpRequest, template: str, *, key: str, title: str, descript
         # "live" = usable on the hosted app today; the rest ship in the code but
         # wait on the platform approving our developer app (QA round 1, BUG-22).
         "platforms": [{**p, "live": p["icon"] in launched} for p in PLATFORMS],
+        # Pages kept for old links but no longer linked ask search engines to drop them.
+        "noindex": noindex,
         **extra,
     }
-    return render(request, template, context)
+    return render(request, template, context, status=status)
 
 
 @require_GET
@@ -211,17 +243,88 @@ def home(request: HttpRequest) -> HttpResponse:
 
 @require_GET
 def pricing(request: HttpRequest) -> HttpResponse:
-    # The same header, navigation and footer as every other public page (marketing/base.html).
+    """The beta has no plans to pick: old pricing links land on Request invite.
+
+    The ``pricing`` URL name stays (``{% url 'pricing' %}`` must keep resolving);
+    ``templates/pricing.html`` is kept, unused.
+    """
+    return redirect("marketing:request_invite", permanent=True)
+
+
+@require_http_methods(["GET", "POST"])
+@ratelimit(key=ratelimit_client_ip, rate=REQUEST_INVITE_RATE, method="POST", block=False)
+def request_invite(request: HttpRequest) -> HttpResponse:
+    """A short form that asks the platform operators for an invitation.
+
+    Each submission makes one ``invite_requested`` notification for every
+    active staff user; with none, one email goes to ``SUPPORT_EMAIL``. A filled
+    honeypot gets the same thank-you page and nothing is sent. The requester's
+    words are untrusted: they are stored and shown escaped, and never reach a
+    prompt or Telegram (``apps.telegram.notifications.notification_event`` has
+    no branch for this event type).
+    """
+    form = RequestInviteForm(request.POST if request.method == "POST" else None)
+    sent = False
+    problem = ""
+    status = 200
+    if request.method == "POST":
+        if getattr(request, "limited", False):
+            problem = "too_many"
+            status = 429
+        elif form.is_bot:
+            sent = True
+        elif form.is_valid():
+            if _pass_on_invite_request(form.cleaned_data):
+                sent = True
+            else:
+                problem = "unavailable"
+                status = 503
     return _page(
         request,
-        "pricing.html",
-        key="pricing",
-        title="Pricing · SM Bean",
-        description=(
-            "SM Bean is open-source and free to self-host, with no per-seat or per-channel fees. "
-            "Hosting, AI services and paid platform APIs have separate costs."
-        ),
+        "marketing/request_invite.html",
+        key="request_invite",
+        title="Request invite · SM Bean",
+        description="SM Bean is in a private beta for agencies. Tell us who you are and we will reply by email.",
+        status=status,
+        form=form,
+        sent=sent,
+        problem=problem,
     )
+
+
+def _pass_on_invite_request(data: dict) -> bool:
+    """Notify every active operator, else mail the support address. False if nobody could be told."""
+    name, agency, email, note = data["name"], data["agency"], data["email"], data.get("note", "")
+    title = f"Invite request from {name} ({agency})"
+    lines = [f"{name} at {agency} asked for an invite.", f"Email: {email}"]
+    if note:
+        lines.append(f"Note: {note}")
+    body = "\n".join(lines)
+
+    operators = list(User.objects.filter(is_staff=True, is_active=True).order_by("pk"))
+    if operators:
+        for operator in operators:
+            notify(operator, EventType.INVITE_REQUESTED, title, body)
+        return True
+
+    support = getattr(settings, "SUPPORT_EMAIL", "")
+    if not support:
+        logger.error("An invite request arrived but there is no active staff user and no SUPPORT_EMAIL to receive it.")
+        return False
+    message = EmailMessage(
+        subject=" · ".join((title, getattr(settings, "SITE_NAME", "SM Bean"))),
+        body=body,
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        to=[support],
+        reply_to=[email],
+    )
+    try:
+        send_or_raise(message)
+    except Exception as exc:
+        # The class name only: a mail error can quote the message back, and the message is the requester's.
+        logger.error("An invite request could not be mailed to the support address (%s).", type(exc).__name__)
+        return False
+    return True
 
 
 @require_GET
@@ -230,6 +333,7 @@ def features(request: HttpRequest) -> HttpResponse:
         request,
         "marketing/features.html",
         key="features",
+        noindex=True,
         title="Features · SM Bean",
         description=(
             "Everything in SM Bean: the composer, calendar and queues, approval workflows, client portal, "
@@ -258,6 +362,7 @@ def platforms(request: HttpRequest) -> HttpResponse:
         request,
         "marketing/platforms.html",
         key="platforms",
+        noindex=True,
         title="Supported platforms · SM Bean",
         description=(
             "Which networks SM Bean publishes to today, which are coming as each platform approves our app, "
@@ -272,6 +377,7 @@ def developers(request: HttpRequest) -> HttpResponse:
         request,
         "marketing/developers.html",
         key="developers",
+        noindex=True,
         title="API & MCP for agents · SM Bean",
         description=(
             "A REST API and an MCP server with the same keys, permissions, rate limits and audit log, "
@@ -287,6 +393,7 @@ def get_started(request: HttpRequest) -> HttpResponse:
         request,
         "marketing/get_started.html",
         key="get_started",
+        noindex=True,
         title="Get started · SM Bean",
         description=(
             "Create an account on the hosted app, or self-host SM Bean with Docker Compose, Railway, "
