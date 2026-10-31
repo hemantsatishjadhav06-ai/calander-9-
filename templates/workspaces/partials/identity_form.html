@@ -1,0 +1,63 @@
+{% comment %}
+The workspace's name and logo: two forms posted to workspaces:settings (explicit actions, so they never
+post to the page that includes them). Extracted from workspaces/settings.html, which includes it, for
+Settings → Brand to include as well. Context: workspace.
+{% endcomment %}
+<section class="ui-card" aria-labelledby="workspace-identity-title">
+    <h2 id="workspace-identity-title" class="ui-card-title">Name and logo</h2>
+
+    <!-- Workspace name -->
+    <form method="POST" action="{% url 'workspaces:settings' workspace_id=workspace.id %}" class="mt-4">
+        {% csrf_token %}
+        <label for="name" class="ui-label">Workspace name</label>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input type="text" id="name" name="name" value="{{ workspace.name }}" required maxlength="100"
+                   class="ui-input sm:flex-1">
+            <button type="submit" class="ui-btn ui-btn-primary shrink-0">Save</button>
+        </div>
+    </form>
+
+    <!-- Logo -->
+    <form method="POST" action="{% url 'workspaces:settings' workspace_id=workspace.id %}" enctype="multipart/form-data" class="mt-5 border-t border-ink-200 pt-5" x-data="{
+        preview: '{% if workspace.icon %}{{ workspace.icon.url }}{% endif %}',
+        hasExisting: {{ workspace.icon|yesno:'true,false' }},
+        fileName: ''
+    }">
+        {% csrf_token %}
+        <input type="hidden" name="upload_icon" value="1">
+        <input type="hidden" name="delete_icon" :value="(!preview && hasExisting) ? '1' : '0'">
+
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-4">
+                <!-- Logo preview or placeholder -->
+                <template x-if="preview">
+                    <div class="relative shrink-0">
+                        <img :src="preview" alt="Workspace logo" class="size-14 rounded-[10px] object-cover shadow-[var(--shadow-creative)]">
+                        <button aria-label="Remove logo" type="button" title="Remove logo"
+                                @click="preview = ''; $refs.fileInput.value = ''; fileName = ''"
+                                class="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-white text-ink-600 shadow-sm ring-1 ring-ink-200 hover:bg-ink-50 hover:text-ink-900">
+                            <svg aria-hidden="true" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                </template>
+                <template x-if="!preview">
+                    <div class="grid size-14 shrink-0 place-items-center rounded-[10px] bg-ink-50 text-ink-400 ring-1 ring-inset ring-ink-200">
+                        <svg aria-hidden="true" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    </div>
+                </template>
+
+                <div>
+                    <p class="text-sm font-semibold text-ink-900">Logo</p>
+                    <p class="mt-0.5 text-small text-ink-600">JPEG, PNG, WebP or GIF, up to 2 MB.</p>
+                </div>
+            </div>
+
+            <label class="ui-btn ui-btn-secondary shrink-0 cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Upload logo
+                <input type="file" name="icon" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" x-ref="fileInput"
+                       @change="if ($el.files[0]) { preview = URL.createObjectURL($el.files[0]); fileName = $el.files[0].name; hasExisting = true; $el.closest('form').requestSubmit(); }">
+            </label>
+        </div>
+    </form>
+</section>

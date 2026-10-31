@@ -1,0 +1,45 @@
+{% comment %}
+The Publish list's Alpine scope: the active tab, the channel, tag and timezone
+filters, and reloadTab(), which re-requests the active tab's fragment into
+#tab-content. Included inside a nonced <script> by calendar/calendar.html and
+approvals/index.html, so both pages run the same code.
+{% endcomment %}function publishList() {
+    return {
+        activeTab: '{{ active_tab|default:"queue" }}',
+        selectedChannels: [],
+        activeTag: '',
+        displayTimezone: '{{ display_timezone|default:"UTC" }}',
+
+        tabUrls: {
+            queue: '{% url "calendar:publish_tab_queue" workspace_id=workspace.id %}',
+            drafts: '{% url "calendar:publish_tab_drafts" workspace_id=workspace.id %}',
+            approvals: '{% url "calendar:publish_tab_approvals" workspace_id=workspace.id %}',
+            sent: '{% url "calendar:publish_tab_sent" workspace_id=workspace.id %}',
+        },
+
+        init() {
+            window.addEventListener('post-deleted', () => this.reloadTab());
+        },
+
+        switchTab(tab) {
+            this.activeTab = tab;
+            this.reloadTab();
+        },
+
+        reloadTab() {
+            // Drop the selection whenever the visible set changes (tab switch,
+            // channel/tag/tz filter). The bar acts on stored ids regardless of
+            // what's rendered, so a stale tick would let Delete hit a row the
+            // user can no longer see. Only the Publish page has that bar (and
+            // its `sel` store); the Approvals screen selects inside its list.
+            const sel = Alpine.store('sel');
+            if (sel) sel.clear();
+            const params = new URLSearchParams();
+            this.selectedChannels.forEach(c => params.append('channel', c));
+            if (this.activeTag) params.set('tag', this.activeTag);
+            if (this.displayTimezone) params.set('tz', this.displayTimezone);
+            const url = this.tabUrls[this.activeTab] + '?' + params.toString();
+            htmx.ajax('GET', url, {target: '#tab-content', swap: 'innerHTML'});
+        }
+    };
+}

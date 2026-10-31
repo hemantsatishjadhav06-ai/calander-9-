@@ -1,0 +1,16 @@
+{% comment %}
+Styles outside the layer for the Publish list's filters and swapped tab content.
+Shared by calendar/calendar.html and approvals/index.html.
+{% endcomment %}/* Outside the layer on purpose: the timezone is always set, so ui_select's
+       "has a value" border would make it look like a filter that is switched on. */
+    .cal-tz-filter .cal-filter-select { border-color: var(--ink-300); color: var(--ink-800); }
+    .cal-tz-filter .cal-filter-select:hover { border-color: var(--ink-400); }
+
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Play slideUp only on HTMX-swapped tab content, not initial server render */
+    .tab-slide-in { animation: slideUp 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+    @media (prefers-reduced-motion: reduce) { .tab-slide-in { animation: none; } }

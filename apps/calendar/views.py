@@ -13,7 +13,7 @@ from django.db.models import QuerySet
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.gzip import gzip_page
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from apps.approvals.gate import ApprovalRequired
 from apps.common.timezones import canonical_timezone
@@ -393,7 +393,12 @@ def _publish_tab_counts(workspace, request):
 
 
 def _get_publish_context(workspace, request):
-    """Build shared context for the publish page (channels, tags, timezone)."""
+    """Build shared context for the publish page (channels, tags, timezone, tab counts)."""
+    return {**_publish_filter_context(workspace, request), **_publish_tab_counts(workspace, request)}
+
+
+def _publish_filter_context(workspace, request):
+    """The channel, tag and timezone filters' options: the Publish page's and the Approvals screen's."""
     # Channels that have posts in this workspace
     channels_with_posts = (
         SocialAccount.objects.filter(
@@ -438,7 +443,6 @@ def _get_publish_context(workspace, request):
         "timezone_choices": tz_list,
         "timezone_options": tz_options,
         "workspace_timezone": ws_tz,
-        **_publish_tab_counts(workspace, request),
     }
 
 
@@ -1135,6 +1139,33 @@ def publish_tab_approvals(request, workspace_id):
     """HTMX partial: Approvals tab content for the publish page."""
     workspace = _get_workspace(request, workspace_id)
     return _render_tab(request, workspace, "approvals")
+
+
+@login_required
+@require_GET
+@gzip_page
+def approvals_index(request, workspace_id):
+    """The Approvals screen (``approvals:index``): the Approvals tab above on a page of its own.
+
+    One source of truth with the tab: the rows and the controls come from
+    ``_get_tab_context``'s approvals branch and the filters from
+    ``_publish_filter_context``, and the page refreshes itself through
+    ``publish_tab_approvals``, so both always show the same list to the same
+    person. Plain clients approve in the client portal, so they are refused here
+    like on the agency's other screens.
+    """
+    from apps.studio.views import is_plain_client
+
+    workspace = _get_workspace(request, workspace_id)
+    if is_plain_client(request.workspace_membership):
+        raise PermissionDenied("This part of SM Bean is for your agency team. Your approvals are in the client portal.")
+    context = {
+        **_publish_filter_context(workspace, request),
+        **_get_tab_context(request, workspace, "approvals"),
+        "active_tab": "approvals",
+        "is_htmx": False,
+    }
+    return render(request, "approvals/index.html", context)
 
 
 @login_required

@@ -1,0 +1,10 @@
+{% comment %}Settings → Approvals: the approvals settings page's body; its form posts to
+workspaces:approvals_settings.{% endcomment %}
+<div class="w-full max-w-2xl">
+    <header class="mb-6">
+        <h2 id="settings-panel-title" class="text-h2 text-ink-950">Approvals</h2>
+        <p class="ui-page-status">Choose who has to say yes before a post is scheduled or published.</p>
+    </header>
+
+    {% include "workspaces/partials/approvals_settings_form.html" %}
+</div>

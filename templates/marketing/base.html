@@ -6,6 +6,7 @@
     <title>{{ page_title }}</title>
     <meta name="description" content="{{ meta_description }}">
     <link rel="canonical" href="{{ canonical_url }}">
+    {% if noindex %}<meta name="robots" content="noindex">{% endif %}
     <meta name="theme-color" content="#FFFFFF">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{ site_name }}">
@@ -35,20 +36,17 @@
             <span>{{ site_name }}</span>
         </a>
         <nav id="marketing-navigation" class="mk-nav" aria-label="Primary">
-            <a href="{% url 'marketing:features' %}" {% if page_key == 'features' %}class="is-active" aria-current="page"{% endif %}>Features</a>
+            <a href="{% url 'marketing:home' %}" {% if page_key == 'home' %}class="is-active" aria-current="page"{% endif %}>Home</a>
             <a href="{% url 'marketing:how_it_works' %}" {% if page_key == 'how_it_works' %}class="is-active" aria-current="page"{% endif %}>How it works</a>
-            <a href="{% url 'marketing:platforms' %}" {% if page_key == 'platforms' %}class="is-active" aria-current="page"{% endif %}>Platforms</a>
-            <a href="{% url 'marketing:developers' %}" {% if page_key == 'developers' %}class="is-active" aria-current="page"{% endif %}>Developers</a>
-            <a href="{% url 'marketing:get_started' %}" {% if page_key == 'get_started' %}class="is-active" aria-current="page"{% endif %}>Get started</a>
-            <a href="{% url 'pricing' %}" {% if page_key == 'pricing' %}class="is-active" aria-current="page"{% endif %}>Pricing</a>
+            <a href="{% url 'marketing:request_invite' %}" {% if page_key == 'request_invite' %}class="is-active" aria-current="page"{% endif %}>Request invite</a>
             <div class="mk-nav__mobile-cta">
                 <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
-                <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create account{% else %}Request early access{% endif %}</a>
+                {% if SIGNUP_OPEN %}<a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">Create account</a>{% else %}<a class="mk-btn mk-btn--primary" href="{% url 'marketing:request_invite' %}">Request invite</a>{% endif %}
             </div>
         </nav>
         <div class="mk-header__actions">
             <a class="mk-btn mk-btn--ghost" href="{% url 'account_login' %}">Sign in</a>
-            <a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create account{% else %}Request early access{% endif %}</a>
+            {% if SIGNUP_OPEN %}<a class="mk-btn mk-btn--primary" href="{% url 'account_signup' %}">Create account</a>{% else %}<a class="mk-btn mk-btn--primary" href="{% url 'marketing:request_invite' %}">Request invite</a>{% endif %}
             <button class="mk-nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="marketing-navigation" aria-label="Toggle navigation"><span></span></button>
         </div>
     </div>
@@ -71,19 +69,16 @@
             <div>
                 <h4>Product</h4>
                 <ul>
-                    <li><a href="{% url 'marketing:features' %}">Features</a></li>
+                    <li><a href="{% url 'marketing:home' %}">Home</a></li>
                     <li><a href="{% url 'marketing:how_it_works' %}">How it works</a></li>
-                    <li><a href="{% url 'marketing:platforms' %}">Supported platforms</a></li>
-                    <li><a href="{% url 'marketing:developers' %}">API &amp; MCP</a></li>
                 </ul>
             </div>
             <div>
                 <h4>Get going</h4>
                 <ul>
-                    <li><a href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create account{% else %}Request early access{% endif %}</a></li>
+                    <li><a href="{% url 'marketing:request_invite' %}">Request invite</a></li>
+                    {% if SIGNUP_OPEN %}<li><a href="{% url 'account_signup' %}">Create account</a></li>{% endif %}
                     <li><a href="{% url 'account_login' %}">Sign in</a></li>
-                    <li><a href="{% url 'marketing:get_started' %}">Self-host it</a></li>
-                    <li><a href="{% url 'marketing:developers' %}#openapi">API reference</a></li>
                 </ul>
             </div>
             <div>

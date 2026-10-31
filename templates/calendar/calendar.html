@@ -12,6 +12,27 @@
     <div class="min-w-0">
         <h1 class="ui-page-title">Publish</h1>
         <p class="ui-page-status">Plan your posts, approve them, and see what went out.</p>
+        {# The publishing pages that were under More in the sidebar; Queues follows its switch. #}
+        <nav aria-label="Publishing pages" class="mt-3 -ml-3 flex flex-wrap items-center gap-1">
+            <a href="{% url 'composer:drafts_list' workspace_id=workspace.id %}" data-testid="calendar-link-drafts" class="ui-btn ui-btn-ghost ui-btn-sm">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Drafts
+            </a>
+            {% if features.queues %}
+            <a href="{% url 'calendar:queue_list' workspace_id=workspace.id %}" data-testid="calendar-link-queues" class="ui-btn ui-btn-ghost ui-btn-sm">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                Queues
+            </a>
+            {% endif %}
+            <a href="{% url 'calendar:posting_slots' workspace_id=workspace.id %}" data-testid="calendar-link-posting-schedule" class="ui-btn ui-btn-ghost ui-btn-sm">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Posting schedule
+            </a>
+            <a href="{% url 'media_library:index' workspace_id=workspace.id %}" data-testid="calendar-link-media" class="ui-btn ui-btn-ghost ui-btn-sm">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                Media
+            </a>
+        </nav>
     </div>
 
     <!-- List / Calendar: peer views, so a segmented control -->
@@ -212,44 +233,7 @@
         color: var(--success-600);
     }
 
-    /* ── Filter dropdowns (ui_select) ───────────────────────────── */
-    .publish-filter-select,
-    .cal-filter-select {
-        height: 32px; padding: 0 10px; border-radius: 8px;
-        font-size: 13px; font-weight: 500;
-        color: var(--ink-800); background: var(--surface-0);
-        border: 1px solid var(--ink-300);
-        box-shadow: var(--shadow-xs);
-        cursor: pointer; white-space: nowrap; flex-shrink: 0;
-        transition: border-color var(--dur-instant) var(--ease-out), background-color var(--dur-instant) var(--ease-out);
-    }
-    @media (max-width: 1023px) { .publish-filter-select, .cal-filter-select { height: 44px; } }
-    .publish-filter-select.has-icon,
-    .cal-filter-select.has-icon { padding-left: 30px; }
-    .publish-filter-select:hover,
-    .cal-filter-select:hover { border-color: var(--ink-400); background: var(--ink-25); }
-    .publish-filter-icon,
-    .cal-filter-icon {
-        position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-        width: 14px; height: 14px; color: var(--ink-500); pointer-events: none;
-    }
-    .cal-filters-scroll { scrollbar-width: none; }
-    .cal-filters-scroll::-webkit-scrollbar { display: none; }
-
-    /* Platform icon tiles (filter menus) */
-    .pi-facebook   { background: #1877F2; }
-    .pi-instagram  { background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF); }
-    .pi-linkedin   { background: #0A66C2; }
-    .pi-linkedin_personal { background: #0A66C2; }
-    .pi-linkedin_company  { background: #0A66C2; }
-    .pi-tiktok     { background: #010101; }
-    .pi-youtube    { background: #FF0000; }
-    .pi-pinterest  { background: #E60023; }
-    .pi-threads    { background: #000000; }
-    .pi-bluesky    { background: #0085FF; }
-    .pi-google_business { background: #4285F4; }
-    .pi-mastodon   { background: #6364FF; }
-    .pi-x          { background: #000000; }
+    {% include "calendar/partials/_publish_filter_styles.html" %}
 
     /* ── Section tabs (Queue / Drafts / Approvals / Sent) ───────── */
     .publish-tab {
@@ -306,19 +290,7 @@
        doesn't render its own explanation on top of the bar it came from. */
     body.has-selection #bb-toast-host { bottom: 5.5rem; }
 
-    /* Outside the layer on purpose: the timezone is always set, so ui_select's
-       "has a value" border would make it look like a filter that is switched on. */
-    .cal-tz-filter .cal-filter-select { border-color: var(--ink-300); color: var(--ink-800); }
-    .cal-tz-filter .cal-filter-select:hover { border-color: var(--ink-400); }
-
-    @keyframes slideUp {
-        from { opacity: 0; transform: translateY(6px); }
-        to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Play slideUp only on HTMX-swapped tab content, not initial server render */
-    .tab-slide-in { animation: slideUp 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-    @media (prefers-reduced-motion: reduce) { .tab-slide-in { animation: none; } }
+    {% include "calendar/partials/_publish_list_styles.html" %}
 </style>
 {% endblock %}
 
@@ -594,43 +566,6 @@ function calendarApp() {
     };
 }
 
-function publishList() {
-    return {
-        activeTab: '{{ active_tab|default:"queue" }}',
-        selectedChannels: [],
-        activeTag: '',
-        displayTimezone: '{{ display_timezone|default:"UTC" }}',
-
-        tabUrls: {
-            queue: '{% url "calendar:publish_tab_queue" workspace_id=workspace.id %}',
-            drafts: '{% url "calendar:publish_tab_drafts" workspace_id=workspace.id %}',
-            approvals: '{% url "calendar:publish_tab_approvals" workspace_id=workspace.id %}',
-            sent: '{% url "calendar:publish_tab_sent" workspace_id=workspace.id %}',
-        },
-
-        init() {
-            window.addEventListener('post-deleted', () => this.reloadTab());
-        },
-
-        switchTab(tab) {
-            this.activeTab = tab;
-            this.reloadTab();
-        },
-
-        reloadTab() {
-            // Drop the selection whenever the visible set changes (tab switch,
-            // channel/tag/tz filter). The bar acts on stored ids regardless of
-            // what's rendered, so a stale tick would let Delete hit a row the
-            // user can no longer see.
-            Alpine.store('sel').clear();
-            const params = new URLSearchParams();
-            this.selectedChannels.forEach(c => params.append('channel', c));
-            if (this.activeTag) params.set('tag', this.activeTag);
-            if (this.displayTimezone) params.set('tz', this.displayTimezone);
-            const url = this.tabUrls[this.activeTab] + '?' + params.toString();
-            htmx.ajax('GET', url, {target: '#tab-content', swap: 'innerHTML'});
-        }
-    };
-}
+{% include "calendar/partials/_publish_list_script.html" %}
 </script>
 {% endblock %}

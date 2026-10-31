@@ -10,6 +10,7 @@ from apps.accounts.uploads import validate_profile_image
 from apps.common.validators import clean_display_name
 from apps.members.decorators import require_org_role
 from apps.members.models import OrgMembership, WorkspaceMembership
+from apps.studio import settings_links
 
 from .models import Workspace
 
@@ -63,112 +64,117 @@ def workspace_settings(request, workspace_id):
     if not membership:
         raise Http404
 
-    is_owner_or_manager = membership.workspace_role in (
-        WorkspaceMembership.WorkspaceRole.OWNER,
-        WorkspaceMembership.WorkspaceRole.MANAGER,
-    )
+    is_owner_or_manager = can_manage_approvals(membership)
 
-    if request.method == "POST":
-        action = request.POST.get("action")
+    if settings_links.is_page_view(request):
+        # The name and logo live in Settings → Brand and the danger zone in Settings → Advanced (spec
+        # D1, D5). Settings is the agency team's: a plain client is refused here, never sent there.
+        from apps.studio.views import is_plain_client
 
-        if action == "archive_workspace" and is_owner_or_manager:
-            with transaction.atomic():
-                active_count = (
-                    Workspace.objects.select_for_update()
-                    .filter(organization=workspace.organization, is_archived=False)
-                    .count()
-                )
-                if active_count <= 1:
-                    messages.error(request, "Cannot archive the last workspace in the organization.")
-                    return redirect("workspaces:settings", workspace_id=workspace.id)
-                workspace.is_archived = True
-                workspace.save(update_fields=["is_archived"])
-            messages.success(request, f'Workspace "{workspace.name}" has been archived.')
-            return redirect("organizations:workspaces")
+        if is_plain_client(membership):
+            raise PermissionDenied(
+                "Workspace settings are for the agency team. Your approvals are in the client portal."
+            )
+        return settings_links.moved(request, workspace.id, "brand")
 
-        if action == "unarchive_workspace" and is_owner_or_manager:
-            workspace.is_archived = False
+    # Only a POST gets here (GET answers the 301 above; HEAD and the rest are 405).
+    action = request.POST.get("action")
+
+    if action == "archive_workspace" and is_owner_or_manager:
+        with transaction.atomic():
+            active_count = (
+                Workspace.objects.select_for_update()
+                .filter(organization=workspace.organization, is_archived=False)
+                .count()
+            )
+            if active_count <= 1:
+                messages.error(request, "Cannot archive the last workspace in the organization.")
+                return redirect("workspaces:settings", workspace_id=workspace.id)
+            workspace.is_archived = True
             workspace.save(update_fields=["is_archived"])
-            messages.success(request, f'Workspace "{workspace.name}" has been restored.')
-            return redirect("workspaces:settings", workspace_id=workspace.id)
+        messages.success(request, f'Workspace "{workspace.name}" has been archived.')
+        return redirect("organizations:workspaces")
 
-        if action == "delete_workspace" and is_owner_or_manager:
-            with transaction.atomic():
-                active_count = (
-                    Workspace.objects.select_for_update()
-                    .filter(organization=workspace.organization, is_archived=False)
-                    .count()
-                )
-                if active_count <= 1 and not workspace.is_archived:
-                    messages.error(request, "Cannot delete the last workspace in the organization.")
-                    return redirect("workspaces:settings", workspace_id=workspace.id)
-                workspace_name = workspace.name
-                workspace.delete()
-            messages.success(request, f'Workspace "{workspace_name}" has been permanently deleted.')
-            return redirect("organizations:workspaces")
-
-        # The generic update below (name, logo) fell through for every member,
-        # so a read-only viewer could rename the workspace. The three actions
-        # above already gate on is_owner_or_manager; this path must too.
-        if not is_owner_or_manager:
-            raise PermissionDenied("Only workspace owners and managers can change workspace settings.")
-
-        name = clean_display_name(request.POST.get("name", ""), max_length=100)
-
-        if name:
-            workspace.name = name
-
-        # Handle logo deletion
-        if request.POST.get("delete_icon") == "1":
-            if workspace.icon:
-                workspace.icon.delete(save=False)
-        # Handle logo upload
-        elif "icon" in request.FILES:
-            icon = request.FILES["icon"]
-
-            # Validate file type
-            allowed_types = ("image/jpeg", "image/png", "image/webp", "image/gif")
-            if icon.content_type not in allowed_types:
-                messages.error(request, "Logo must be a JPEG, PNG, WebP, or GIF image.")
-                return redirect("workspaces:settings", workspace_id=workspace.id)
-
-            # Validate file size (2 MB max)
-            max_size = 2 * 1024 * 1024
-            if icon.size > max_size:
-                messages.error(request, "Logo must be under 2 MB.")
-                return redirect("workspaces:settings", workspace_id=workspace.id)
-
-            try:
-                icon = validate_profile_image(icon)
-            except ValidationError as exc:
-                messages.error(request, " ".join(exc.messages))
-                return redirect("workspaces:settings", workspace_id=workspace.id)
-
-            # Delete old icon before saving new one
-            if workspace.icon:
-                workspace.icon.delete(save=False)
-            workspace.icon = icon
-
-        workspace.save()
-        messages.success(request, "Workspace settings updated.")
+    if action == "unarchive_workspace" and is_owner_or_manager:
+        workspace.is_archived = False
+        workspace.save(update_fields=["is_archived"])
+        messages.success(request, f'Workspace "{workspace.name}" has been restored.')
         return redirect("workspaces:settings", workspace_id=workspace.id)
 
+    if action == "delete_workspace" and is_owner_or_manager:
+        with transaction.atomic():
+            active_count = (
+                Workspace.objects.select_for_update()
+                .filter(organization=workspace.organization, is_archived=False)
+                .count()
+            )
+            if active_count <= 1 and not workspace.is_archived:
+                messages.error(request, "Cannot delete the last workspace in the organization.")
+                return redirect("workspaces:settings", workspace_id=workspace.id)
+            workspace_name = workspace.name
+            workspace.delete()
+        messages.success(request, f'Workspace "{workspace_name}" has been permanently deleted.')
+        return redirect("organizations:workspaces")
+
+    # The generic update below (name, logo) fell through for every member,
+    # so a read-only viewer could rename the workspace. The three actions
+    # above already gate on is_owner_or_manager; this path must too.
+    if not is_owner_or_manager:
+        raise PermissionDenied("Only workspace owners and managers can change workspace settings.")
+
+    name = clean_display_name(request.POST.get("name", ""), max_length=100)
+
+    if name:
+        workspace.name = name
+
+    # Handle logo deletion
+    if request.POST.get("delete_icon") == "1":
+        if workspace.icon:
+            workspace.icon.delete(save=False)
+    # Handle logo upload
+    elif "icon" in request.FILES:
+        icon = request.FILES["icon"]
+
+        # Validate file type
+        allowed_types = ("image/jpeg", "image/png", "image/webp", "image/gif")
+        if icon.content_type not in allowed_types:
+            messages.error(request, "Logo must be a JPEG, PNG, WebP, or GIF image.")
+            return redirect("workspaces:settings", workspace_id=workspace.id)
+
+        # Validate file size (2 MB max)
+        max_size = 2 * 1024 * 1024
+        if icon.size > max_size:
+            messages.error(request, "Logo must be under 2 MB.")
+            return redirect("workspaces:settings", workspace_id=workspace.id)
+
+        try:
+            icon = validate_profile_image(icon)
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect("workspaces:settings", workspace_id=workspace.id)
+
+        # Delete old icon before saving new one
+        if workspace.icon:
+            workspace.icon.delete(save=False)
+        workspace.icon = icon
+
+    workspace.save()
+    messages.success(request, "Workspace settings updated.")
+    return redirect("workspaces:settings", workspace_id=workspace.id)
+
+
+def workspace_settings_context(workspace, membership) -> dict:
+    """What the danger zone shows in Settings → Advanced (and ``workspaces/settings.html``, kept but no
+    longer rendered: this page answers 301 to Settings on GET)."""
+    is_owner_or_manager = can_manage_approvals(membership)
     active_count = Workspace.objects.filter(organization=workspace.organization, is_archived=False).count()
     is_last_active = active_count <= 1 and not workspace.is_archived
-    can_archive = is_owner_or_manager and not workspace.is_archived and not is_last_active
-    can_delete = is_owner_or_manager and not is_last_active
-
-    return render(
-        request,
-        "workspaces/settings.html",
-        {
-            "workspace": workspace,
-            "settings_active": "general",
-            "is_owner_or_manager": is_owner_or_manager,
-            "can_archive": can_archive,
-            "can_delete": can_delete,
-        },
-    )
+    return {
+        "workspace": workspace,
+        "is_owner_or_manager": is_owner_or_manager,
+        "can_archive": is_owner_or_manager and not workspace.is_archived and not is_last_active,
+        "can_delete": is_owner_or_manager and not is_last_active,
+    }
 
 
 @login_required
@@ -183,10 +189,7 @@ def approvals_settings(request, workspace_id):
     if not membership:
         raise Http404
 
-    is_owner_or_manager = membership.workspace_role in (
-        WorkspaceMembership.WorkspaceRole.OWNER,
-        WorkspaceMembership.WorkspaceRole.MANAGER,
-    )
+    is_owner_or_manager = can_manage_approvals(membership)
 
     if request.method == "POST":
         if not is_owner_or_manager:
@@ -217,11 +220,23 @@ def approvals_settings(request, workspace_id):
     return render(
         request,
         "workspaces/approvals_settings.html",
-        {
-            "workspace": workspace,
-            "settings_active": "approvals",
-            "is_owner_or_manager": is_owner_or_manager,
-            "is_owner": membership.workspace_role == WorkspaceMembership.WorkspaceRole.OWNER,
-            "approval_modes": Workspace.ApprovalWorkflowMode,
-        },
+        {**approvals_settings_context(workspace, membership), "settings_active": "approvals"},
     )
+
+
+def can_manage_approvals(membership) -> bool:
+    """A workspace owner or manager: who may change the approval workflow and the workspace itself."""
+    return membership.workspace_role in (
+        WorkspaceMembership.WorkspaceRole.OWNER,
+        WorkspaceMembership.WorkspaceRole.MANAGER,
+    )
+
+
+def approvals_settings_context(workspace, membership) -> dict:
+    """What the approvals form shows: this page and Settings → Approvals read the same values."""
+    return {
+        "workspace": workspace,
+        "is_owner_or_manager": can_manage_approvals(membership),
+        "is_owner": membership.workspace_role == WorkspaceMembership.WorkspaceRole.OWNER,
+        "approval_modes": Workspace.ApprovalWorkflowMode,
+    }

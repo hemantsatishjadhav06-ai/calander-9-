@@ -34,68 +34,12 @@
             </section>
 
             {# ---- Write one ---- #}
-            <section aria-labelledby="new-routine-heading" class="ui-card">
-                <h2 id="new-routine-heading" class="ui-card-title">Write a routine</h2>
-                <p class="ui-card-subtitle mb-5">Say what the team should do, as you would in the thread. It runs in your name, at the time you choose ({{ tzname }}).</p>
-                <form method="post" action="{% url 'studio:routines_create' workspace_id=workspace.id %}" class="space-y-4" x-data="{ cadence: '{{ form.cadence }}' }">
-                    {% csrf_token %}
-                    <div>
-                        <label for="routine-instruction" class="ui-label">What should the team do?</label>
-                        <textarea id="routine-instruction" name="instruction" rows="3" maxlength="2000" required class="ui-input" placeholder="Draft a market update for Instagram from this week's facts, for my approval.">{{ form.instruction }}</textarea>
-                    </div>
-                    <div class="grid sm:grid-cols-3 gap-3">
-                        <div>
-                            <label for="routine-cadence" class="ui-label">How often</label>
-                            <select id="routine-cadence" name="cadence" x-model="cadence" class="ui-input">
-                                {% for value, label in cadences %}
-                                <option value="{{ value }}" {% if value == form.cadence %}selected{% endif %}>{{ label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div x-show="cadence === 'weekly'">
-                            <label for="routine-weekday" class="ui-label">Day</label>
-                            <select id="routine-weekday" name="weekday" class="ui-input">
-                                {% for value, label in weekdays %}
-                                <option value="{{ value }}" {% if value|stringformat:"s" == form.weekday %}selected{% endif %}>{{ label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div>
-                            <label for="routine-time" class="ui-label">Time</label>
-                            <input id="routine-time" name="time" type="time" value="{{ form.time }}" required class="ui-input tabular-nums">
-                        </div>
-                    </div>
-                    <div>
-                        <label for="routine-title" class="ui-label">Name <span class="font-normal text-ink-500">(optional)</span></label>
-                        <input id="routine-title" name="title" type="text" maxlength="120" value="{{ form.title }}" class="ui-input" placeholder="Monday market update">
-                    </div>
-                    <div class="flex justify-end pt-1">
-                        <button type="submit" class="ui-btn ui-btn-primary max-sm:w-full">Save routine</button>
-                    </div>
-                </form>
-            </section>
+            {% include "studio/partials/routine_form.html" %}
         </div>
 
         <aside class="space-y-6 min-w-0">
             {# ---- Suggestions ---- #}
-            <section aria-labelledby="suggestions-heading" class="ui-card">
-                <h2 id="suggestions-heading" class="text-h3 text-ink-950">Start with one of these</h2>
-                <ul class="mt-2 divide-y divide-ink-200">
-                    {% for item in suggestions %}
-                    <li class="flex items-start justify-between gap-3 py-3 last:pb-0">
-                        <div class="min-w-0">
-                            <p class="text-sm font-semibold text-ink-900">{{ item.title }}</p>
-                            <p class="text-[13px]/[18px] text-ink-600">{{ item.blurb }}</p>
-                        </div>
-                        <form method="post" action="{% url 'studio:routines_create' workspace_id=workspace.id %}" class="shrink-0">
-                            {% csrf_token %}
-                            <input type="hidden" name="suggestion" value="{{ item.key }}">
-                            <button type="submit" class="ui-btn ui-btn-sm ui-btn-tinted" aria-label="Add “{{ item.title }}”">Add</button>
-                        </form>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </section>
+            {% include "studio/partials/routine_presets.html" %}
 
             {# ---- The promise ---- #}
             <section aria-labelledby="promise-heading" class="ui-callout">

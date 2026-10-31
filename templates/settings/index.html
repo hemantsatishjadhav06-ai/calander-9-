@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% comment %}
+Settings (spec D5): one screen, a tab per settings page. apps/studio/views_settings.py decides which
+tabs this person may use (settings_tabs), which one is open (settings_tab) and builds only that one;
+settings_panel is its partial. The strip is the section-tabs component (ui-tabs / ui-tab), as on the
+blog list; each tab is a link to ?tab=<key>. Forms in a panel post to their old pages' handlers.
+{% endcomment %}
+
+{% block title %}{{ settings_tab_label }} - Settings - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-[1180px] min-w-0">
+    <header class="mb-5">
+        <h1 class="ui-page-title">Settings</h1>
+        <p class="ui-page-status">How {{ workspace.name }} is set up. Pick a tab to see or change it.</p>
+    </header>
+
+    <nav aria-label="Settings" class="mb-6">
+        <ul class="ui-tabs">
+            {% for tab in settings_tabs %}
+            <li>
+                <a href="{{ tab.url }}" class="ui-tab no-underline max-lg:min-h-11" data-testid="settings-tab-{{ tab.key }}"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+
+    <section aria-labelledby="settings-panel-title" data-testid="settings-panel-{{ settings_tab }}">
+        {% include settings_panel %}
+    </section>
+</div>
+{% endblock %}

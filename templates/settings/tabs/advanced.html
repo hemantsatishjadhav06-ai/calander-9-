@@ -1,0 +1,88 @@
+{% comment %}
+Settings → Advanced (spec D5, D6). Each section is its old page's own body and keeps that page's check:
+Health is the Set up checklist (studio:setup keeps rendering and its wording); the free-form routine form
+posts to studio:routines_create (create_posts); Verified facts, Creative memory and Outcomes show only
+with the advanced_settings switch on (facts for the agency team, memory with create_posts, outcomes for
+people who record them or read analytics); Developers links to the API keys page for the organisation's
+owners and admins; the danger zone posts to workspaces:settings for a workspace owner or manager.
+Context: views_settings._advanced.
+{% endcomment %}
+<div class="max-w-[960px] min-w-0">
+    <header class="mb-6 max-w-2xl">
+        <h2 id="settings-panel-title" class="text-h2 text-ink-950">Advanced</h2>
+        <p class="ui-page-status">How healthy {{ workspace.name }}'s set-up is, and the settings most teams rarely change.</p>
+    </header>
+
+    <section id="health" class="mb-8" aria-labelledby="settings-health-title" data-testid="settings-advanced-health">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+            <div class="min-w-0">
+                <h3 id="settings-health-title" class="text-h3 text-ink-950">Health</h3>
+                <p class="mt-1 text-sm text-ink-600">{% if left %}Finish these Set up steps and your team works on its own, asking you only when it needs you.{% else %}Everything is set up. Your team works on its own and asks you only when it needs you.{% endif %}</p>
+            </div>
+            <a href="{{ setup_url }}" class="ui-link inline-flex items-center max-lg:min-h-11">Open Set up</a>
+        </div>
+        {% include "studio/partials/setup_progress.html" %}
+        <div class="mt-4">
+            {% include "studio/partials/setup_checklist.html" %}
+        </div>
+    </section>
+
+    {% if show_routine_form %}
+    <div id="write-a-routine" class="mb-8" data-testid="settings-advanced-routine">
+        {% include "studio/partials/routine_form.html" with form=routine_form %}
+    </div>
+    {% endif %}
+
+    {% if show_facts %}
+    <section id="verified-facts" class="mb-8" aria-labelledby="settings-facts-title" data-testid="settings-advanced-facts">
+        <header class="mb-4 max-w-3xl">
+            <h3 id="settings-facts-title" class="text-h3 text-ink-950">Verified facts and project photos</h3>
+            <p class="mt-1 text-sm text-ink-600">Record who checked each claim, its source and review expiry. These are human attestations; collecting a website does not independently verify a commercial claim. Saved brand background notes remain unverified.</p>
+        </header>
+        {% include "studio/partials/verified_facts.html" with form=claim_form %}
+    </section>
+    {% endif %}
+
+    {% if show_memory %}
+    <section id="creative-memory" class="mb-8" aria-labelledby="settings-memory-title" data-testid="settings-advanced-memory" x-data="{ upload: {% if open_upload %}true{% else %}false{% endif %} }">
+        <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+            <header class="max-w-2xl min-w-0">
+                <h3 id="settings-memory-title" class="text-h3 text-ink-950">Creative memory</h3>
+                <p class="mt-1 text-sm text-ink-600">What the team learns from: your best designer's work and the posts that performed best. The prompt engineer and art director start every graphic from here.</p>
+            </header>
+            {% include "studio/partials/memory_actions.html" %}
+        </div>
+        {% include "studio/partials/memory_body.html" %}
+    </section>
+    {% endif %}
+
+    {% if show_outcomes %}
+    <section class="mb-8 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" aria-labelledby="settings-outcomes-title" data-testid="settings-advanced-outcomes">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <div class="min-w-0">
+                <h3 id="settings-outcomes-title" class="text-h3 text-ink-950">Outcomes</h3>
+                <p class="mt-1 text-sm text-ink-600">What each campaign is for, and how it is measured.</p>
+            </div>
+            <a href="{% url 'studio:outcomes' workspace_id=workspace.id %}" class="ui-btn ui-btn-secondary max-sm:w-full">Open Outcomes</a>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if show_developers %}
+    <section class="mb-8 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" aria-labelledby="settings-developers-title" data-testid="settings-advanced-developers">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <div class="min-w-0">
+                <h3 id="settings-developers-title" class="text-h3 text-ink-950">Developers</h3>
+                <p class="mt-1 text-sm text-ink-600">API keys connect your own tools to your organisation's workspaces.</p>
+            </div>
+            <a href="{% url 'api_keys:list' %}" class="ui-btn ui-btn-secondary max-sm:w-full">Manage API keys</a>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if show_danger_zone %}
+    <div id="danger-zone" data-testid="settings-advanced-danger">
+        {% include "workspaces/partials/danger_zone.html" %}
+    </div>
+    {% endif %}
+</div>

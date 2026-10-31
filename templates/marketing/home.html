@@ -12,7 +12,7 @@
             <h1 class="mk-display">One calendar for every brand you run. <em class="mk-accent">Publish to your connected channels.</em></h1>
             <p class="mk-lead">{{ site_name }} is a social media management studio for creators, agencies and small teams. Compose once, publish to {{ LIVE_PLATFORM_NAMES|join:", " }} today (with {{ COMING_SOON_PLATFORM_NAMES|join:", " }} coming as each approves our app), run client approvals, handle supported conversations in one inbox, and review the metrics each platform provides.</p>
             <div class="mk-hero__actions">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %} {% include "marketing/_icon.html" with name="arrow" %}</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% if SIGNUP_OPEN %}{% url 'account_signup' %}{% else %}{% url 'marketing:request_invite' %}{% endif %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request invite{% endif %} {% include "marketing/_icon.html" with name="arrow" %}</a>
                 <a class="mk-link" href="{% url 'marketing:how_it_works' %}">See how it works {% include "marketing/_icon.html" with name="arrow" %}</a>
             </div>
             <ul class="mk-hero__trust">
@@ -45,14 +45,14 @@
             </div>
             <div class="mk-hero__fade"></div>
         </div>
-        <p class="mk-small mk-muted">Screens and sample posts on this page use demo data and include coming-soon channels. Check <a href="{% url 'marketing:platforms' %}">Supported platforms</a> for hosted availability.</p>
+        <p class="mk-small mk-muted">Screens and sample posts on this page use demo data and include coming-soon channels. Live on the hosted app today: {{ LIVE_PLATFORM_NAMES|join:", " }}.</p>
     </div>
 </section>
 
 <!-- ============================================================ Networks -->
 <section class="mk-strip">
     <div class="mk-container">
-        <p class="mk-strip__label">Direct official APIs for the networks below. <a href="{% url 'marketing:platforms' %}">See hosted availability and capabilities.</a></p>
+        <p class="mk-strip__label">Direct official APIs for the networks below.</p>
         <div class="mk-marquee" aria-label="Supported networks">
             <div class="mk-marquee__track">
                 {% for name, icon in networks %}<span class="mk-chip">{% include "partials/_platform_icon.html" with platform=icon size="md" %} {{ name }}</span>{% endfor %}
@@ -187,9 +187,6 @@
             </article>
         </div>
 
-        <div class="mk-btn-row reveal" style="margin-top: 36px;">
-            <a class="mk-link" href="{% url 'marketing:features' %}">Explore every feature {% include "marketing/_icon.html" with name="arrow" %}</a>
-        </div>
     </div>
 </section>
 
@@ -245,7 +242,7 @@
         <div class="mk-section-head reveal">
             <span class="mk-eyebrow">The deal</span>
             <h2 class="mk-h2">Open-source tools for your team. <em class="mk-accent">No per-seat or per-channel fees.</em></h2>
-            <p class="mk-lead">The software does not meter seats, channels or workspaces. Hosting, model requests, generated pictures and paid platform APIs have separate costs. See <a href="{% url 'pricing' %}">pricing</a> before enabling external services.</p>
+            <p class="mk-lead">The software does not meter seats, channels or workspaces. Hosting, model requests, generated pictures and paid platform APIs have separate costs; check them before enabling external services.</p>
         </div>
         <div class="mk-compare">
             <div class="mk-compare__col mk-compare__col--lo reveal">
@@ -271,32 +268,6 @@
     </div>
 </section>
 
-<!-- ============================================================ Developers teaser -->
-<section class="mk-section mk-section--flush-top" id="dev">
-    <div class="mk-container">
-        <div class="mk-feature reveal" style="padding-top: 0;">
-            <div class="mk-feature__copy">
-                <span class="mk-eyebrow">For developers and agents</span>
-                <h2 class="mk-h2">Scriptable from day one</h2>
-                <p>Issue a workspace-scoped API key and drive the same pipeline your team uses: create drafts, schedule posts, upload media, read analytics and answer the inbox. The MCP server exposes the same tools to Claude and other agents, with the same permissions and audit log.</p>
-                <a class="mk-link" href="{% url 'marketing:developers' %}" style="margin-top: 18px;">API and MCP reference {% include "marketing/_icon.html" with name="arrow" %}</a>
-            </div>
-            <div class="mk-feature__media">
-                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>POST /api/v1/posts</span><span>bearer bb_studio_…</span></div><pre><span class="c"># Create a draft for two accounts and schedule it</span>
-curl -X POST <span class="s">"$APP_URL/api/v1/posts"</span> \
-  -H <span class="s">"Authorization: Bearer $KEY"</span> \
-  -H <span class="s">"Content-Type: application/json"</span> \
-  -d <span class="s">'{
-    "account_ids": ["…instagram…", "…linkedin…"],
-    "caption": "New single-origin drop, this Thursday.",
-    "media_ids": ["…"],
-    "scheduled_at": "2026-10-01T09:00:00Z"
-  }'</span></pre></div>
-            </div>
-        </div>
-    </div>
-</section>
-
 <!-- ============================================================ CTA -->
 <section class="mk-section mk-section--flush-top">
     <div class="mk-container">
@@ -304,8 +275,8 @@ curl -X POST <span class="s">"$APP_URL/api/v1/posts"</span> \
             <h2 class="mk-h2">Bring every brand into one studio.</h2>
             <p class="mk-lead">{% if SIGNUP_OPEN %}Create an account and connect a supported channel, or run the app on your own server.{% else %}Request an invitation to the hosted app, or run the app on your own server.{% endif %}</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
-                <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:get_started' %}">Self-host it</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% if SIGNUP_OPEN %}{% url 'account_signup' %}{% else %}{% url 'marketing:request_invite' %}{% endif %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request invite{% endif %}</a>
+                <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:how_it_works' %}">See how it works</a>
             </div>
         </div>
     </div>

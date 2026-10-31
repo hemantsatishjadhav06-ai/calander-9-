@@ -32,6 +32,7 @@ from apps.members.decorators import require_permission
 from apps.members.models import WorkspaceMembership
 from apps.notifications.engine import notify
 from apps.notifications.models import EventType
+from apps.social_accounts.availability import unavailable_message, withheld_platforms
 from apps.social_accounts.oauth_aliases import from_url_slug, redirect_uri_from_request, to_url_slug
 from apps.social_accounts.oauth_pkce import issue_pkce_verifier, pkce_kwargs
 from apps.social_accounts.provider_factory import _get_provider_for_platform
@@ -254,6 +255,18 @@ def dismiss_checklist(request, workspace_id):
     return redirect("calendar:calendar", workspace_id=workspace_id)
 
 
+def _withheld(request, link, platform) -> bool:
+    """Whether the link's workspace switch withholds *platform* from a new connection.
+
+    When it does, the link page shows the sentence once (the same session error
+    every refusal here uses) and nothing contacts the platform.
+    """
+    if platform not in withheld_platforms(link.workspace):
+        return False
+    request.session["connection_link_error"] = unavailable_message(platform)
+    return True
+
+
 # ------------------------------------------------------------------
 # Public Connection Link Views (NO auth required)
 # ------------------------------------------------------------------
@@ -287,6 +300,15 @@ def connection_page(request, token):
     connected_usages = ConnectionLinkUsage.objects.filter(connection_link=link).select_related("social_account")
     connected_accounts = {usage.social_account.platform: usage.social_account for usage in connected_usages}
 
+    # No workspace in this URL, so the link's workspace decides what its switch withholds; a platform
+    # already connected through the link keeps showing as connected.
+    withheld = withheld_platforms(workspace)
+    platform_choices = [
+        (value, label)
+        for value, label in PlatformCredential.Platform.choices
+        if value not in withheld or value in connected_accounts
+    ]
+
     # Store token in session for OAuth flow
     request.session["connection_link_token"] = token
 
@@ -301,7 +323,7 @@ def connection_page(request, token):
             "workspace": workspace,
             "error": session_error,
             "org": org,
-            "platform_choices": PlatformCredential.Platform.choices,
+            "platform_choices": platform_choices,
             "configured_platforms": configured_platforms,
             "connected_accounts": connected_accounts,
         },
@@ -325,6 +347,8 @@ def connection_oauth_start(request, token):
 
     platform = request.POST.get("platform", "").strip()
     if platform not in dict(PlatformCredential.Platform.choices):
+        return redirect("onboarding:connection_page", token=token)
+    if _withheld(request, link, platform):
         return redirect("onboarding:connection_page", token=token)
 
     org = link.workspace.organization
@@ -649,6 +673,8 @@ def connection_bluesky_connect(request, token):
         return render(request, "onboarding/connection_expired.html", status=400)
     if not _check_rate_limit(token):
         return HttpResponse("Too many connection attempts. Please try again later.", status=429)
+    if _withheld(request, link, PlatformCredential.Platform.BLUESKY):
+        return redirect("onboarding:connection_page", token=token)
 
     handle = request.POST.get("handle", "").strip()
     app_password = request.POST.get("app_password", "").strip()
@@ -695,6 +721,8 @@ def connection_devto_connect(request, token):
         return render(request, "onboarding/connection_expired.html", status=400)
     if not _check_rate_limit(token):
         return HttpResponse("Too many connection attempts. Please try again later.", status=429)
+    if _withheld(request, link, PlatformCredential.Platform.DEVTO):
+        return redirect("onboarding:connection_page", token=token)
 
     api_key = request.POST.get("api_key", "").strip()
     if not api_key:
@@ -727,6 +755,8 @@ def connection_mastodon_start(request, token):
         return render(request, "onboarding/connection_expired.html", status=400)
     if not _check_rate_limit(token):
         return HttpResponse("Too many connection attempts. Please try again later.", status=429)
+    if _withheld(request, link, PlatformCredential.Platform.MASTODON):
+        return redirect("onboarding:connection_page", token=token)
 
     instance_url = _normalize_mastodon_instance_url(request.POST.get("instance_url", ""))
     if not instance_url:

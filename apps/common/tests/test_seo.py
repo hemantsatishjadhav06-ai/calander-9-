@@ -23,8 +23,12 @@ def test_sitemap_lists_the_public_pages_only():
     assert resp.status_code == 200
     assert resp["Content-Type"].startswith("application/xml")
     body = resp.content.decode()
-    for path in ("http://testserver/", "http://testserver/pricing/", "http://testserver/terms/"):
-        assert f"<loc>{path}</loc>" in body
+    # The three linked pages, then the legal pages it always listed.
+    for path in ("/", "/how-it-works/", "/request-invite/", "/terms/", "/privacy/", "/support/"):
+        assert f"<loc>http://testserver{path}</loc>" in body
+    # Pricing redirects now, and the hidden pages ask not to be indexed.
+    for path in ("/pricing/", "/features/", "/platforms/", "/developers/", "/get-started/"):
+        assert f"<loc>http://testserver{path}</loc>" not in body
     # The app surface is disallowed in robots.txt; it must not be advertised here.
     assert "/workspace/" not in body
     assert "/accounts/" not in body

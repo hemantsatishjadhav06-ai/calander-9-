@@ -1,8 +1,10 @@
 """The rest of the audit's yellow list, each pinned by the thing a user sees.
 
-- The sidebar only advertises platforms that can actually be connected.
+- The connect page offers only platforms that can actually be connected; the
+  sidebar no longer looks up channels at all (no template drew them).
 - Six real pages (Drafts, Queues, Posting schedule, Templates, Categories,
-  CSV import) are reachable by clicking.
+  CSV import) are reachable by clicking, from the Calendar page's header and
+  the New menu; Queues, Templates and Categories follow their switches.
 - The calendar's repeat-icon lookup no longer costs one query per chip.
 - Logging out is a POST: a GET must not end the session.
 - An external client does not get the org roster.
@@ -10,17 +12,19 @@
 """
 
 from django.db import connection
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.calendar.models import RecurrenceRule
+from apps.common.context_processors import sidebar_context
 from apps.composer.models import PlatformPost, Post
 from apps.members.models import OrgMembership, WorkspaceMembership
 from apps.organizations.models import Organization
 from apps.social_accounts.models import SocialAccount
+from apps.studio.models import AgencySettings
 from apps.workspaces.models import Workspace
 
 WR = WorkspaceMembership.WorkspaceRole
@@ -47,20 +51,58 @@ class WorkspaceBase(TestCase):
         self.calendar_url = reverse("calendar:calendar", kwargs={"workspace_id": self.ws.id})
 
 
+#: Tables the sidebar used to read for channel shortcuts no template drew (plan T8).
+CHANNEL_TABLES = (
+    "social_accounts_social_account",
+    "social_accounts_platform_visibility",
+    "credentials_platform_credential",
+)
+
+
 class SidebarTests(WorkspaceBase):
-    def test_only_connectable_platforms_are_advertised(self):
-        """No credentials configured in tests: the app-review platforms must not appear."""
+    def test_only_connectable_platforms_are_offered(self):
+        """No credentials configured in tests: the app-review platforms have no Connect button."""
+        # Every platform shown, so this pins "can it be connected", not the extra-providers switch.
+        AgencySettings.objects.create(workspace=self.ws, features={"extra_providers": True})
         self.client.force_login(self.owner)
-        response = self.client.get(self.calendar_url)
+        response = self.client.get(reverse("social_accounts:connect", kwargs={"workspace_id": self.ws.id}))
         self.assertEqual(response.status_code, 200)
-        offered = {key for key, _label in response.context["sidebar_connectable_platforms"]}
         # Session / instance-OAuth platforms need no app credentials.
-        self.assertIn("bluesky", offered)
-        self.assertIn("mastodon", offered)
+        self.assertContains(response, 'data-testid="connect-platform-bluesky"')
+        self.assertContains(response, 'data-testid="connect-platform-mastodon"')
         for needs_app in ("instagram", "tiktok", "linkedin_company"):
-            self.assertNotIn(needs_app, offered, f"{needs_app} is advertised but cannot be connected")
+            with self.subTest(platform=needs_app):
+                self.assertNotContains(response, f'data-testid="connect-platform-{needs_app}"')
+
+    def test_the_sidebar_context_reads_no_channels(self):
+        """The three channel lists no template drew are gone, and their queries with them."""
+        SocialAccount.objects.create(
+            workspace=self.ws,
+            platform="bluesky",
+            account_platform_id="did",
+            account_name="a",
+            connection_status=SocialAccount.ConnectionStatus.CONNECTED,
+        )
+        request = RequestFactory().get(self.calendar_url)
+        request.user = self.owner
+        request.workspace = self.ws
+        request.org_membership = OrgMembership.objects.get(user=self.owner, organization=self.org)
+
+        with CaptureQueriesContext(connection) as ctx:
+            context = sidebar_context(request)
+
+        for key in ("sidebar_channels", "sidebar_unhealthy_channels", "sidebar_connectable_platforms"):
+            self.assertNotIn(key, context)
+        read = [q["sql"] for q in ctx.captured_queries if any(f'"{t}"' in q["sql"] for t in CHANNEL_TABLES)]
+        self.assertEqual(read, [])
+        # Analytics platforms, workspaces, unread inbox, approvals, idea columns and tags: four fewer
+        # than before (two channel lists, the visible platforms and the configured credentials).
+        self.assertLessEqual(len(ctx.captured_queries), 6, [q["sql"] for q in ctx.captured_queries])
 
     def test_the_six_orphaned_pages_are_linked(self):
+        """From the Calendar page: its header and the New menu (plan T9), Queues, Templates and
+        Categories with their switches on."""
+        AgencySettings.objects.create(workspace=self.ws, features={"queues": True, "templates": True})
         self.client.force_login(self.owner)
         response = self.client.get(self.calendar_url)
         kwargs = {"workspace_id": self.ws.id}
@@ -74,6 +116,21 @@ class SidebarTests(WorkspaceBase):
         ):
             with self.subTest(name=name):
                 self.assertContains(response, reverse(name, kwargs=kwargs))
+
+    def test_with_their_switches_off_only_queues_templates_and_categories_are_unlinked(self):
+        """The pages still answer (switches hide links, spec D6); the other three stay linked."""
+        AgencySettings.objects.create(workspace=self.ws, features={"queues": False, "templates": False})
+        self.client.force_login(self.owner)
+        response = self.client.get(self.calendar_url)
+        kwargs = {"workspace_id": self.ws.id}
+        for name in ("composer:drafts_list", "calendar:posting_slots", "composer:csv_upload"):
+            with self.subTest(linked=name):
+                self.assertContains(response, reverse(name, kwargs=kwargs))
+        for name in ("calendar:queue_list", "composer:template_list", "composer:category_list"):
+            with self.subTest(unlinked=name):
+                url = reverse(name, kwargs=kwargs)
+                self.assertNotContains(response, f'href="{url}"')
+                self.assertEqual(self.client.get(url).status_code, 200)
 
 
 class CalendarRecurrenceQueryTests(WorkspaceBase):

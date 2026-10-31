@@ -1,0 +1,15 @@
+{% comment %}Settings → Accounts: the accounts page's body; connecting stays on social_accounts:connect and
+every card's actions post to their own handlers.{% endcomment %}
+<div class="max-w-4xl">
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div class="min-w-0">
+            <h2 id="settings-panel-title" class="text-h2 text-ink-950">Social accounts</h2>
+            <p class="ui-page-status">The channels this workspace posts to. Connect one to start publishing.</p>
+        </div>
+        {% if accounts %}
+        {% include "social_accounts/partials/_connect_button.html" %}
+        {% endif %}
+    </div>
+
+    {% include "social_accounts/partials/_account_list.html" %}
+</div>

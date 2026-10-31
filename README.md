@@ -786,7 +786,7 @@ SM Bean ships a REST API and an MCP (Model Context Protocol) server so agents an
 
 ### Authentication
 
-Issue an API key from **Organization → API Keys**. Keys are workspace-scoped, can be allowlisted to specific social accounts, and inherit a subset of the issuer's workspace permissions. Revocation takes effect immediately. Send the key as a Bearer token:
+Issue an API key from **Settings → Advanced → Developers** (organisation owners and admins; the page lives at `/organizations/api-keys/`). Keys are workspace-scoped, can be allowlisted to specific social accounts, and inherit a subset of the issuer's workspace permissions. Revocation takes effect immediately. Send the key as a Bearer token:
 
 ```
 Authorization: Bearer bb_studio_...

@@ -1,5 +1,6 @@
 """Set up: one checklist in plain words, the Settings hub, Home's status line and the Today card."""
 
+import re
 from datetime import datetime, timedelta
 
 import pytest
@@ -278,14 +279,19 @@ class TestAutopilotDefaults:
 # ---------------------------------------------------------------------------
 
 
-def test_the_settings_hub_links_every_settings_page(client, world):
+def test_the_settings_hub_moved_to_the_settings_screen(client, world):
+    """The hub's cards became Settings tabs (spec D5): the hub answers 301 to Brand, and Set up is a click away."""
     client.force_login(world.editor)
+    settings_url = reverse("settings:index", kwargs={"workspace_id": world.workspace.id})
 
-    html = client.get(_url("settings_hub", world)).content.decode()
+    response = client.get(_url("settings_hub", world))
 
-    for key in ("brand", "trust", "memory", "outcomes", "autopilot", "telegram", "budget"):
-        assert f'data-settings-card="{key}"' in html
-    assert "Open Set up" in html
+    assert response.status_code == 301 and response["Location"] == f"{settings_url}?tab=brand"
+    html = client.get(response["Location"]).content.decode()
+    for key in ("brand", "team", "autopilot", "notifications", "advanced"):
+        assert f'data-testid="settings-tab-{key}"' in html
+    advanced = client.get(f"{settings_url}?tab=advanced").content.decode()
+    assert "Open Set up" in advanced and _url("setup", world) in advanced
 
 
 def test_the_agency_tabs_are_home_routines_team_settings(world):
@@ -391,28 +397,40 @@ class TestHome:
         ).content.decode()
         assert 'id="onboarding-checklist"' not in elsewhere
 
-    def test_the_sidebar_is_short_with_more_behind_a_disclosure(self, client, world):
+    def test_the_sidebar_is_six_places_and_a_gear(self, client, world):
+        """More, Set up and Notifications left the sidebar (plan T9); their pages are a click away elsewhere."""
         client.force_login(world.owner)
 
         html = client.get(_url("index", world)).content.decode()
 
-        for label in ("Home", "Approvals", "Calendar", "Inbox", "Blog &amp; SEO", "Set up", "More"):
+        for label in ("Home", "Approvals", "Calendar", "Inbox", "Activity", "Settings"):
             assert f'<span class="sidebar-nav-label">{label}</span>' in html, label
-        assert '<details class="sidebar-more"' in html
+        for gone in ("More", "Set up", "Notifications", "Blog &amp; SEO"):
+            assert f'<span class="sidebar-nav-label">{gone}</span>' not in html, gone
+        assert "sidebar-more" not in html
         assert "Start a post" not in html and "customer_workflow" not in html
-        for name in ("composer:drafts_list", "calendar:queue_list", "composer:csv_upload", "media_library:index"):
-            assert reverse(name, kwargs={"workspace_id": world.workspace.id}) in html
+        kwargs = {"workspace_id": world.workspace.id}
+        for name in ("composer:create_landing", "composer:csv_upload"):  # the New menu
+            assert reverse(name, kwargs=kwargs) in html, name
+        calendar = client.get(reverse("calendar:calendar", kwargs=kwargs)).content.decode()
+        for name in ("composer:drafts_list", "calendar:posting_slots", "media_library:index"):  # its header
+            assert reverse(name, kwargs=kwargs) in calendar, name
 
-    def test_more_opens_itself_only_on_its_own_pages(self, client, world, fake_team):
-        """ "detail" and "list" are not "queue_detail" and "drafts_list": a brief page keeps More closed."""
+    def test_each_page_lights_its_own_place_only(self, client, world, fake_team):
+        """ "detail" and "list" are not "queue_detail" and "drafts_list": a brief page lights Home alone,
+        and a page outside the six places lights nothing."""
         client.force_login(world.owner)
         brief = make_brief(world)
 
-        for name, kwargs in (("studio:detail", {"brief_id": brief.pk}), ("studio:index", {}), ("blog:list", {})):
+        for name, kwargs, lit in (
+            ("studio:detail", {"brief_id": brief.pk}, ["Home"]),
+            ("studio:index", {}, ["Home"]),
+            ("blog:list", {}, []),  # no Blog item while the blog switch is off
+            ("composer:drafts_list", {}, []),
+        ):
             html = client.get(reverse(name, kwargs={"workspace_id": world.workspace.id, **kwargs})).content.decode()
-            assert '<details class="sidebar-more" data-sidebar-more>' in html, name
-        drafts = client.get(reverse("composer:drafts_list", kwargs={"workspace_id": world.workspace.id}))
-        assert '<details class="sidebar-more" data-sidebar-more open>' in drafts.content.decode()
+            assert re.findall(r'sidebar-nav-item active".*?sidebar-nav-label">([^<]+)<', html, re.S) == lit, name
+            assert "sidebar-more" not in html, name
 
     def test_links_to_approvers_and_budget_open_the_advanced_section(self, client, world):
         AgencySettings.objects.create(workspace=world.workspace, lead=world.manager)
@@ -421,8 +439,10 @@ class TestHome:
 
         setup = client.get(_url("setup", world)).content.decode()
         assert setup.count(advanced) == 2  # the approvers' Change, and the budget's Change
-        hub = client.get(_url("settings_hub", world)).content.decode()
-        assert advanced in hub
+        # The Settings screen's Autopilot tab honours the same ?open=advanced (the hub that linked it moved there).
+        settings_url = reverse("settings:index", kwargs={"workspace_id": world.workspace.id})
+        tab = client.get(f"{settings_url}?tab=autopilot&open=advanced").content.decode()
+        assert "data-autopilot-advanced open>" in tab
         closed = client.get(_url("autopilot", world)).content.decode()
         assert "data-autopilot-advanced>" in closed and "data-autopilot-advanced open>" not in closed
         opened = client.get(advanced).content.decode()
@@ -586,7 +606,7 @@ def test_the_pages_pass_the_accessibility_sweep(client, world):
 
     client.force_login(world.owner)
     for name in ("setup", "settings_hub", "index"):
-        html = client.get(_url(name, world)).content.decode()
+        html = client.get(_url(name, world), follow=True).content.decode()  # the hub moved to Settings
         audit = _Audit()
         audit.feed(html)
         audit.finish()

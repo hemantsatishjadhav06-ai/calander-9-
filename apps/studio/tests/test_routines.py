@@ -808,6 +808,9 @@ class TestRoutinesNeverApprove:
 
 
 class TestPage:
+    # The list and the presets are on Activity (studio:team, its #routines section) since Phase 2;
+    # /studio/routines/ answers a 301 there after its own checks (test_activity.py). The form comes
+    # back on its own page when a routine fails to save.
     def test_the_tab_sits_after_overview(self, world):
         from apps.studio import dashboard
 
@@ -820,7 +823,7 @@ class TestPage:
         make_routine(world, cadence="weekly", weekday=0, time=dt.time(9, 0), enabled=False, title="Monday plan")
         client.force_login(world.editor)
 
-        html = client.get(_url("studio:routines", world)).content.decode()
+        html = client.get(_url("studio:team", world)).content.decode()
 
         assert "Mornings" in html and "Weekdays at 08:30" in html and "Mondays at 09:00" in html
         assert "run yet" in html and "Paused" in html and "Asia/Kolkata" in html
@@ -828,19 +831,22 @@ class TestPage:
         assert _url("studio:routines_run_now", world, routine_id=routine.pk) in html
         assert _url("studio:routines_toggle", world, routine_id=routine.pk) in html
         assert _url("studio:routines_delete", world, routine_id=routine.pk) in html
-        assert 'aria-current="page"' in html and "Routines" in html
+        # Activity's Routines section, with the controls inside it (not only a tab that says "Routines").
+        assert 'id="routines"' in html and 'id="activity-routines-heading"' in html
+        section = html.index('id="routines"')
+        assert section < html.index(_url("studio:routines_run_now", world, routine_id=routine.pk))
         for word in ("AI Studio", "assistant", "operator", "CTO", "API_KEY"):
             assert word not in html
 
     def test_someone_else_sees_run_now_but_not_pause_or_delete(self, client, world):
         other = make_routine(world, user=world.manager, title="Manager's routine")
         client.force_login(world.editor)
-        html = client.get(_url("studio:routines", world)).content.decode()
+        html = client.get(_url("studio:team", world)).content.decode()
         assert _url("studio:routines_run_now", world, routine_id=other.pk) in html
         assert _url("studio:routines_delete", world, routine_id=other.pk) not in html
 
         client.force_login(world.owner)  # manages the workspace's settings
-        html = client.get(_url("studio:routines", world)).content.decode()
+        html = client.get(_url("studio:team", world)).content.decode()
         assert _url("studio:routines_delete", world, routine_id=other.pk) in html
 
     def test_the_form_makes_a_routine_and_says_so(self, client, world):
@@ -918,7 +924,8 @@ class TestPage:
         response = client.post(
             _url("studio:routines_toggle", world, routine_id=routine.pk), {"next": "https://evil.example/x"}
         )
-        assert response["Location"] == _url("studio:routines", world)
+        assert response.status_code == 302
+        assert response["Location"] == _url("studio:team", world) + "#routines"
 
     def test_run_now_is_rate_limited(self, client, world, settings, manager_agent, jobs):
         settings.RATELIMIT_ENABLE = True
@@ -936,13 +943,18 @@ class TestPage:
         make_routine(world, user=world.owner, title="Owner's", enabled=False)
         client.force_login(world.owner)
 
-        html = client.get(_url("studio:routines", world)).content.decode()
+        activity = client.get(_url("studio:team", world)).content.decode()
+        # The form, as it comes back when a routine fails to save.
+        form = client.post(_url("studio:routines_create", world), {"instruction": "", "cadence": "daily"})
+        assert 'id="routines"' in activity and form.status_code == 400
 
-        audit = _Audit()
-        audit.feed(html)
-        audit.finish()
-        assert audit.unnamed_buttons == [] and audit.unnamed_controls == []
-        assert [m.group(3) for m in FAINT_TEXT.finditer(html) if m.group(3).strip() not in ("•", "·", "&bull;")] == []
+        for html in (activity, form.content.decode()):
+            audit = _Audit()
+            audit.feed(html)
+            audit.finish()
+            assert audit.unnamed_buttons == [] and audit.unnamed_controls == []
+            faint = [m.group(3) for m in FAINT_TEXT.finditer(html) if m.group(3).strip() not in ("•", "·", "&bull;")]
+            assert faint == []
 
 
 class TestPermissions:

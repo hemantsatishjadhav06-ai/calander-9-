@@ -425,21 +425,6 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
   .sidebar-nav-item { min-height: 44px; padding: 10px 12px; }
 }
 
-/* "More" in the sidebar: a native disclosure styled like a nav item */
-.sidebar-more > summary {
-  list-style: none;
-}
-.sidebar-more > summary::-webkit-details-marker {
-  display: none;
-}
-.sidebar-more-chevron { transition: transform var(--dur-base) var(--ease-out); }
-.sidebar-more[open] > summary .sidebar-more-chevron {
-  transform: rotate(180deg);
-}
-.sidebar-more-items {
-  padding-left: 0;
-}
-
 /* Home: the conversation is the main column. Its message log fills about
    60% of the viewport on desktop and less on a phone, so the composer stays
    visible without scrolling. */

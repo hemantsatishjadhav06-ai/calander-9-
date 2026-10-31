@@ -1,0 +1,12 @@
+{% comment %}
+The notifications bell (spec D8): in the sidebar's header and in the phone's top bar. It opens the
+notifications drawer (base.html) and carries the unread badge, seeded from the server count and kept
+fresh by notificationBadge(). bell_class: extra classes (where it shows).
+{% endcomment %}<button type="button" data-testid="notifications-bell" x-data="notificationBadge({{ unread_notification_count|default:0 }})" x-init="start()" @notifications-read.window="refresh()"
+        @click="$dispatch('open-notifications')" aria-haspopup="dialog"
+        aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}"
+        :aria-label="count ? 'Notifications, ' + count + ' unread' : 'Notifications'"
+        class="{% if bell_class %}{{ bell_class }} {% endif %}ui-btn ui-btn-icon relative flex-shrink-0">
+    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+    <span class="sidebar-badge absolute -top-1 -right-1 !ml-0" data-testid="notification-badge" x-show="count > 0" x-text="count > 99 ? '99+' : count"{% if not unread_notification_count %} x-cloak{% endif %}>{% if unread_notification_count %}{{ unread_notification_count }}{% endif %}</span>
+</button>

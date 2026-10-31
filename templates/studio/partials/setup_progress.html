@@ -1,0 +1,8 @@
+{% comment %}
+How many Set up steps are done, as a bar and in words. Extracted unchanged from studio/setup.html, which
+includes it, for Settings → Advanced → Health to include as well. Context: done, total.
+{% endcomment %}
+<div class="mt-4 flex items-center gap-3" aria-label="{{ done }} of {{ total }} steps done">
+    <div class="ui-progress flex-1" aria-hidden="true"><span style="width: {% widthratio done total 100 %}%"></span></div>
+    <p class="text-[13px] font-semibold text-ink-900 whitespace-nowrap tabular-nums" data-setup-progress>{{ done }} of {{ total }} steps done</p>
+</div>

@@ -1,0 +1,29 @@
+{% comment %}Settings → Notifications: where this person's notification settings and Telegram stand, and the
+way to each page. No form moves here: both pages are this person's own. Context: quiet (their quiet hours
+and digest, or None), telegram (readiness.telegram_state for this person).{% endcomment %}
+<div class="w-full max-w-3xl">
+    <header class="mb-6">
+        <h2 id="settings-panel-title" class="text-h2 text-ink-950">Notifications</h2>
+        <p class="ui-page-status">How you hear about what needs you. These settings are yours: everyone on the team sets their own.</p>
+    </header>
+
+    <section class="mb-6 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" aria-labelledby="settings-notifications-preferences-title" data-testid="settings-notifications-preferences">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <div class="min-w-0">
+                <h3 id="settings-notifications-preferences-title" class="text-h3 text-ink-950">In the app and by email</h3>
+                <p class="mt-1 text-sm text-ink-600">{% if quiet.digest_mode %}Emails come in one daily digest.{% else %}Emails arrive as they happen.{% endif %} {% if quiet.is_enabled and quiet.start_time and quiet.end_time %}Quiet hours {{ quiet.start_time|time:"H:i" }}–{{ quiet.end_time|time:"H:i" }} ({{ quiet.timezone }}).{% else %}Quiet hours are off.{% endif %}</p>
+            </div>
+            <a href="{% url 'notifications:preferences' %}" class="ui-btn ui-btn-secondary max-sm:w-full">Change notification settings</a>
+        </div>
+    </section>
+
+    <section class="mb-6 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" aria-labelledby="settings-notifications-telegram-title" data-testid="settings-notifications-telegram">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <div class="min-w-0">
+                <h3 id="settings-notifications-telegram-title" class="text-h3 text-ink-950">Telegram</h3>
+                <p class="mt-1 text-sm text-ink-600">{{ telegram.label }}</p>
+            </div>
+            <a href="{% url 'telegram:settings' workspace_id=workspace.id %}" class="ui-btn ui-btn-secondary max-sm:w-full">Open Telegram settings</a>
+        </div>
+    </section>
+</div>

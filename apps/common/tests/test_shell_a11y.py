@@ -12,7 +12,8 @@
 - The sidebar "New > Idea" modal's borderless title and notes fields showed no focus indicator.
 - The account button's second line dropped to 4.25:1 on hover (ink-500); it is ink-600.
 - The page scroller clipped focus rings on anything flush with its edges; it has a 4px inner gutter.
-- "More" labels were title case and did not match their pages.
+- "More" labels were title case and did not match their pages. More is gone (plan T9); its entries
+  keep their labels in the New menu and the Calendar page's header.
 """
 
 import re
@@ -94,10 +95,19 @@ class ShellA11yTests(TestCase):
             'class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-1 p-1"', self.html
         )
 
+    def _link_text(self, testid):
+        anchor = re.search(rf'data-testid="{testid}"[^>]*>(.*?)</a>', self.html, re.S)
+        self.assertIsNotNone(anchor, testid)
+        return re.sub(r"<[^>]+>", "", anchor.group(1)).strip()
+
     def test_more_labels_are_sentence_case_and_match_their_pages(self):
-        labels = re.findall(r'sidebar-nav-label">([^<]+)<', self.html)
-        for label in ("Ideas", "Posting schedule", "Import from CSV"):
-            self.assertIn(label, labels)
+        moved = {
+            "sidebar-new-ideas": "Ideas",
+            "calendar-link-posting-schedule": "Posting schedule",
+            "sidebar-new-csv": "Import from CSV",
+        }
+        labels = [self._link_text(testid) for testid in moved]
+        self.assertEqual(labels, list(moved.values()))
         for old in ("Create Idea", "Posting Schedule", "Import CSV"):
             self.assertNotIn(old, labels)
         self.assertIn('<h2 class="text-h2 text-ink-950">New idea</h2>', self.html)

@@ -423,9 +423,8 @@ class PlatformVisibility(models.Model):
     def visible_choices(cls) -> list[tuple[str, str]]:
         """``Platform.choices`` minus the platforms an admin has hidden.
 
-        The single source for "what can be connected" — the connect page and
-        the sidebar's connect shortcuts both read it, so they can't drift
-        (the sidebar used to keep its own hand-maintained copy, which had
+        The single source for "what can be connected": the connect page reads
+        it (the sidebar once kept its own hand-maintained copy, which had
         fallen behind by two platforms). Platforms without a row default to
         visible, matching ``is_visible``.
         """

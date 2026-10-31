@@ -18,6 +18,9 @@
         <p class="ui-page-status">DEV.to signs in with a personal API key.</p>
     </div>
 
+    {% if unavailable %}
+    {% include "social_accounts/partials/_connect_unavailable.html" %}
+    {% else %}
     <form method="post" action="{% url 'social_accounts:connect_devto' workspace_id=workspace_id %}" class="ui-card space-y-5">
         {% csrf_token %}
 
@@ -40,5 +43,6 @@
             <a href="{% url 'social_accounts:connect' workspace_id=workspace_id %}" class="ui-btn ui-btn-ghost">Cancel</a>
         </div>
     </form>
+    {% endif %}
 </div>
 {% endblock %}

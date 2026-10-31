@@ -48,6 +48,7 @@
         html.sidebar-is-collapsed .sidebar-initial .sidebar-connect-channels { display: none; }
         /* Collapsed child overrides before Alpine */
         html.sidebar-is-collapsed .sidebar-initial .sidebar-ws-btn { justify-content: center; padding-left: 0; padding-right: 0; gap: 0; }
+        html.sidebar-is-collapsed .sidebar-initial .sidebar-head { flex-direction: column; padding-left: 0.5rem; padding-right: 0.5rem; }
         html.sidebar-is-collapsed .sidebar-initial .sidebar-new-wrap { padding-left: 0.5rem; padding-right: 0.5rem; }
         html.sidebar-is-collapsed .sidebar-initial .sidebar-nav { padding-left: 0.5rem; padding-right: 0.5rem; }
         html.sidebar-is-collapsed .sidebar-initial .sidebar-org-footer { padding: 0.5rem; }
@@ -361,12 +362,13 @@
                x-init="$el.classList.remove('sidebar-initial'); document.documentElement.classList.remove('sidebar-is-collapsed'); $nextTick(() => $el.classList.add('transition-all', 'duration-200'))"
                @click="if (window.innerWidth < 1024 && $event.target.closest('a')) { mobileMenuOpen = false }">
 
-            <!-- Workspace switcher (top of sidebar) -->
-            <div class="relative px-3 pt-3 pb-1" :class="sidebarCollapsed && 'px-2'" x-data="{ wsOpen: false }"
+            <!-- Sidebar header: the workspace switcher, then (desktop) Go to and the notifications bell.
+                 Below 1024px those two live in the top bar instead. -->
+            <div class="sidebar-head relative px-3 pt-3 pb-1 flex items-center gap-1" :class="sidebarCollapsed && 'px-2 flex-col'" x-data="{ wsOpen: false }"
                  @keydown.escape="if (wsOpen) { $event.stopPropagation(); wsOpen = false; $refs.wsBtn.focus() }"
                  @focusout="if (wsOpen && $event.relatedTarget && !$el.contains($event.relatedTarget)) wsOpen = false">
                 <button x-ref="wsBtn" aria-haspopup="true" :aria-expanded="wsOpen" @click="wsOpen = !wsOpen"
-                        class="sidebar-ws-btn w-full flex items-center gap-2.5 px-2 py-1.5 min-h-10 max-lg:min-h-11 text-left rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer"
+                        class="sidebar-ws-btn flex-1 min-w-0 flex items-center gap-2.5 px-2 py-1.5 min-h-10 max-lg:min-h-11 text-left rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer"
                         :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-2.5 px-2'">
                     {% with current_ws=request.workspace %}
                     {% if current_ws %}
@@ -442,6 +444,8 @@
                     {% endif %}
                 </div>
 
+                {% if nav_palette %}{% include "components/palette_button.html" with palette_class="hidden lg:inline-flex" %}{% endif %}
+                {% include "components/notifications_bell.html" with bell_class="hidden lg:inline-flex" %}
             </div>
 
             <!-- + New CTA -->
@@ -487,6 +491,26 @@
                                 <div class="text-xs text-ink-500">Capture a content idea</div>
                             </div>
                         </button>
+                        {# The pages that were under More in the sidebar; Templates and Categories follow their switch. #}
+                        <div class="ui-menu-separator" role="none"></div>
+                        <a href="{% url 'composer:create_landing' workspace_id=request.workspace.id %}" data-testid="sidebar-new-ideas" class="ui-menu-item">
+                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 00-4 12.73V16a1 1 0 001 1h6a1 1 0 001-1v-1.27A7 7 0 0012 2z"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                            Ideas
+                        </a>
+                        <a href="{% url 'composer:csv_upload' workspace_id=request.workspace.id %}" data-testid="sidebar-new-csv" class="ui-menu-item">
+                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Import from CSV
+                        </a>
+                        {% if features.templates %}
+                        <a href="{% url 'composer:template_list' workspace_id=request.workspace.id %}" data-testid="sidebar-new-templates" class="ui-menu-item">
+                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                            Templates
+                        </a>
+                        <a href="{% url 'composer:category_list' workspace_id=request.workspace.id %}" data-testid="sidebar-new-categories" class="ui-menu-item">
+                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                            Categories
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -702,117 +726,25 @@
             </div>
             {% endif %}
 
-            <!-- Navigation -->
+            <!-- Navigation: the places from apps/common/navigation.build_nav, then Settings, the gear, at the bottom. -->
             <nav class="sidebar-nav flex-1 overflow-y-auto pt-1 pb-3 px-3 flex flex-col gap-0.5" :class="sidebarCollapsed ? 'px-2' : 'px-3'" aria-label="Main">
-                {% block sidebar_nav %}
-                {% if request.workspace %}
-                {% with match=request.resolver_match %}
-                {# Seven places, then More. Home is the conversation with your team. #}
-                <a href="{% url 'studio:index' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.app_name == 'studio' and match.url_name != 'setup' %}active{% endif %}"{% if match.app_name == 'studio' and match.url_name != 'setup' %} aria-current="page"{% endif %}>
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
-                    <span class="sidebar-nav-label">Home</span>
+                {% block sidebar_nav %}{% spaceless %}
+                {% for item in nav.items %}
+                <a href="{{ item.url }}" data-testid="nav-{{ item.key }}" class="sidebar-nav-item{% if item.active %} active{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}
+                   aria-label="Approvals{% if item.count %}, {{ item.count }} waiting{% endif %}"{% endif %}>
+                    {% include "components/nav_icon.html" with key=item.key %}
+                    <span class="sidebar-nav-label">{{ item.label }}</span>
+                    {% if item.count %}<span class="sidebar-badge{% if item.key == "approvals" %} is-turn{% endif %}">{{ item.count }}</span>{% endif %}
                 </a>
-                <a href="{% url 'calendar:calendar' workspace_id=request.workspace.id %}?mode=list&amp;tab=approvals" class="sidebar-nav-item {% if match.url_name == 'calendar' and request.GET.tab == 'approvals' %}active{% endif %}"{% if match.url_name == 'calendar' and request.GET.tab == 'approvals' %} aria-current="page"{% endif %}
-                   aria-label="Approvals{% if sidebar_pending_approvals %}, {{ sidebar_pending_approvals }} waiting{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-                    <span class="sidebar-nav-label">Approvals</span>
-                    {% if sidebar_pending_approvals %}<span class="sidebar-badge is-turn">{{ sidebar_pending_approvals }}</span>{% endif %}
-                </a>
-                <a href="{% url 'calendar:calendar' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'calendar' and request.GET.tab != 'approvals' %}active{% endif %}"{% if match.url_name == 'calendar' and request.GET.tab != 'approvals' %} aria-current="page"{% endif %}>
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <span class="sidebar-nav-label">Calendar</span>
-                </a>
-                <a href="{% url 'inbox:feed' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.app_name == 'inbox' %}active{% endif %}"{% if match.app_name == 'inbox' %} aria-current="page"{% endif %}>
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                    <span class="sidebar-nav-label">Inbox</span>
-                    {% if sidebar_unread_inbox_count %}<span class="sidebar-badge">{{ sidebar_unread_inbox_count }}</span>{% endif %}
-                </a>
-                <a href="{% url 'blog:list' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.app_name == 'blog' %}active{% endif %}"{% if match.app_name == 'blog' %} aria-current="page"{% endif %}>
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="14" y2="11"/></svg>
-                    <span class="sidebar-nav-label">Blog &amp; SEO</span>
-                </a>
-                {% if analytics_enabled_platforms %}
-                <a href="{% url 'analytics:index' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.app_name == 'analytics' %}active{% endif %}"{% if match.app_name == 'analytics' %} aria-current="page"{% endif %}>
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 12l4-4 4 4 6-6"/></svg>
-                    <span class="sidebar-nav-label">Analytics</span>
+                {% endfor %}
+                {% if nav.settings %}
+                <div class="mt-auto" aria-hidden="true"></div>{# the gear sits at the bottom #}
+                <a href="{{ nav.settings.url }}" data-testid="nav-settings" class="sidebar-nav-item{% if nav.settings.active %} active{% endif %}"{% if nav.settings.active %} aria-current="page"{% endif %}>
+                    {% include "components/nav_icon.html" with key="settings" %}
+                    <span class="sidebar-nav-label">{{ nav.settings.label }}</span>
                 </a>
                 {% endif %}
-                {% endwith %}
-                {% endif %}
-
-                <a href="{% url 'notifications:list' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'list' and request.resolver_match.app_name == 'notifications' %}active{% endif %}"
-                   x-data="notificationBadge({{ unread_notification_count|default:0 }})" x-init="start()" @notifications-read.window="refresh()"
-                   :aria-label="count ? 'Notifications, ' + count + ' unread' : 'Notifications'">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-                    <span class="sidebar-nav-label">Notifications</span>
-                    <span class="sidebar-badge" data-testid="notification-badge" x-show="count > 0" x-text="count > 99 ? '99+' : count"{% if not unread_notification_count %} x-cloak{% endif %}>{% if unread_notification_count %}{{ unread_notification_count }}{% endif %}</span>
-                </a>
-
-                {% if request.workspace %}
-                {% with match=request.resolver_match %}
-                <a href="{% url 'studio:setup' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'setup' %}active{% endif %}"{% if match.url_name == 'setup' %} aria-current="page"{% endif %}>
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                    <span class="sidebar-nav-label">Set up</span>
-                </a>
-                {# Everything else lives behind More, so the sidebar stays short. #}
-                {# Open only on one of its own pages: an exact name each, since "in" on a string is a substring test. #}
-                <details class="sidebar-more" data-sidebar-more{% if match.url_name == 'create_landing' or match.url_name == 'drafts_list' or match.url_name == 'queue_list' or match.url_name == 'queue_detail' or match.url_name == 'posting_slots' or match.url_name == 'template_list' or match.url_name == 'category_list' or match.url_name == 'csv_upload' or match.app_name == 'media_library' %} open{% endif %}>
-                    <summary class="sidebar-nav-item" aria-label="More pages">
-                        <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
-                        <span class="sidebar-nav-label">More</span>
-                        <svg class="sidebar-nav-label sidebar-more-chevron ml-auto flex-shrink-0" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-                    </summary>
-                    <div class="sidebar-more-items mt-0.5 flex flex-col gap-0.5">
-                        <a href="{% url 'composer:create_landing' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'create_landing' %}active{% endif %}">
-                            <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a7 7 0 00-4 12.73V16a1 1 0 001 1h6a1 1 0 001-1v-1.27A7 7 0 0012 2z"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
-                            <span class="sidebar-nav-label">Ideas</span>
-                        </a>
-                        <a href="{% url 'composer:drafts_list' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'drafts_list' %}active{% endif %}">
-                            <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                            <span class="sidebar-nav-label">Drafts</span>
-                        </a>
-                        <a href="{% url 'calendar:queue_list' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'queue_list' or match.url_name == 'queue_detail' %}active{% endif %}">
-                            <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                            <span class="sidebar-nav-label">Queues</span>
-                        </a>
-                        <a href="{% url 'calendar:posting_slots' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'posting_slots' %}active{% endif %}">
-                            <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                            <span class="sidebar-nav-label">Posting schedule</span>
-                        </a>
-                        <a href="{% url 'composer:template_list' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'template_list' %}active{% endif %}">
-                            <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                            <span class="sidebar-nav-label">Templates</span>
-                        </a>
-                        <a href="{% url 'composer:category_list' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'category_list' %}active{% endif %}">
-                            <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                            <span class="sidebar-nav-label">Categories</span>
-                        </a>
-                        <a href="{% url 'composer:csv_upload' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.url_name == 'csv_upload' %}active{% endif %}">
-                            <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            <span class="sidebar-nav-label">Import from CSV</span>
-                        </a>
-                        <a href="{% url 'media_library:index' workspace_id=request.workspace.id %}" class="sidebar-nav-item {% if match.app_name == 'media_library' %}active{% endif %}">
-                            <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                            <span class="sidebar-nav-label">Media</span>
-                        </a>
-                    </div>
-                </details>
-                {% endwith %}
-                {% endif %}
-
-                {% comment %}
-                  Intelligence — opt-in via env. INTELLIGENCE_ENABLED is False
-                  for self-hosters who haven't configured the integration, so
-                  they see no Stripe / billing surface at all.
-                {% endcomment %}
-                {% if INTELLIGENCE_ENABLED and request.org %}
-                <a href="{% url 'intelligence:playground' org_id=request.org.id %}"
-                   class="sidebar-nav-item {% if request.resolver_match.app_name == 'intelligence' %}active{% endif %}">
-                    <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polygon points="16.24 7.76 13.41 13.41 7.76 16.24 10.59 10.59 16.24 7.76"/></svg>
-                    <span class="sidebar-nav-label">Intelligence</span>
-                </a>
-                {% endif %}
-                {% endblock %}
+                {% endspaceless %}{% endblock %}
             </nav>
 
             <!-- Organization footer -->
@@ -883,11 +815,11 @@
                     </div>
 
                     <div class="border-t border-ink-200 pt-1">
-                        <!-- Settings -->
+                        <!-- Account: this person's own settings (the gear in the sidebar is the workspace's Settings) -->
                         <a href="{% url 'accounts:settings' %}"
                            class="ui-menu-item">
-                            <svg class="w-4 h-4 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                            Settings
+                            <svg class="w-4 h-4 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Account
                         </a>
                     </div>
 
@@ -935,15 +867,9 @@
                     {% endif %}
                     {% endwith %}
                 </div>
-                {% if request.workspace and sidebar_pending_approvals %}
-                <a href="{% url 'calendar:calendar' workspace_id=request.workspace.id %}?mode=list&amp;tab=approvals"
-                   class="flex-shrink-0 inline-flex items-center justify-center min-w-11 h-11 rounded-lg hover:bg-ink-900/5"
-                   aria-label="Approvals, {{ sidebar_pending_approvals }} waiting">
-                    <span class="sidebar-badge is-turn !ml-0" aria-hidden="true">{{ sidebar_pending_approvals }}</span>
-                </a>
-                {% else %}
-                <div class="w-11 flex-shrink-0" aria-hidden="true"></div>
-                {% endif %}
+                {# Approvals and its count are in the phone bar below; Go to and the bell sit here. #}
+                {% if nav_palette %}{% include "components/palette_button.html" with palette_class="text-ink-900" %}{% endif %}
+                {% include "components/notifications_bell.html" with bell_class="text-ink-900" %}
             </div>
             <!-- Main content -->
             <main id="main-content" tabindex="-1" class="relative flex-1 min-w-0 bg-ink-50 px-4 pt-5 pb-12 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-16 overflow-y-auto flex flex-col focus:outline-none">
@@ -965,10 +891,104 @@
                    cut off on a full-width button, a card or a breadcrumb that touches the edge.{% endcomment %}
                 <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-1 p-1">
                 {% block content %}{% endblock %}
+                {% comment %}
+                  Below 1024px the phone bar is fixed along the bottom of the screen. This room at the end
+                  of the page lets its last line scroll clear of the bar, whichever element scrolls: this
+                  one, or main when a page lets its content run over (the calendar). Padding on main
+                  alone would not do for the second: the overflow runs past it.
+                {% endcomment %}
+                {% if nav.phone %}<div class="lg:hidden h-16 flex-shrink-0" aria-hidden="true" data-phone-bar-room></div>{% endif %}
                 </div>
             </main>
+
+            {% comment %}
+              The phone bar (below 1024px): Home, Approvals with its count, Calendar, Inbox, and More,
+              which opens the menu drawer above. build_nav leaves it out on the post page, whose own
+              Approve & schedule bar takes the bottom of the screen.
+            {% endcomment %}
+            {% block phone_bar %}{% spaceless %}
+            {% if nav.phone %}
+            <nav data-testid="phone-bar" data-phone-bar aria-label="Sections" class="lg:hidden fixed inset-x-0 bottom-0 z-20 translucent-bar border-t border-ink-200 pb-[env(safe-area-inset-bottom)]">
+                <ul class="grid grid-cols-5">
+                    {% for item in nav.phone %}
+                    <li>
+                        {% if item.url %}
+                        <a href="{{ item.url }}" data-testid="phone-bar-{{ item.key }}" class="relative flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-[11px] leading-4 font-medium rounded-lg {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}
+                           aria-label="Approvals{% if item.count %}, {{ item.count }} waiting{% endif %}"{% endif %}>
+                            {% if item.active %}{% include "components/nav_icon.html" with key=item.key icon_class="text-brand-700" %}{% else %}{% include "components/nav_icon.html" with key=item.key icon_class="text-ink-500" %}{% endif %}
+                            <span>{{ item.label }}</span>
+                            {% if item.count %}<span class="sidebar-badge{% if item.key == "approvals" %} is-turn{% endif %} absolute top-1 left-1/2 !ml-1.5">{{ item.count }}</span>{% endif %}
+                        </a>
+                        {% else %}
+                        <button type="button" data-testid="phone-bar-{{ item.key }}" aria-controls="app-sidebar" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = true"
+                                class="w-full flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-[11px] leading-4 font-medium rounded-lg cursor-pointer {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}">
+                            {% if item.active %}{% include "components/nav_icon.html" with key=item.key icon_class="text-brand-700" %}{% else %}{% include "components/nav_icon.html" with key=item.key icon_class="text-ink-500" %}{% endif %}
+                            <span>{{ item.label }}</span>
+                        </button>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% endspaceless %}{% endblock %}
         </div>
     </div>
+
+    {% comment %}
+      The notifications drawer: the bell (sidebar header, phone top bar) opens it, and it loads the
+      existing notifications:drawer partial into #notification-drawer-content each time it opens.
+      /notifications/ stays the full history.
+    {% endcomment %}
+    {% spaceless %}
+    <div x-data="{ notificationsOpen: false }" @open-notifications.window="notificationsOpen = true">
+        <div x-show="notificationsOpen" x-cloak class="fixed inset-0 z-[100] flex justify-end" @keydown.escape.window="notificationsOpen = false">
+            <div class="ui-overlay" @click="notificationsOpen = false"></div>
+            <div data-testid="notifications-drawer" role="dialog" aria-modal="true" aria-label="Notifications" x-trap.noscroll="notificationsOpen"
+                 class="relative flex flex-col w-full max-w-[100vw] sm:max-w-sm h-full bg-white shadow-xl">
+                <div class="flex justify-end px-3 pt-3">
+                    <button type="button" class="ui-btn ui-btn-icon" @click="notificationsOpen = false" aria-label="Close notifications">
+                        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div id="notification-drawer-content" class="flex flex-col flex-1 min-h-0"
+                     hx-get="{% url 'notifications:drawer' %}" hx-trigger="open-notifications from:window" hx-swap="innerHTML">
+                    <p class="px-5 text-sm text-ink-600">Loading notifications…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endspaceless %}
+
+    {% comment %}
+      Go to (the command palette, spec R2): the Go to button or Ctrl/Cmd-K opens it. Typing filters the
+      places this person can open (navigation.build_palette); the arrow keys or Tab move through them,
+      Enter opens one, Escape closes it and the focus goes back where it was (x-trap).
+    {% endcomment %}
+    {% block command_palette %}{% spaceless %}
+    {% if nav_palette %}
+    <div x-data="commandPalette([{% for entry in nav_palette %}'{{ entry.search|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}])"
+         @open-palette.window="show()" @keydown.ctrl.k.window.prevent="toggle()" @keydown.meta.k.window.prevent="toggle()">
+        <div x-show="open" x-cloak class="fixed inset-0 z-[110] flex items-start justify-center px-4 pt-[12vh]">
+            <div class="ui-overlay" @click="close()"></div>
+            <div data-testid="palette-dialog" role="dialog" aria-modal="true" aria-label="Go to a page" x-trap.noscroll="open"
+                 @keydown.escape.prevent.stop="close()" class="ui-modal overflow-hidden">
+                <div class="p-3 border-b border-ink-200">
+                    <input x-ref="input" type="text" data-testid="palette-input" class="ui-input" placeholder="Go to…" aria-label="Find a page"
+                           autocomplete="off" spellcheck="false" x-model="query"
+                           @keydown.arrow-down.prevent="move(1)" @keydown.enter.prevent="openFirst()">
+                </div>
+                {# One line per entry: this list is on every page. The arrow keys bubble up from its links. #}
+                <ul x-ref="list" class="max-h-[60vh] overflow-y-auto p-1" aria-label="Pages" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)">
+                    {% for entry in nav_palette %}<li x-show="matches({{ forloop.counter0 }})"><a href="{{ entry.url }}" data-testid="palette-item-{{ entry.key }}" class="ui-menu-item"><span class="flex-1 min-w-0 truncate">{{ entry.label }}</span>{% if entry.section %}<span class="text-xs text-ink-600">{{ entry.section }}</span>{% endif %}</a></li>{% endfor %}
+                </ul>
+                <p x-show="!shown" x-cloak class="px-4 pb-4 text-sm text-ink-600">Nothing matches.</p>
+                <p class="sr-only" aria-live="polite" x-text="announcement"></p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endspaceless %}{% endblock %}
 
     {% else %}
     <main id="main-content" tabindex="-1" class="auth-bg min-h-screen flex flex-col items-center justify-center py-12 px-4" style="font-family: var(--font-body);">
@@ -986,15 +1006,18 @@
     <!-- Vendored JS -->
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script nonce="{{ request.csp_nonce }}">
-        /* Unread badge on the sidebar Notifications link. Polls every 60s while
-           the tab is visible, and refreshes at once when a notification is
+        /* Unread badge on the notifications bell. There is one bell in the sidebar
+           and one in the phone's top bar; the one on screen polls every 60s while
+           the tab is visible, and both refresh at once when a notification is
            marked read anywhere on the page. */
         function notificationBadge(initial) {
             return {
                 count: initial || 0,
                 _timer: null,
                 start() {
-                    this._timer = setInterval(() => { if (!document.hidden) this.refresh(); }, 60000);
+                    this._timer = setInterval(() => {
+                        if (!document.hidden && this.$el.getClientRects().length) this.refresh();
+                    }, 60000);
                 },
                 async refresh() {
                     try {
@@ -1003,6 +1026,54 @@
                     } catch (e) { /* offline: keep the last known count */ }
                 },
                 destroy() { if (this._timer) clearInterval(this._timer); },
+            };
+        }
+        /* Go to (the command palette). entries: each destination's searchable text, in the
+           order of its links. Every word typed must appear in an entry for it to show. */
+        function commandPalette(entries) {
+            return {
+                open: false,
+                query: '',
+                entries: entries || [],
+                matches(index) {
+                    var text = this.entries[index] || '';
+                    return this.query.trim().toLowerCase().split(/\s+/).every(function (word) { return text.indexOf(word) !== -1; });
+                },
+                get shown() {
+                    var count = 0;
+                    for (var i = 0; i < this.entries.length; i += 1) { if (this.matches(i)) count += 1; }
+                    return count;
+                },
+                get announcement() {
+                    if (!this.open) return '';
+                    return this.shown === 1 ? '1 page' : this.shown + ' pages';
+                },
+                show() {
+                    // The dialog's x-trap puts the focus in the field (its first control) and, on
+                    // closing, hands it back to whatever had it before; focusing the field here
+                    // first would make the field that element.
+                    this.query = '';
+                    this.open = true;
+                },
+                close() { this.open = false; },
+                toggle() { if (this.open) this.close(); else this.show(); },
+                visible() {
+                    return Array.prototype.filter.call(
+                        this.$refs.list.querySelectorAll('a'),
+                        function (link) { return link.getClientRects().length > 0; }
+                    );
+                },
+                move(step) {
+                    var links = this.visible();
+                    if (!links.length) return;
+                    var next = links.indexOf(document.activeElement) + step;
+                    if (next < 0) { this.$refs.input.focus(); return; }
+                    links[Math.min(next, links.length - 1)].focus();
+                },
+                openFirst() {
+                    var first = this.visible()[0];
+                    if (first) first.click();
+                },
             };
         }
         document.body.addEventListener('htmx:afterRequest', function(evt) {

@@ -21,6 +21,13 @@ from .models import (
 )
 
 
+def _listed_event_types():
+    """The event types a person sees in their preferences and history filter (operator-only ones left out)."""
+    from .engine import OPERATOR_ONLY_EVENTS
+
+    return [(value, label) for value, label in EventType.choices if value not in OPERATOR_ONLY_EVENTS]
+
+
 @login_required
 @require_GET
 def notification_drawer(request):
@@ -70,7 +77,7 @@ def _history_context(user, params):
     page = paginator.get_page(params.get("page", 1))
     return {
         "notifications": page.object_list,
-        "event_types": EventType.choices,
+        "event_types": _listed_event_types(),
         "selected_event_type": event_type,
         "selected_read_status": read_status,
         "page": page.number,
@@ -150,7 +157,7 @@ def preferences(request):
     from .engine import DEFAULT_CHANNELS
 
     matrix = []
-    for event_value, event_label in EventType.choices:
+    for event_value, event_label in _listed_event_types():
         channel_toggles = []
         for ch_value, ch_label in Channel.choices:
             if request.method == "POST":
@@ -230,7 +237,7 @@ def _save_preferences(request, quiet_form):
     user = request.user
 
     # Save channel toggles
-    for event_value, _ in EventType.choices:
+    for event_value, _ in _listed_event_types():
         for ch_value, _ in Channel.choices:
             field_name = f"pref_{event_value}_{ch_value}"
             is_enabled = field_name in request.POST

@@ -1,0 +1,54 @@
+{% extends "marketing/base.html" %}
+
+{% block content %}
+<section class="mk-page-hero">
+    <div class="mk-hero__bg"></div>
+    <div class="mk-container">
+        <div class="mk-page-hero__inner">
+            <span class="mk-eyebrow">Private beta</span>
+            <h1 class="mk-h1">Request an invite</h1>
+            <p class="mk-lead">{{ site_name }} is opening to agencies a few at a time. Tell us who you are and we will reply by email.</p>
+        </div>
+    </div>
+</section>
+
+<section class="mk-section mk-section--flush-top">
+    <div class="mk-container">
+        {% if sent %}
+        <div class="mk-callout mk-callout--green mk-form__notice" role="status" data-testid="request-invite-thanks">
+            {% include "marketing/_icon.html" with name="check" %}
+            <p><strong>Thank you, your request has reached us.</strong> We will reply by email.</p>
+        </div>
+        {% else %}
+        {% if problem %}
+        <div class="mk-callout mk-form__notice" role="alert" data-testid="request-invite-problem">
+            {% include "marketing/_icon.html" with name="info" %}
+            {% if problem == "too_many" %}
+            <p><strong>Too many requests from your network.</strong> Please try again in an hour.</p>
+            {% else %}
+            <p><strong>We could not pass your request on just now.</strong> Please try again later.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+        <form class="mk-form" method="post" action="{% url 'marketing:request_invite' %}" data-testid="request-invite-form" novalidate>
+            {% csrf_token %}
+            {% for field in form %}{% if field.name != "website" %}
+            <div class="mk-field">
+                <label class="mk-label" for="{{ field.auto_id }}">{{ field.label }}{% if not field.field.required %} <span class="mk-muted">(optional)</span>{% endif %}</label>
+                {{ field }}
+                {% if field.errors %}<p class="mk-error" id="{{ field.auto_id }}_error">{{ field.errors|join:" " }}</p>{% endif %}
+            </div>
+            {% endif %}{% endfor %}
+            <div data-testid="request-invite-honeypot" hidden>
+                <label for="{{ form.website.auto_id }}">Leave this empty</label>
+                {{ form.website }}
+            </div>
+            <p class="mk-small mk-muted">We use these details only to answer your request. Read our <a href="{{ LEGAL_PRIVACY_URL }}">Privacy policy</a>.</p>
+            <div class="mk-btn-row">
+                <button class="mk-btn mk-btn--primary mk-btn--lg" type="submit" data-testid="request-invite-submit">Request invite</button>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

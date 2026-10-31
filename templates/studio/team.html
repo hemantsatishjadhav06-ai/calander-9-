@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% load static %}
 {% comment %}
-The Team tab: the team at work, live (docs/DESIGN_SYSTEM.md section 14).
-Context: workspace, live (apps.studio.live.snapshot), tabs, can_create, can_approve.
+Activity (studio:team at /studio/activity/): the team at work, live (docs/DESIGN_SYSTEM.md section 14),
+then the routines for people who may create posts.
+Context: workspace, live (apps.studio.live.snapshot), tabs, can_create, can_approve, routines_section
+(views_routines.section: routines, suggestions, tzname, can_manage; None without create_posts, so a viewer's
+page carries no routine title or control).
 The board refreshes every 5 s while the tab is visible (studio:team_board); a refresh that changes
 nothing swaps nothing, and only meaningful changes are announced in #team-live-announce
-(static/js/live_board.js).
+(static/js/live_board.js). The Routines section sits outside #team-board, so the refresh never replaces it;
+/studio/routines/ answers a 301 to #routines.
 {% endcomment %}
 
 {% block title %}Your team - Agency - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
@@ -30,6 +34,34 @@ nothing swaps nothing, and only meaningful changes are announced in #team-live-a
         {% include "studio/partials/team_board.html" %}
     </div>
     <p id="team-live-announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+
+    {# ---- Routines: the standing instructions and three presets, for people who may create posts ---- #}
+    {% if routines_section %}
+    {% with section=routines_section %}
+    <section id="routines" aria-labelledby="activity-routines-heading" class="mt-6 scroll-mt-6" data-activity-routines>
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-3">
+            <h2 id="activity-routines-heading" class="text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Routines</h2>
+            <p class="text-[13px] text-ink-600">Your team runs them on time ({{ section.tzname }}); every post still waits for your approval.</p>
+        </div>
+        <div class="grid xl:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
+            <div class="ui-card p-0 overflow-hidden min-w-0">
+                {% if section.routines %}
+                {% include "studio/partials/routine_rows.html" with routines=section.routines workspace=workspace can_manage=section.can_manage %}
+                {% else %}
+                <div class="ui-empty">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                    <p class="ui-empty-title">No routines yet</p>
+                    <p class="ui-empty-body">Take one of the suggestions, or tell your manager in the team thread, like “every Monday at 9 draft a market update”.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="min-w-0">
+                {% include "studio/partials/routine_presets.html" with suggestions=section.suggestions workspace=workspace %}
+            </div>
+        </div>
+    </section>
+    {% endwith %}
+    {% endif %}
 </div>
 {% endblock %}
 

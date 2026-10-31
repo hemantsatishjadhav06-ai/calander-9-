@@ -1,27 +1,27 @@
+import uuid
+from typing import Any
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import BadRequest, PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+from apps.common.features import request_features
 from apps.media_library.models import MediaAsset
 
-from . import dashboard, guards, trust
+from . import dashboard, guards, settings_links, trust
 from .forms_trust import BrandClaimForm
 from .models import BrandClaim
 from .views import _can_edit_brand, _perms, _workspace
 
 
-@login_required
-@require_http_methods(["GET", "POST"])
-def verified_facts(request, workspace_id):
-    import uuid
-
-    from django.http import HttpResponseBadRequest
-
-    workspace = _workspace(request, workspace_id)
+def may_read_facts(request, workspace) -> bool:
+    """This page's own check: someone on the agency's team, never a client (a client-facing custom role
+    included). Settings → Advanced applies it to its Verified facts section."""
     from . import chat
 
     viewer = chat.membership_for(request.user, workspace)
@@ -29,16 +29,67 @@ def verified_facts(request, workspace_id):
     client_role = client_role or bool(
         viewer and viewer.custom_role and (viewer.custom_role.permissions or {}).get("client_facing")
     )
-    if viewer is None or client_role:
+    return not (viewer is None or client_role)
+
+
+def can_verify(request, workspace) -> bool:
+    """Whether this person may record claims and attest photos: the brand's editors who verify here."""
+    return _can_edit_brand(request) and request.user.pk in trust.verification_people(workspace)
+
+
+def selected_claim(request, workspace) -> BrandClaim | None:
+    """The claim ``?claim=`` reopens for review, read the same way here and in Settings → Advanced: one
+    of this workspace's claims (another workspace's is 404); a malformed id is 400."""
+    value = request.GET.get("claim")
+    if not value:
+        return None
+    try:
+        claim_id = uuid.UUID(value)
+    except (TypeError, ValueError, AttributeError):
+        raise BadRequest("Choose a valid workspace claim.") from None
+    return get_object_or_404(BrandClaim, pk=claim_id, workspace=workspace)
+
+
+def facts_context(request, workspace, *, form, selected, editable, claim_url) -> dict:
+    """What the facts body shows (``partials/verified_facts.html``): this page and Settings → Advanced.
+
+    ``claim_url(claim_id)`` is where a claim's "Review or renew" link reopens the including page.
+    """
+    active_ids = set(trust.current_claims(workspace).values_list("pk", flat=True))
+    # Each claim carries two display attributes for the template: whether it is in use, and its link.
+    claims: list[Any] = list(BrandClaim.objects.filter(workspace=workspace).select_related("verified_by")[:100])
+    for claim in claims:
+        claim.current = claim.pk in active_ids
+        claim.edit_url = claim_url(claim.pk)
+    photos = list(
+        MediaAsset.objects.filter(workspace=workspace, organization=workspace.organization, media_type="image")
+        .select_related("verified_by")
+        .order_by("-created_at")[:40]
+    )
+    return {
+        "workspace": workspace,
+        "form": form,
+        "claims": claims,
+        "photos": [{"asset": a, "provenance": trust.photo_status(a)} for a in photos],
+        "can_verify": editable,
+        "selected_claim": selected,
+    }
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def verified_facts(request, workspace_id):
+    from django.http import HttpResponseBadRequest
+
+    workspace = _workspace(request, workspace_id)
+    if not may_read_facts(request, workspace):
         raise PermissionDenied("Source verification belongs to the agency team; client review remains in the portal.")
-    editable = _can_edit_brand(request) and request.user.pk in trust.verification_people(workspace)
-    selected = None
-    if request.method == "GET" and request.GET.get("claim"):
-        try:
-            selected_id = uuid.UUID(request.GET["claim"])
-        except (TypeError, ValueError, AttributeError):
-            return HttpResponseBadRequest("Choose a valid workspace claim.")
-        selected = get_object_or_404(BrandClaim, pk=selected_id, workspace=workspace)
+    # The page lives in Settings → Advanced while the advanced_settings switch shows it there (spec D1,
+    # D6); otherwise it keeps rendering here, so the direct links to it keep working.
+    if settings_links.is_page_view(request) and request_features(request)["advanced_settings"]:
+        return settings_links.moved(request, workspace.pk, "advanced", anchor="verified-facts", cacheable=False)
+    editable = can_verify(request, workspace)
+    selected = selected_claim(request, workspace) if request.method == "GET" else None
     form = BrandClaimForm(workspace=workspace, instance=selected)
     if request.method == "POST":
         guards.forbid_in_agent_work("verify a commercial claim or property photo")
@@ -136,26 +187,19 @@ def verified_facts(request, workspace_id):
                 claim.save()
                 messages.success(request, "Source, verifier and expiry recorded. The team can use this current claim.")
                 return redirect("studio:trust", workspace_id=workspace.pk)
-    active_ids = set(trust.current_claims(workspace).values_list("pk", flat=True))
-    claims = list(BrandClaim.objects.filter(workspace=workspace).select_related("verified_by")[:100])
-    for claim in claims:
-        claim.current = claim.pk in active_ids
-    photos = list(
-        MediaAsset.objects.filter(workspace=workspace, organization=workspace.organization, media_type="image")
-        .select_related("verified_by")
-        .order_by("-created_at")[:40]
-    )
-    photo_rows = [{"asset": a, "provenance": trust.photo_status(a)} for a in photos]
+    page = reverse("studio:trust", kwargs={"workspace_id": workspace.pk})
     return render(
         request,
         "studio/trust.html",
         {
-            "workspace": workspace,
             "tabs": dashboard.tabs(workspace, "trust", perms=_perms(request)),
-            "form": form,
-            "claims": claims,
-            "photos": photo_rows,
-            "can_verify": editable,
-            "selected_claim": selected,
+            **facts_context(
+                request,
+                workspace,
+                form=form,
+                selected=selected,
+                editable=editable,
+                claim_url=lambda claim_id: f"{page}?claim={claim_id}",
+            ),
         },
     )
