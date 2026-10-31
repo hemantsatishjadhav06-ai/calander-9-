@@ -363,7 +363,7 @@ base `inline-flex items-center gap-1.5 h-[22px] pl-[7px] pr-2 rounded-full text-
 ### 10.6 Tabs
 
 - Peer views (Home / Routines / Team / Settings; List / Calendar) are a **segmented control**: track `inline-flex p-0.5 rounded-[9px] bg-ink-900/5` (`role="tablist"`); segment `px-3.5 py-[5px] rounded-[7px] text-[13px] font-medium text-ink-600 aria-selected:bg-white aria-selected:text-ink-950 aria-selected:font-semibold aria-selected:shadow-[var(--shadow-segment)]`.
-- Section tabs (Queue / Drafts / Approvals / Sent): `flex gap-6 border-b border-ink-200`; tab `h-10 -mb-px border-b-2 border-transparent text-sm font-medium text-ink-600 hover:text-ink-900 aria-selected:border-ink-900 aria-selected:text-ink-950 aria-selected:font-semibold`; counts are neutral badges. Tabs never use the accent.
+- Section tabs (Queue / Drafts / Approvals / Sent; the Settings screen's seven tabs, each a link with `aria-current="page"`): `flex gap-6 border-b border-ink-200`; tab `h-10 -mb-px border-b-2 border-transparent text-sm font-medium text-ink-600 hover:text-ink-900 aria-selected:border-ink-900 aria-selected:text-ink-950 aria-selected:font-semibold`; counts are neutral badges. Tabs never use the accent.
 
 ### 10.7 Tables
 
@@ -396,10 +396,20 @@ Overlay `fixed inset-0 bg-ink-950/35`. Dialog `w-full max-w-[560px] rounded-2xl 
 | Sidebar | `w-60` (collapsed `w-[60px]`), `bg-ink-100 border-r border-ink-200 px-3 py-3 flex flex-col gap-0.5`. Workspace switcher: 28px mark (client icon, or `bg-ink-900` with a white initial, `rounded-[7px]`), name 14/600. "New" = secondary button, full width. Nav items `.sidebar-nav-item` (32px tall, 44px on touch; icon 18px stroke 1.75 ink-500; label 14/500 ink-700; hover `bg-ink-900/5`; active = white pill + `--shadow-nav-active` + 600 ink-950 label + brand-700 icon + `aria-current="page"`). Section label `.sidebar-section-label` 12/600 ink-500 sentence case. Badges `.sidebar-badge` (neutral) / `.sidebar-badge.is-turn` (Approvals). Footer: 28px ink-200 avatar, name 13/600, role 12 ink-500. |
 | Main | `flex-1 min-w-0 bg-ink-50 px-10 pt-8 pb-16 max-lg:px-6 max-sm:px-4`; the inset white sheet is removed: cards sit directly on the canvas. |
 | Page header | `text-h1 text-ink-950` → status line `mt-1.5 text-sm text-ink-600` with `·` separators in ink-400 and underlined links → segmented tabs `mt-5` → content `mt-6`. |
-| Phone top bar | 52px `.translucent-bar sticky top-0`: menu icon, workspace 16/600, spacer, Approvals badge. Drawer 280px over `bg-ink-950/35`. |
-| Widths | Home, Publish, Team 1180px; Routines 960px; Set up 880px; thread column ≤ 720px; Home grid `grid-cols-[minmax(0,1fr)_372px] gap-6` at ≥ 1280px, one column below with Today first only when something waits. |
+| Phone top bar | 52px `.translucent-bar sticky top-0`: menu icon, workspace 16/600, spacer, Go to and the bell (`.ui-btn-icon`). The Approvals count is in the phone bar (11.1). Drawer 280px over `bg-ink-950/35`. |
+| Widths | Home, Publish, Approvals, Activity, Settings 1180px (a Settings panel 672–960px); Routines (the form's error page) 960px; Set up 880px; thread column ≤ 720px; Home grid `grid-cols-[minmax(0,1fr)_372px] gap-6` at ≥ 1280px, one column below with Today first only when something waits. |
 | Rhythm | 4px base: 4, 8, 12, 16, 20, 24, 32, 40, 64. Card padding 20 (16 phone); gap between cards 24; section gap 40; group label top margin 18; page padding 32/40 desktop, 24 tablet, 16 phone. |
 | Breakpoints | phone < 640, tablet 640–1023 (sidebar becomes a drawer, 44px targets), desktop ≥ 1024, wide ≥ 1280. |
+
+### 11.1 Navigation
+
+`apps/common/navigation.py` decides what shows and what is lit; `templates/base.html` draws it with the classes above. No tokens of its own.
+
+- **Sidebar:** "New", then six places in this order: Home, Approvals, Calendar, Inbox, Analytics, Activity, and Blog as a seventh only with its switch. Each is a `.sidebar-nav-item` with its 18px icon (`components/nav_icon.html`). Approvals carries `.sidebar-badge.is-turn` and names its count in `aria-label` ("Approvals, 3 waiting"); Inbox a neutral `.sidebar-badge`. No section labels and no *More* disclosure. One place is lit.
+- **The gear:** Settings is a `.sidebar-nav-item` with the gear icon, pushed to the bottom of the nav (`mt-auto`), lit on Settings and on every page a setting lives on. The account menu below it says **Account** for the person's own settings.
+- **Bell and Go to:** two `.ui-btn-icon`s in the sidebar header (desktop) and again in the phone top bar; each page shows one of the two copies. The bell's unread count is a neutral `.sidebar-badge` at its top right, never Pine. It opens a right-hand drawer (white, `max-w-sm`, `shadow-xl`, over `.ui-overlay`).
+- **Phone bar (below 1024px):** `fixed inset-x-0 bottom-0 z-20 .translucent-bar border-t border-ink-200`, plus the bottom safe area; five equal columns: Home, Approvals, Calendar, Inbox, More. Each is at least 56px tall, icon over an 11/16 500 label; the lit one has an ink-950 label, a brand-700 icon and `aria-current="page"`, the rest ink-600 and an ink-500 icon. Approvals' count is `.sidebar-badge.is-turn` over its icon. More is a button that opens the drawer. A 64px spacer ends the page so its last line scrolls clear; toasts, selection bars and sticky save bars sit above the bar. The post page and the composer show no phone bar, so their own action bar keeps the bottom edge.
+- **Go to (command palette):** a `.ui-modal` dialog over `.ui-overlay`, 12vh from the top: a `.ui-input` ("Go to…"), then the places as `.ui-menu-item`s, a Settings tab with "Settings" after it in `text-xs text-ink-600`; "Nothing matches." when the filter empties it. Focus is trapped while it is open and returns where it was on Escape.
 
 ---
 

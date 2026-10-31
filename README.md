@@ -56,6 +56,10 @@ Deploy it with a one-click button on Heroku or Render, run it on your own VPS vi
   </tr>
 </table>
 
+### The public site
+
+During the invite-only beta the public site has three linked pages: **Home** (`/`), **How it works** (`/how-it-works/`) and **Request invite** (`/request-invite/`, a short form that tells the platform's operators). `/pricing/` redirects to Request invite. `/features/`, `/platforms/`, `/developers/` and `/get-started/` still answer for old links but are not linked and are not indexed. A signed-in person who opens `/` goes to their workspace. Every page and route is in the [product map](docs/PRODUCT_MAP.md#the-public-site).
+
 ## Supported Platforms
 
 | Platform | Publish | Comments | DMs | Insights |
@@ -373,10 +377,10 @@ calander-9-/
 │   ├── settings_manager/      # Configurable defaults with cascade logic
 │   ├── credentials/           # Platform API credential storage (encrypted)
 │   ├── common/                # Shared: encrypted fields, scoped model managers
-│   └── marketing/             # Public pages: /, /features/, /how-it-works/, /platforms/, /developers/, /get-started/
+│   └── marketing/             # Public pages: / (Home), /how-it-works/, /request-invite/; /pricing/ redirects to /request-invite/
 ├── providers/                 # Social platform API modules (one file per platform)
 ├── templates/                 # Django templates
-│   ├── base.html              # Layout with sidebar + nav
+│   ├── base.html              # Layout: sidebar (six places, the Settings gear), phone bar, bell, Go to
 │   ├── marketing/             # Public marketing site (own layout, no app shell)
 │   └── components/            # Reusable HTMX partials
 ├── static/
@@ -716,11 +720,11 @@ Each post's **Cover** setting chooses between the designed cover (default) and t
 
 **Home is a conversation.** Every workspace opens on Home. Say what you want in plain words — "a post inviting families to Saturday's site visit, with this photo" — and your manager (the account manager agent) answers, proposes a brief with the brand's defaults already filled in, and the team gets to work: strategist, copywriter, art director, prompt engineer, illustrator, designer, brand reviewer, channel editor, QA inspector, scheduler, producer. The **Today** card shows what is waiting for you, what goes out today and what was made overnight; **In progress** follows every idea from brief to approval; **Recent work** keeps the drafts. Ask for a change on any post ("shorter headline", "new picture") and the right agent does it. Clients have the same conversation in the client portal (**Talk to the team**); their requests still need internal approval. A workspace chooses how a team member's idea starts: **Show me the brief first** (one tap on **Go ahead**) or **Go ahead unless I say stop** (the card shows **Stop** for a minute).
 
-**Routines** are standing instructions in plain words with a schedule: "every weekday at 08:30 tell me what's waiting" (the morning briefing), "Mondays at 09:00 plan the week's posts from our pillars", "weekdays at 17:00 draft replies to new comments". A routine runs by itself to the minute, posts its result in the team thread, skips a run when the workspace, the provider or the budget says no, and never retries an interrupted run without a person. **Autopilot** (Settings → Autopilot) plans a whole week at the chosen time — posts per week, accounts, content pillars, articles per month, a monthly soft budget — and tells the lead approver once when the drafts are ready.
+**Routines** (on **Activity**, which also shows the team at work) are standing instructions in plain words with a schedule: "every weekday at 08:30 tell me what's waiting" (the morning briefing), "Mondays at 09:00 plan the week's posts from our pillars", "weekdays at 17:00 draft replies to new comments". A routine runs by itself to the minute, posts its result in the team thread, skips a run when the workspace, the provider or the budget says no, and never retries an interrupted run without a person. **Autopilot** (Settings → Autopilot) plans a whole week at the chosen time — posts per week, accounts, content pillars, articles per month, a monthly soft budget — and tells the lead approver once when the drafts are ready.
 
-**Telegram is the manager in your pocket.** Each workspace has its own bot. Pair your account from Agency → Telegram and your private chat becomes your inbox: a finished draft arrives as a review card (or a preview with **Open to approve**), plus reminders, a planned week, a failed delivery, the weekly report and the morning briefing, with quiet hours, a daily cap and `/mute`. Plain text in that chat is an instruction to your manager, with the same **Go ahead** card as the web; `/status`, `/approvals`, `/week`, `/routines`, `/pause`, `/resume`, `/retry` and `/help` do the rest. Team and client groups and a status channel are optional. See [Telegram](docs/TELEGRAM_CLIENT_HUB.md) and [status channels](docs/TELEGRAM_CHANNELS.md).
+**Telegram is the manager in your pocket.** Each workspace has its own bot. Pair your account from Settings → Notifications → Telegram and your private chat becomes your inbox: a finished draft arrives as a review card (or a preview with **Open to approve**), plus reminders, a planned week, a failed delivery, the weekly report and the morning briefing, with quiet hours, a daily cap and `/mute`. Plain text in that chat is an instruction to your manager, with the same **Go ahead** card as the web; `/status`, `/approvals`, `/week`, `/routines`, `/pause`, `/resume`, `/retry` and `/help` do the rest. Team and client groups and a status channel are optional. See [Telegram](docs/TELEGRAM_CLIENT_HUB.md) and [status channels](docs/TELEGRAM_CHANNELS.md).
 
-**Set up** is one checklist with live state and one button per row — AI team, Pictures, Social accounts, Approvers, Autopilot, Creation mode, Telegram, Email, Verified facts, Blog website, Monthly AI budget — so a workspace always knows what is missing; owners see the variable names there and nowhere else. The same line appears under the Home greeting. Brand, Verified facts, Creative memory, Outcomes, Autopilot, Telegram and Budget sit behind the Settings tab.
+**Set up** is one checklist with live state and one button per row — AI team, Pictures, Social accounts, Approvers, Autopilot, Creation mode, Telegram, Email, Verified facts, Blog website, Monthly AI budget — so a workspace always knows what is missing; owners see the variable names there, and in the same checklist under Settings → Advanced → Health, and nowhere else. The same line appears under the Home greeting. Settings, the gear at the bottom of the sidebar, is one screen with seven tabs: Brand, Accounts, Team & clients, Approvals, Autopilot (with the budget), Notifications (with Telegram) and Advanced (Health, the routine form, Developers, and Verified facts, Creative memory and Outcomes where the workspace's `advanced_settings` switch is on).
 
 **Nothing goes out without you.** Everything the team makes — posts, articles, inbox reply drafts, weekly plans — stops at the approval gate. A current approver reviews the exact copy, visual, destination and time and chooses **Approve & schedule** (plain **Approve** does not schedule); any change afterwards withdraws the approval; the publisher checks it again before sending; an uncertain delivery is held for a person to reconcile, never resent on its own. Agents cannot approve, schedule, publish or send a reply — not from the web, the API, MCP, the portal or Telegram. Every agent turn is recorded with its estimated cost, and the team stops starting new work when the month's budget is reached. The task controls — Pause, Resume, Retry after review — come from [OpenDots](docs/OPENDOTS_INTEGRATION.md).
 
@@ -743,7 +747,7 @@ GSC_CLIENT_SECRET=
 INDEXNOW_KEY=                      # optional; tells search engines when an article goes live
 ```
 
-The owner's Set up page is the one place in the product that names these variables and shows which are missing. `python manage.py live_verify` reports `agency.provider`, `agency.fal_key` and `telegram.webhook` with the rest. The canonical variable table — which service, required or optional, how to verify — is in [Live operations](docs/LIVE_OPERATIONS.md#environment-variables); every page and flow is described in the [product map](docs/PRODUCT_MAP.md).
+The owner's Set up checklist (on Set up, and the same list in Settings → Advanced → Health) is the one place in the product that names these variables and shows which are missing. `python manage.py live_verify` reports `agency.provider`, `agency.fal_key` and `telegram.webhook` with the rest. The canonical variable table — which service, required or optional, how to verify — is in [Live operations](docs/LIVE_OPERATIONS.md#environment-variables); every page and flow is described in the [product map](docs/PRODUCT_MAP.md).
 
 **Google Search Console** (optional): in Google Cloud Console create an OAuth client ID (Web application), enable the *Google Search Console API*, add the redirect URI `{APP_URL}/blog/search-console/callback/`, and set `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` on both services. Then an owner chooses **Connect Google Search Console** on the blog list and picks the property for that website (the Google account must have access to it). Rankings sync daily.
 

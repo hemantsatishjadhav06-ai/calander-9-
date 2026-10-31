@@ -133,3 +133,44 @@ studio:thread_stop_brief conversation_id=<conversation> brief_id=<brief>  405  #
 studio:inbox_draft  405  # prose: Draft replies with the team; POST only
 /routines  skip  # a Telegram command, not a URL
 /mute  skip  # a Telegram command, not a URL
+
+# ---------------------------------------------------------------------------------------------
+# Added when T13 rewrote the map for Phase 2 (docs/specs/02-cut-and-merge.md R10): the new screens,
+# the Settings tabs and the public site. Same rules as above.
+
+# Approvals
+approvals:index
+W/approvals/
+calendar:publish_tab_approvals  # the HTMX fragment that refreshes the list; a plain GET answers it too
+
+# Activity
+W/studio/activity/  # studio:team's address (D4)
+
+# Settings and its seven tabs
+settings:index
+W/settings/  # the first tab this person may use
+W/settings/?tab=brand
+W/settings/?tab=accounts
+W/settings/?tab=team
+W/settings/?tab=approvals
+W/settings/?tab=autopilot
+W/settings/?tab=notifications
+W/settings/?tab=advanced
+W/settings/clients/  # client_portal_admin:client_list; 301 to Settings, Team & clients tab (D5)
+social_accounts:connect
+api_keys:list  # Settings, Advanced, Developers (D7)
+
+# Notifications: the bell's drawer
+notifications:drawer
+
+# The public site (signed in as the owner here)
+marketing:home  # 302 to the owner's landing page, like /
+marketing:how_it_works
+/how-it-works/
+marketing:request_invite
+/request-invite/
+/pricing/  # 301 to Request invite (D9)
+/features/
+/platforms/
+/developers/
+/get-started/

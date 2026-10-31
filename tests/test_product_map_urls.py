@@ -268,6 +268,29 @@ def test_the_fixture_lists_every_url_name_and_path_in_the_product_map():
     assert not missing, f"docs/PRODUCT_MAP.md lists URLs {FIXTURE.name} does not: " + ", ".join(missing)
 
 
+def test_the_map_names_the_screens_phase_2_added():
+    """Docs (spec R10): the map names Approvals, Settings with each of its tabs, Activity and the public
+    site's Request invite, so the test above makes the gate fetch them too. A Settings tab added to
+    ``views_settings.TABS`` fails here until the map, and then the fixture, list it."""
+    from apps.studio.views_settings import TABS
+
+    wanted = {
+        "approvals:index",
+        "/approvals/",
+        "settings:index",
+        "/settings/",
+        *(f"/settings/?tab={tab.key}" for tab in TABS),
+        "/studio/activity/",
+        "marketing:request_invite",
+        "/request-invite/",
+        "/pricing/",
+    }
+
+    missing = sorted(wanted - map_tokens(PRODUCT_MAP.read_text(encoding="utf-8")))
+
+    assert not missing, "docs/PRODUCT_MAP.md does not name " + ", ".join(missing)
+
+
 def test_every_mark_comes_with_its_reason():
     for entry in load_entries():
         assert len(entry.marks) <= 1, entry
