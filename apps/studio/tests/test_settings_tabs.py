@@ -353,6 +353,66 @@ def test_a_foreign_or_malformed_claim_is_refused_in_advanced(client, world):
     assert _get(client, world.owner, world, "advanced", claim="not-a-claim").status_code == 400
 
 
+@pytest.mark.parametrize("where", ["page", "advanced"])
+def test_verified_facts_and_advanced_open_a_claim_by_one_rule(client, world, where):
+    """``?claim=`` is read once for both: a claim of this workspace opens, another's is 404, a malformed
+    one 400. The page renders with the switch off; Advanced shows the section with it on."""
+    _advanced_on(world, where == "advanced")
+    claim = make_claim(world)
+    foreign = make_claim(world, workspace=Workspace.objects.create(organization=world.org, name="Other brand"))
+    client.force_login(world.owner)
+
+    def opened(value):
+        if where == "advanced":
+            return client.get(_settings(world, "advanced", claim=value))
+        return client.get(_url("studio:trust", world) + f"?claim={value}")
+
+    response = opened(claim.pk)
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "Review or renew a claim" in html and f'name="claim_id" value="{claim.pk}"' in html
+    assert opened(foreign.pk).status_code == 404
+    assert opened("not-a-claim").status_code == 400
+
+
+def _custom_member(world, email, workspace_role, permissions):
+    user = world.viewer.__class__.objects.create_user(
+        email=email, password="pw-12345678", name=email.split("@")[0], tos_accepted_at=timezone.now()
+    )
+    OrgMembership.objects.create(user=user, organization=world.org, org_role="member")
+    role = CustomRole.objects.create(organization=world.org, name=email, permissions=permissions)
+    WorkspaceMembership.objects.create(
+        user=user, workspace=world.workspace, workspace_role=workspace_role, custom_role=role
+    )
+    return user
+
+
+@pytest.mark.parametrize(
+    ("who", "reads_outcomes"),
+    [
+        ("owner", True),
+        ("manager", True),
+        ("editor", True),  # records outcomes (create_posts)
+        ("viewer", True),  # reads them (view_analytics)
+        ("approver", False),  # a custom role with neither
+        ("facing", False),  # a client-facing custom role on a client membership
+    ],
+)
+def test_the_outcomes_link_shows_exactly_when_the_outcomes_page_lets_the_person_in(client, world, who, reads_outcomes):
+    _advanced_on(world)
+    user = {
+        "approver": lambda: _custom_member(world, "approver@example.com", "viewer", {"approve_posts": True}),
+        "facing": lambda: _custom_member(
+            world, "facing@example.com", "client", {"client_facing": True, "approve_posts": True}
+        ),
+    }.get(who, lambda: getattr(world, who))()
+
+    html = _get(client, user, world, "advanced").content.decode()
+
+    assert ('data-testid="settings-advanced-outcomes"' in html) is reads_outcomes
+    assert client.get(_url("studio:outcomes", world)).status_code == (200 if reads_outcomes else 403)
+
+
 def test_verifying_a_claim_from_advanced_goes_through_its_page(client, world):
     _advanced_on(world)
     client.force_login(world.owner)

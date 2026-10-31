@@ -1,8 +1,9 @@
+import uuid
 from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import BadRequest, PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -36,6 +37,19 @@ def can_verify(request, workspace) -> bool:
     return _can_edit_brand(request) and request.user.pk in trust.verification_people(workspace)
 
 
+def selected_claim(request, workspace) -> BrandClaim | None:
+    """The claim ``?claim=`` reopens for review, read the same way here and in Settings → Advanced: one
+    of this workspace's claims (another workspace's is 404); a malformed id is 400."""
+    value = request.GET.get("claim")
+    if not value:
+        return None
+    try:
+        claim_id = uuid.UUID(value)
+    except (TypeError, ValueError, AttributeError):
+        raise BadRequest("Choose a valid workspace claim.") from None
+    return get_object_or_404(BrandClaim, pk=claim_id, workspace=workspace)
+
+
 def facts_context(request, workspace, *, form, selected, editable, claim_url) -> dict:
     """What the facts body shows (``partials/verified_facts.html``): this page and Settings → Advanced.
 
@@ -65,8 +79,6 @@ def facts_context(request, workspace, *, form, selected, editable, claim_url) ->
 @login_required
 @require_http_methods(["GET", "POST"])
 def verified_facts(request, workspace_id):
-    import uuid
-
     from django.http import HttpResponseBadRequest
 
     workspace = _workspace(request, workspace_id)
@@ -77,13 +89,7 @@ def verified_facts(request, workspace_id):
     if settings_links.is_page_view(request) and request_features(request)["advanced_settings"]:
         return settings_links.moved(request, workspace.pk, "advanced", anchor="verified-facts")
     editable = can_verify(request, workspace)
-    selected = None
-    if request.method == "GET" and request.GET.get("claim"):
-        try:
-            selected_id = uuid.UUID(request.GET["claim"])
-        except (TypeError, ValueError, AttributeError):
-            return HttpResponseBadRequest("Choose a valid workspace claim.")
-        selected = get_object_or_404(BrandClaim, pk=selected_id, workspace=workspace)
+    selected = selected_claim(request, workspace) if request.method == "GET" else None
     form = BrandClaimForm(workspace=workspace, instance=selected)
     if request.method == "POST":
         guards.forbid_in_agent_work("verify a commercial claim or property photo")

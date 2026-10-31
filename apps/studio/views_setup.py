@@ -488,17 +488,8 @@ def status_line(request, workspace, *, steps_left: int) -> list[dict[str, str]]:
 @require_GET
 def setup(request, workspace_id):
     workspace = _workspace(request, workspace_id)
-    progress = checklist(request, workspace)
-    response = render(
-        request,
-        "studio/setup.html",
-        {
-            "workspace": workspace,
-            "checked_at": timezone.now(),
-            "tzname": workspace.effective_timezone or "UTC",
-            **progress,
-        },
-    )
+    # The same context as Settings → Advanced → Health, so the two can never drift apart.
+    response = render(request, "studio/setup.html", {"workspace": workspace, **health_context(request, workspace)})
     response["Cache-Control"] = "no-store, private"
     return response
 
@@ -515,7 +506,7 @@ def settings_hub(request, workspace_id):
 
 
 def health_context(request, workspace) -> dict[str, Any]:
-    """The Set up checklist as Settings → Advanced → Health shows it: the same rows as this page."""
+    """The Set up checklist: what this page shows, and Settings → Advanced → Health with it."""
     return {
         "checked_at": timezone.now(),
         "tzname": workspace.effective_timezone or "UTC",

@@ -174,6 +174,31 @@ def test_a_viewer_still_cannot_rename_the_workspace(client, world):
     assert client.post(_url("workspaces:settings", world), {"name": "OWNED"}).status_code == 403
 
 
+def test_the_danger_zone_still_answers_only_owners_and_managers(client, world):
+    Workspace.objects.create(organization=world.org, name="Second")
+    for user in (world.editor, world.viewer):
+        client.force_login(user)
+        for action in ("archive_workspace", "unarchive_workspace", "delete_workspace"):
+            assert client.post(_url("workspaces:settings", world), {"action": action}).status_code == 403, action
+    world.workspace.refresh_from_db()
+    assert not world.workspace.is_archived
+
+    client.force_login(world.manager)
+    response = client.post(_url("workspaces:settings", world), {"action": "archive_workspace"})
+    assert response.status_code == 302 and response["Location"] == reverse("organizations:workspaces")
+    world.workspace.refresh_from_db()
+    assert world.workspace.is_archived
+
+
+def test_the_workspace_page_answers_get_with_the_301_and_nothing_else_but_post(client, world):
+    """The page itself no longer renders: GET moves, HEAD was never allowed, POST keeps its handler."""
+    client.force_login(world.owner)
+    assert client.get(_url("workspaces:settings", world)).status_code == 301
+    assert client.head(_url("workspaces:settings", world)).status_code == 405
+    for method in (client.put, client.delete, client.patch):
+        assert method(_url("workspaces:settings", world)).status_code == 405
+
+
 @pytest.mark.parametrize("on", [True, False])
 def test_verifying_a_claim_still_posts_to_verified_facts(client, world, on):
     _advanced_on(world, on)

@@ -23,36 +23,35 @@ context and the partial it shows. Adding a tab is adding an entry.
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import BadRequest, PermissionDenied
+from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import render
 from django.views.decorators.http import require_GET
 
 from apps.client_portal.views_admin import client_list_context
 from apps.common.features import request_features
 from apps.members.decorators import require_org_role, require_permission, require_workspace_role
-from apps.members.models import OrgMembership, WorkspaceMembership, has_org_permission
+from apps.members.models import OrgMembership, has_org_permission
 from apps.members.views import is_internal_to_org
 from apps.social_accounts.views import account_list_context
 from apps.workspaces.views import approvals_settings_context, can_manage_approvals, workspace_settings_context
 
-from . import outcomes, readiness
+from . import readiness
 from .brand_defaults import ensure_profile
 from .forms import BrandProfileForm
 from .forms_trust import BrandClaimForm
-from .models import BrandClaim
 from .settings_links import tab_url
 from .views import _perms, _workspace, brand_profile_context
 from .views_autopilot import form_context as autopilot_form_context
 from .views_memory import memory_context
+from .views_outcomes import may_read_outcomes
 from .views_routines import form_context as routine_form_context
 from .views_setup import health_context
-from .views_trust import can_verify, facts_context, may_read_facts
+from .views_trust import can_verify, facts_context, may_read_facts, selected_claim
 
 
 @dataclass(frozen=True)
@@ -192,23 +191,9 @@ def _developers_allowed(request) -> bool:
     return has_org_permission(org_membership, "manage_api_keys")
 
 
-def _outcomes_allowed(request) -> bool:
-    """The outcomes page's check: staff who record outcomes or read analytics."""
-    membership = request.workspace_membership
-    if membership is None or membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT:
-        return False
-    return outcomes.can_record(membership) or bool(membership.effective_permissions.get("view_analytics"))
-
-
 def _facts(request, workspace) -> dict:
     """Verified facts as its page shows them, with ``?claim=`` reopening a claim here."""
-    selected = None
-    if request.GET.get("claim"):
-        try:
-            claim_id = uuid.UUID(request.GET["claim"])
-        except (TypeError, ValueError, AttributeError):
-            raise BadRequest("Choose a valid workspace claim.") from None
-        selected = get_object_or_404(BrandClaim, pk=claim_id, workspace=workspace)
+    selected = selected_claim(request, workspace)
     facts = facts_context(
         request,
         workspace,
@@ -233,7 +218,7 @@ def _advanced(request, workspace) -> dict:
         "show_routine_form": show_routine_form,
         "show_facts": show_facts,
         "show_memory": show_memory,
-        "show_outcomes": power and _outcomes_allowed(request),
+        "show_outcomes": power and may_read_outcomes(membership),
         "show_developers": _developers_allowed(request),
         "show_danger_zone": danger["is_owner_or_manager"],
         "can_archive": danger["can_archive"],

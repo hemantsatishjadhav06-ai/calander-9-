@@ -180,9 +180,24 @@ class SidebarActiveStateTests(ChannellessDraftBase):
         self.assertNotIn("Ideas", self._active_labels(response))
         self.assertIn("Ideas", self._active_labels(self.client.get(reverse("composer:create_landing", kwargs=self.kw))))
 
+    def _labels(self, response):
+        return re.findall(r'sidebar-nav-label">([^<]+)<', response.content.decode())
+
     def test_queues_only_lights_on_queue_views(self):
-        # "list" is a substring of "queue_list,queue_detail" — the old ``in`` test lit Queues here.
-        channels = self.client.get(reverse("social_accounts:list", kwargs=self.kw))
-        self.assertEqual(channels.resolver_match.url_name, "list")
+        # "list" is a substring of "queue_list,queue_detail" — the old ``in`` test lit Queues on any page
+        # named "list". The accounts list now answers 301 to Settings → Accounts (plan T6), so a page that
+        # still renders under that name keeps the substring case covered, and the Accounts tab is checked
+        # where the redirect lands. Queues must be in the sidebar, unlit, for either check to mean anything.
+        listed = self.client.get(reverse("notifications:list"))
+        self.assertEqual((listed.status_code, listed.resolver_match.url_name), (200, "list"))
+        self.assertIn("Queues", self._labels(listed))
+        self.assertNotIn("Queues", self._active_labels(listed))
+
+        channels = self.client.get(reverse("social_accounts:list", kwargs=self.kw), follow=True)
+        accounts_tab = reverse("settings:index", kwargs=self.kw) + "?tab=accounts"
+        self.assertEqual(channels.redirect_chain, [(accounts_tab, 301)])
+        self.assertEqual(channels.status_code, 200)
+        self.assertIn("Queues", self._labels(channels))
         self.assertNotIn("Queues", self._active_labels(channels))
+
         self.assertIn("Queues", self._active_labels(self.client.get(reverse("calendar:queue_list", kwargs=self.kw))))
