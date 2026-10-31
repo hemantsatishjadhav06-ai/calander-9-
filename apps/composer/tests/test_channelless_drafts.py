@@ -21,6 +21,7 @@ from apps.composer.models import Idea, PlatformPost, Post
 from apps.members.models import OrgMembership, WorkspaceMembership
 from apps.organizations.models import Organization
 from apps.social_accounts.models import SocialAccount
+from apps.studio.models import AgencySettings
 from apps.workspaces.models import Workspace
 
 
@@ -171,14 +172,23 @@ class DraftTitleTests(ChannellessDraftBase):
 
 
 class SidebarActiveStateTests(ChannellessDraftBase):
+    """The sidebar lights one place, by exact page name (apps/common/navigation.py). Ideas and Queues
+    left the sidebar with More (plan T9): Ideas is in the New menu, Queues in the Calendar page's
+    header. These keep pinning that a page lights its own place and never a look-alike."""
+
     def _active_labels(self, response):
         html = response.content.decode()
         return re.findall(r'sidebar-nav-item active".*?sidebar-nav-label">([^<]+)<', html, re.S)
 
     def test_new_post_does_not_light_create_idea(self):
-        response = self.client.get(reverse("composer:compose", kwargs=self.kw))
-        self.assertNotIn("Ideas", self._active_labels(response))
-        self.assertIn("Ideas", self._active_labels(self.client.get(reverse("composer:create_landing", kwargs=self.kw))))
+        # Neither the composer nor the Ideas page is one of the six places: nothing is lit on either,
+        # and Ideas is a New-menu entry on both, never a sidebar item.
+        for name in ("composer:compose", "composer:create_landing"):
+            response = self.client.get(reverse(name, kwargs=self.kw))
+            self.assertEqual(response.status_code, 200, name)
+            self.assertEqual(self._active_labels(response), [], name)
+            self.assertNotIn("Ideas", self._labels(response), name)
+            self.assertContains(response, 'data-testid="sidebar-new-ideas"')
 
     def _labels(self, response):
         return re.findall(r'sidebar-nav-label">([^<]+)<', response.content.decode())
@@ -187,17 +197,19 @@ class SidebarActiveStateTests(ChannellessDraftBase):
         # "list" is a substring of "queue_list,queue_detail" — the old ``in`` test lit Queues on any page
         # named "list". The accounts list now answers 301 to Settings → Accounts (plan T6), so a page that
         # still renders under that name keeps the substring case covered, and the Accounts tab is checked
-        # where the redirect lands. Queues must be in the sidebar, unlit, for either check to mean anything.
+        # where the redirect lands. Queues' own page lights Calendar, whose header links it.
+        AgencySettings.objects.create(workspace=self.ws, features={"queues": True})
         listed = self.client.get(reverse("notifications:list"))
         self.assertEqual((listed.status_code, listed.resolver_match.url_name), (200, "list"))
-        self.assertIn("Queues", self._labels(listed))
-        self.assertNotIn("Queues", self._active_labels(listed))
+        self.assertEqual(self._active_labels(listed), [])
 
         channels = self.client.get(reverse("social_accounts:list", kwargs=self.kw), follow=True)
         accounts_tab = reverse("settings:index", kwargs=self.kw) + "?tab=accounts"
         self.assertEqual(channels.redirect_chain, [(accounts_tab, 301)])
         self.assertEqual(channels.status_code, 200)
-        self.assertIn("Queues", self._labels(channels))
-        self.assertNotIn("Queues", self._active_labels(channels))
+        self.assertEqual(self._active_labels(channels), ["Settings"])
 
-        self.assertIn("Queues", self._active_labels(self.client.get(reverse("calendar:queue_list", kwargs=self.kw))))
+        queues = self.client.get(reverse("calendar:queue_list", kwargs=self.kw))
+        self.assertEqual(self._active_labels(queues), ["Calendar"])
+        calendar = self.client.get(reverse("calendar:calendar", kwargs=self.kw))
+        self.assertContains(calendar, 'data-testid="calendar-link-queues"')

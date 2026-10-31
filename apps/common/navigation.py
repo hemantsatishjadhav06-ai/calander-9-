@@ -11,12 +11,19 @@ and shares with the templates' ``features``.
   a platform has analytics), Activity, then Blog (only with the ``blog``
   switch). Settings is the gear, kept apart from the items.
 - **Phone bar:** Home, Approvals, Calendar, Inbox, and More, a button that
-  opens the drawer. More is lit on a place the bar does not show.
+  opens the drawer. More is lit on a place the bar does not show. The post page
+  and the composer have none: their own action bar sits where it would.
 - **One place is lit**, from ``request.resolver_match``; see ``_place``.
+- **The command palette** (``build_palette``) offers the same places, Settings
+  and the Settings tabs this person may use.
 
-Approvals, Activity and Settings get their own screens later in Phase 2. Until
-a screen's route exists its item points where that work is done today, so a
-task that adds the route moves the link without a change here.
+Activity is ``studio:team`` (its path is ``/studio/activity/``). Approvals and
+Settings point at their own screens, or at where that work was done before
+those routes existed.
+
+``sidebar_context`` hands templates a lazy ``nav`` and ``nav_palette``: a page
+builds them once from the values the context already has, and an HTMX fragment,
+which never reads them, never builds them.
 """
 
 from __future__ import annotations
@@ -44,7 +51,8 @@ class NavItem:
 
 @dataclass(frozen=True)
 class Nav:
-    """The sidebar's items, its gear and the phone bar; empty without a workspace."""
+    """The sidebar's items, its gear and the phone bar; empty without a workspace.
+    ``phone`` is also empty on a page whose own bar takes the bottom of a phone."""
 
     items: tuple[NavItem, ...] = ()
     settings: NavItem | None = None
@@ -93,6 +101,15 @@ _SETTINGS_PAGES = frozenset(
 # The phone bar shows these items; More stands for the rest.
 _PHONE_KEYS = ("home", "approvals", "calendar", "inbox")
 
+# Pages with a bar of their own along the bottom of a phone, which the phone bar
+# would cover: the post page's Approve & schedule (studio/detail.html) and the
+# composer's action bar (composer/compose.html, which fills the screen).
+_NO_PHONE_BAR = frozenset({("studio", "detail"), ("composer", "compose"), ("composer", "compose_edit")})
+
+# Screens that refuse a plain client (they approve in the client portal): the
+# agency's pages (``studio.views._workspace``), Approvals and Settings.
+_REFUSED_TO_CLIENTS = frozenset({"home", "approvals", "activity", "settings"})
+
 
 def _place(app: str, name: str, tab: str | None) -> str | None:
     """The key of the place a page belongs to, or None for a page outside them."""
@@ -118,6 +135,11 @@ def _lit_place(request) -> str | None:
     if match is None:
         return None
     return _place(match.app_name, match.url_name or "", request.GET.get("tab"))
+
+
+def _has_phone_bar(request) -> bool:
+    match = getattr(request, "resolver_match", None)
+    return match is None or (match.app_name, match.url_name) not in _NO_PHONE_BAR
 
 
 def _new_or_today(workspace_id, new: str, today: str, query: str = "") -> str:
@@ -163,7 +185,7 @@ def build_nav(request, context: Mapping[str, Any] | None = None) -> Nav:
     ]
     if context.get("analytics_enabled_platforms"):
         places.append(("analytics", "Analytics", reverse("analytics:index", kwargs=kwargs), None))
-    places.append(("activity", "Activity", _new_or_today(ws, "studio:activity", "studio:team"), None))
+    places.append(("activity", "Activity", reverse("studio:team", kwargs=kwargs), None))
     if request_features(request)["blog"]:
         places.append(("blog", "Blog", reverse("blog:list", kwargs=kwargs), None))
 
@@ -175,5 +197,55 @@ def build_nav(request, context: Mapping[str, Any] | None = None) -> Nav:
 
     shown = {item.key for item in items} | {"settings"}
     more = NavItem("more", "More", None, None, lit in shown and lit not in _PHONE_KEYS)
-    phone = (*(item for item in items if item.key in _PHONE_KEYS), more)
+    phone = (*(item for item in items if item.key in _PHONE_KEYS), more) if _has_phone_bar(request) else ()
     return Nav(items=items, settings=settings, phone=phone)
+
+
+@dataclass(frozen=True)
+class PaletteEntry:
+    """One destination in the command palette. ``section`` names where it lives
+    (``"Settings"`` for a Settings tab), and is searched with the label."""
+
+    key: str
+    label: str
+    url: str
+    section: str = ""
+
+    @property
+    def search(self) -> str:
+        return f"{self.label} {self.section}".strip().lower()
+
+
+def build_palette(request, nav: Nav) -> tuple[PaletteEntry, ...]:
+    """The places *nav* shows, then Settings and the tabs the Settings screen
+    would show this person (its own checks, ``views_settings.usable_tabs``).
+
+    A plain client is offered none of the screens that refuse them, and so no
+    Settings tab. Reading the tabs' checks costs at most one query, and only
+    when a page renders the palette.
+    """
+    if not nav.items:
+        return ()
+    from apps.studio.views import is_plain_client
+
+    membership = getattr(request, "workspace_membership", None)
+    client = is_plain_client(membership)
+    entries = [
+        PaletteEntry(item.key, item.label, item.url or "")
+        for item in nav.items
+        if not (client and item.key in _REFUSED_TO_CLIENTS)
+    ]
+    if client or membership is None or nav.settings is None:
+        return tuple(entries)
+
+    from apps.studio.settings_links import tab_url
+    from apps.studio.views_settings import usable_tabs
+
+    workspace = request.workspace
+    tabs = usable_tabs(request)
+    if tabs:
+        entries.append(PaletteEntry("settings", nav.settings.label, nav.settings.url or ""))
+        entries.extend(
+            PaletteEntry(f"settings-{tab.key}", tab.label, tab_url(workspace.id, tab.key), "Settings") for tab in tabs
+        )
+    return tuple(entries)

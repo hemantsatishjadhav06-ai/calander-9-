@@ -3,7 +3,8 @@
 - The connect page offers only platforms that can actually be connected; the
   sidebar no longer looks up channels at all (no template drew them).
 - Six real pages (Drafts, Queues, Posting schedule, Templates, Categories,
-  CSV import) are reachable by clicking.
+  CSV import) are reachable by clicking, from the Calendar page's header and
+  the New menu; Queues, Templates and Categories follow their switches.
 - The calendar's repeat-icon lookup no longer costs one query per chip.
 - Logging out is a POST: a GET must not end the session.
 - An external client does not get the org roster.
@@ -99,6 +100,9 @@ class SidebarTests(WorkspaceBase):
         self.assertLessEqual(len(ctx.captured_queries), 6, [q["sql"] for q in ctx.captured_queries])
 
     def test_the_six_orphaned_pages_are_linked(self):
+        """From the Calendar page: its header and the New menu (plan T9), Queues, Templates and
+        Categories with their switches on."""
+        AgencySettings.objects.create(workspace=self.ws, features={"queues": True, "templates": True})
         self.client.force_login(self.owner)
         response = self.client.get(self.calendar_url)
         kwargs = {"workspace_id": self.ws.id}
@@ -112,6 +116,21 @@ class SidebarTests(WorkspaceBase):
         ):
             with self.subTest(name=name):
                 self.assertContains(response, reverse(name, kwargs=kwargs))
+
+    def test_with_their_switches_off_only_queues_templates_and_categories_are_unlinked(self):
+        """The pages still answer (switches hide links, spec D6); the other three stay linked."""
+        AgencySettings.objects.create(workspace=self.ws, features={"queues": False, "templates": False})
+        self.client.force_login(self.owner)
+        response = self.client.get(self.calendar_url)
+        kwargs = {"workspace_id": self.ws.id}
+        for name in ("composer:drafts_list", "calendar:posting_slots", "composer:csv_upload"):
+            with self.subTest(linked=name):
+                self.assertContains(response, reverse(name, kwargs=kwargs))
+        for name in ("calendar:queue_list", "composer:template_list", "composer:category_list"):
+            with self.subTest(unlinked=name):
+                url = reverse(name, kwargs=kwargs)
+                self.assertNotContains(response, f'href="{url}"')
+                self.assertEqual(self.client.get(url).status_code, 200)
 
 
 class CalendarRecurrenceQueryTests(WorkspaceBase):

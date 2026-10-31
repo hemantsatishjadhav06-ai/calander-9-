@@ -3,6 +3,7 @@
 from django.conf import settings
 from django.utils.functional import SimpleLazyObject
 
+from apps.common import navigation
 from apps.common.features import features_for, request_features
 
 
@@ -61,6 +62,10 @@ def sidebar_context(request):
         features: the current workspace's switches (``features_for``), read
             once per request and only when a template asks; every default,
             without a lookup, when there is no workspace
+        nav, nav_palette: the navigation (``navigation.build_nav``) and the
+            command palette's destinations (``navigation.build_palette``), built
+            from these values when a template first reads them, so a page builds
+            them once and an HTMX fragment, which never reads them, never does
     """
     if not hasattr(request, "user") or not request.user.is_authenticated:
         return {}
@@ -127,7 +132,7 @@ def sidebar_context(request):
     # them never look at a switch.
     features = SimpleLazyObject(lambda: request_features(request)) if workspace else features_for(None)
 
-    return {
+    values = {
         "features": features,
         "sidebar_workspaces": sidebar_workspaces,
         "can_create_workspace": can_create_workspace,
@@ -137,3 +142,7 @@ def sidebar_context(request):
         "sidebar_idea_tags": sidebar_idea_tags,
         "analytics_enabled_platforms": analytics_enabled_platforms,
     }
+    nav = SimpleLazyObject(lambda: navigation.build_nav(request, values))
+    values["nav"] = nav
+    values["nav_palette"] = SimpleLazyObject(lambda: navigation.build_palette(request, nav))
+    return values

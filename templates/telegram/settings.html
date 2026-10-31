@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% load tz %}
 {% block title %}Telegram · {{ workspace.name }}{% endblock %}
-{% block extra_head %}{% if not internal %}<style>.sidebar-new-wrap { display: none; }</style>{% endif %}{% endblock %}
+{% block extra_head %}{% if not internal %}<style>.sidebar-new-wrap, [data-palette-open] { display: none; }</style>{% endif %}{% endblock %}
+{% block phone_bar %}{% if internal %}{{ block.super }}{% endif %}{% endblock %}
+{% block command_palette %}{% if internal %}{{ block.super }}{% endif %}{% endblock %}
 {% block sidebar_nav %}
 {% if internal %}{{ block.super }}{% else %}
 <a href="{% url 'telegram:settings' workspace_id=workspace.id %}" class="sidebar-nav-item active" aria-current="page">My Telegram connection</a>

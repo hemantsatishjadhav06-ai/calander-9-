@@ -10,8 +10,9 @@ Spec R1 (docs/specs/02-cut-and-merge.md), plan T2 (docs/specs/phase-2.md).
   pages, Activity on the team, job and routine pages, Settings on every page a
   setting lives on today, Approvals on the approvals list, Calendar on the rest
   of the calendar, and Inbox, Analytics and Blog on their apps.
-- Approvals, Activity and Settings point at their new screens once those
-  routes exist, and at today's pages until then.
+- Approvals and Settings point at their new screens once those routes exist,
+  and at today's pages until then. Activity is ``studio:team``, whose path is
+  ``/studio/activity/`` (spec D4).
 - The counts are the ones ``sidebar_context`` already computed: building the
   navigation reads nothing but the request's switches, which it shares.
 """
@@ -211,7 +212,7 @@ def test_no_workspace_means_no_navigation(user):
     assert Nav().items == () and Nav().settings is None and Nav().phone == ()
 
 
-# --- the three new screens: their route once it exists, today's page until then --
+# --- the new screens: Approvals and Settings by their route once it exists, Activity by studio:team --
 
 
 def _reverse_as_if(missing=(), present=None):
@@ -248,21 +249,14 @@ def test_approvals_goes_to_its_own_screen_once_the_route_exists(workspace, user)
 
 
 @pytest.mark.django_db
-def test_activity_falls_back_to_the_team_page(workspace, user):
-    request = _request(_url("studio:index", workspace), workspace, user)
-    with _reverse_as_if(missing={"studio:activity"}):
-        nav = _nav(request)
-
-    assert _item(nav, "activity").url == _url("studio:team", workspace)
-
-
-@pytest.mark.django_db
-def test_activity_goes_to_its_own_screen_once_the_route_exists(workspace, user):
+def test_activity_is_the_team_route_at_its_activity_address(workspace, user):
+    """``studio:team`` names Activity (spec D4): no other route name is tried first, even one that resolves."""
     request = _request(_url("studio:index", workspace), workspace, user)
     with _reverse_as_if(present={"studio:activity": "/activity-screen/"}):
         nav = _nav(request)
 
-    assert _item(nav, "activity").url == "/activity-screen/"
+    assert _item(nav, "activity").url == _url("studio:team", workspace)
+    assert _item(nav, "activity").url.endswith("/studio/activity/")
 
 
 @pytest.mark.django_db

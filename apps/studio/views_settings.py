@@ -255,11 +255,16 @@ TABS: tuple[Tab, ...] = (
 )
 
 
+def usable_tabs(request) -> list[Tab]:
+    """The tabs *request*'s person may use, in order: the strip, and the command palette."""
+    return [tab for tab in TABS if tab.allowed(request)]
+
+
 @login_required
 @require_GET
 def index(request, workspace_id):
     workspace = _workspace(request, workspace_id)
-    usable = [tab for tab in TABS if tab.allowed(request)]
+    usable = usable_tabs(request)
     asked = request.GET.get("tab", "")
     if asked in {tab.key for tab in TABS}:
         active = next((tab for tab in usable if tab.key == asked), None)
