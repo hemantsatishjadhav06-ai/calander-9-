@@ -2,6 +2,9 @@
 
 from django.conf import settings
 from django.db.models import Count, Q
+from django.utils.functional import SimpleLazyObject
+
+from apps.common.features import features_for, request_features
 
 
 def branding(request):
@@ -56,6 +59,9 @@ def sidebar_context(request):
         sidebar_workspaces: list of workspace objects the user belongs to
         sidebar_channels: connected social accounts for the current workspace
         sidebar_connectable_platforms: platforms available to connect
+        features: the current workspace's switches (``features_for``), read
+            once per request and only when a template asks; every default,
+            without a lookup, when there is no workspace
     """
     if not hasattr(request, "user") or not request.user.is_authenticated:
         return {}
@@ -170,7 +176,12 @@ def sidebar_context(request):
     if org_membership and org_membership.org_role in ("owner", "admin"):
         can_create_workspace = True
 
+    # Lazy: this runs on every render, HTMX fragments included, and most of
+    # them never look at a switch.
+    features = SimpleLazyObject(lambda: request_features(request)) if workspace else features_for(None)
+
     return {
+        "features": features,
         "sidebar_workspaces": sidebar_workspaces,
         "can_create_workspace": can_create_workspace,
         "sidebar_channels": sidebar_channels,
