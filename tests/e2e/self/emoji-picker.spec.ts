@@ -1,10 +1,6 @@
 import { expect, test } from '../support/test';
 
 test('the idea emoji picker renders on demand, searches, inserts and reopens', async ({ page, harness, as, axe }) => {
-  test.skip(
-    process.env.E2E_VERIFY_EMOJI_QUARANTINE !== '1',
-    'Quarantined during modal-focus repair and stability verification: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/18',
-  );
   await as('owner');
   await page.goto(`/workspace/${harness.ids.workspace_a}/studio/`);
   await expect(page.getByTestId('home-today')).toBeVisible();

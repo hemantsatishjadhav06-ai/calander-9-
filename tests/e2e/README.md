@@ -68,17 +68,15 @@ can opt out with `test.use({ mockedNavigationBarrier: false })`. The helper's de
 contract tests run in `npm run test:ui`; `self/mock-navigation.spec.ts` verifies ordering and
 ordinary failed navigation in each browser. The invariant onboarding golden path stays unchanged.
 
-Temporary stability verification includes the emoji scenario ([issue #18](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/18)),
-the WebKit onboarding scenario ([issue #19](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19)),
-the owner/editor draft handoff scenarios on all three devices ([issue #20](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/20)),
-Calendar filter accessibility ([issue #21](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21)),
-and Pixel 7 keyboard scroll completion ([issue #22](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/22))
-with `E2E_VERIFY_EMOJI_QUARANTINE=1 E2E_VERIFY_ONBOARDING_QUARANTINE=1 E2E_VERIFY_HANDOFF_QUARANTINE=1 E2E_VERIFY_CALENDAR_QUARANTINE=1 E2E_VERIFY_KEYBOARD_QUARANTINE=1 CI=1 npm run test:e2e`.
-The client refusal scenarios remain active. The original golden-path assertions are unchanged.
-The isolated past-week keyboard regression remains active on Desktop Chrome and WebKit.
-Their default quarantines remain visible as skipped cases until three complete consecutive
-stability runs pass, followed by a normal CI run after removing the quarantines. They are never
-counted as passing merely because a normal CI run skipped them.
+No browser case is quarantined. The five scenarios that were quarantined while their repairs
+were verified run in every suite again: the emoji picker ([issue #18](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/18)),
+WebKit onboarding ([issue #19](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19)),
+the owner/editor draft handoff on all three devices ([issue #20](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/20)),
+Calendar filter accessibility ([issue #21](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21))
+and Pixel 7 keyboard scroll completion ([issue #22](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/22)).
+`docs/specs/CHANGELOG.md` records the consecutive complete runs that cleared them. The original
+golden-path assertions are unchanged. Golden path 12 (TOTP) stays declared pending until Phase 4
+and is never counted as passing.
 
 Keyboard scrolling uses `support/scroll.ts`: install a bounded native `scrollend` listener,
 send one key, then await completion before scrolling on the other axis. The movement assertions

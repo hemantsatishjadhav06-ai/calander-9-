@@ -24,10 +24,6 @@ type TestFixtures = {
   as: As;
   axe: Axe;
   network: NetworkGuard;
-  onboardingQuarantine: void;
-  handoffQuarantine: void;
-  calendarQuarantine: void;
-  keyboardQuarantine: void;
   mockedNavigationBarrier: boolean;
 };
 
@@ -46,57 +42,6 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     try { await use(page); }
     finally { await barrier?.dispose(); }
   },
-
-  onboardingQuarantine: [
-    async ({}, use, testInfo) => {
-      testInfo.skip(
-        testInfo.project.name === 'iphone-13' &&
-          testInfo.file.endsWith('/golden/02-onboarding.spec.ts') &&
-          process.env.E2E_VERIFY_ONBOARDING_QUARANTINE !== '1',
-        'Quarantined while the mocked form navigation race is repaired and verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/19',
-      );
-      await use();
-    },
-    { auto: true },
-  ],
-
-  handoffQuarantine: [
-    async ({}, use, testInfo) => {
-      testInfo.skip(
-        testInfo.file.endsWith('/golden/03-ask-the-team.spec.ts') &&
-          /^(owner|editor) asks the team for a post on Home,/.test(testInfo.title) &&
-          process.env.E2E_VERIFY_HANDOFF_QUARANTINE !== '1',
-        'Quarantined while atomic draft handoff is repaired and verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/20',
-      );
-      await use();
-    },
-    { auto: true },
-  ],
-
-  calendarQuarantine: [
-    async ({}, use, testInfo) => {
-      testInfo.skip(
-        testInfo.file.endsWith('/self/ui-select.spec.ts') &&
-          process.env.E2E_VERIFY_CALENDAR_QUARANTINE !== '1',
-        'Quarantined while calendar keyboard access is repaired and verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/21',
-      );
-      await use();
-    },
-    { auto: true },
-  ],
-
-  keyboardQuarantine: [
-    async ({}, use, testInfo) => {
-      testInfo.skip(
-        testInfo.project.name === 'pixel-7' &&
-          testInfo.file.endsWith('/self/calendar-keyboard.spec.ts') &&
-          process.env.E2E_VERIFY_KEYBOARD_QUARANTINE !== '1',
-        'Quarantined while native keyboard scroll completion is verified: https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/22',
-      );
-      await use();
-    },
-    { auto: true },
-  ],
 
   harness: [
     async ({ playwright }, use, workerInfo) => {
