@@ -1,0 +1,10 @@
+{% comment %}Settings → Autopilot: the autopilot page's whole form, never split, posting to studio:autopilot.
+The last run, the weekly reports and "Plan next week now" stay on that page, linked from here.{% endcomment %}
+<div class="max-w-[880px] min-w-0">
+    <header class="mb-6 max-w-2xl">
+        <h2 id="settings-panel-title" class="text-h2 text-ink-950">Autopilot</h2>
+        <p class="ui-page-status">How often your team plans on its own, for which accounts, and within what budget. Every post still waits for your approval. <a href="{% url 'studio:autopilot' workspace_id=workspace.id %}" class="link-inline">See the last run and the weekly reports</a>.</p>
+    </header>
+
+    {% include "studio/partials/autopilot_form.html" %}
+</div>

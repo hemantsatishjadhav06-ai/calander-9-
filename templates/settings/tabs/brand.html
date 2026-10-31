@@ -1,4 +1,5 @@
-{% comment %}Settings → Brand: the brand page's body; its form posts to studio:brand.{% endcomment %}
+{% comment %}Settings → Brand: the brand page's body, its form posting to studio:brand; then the workspace's name
+and logo from the workspace page (which moved here), posting to workspaces:settings.{% endcomment %}
 <div class="max-w-[880px] min-w-0">
     <header class="mb-6 max-w-2xl">
         <h2 id="settings-panel-title" class="text-h2 text-ink-950">Brand profile</h2>
@@ -6,4 +7,8 @@
     </header>
 
     {% include "studio/partials/brand_profile_form.html" %}
+
+    <div class="mt-8 max-w-2xl" id="workspace-identity">
+        {% include "workspaces/partials/identity_form.html" %}
+    </div>
 </div>

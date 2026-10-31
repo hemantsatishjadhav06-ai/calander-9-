@@ -1,0 +1,129 @@
+{% comment %}
+Archive or delete the workspace: the danger zone, posted to workspaces:settings (explicit actions). Extracted
+from workspaces/settings.html, which includes it for a workspace owner or manager, for Settings → Advanced
+to include for the same people. Context: workspace, can_archive, can_delete.
+{% endcomment %}
+<section class="ui-card mt-6" aria-labelledby="workspace-lifecycle-title">
+    <h2 id="workspace-lifecycle-title" class="ui-card-title">Archive or delete</h2>
+
+    <!-- Archive / restore -->
+    <div x-data="{ showArchiveModal: false }" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div class="min-w-0">
+            <h3 class="text-h3 text-ink-950">
+                {% if workspace.is_archived %}Restore this workspace{% else %}Archive this workspace{% endif %}
+            </h3>
+            <p class="mt-1 max-w-[52ch] text-sm text-ink-600">
+                {% if workspace.is_archived %}
+                This workspace is archived. Restoring it puts it back in the sidebar for every member.
+                {% elif can_archive %}
+                Hides the workspace from the sidebar and stops new posts. Nothing is deleted, and you can restore it at any time.
+                {% else %}
+                You can't archive the last active workspace in the organization. Create another workspace first.
+                {% endif %}
+            </p>
+        </div>
+
+        {% if workspace.is_archived %}
+        <form method="POST" action="{% url 'workspaces:settings' workspace_id=workspace.id %}" class="shrink-0">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="unarchive_workspace">
+            <button type="submit" class="ui-btn ui-btn-secondary">Restore workspace</button>
+        </form>
+        {% elif can_archive %}
+        <button type="button" @click="showArchiveModal = true" class="ui-btn ui-btn-secondary shrink-0 self-start">
+            Archive workspace
+        </button>
+
+        <!-- Archive confirmation -->
+        <template x-teleport="body">
+            <div x-show="showArchiveModal" x-transition.opacity
+                 @keydown.escape.window="showArchiveModal = false"
+                 class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+                 style="background: var(--overlay);">
+                <div @click.outside="showArchiveModal = false"
+                     x-show="showArchiveModal"
+                     x-transition
+                     x-trap.noscroll="showArchiveModal" role="dialog" aria-modal="true" aria-labelledby="archive-workspace-title"
+                     class="ui-modal max-w-[440px] max-sm:max-h-[92vh] max-sm:overflow-y-auto max-sm:rounded-b-none">
+                    <div class="ui-modal-header">
+                        <h2 id="archive-workspace-title" class="ui-modal-title">Archive this workspace?</h2>
+                        <button type="button" @click="showArchiveModal = false" class="ui-btn ui-btn-icon -mr-2 -mt-1" aria-label="Close">
+                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                    <div class="ui-modal-body">
+                        <p><strong class="font-semibold text-ink-900">{{ workspace.name }}</strong> will leave the sidebar and no new posts can be made in it. Everything in it is kept.</p>
+                    </div>
+                    <div class="ui-modal-footer">
+                        <button type="button" @click="showArchiveModal = false" class="ui-btn ui-btn-secondary">Cancel</button>
+                        <form method="POST" action="{% url 'workspaces:settings' workspace_id=workspace.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="archive_workspace">
+                            <button type="submit" class="ui-btn ui-btn-primary">Archive workspace</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </template>
+        {% endif %}
+    </div>
+
+    <!-- Delete -->
+    <div x-data="{ showDeleteModal: false }" class="mt-5 flex flex-col gap-3 border-t border-ink-200 pt-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div class="min-w-0">
+            <h3 class="text-h3 text-ink-950">Delete this workspace</h3>
+            <p class="mt-1 max-w-[52ch] text-sm text-ink-600">
+                {% if can_delete %}
+                Removes the workspace and everything in it: posts, connected accounts, media and memberships. This can't be undone.
+                {% else %}
+                You can't delete the last active workspace in the organization. Create another workspace first.
+                {% endif %}
+            </p>
+        </div>
+
+        {% if can_delete %}
+        <button type="button" @click="showDeleteModal = true" class="ui-btn ui-btn-danger-ghost shrink-0 self-start">
+            Delete workspace
+        </button>
+
+        <!-- Delete confirmation -->
+        <template x-teleport="body">
+            <div x-show="showDeleteModal" x-transition.opacity
+                 @keydown.escape.window="showDeleteModal = false"
+                 class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+                 style="background: var(--overlay);">
+                <div @click.outside="showDeleteModal = false"
+                     x-show="showDeleteModal"
+                     x-transition
+                     x-trap.noscroll="showDeleteModal" role="dialog" aria-modal="true" aria-labelledby="delete-workspace-title"
+                     class="ui-modal max-w-[440px] max-sm:max-h-[92vh] max-sm:overflow-y-auto max-sm:rounded-b-none">
+                    <div class="ui-modal-header">
+                        <h2 id="delete-workspace-title" class="ui-modal-title">Delete this workspace?</h2>
+                        <button type="button" @click="showDeleteModal = false" class="ui-btn ui-btn-icon -mr-2 -mt-1" aria-label="Close">
+                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                    <div class="ui-modal-body space-y-3">
+                        <p><strong class="font-semibold text-ink-900">{{ workspace.name }}</strong> will be deleted for good. This can't be undone.</p>
+                        <p>These go with it:</p>
+                        <ul class="ml-4 list-disc space-y-1">
+                            <li>All scheduled and published posts</li>
+                            <li>Connected social accounts</li>
+                            <li>Media and files</li>
+                            <li>Workspace memberships</li>
+                        </ul>
+                    </div>
+                    <div class="ui-modal-footer">
+                        <button type="button" @click="showDeleteModal = false" class="ui-btn ui-btn-secondary">Cancel</button>
+                        <form method="POST" action="{% url 'workspaces:settings' workspace_id=workspace.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_workspace">
+                            <button type="submit" class="ui-btn ui-btn-danger">Delete workspace</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </template>
+        {% endif %}
+    </div>
+</section>

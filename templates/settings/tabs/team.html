@@ -1,6 +1,7 @@
-{% comment %}Settings → Team & clients: how many people and clients there are, and the way to each page.
-Inviting and changing roles stay on those pages (their dialogs listen to every request on the window,
-so they never share a page). Context: show_members, member_count, show_clients, client_count.{% endcomment %}
+{% comment %}Settings → Team & clients: how many people the organisation has and the way to its page (inviting
+and changing roles stay there), then the client admin itself for a workspace manager (its page moved here).
+Only the client invite dialog is on this page: the two dialogs listen to every request on the window, so
+they never share one. Context: show_members, member_count, show_clients, clients_data, pending_invites.{% endcomment %}
 <div class="w-full max-w-3xl">
     <header class="mb-6">
         <h2 id="settings-panel-title" class="text-h2 text-ink-950">Team &amp; clients</h2>
@@ -23,17 +24,8 @@ so they never share a page). Context: show_members, member_count, show_clients, 
     {% endif %}
 
     {% if show_clients %}
-    <section class="mb-6 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" aria-labelledby="settings-team-clients-title" data-testid="settings-team-clients">
-        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
-            <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                    <h3 id="settings-team-clients-title" class="text-h3 text-ink-950">Client portal</h3>
-                    <span class="ui-badge">{{ client_count }}</span>
-                </div>
-                <p class="mt-1 text-sm text-ink-600">Invite external clients to review and approve posts.</p>
-            </div>
-            <a href="{% url 'client_portal_admin:client_list' workspace_id=workspace.id %}" class="ui-btn ui-btn-secondary max-sm:w-full">Manage client access</a>
-        </div>
-    </section>
+    <div data-testid="settings-team-clients">
+        {% include "client_portal/admin/partials/client_admin.html" %}
+    </div>
     {% endif %}
 </div>

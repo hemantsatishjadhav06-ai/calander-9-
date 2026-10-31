@@ -3,7 +3,8 @@
 Each tab shows its old page's body and applies that page's own permission check: a tab someone may
 not use is not in the strip and its ``?tab=`` answers 403. The forms post to the old handlers with
 an explicit ``action=``, so saving from a tab gives exactly the old result. Only the active tab is
-built. The old pages keep rendering (their redirects come later).
+built. The last three tabs and the old pages' redirects are in ``test_settings_tabs.py`` and
+``test_settings_redirects.py``.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from apps.studio.models import BrandProfile
 from apps.workspaces.models import Workspace
 
 FIRST_FOUR = ("brand", "accounts", "team", "approvals")
+ALL_TABS = [*FIRST_FOUR, "autopilot", "notifications", "advanced"]
 
 
 def _settings(world, tab: str | None = None) -> str:
@@ -78,10 +80,12 @@ def _brand_data(profile: BrandProfile, **changes) -> dict[str, str]:
 def test_settings_lives_under_the_workspace_next_to_the_client_admin(client, world):
     ws = world.workspace.id
     assert _settings(world) == f"/workspace/{ws}/settings/"
-    # The client admin keeps its address under /settings/clients/ and keeps answering.
+    # The client admin keeps its address under /settings/clients/ and keeps answering: a GET moves to
+    # the Team & clients tab (spec D1), its actions below it stay where they are.
     assert _url("client_portal_admin:client_list", world) == f"/workspace/{ws}/settings/clients/"
     client.force_login(world.owner)
-    assert client.get(_url("client_portal_admin:client_list", world)).status_code == 200
+    response = client.get(_url("client_portal_admin:client_list", world))
+    assert response.status_code == 301 and response["Location"] == _settings(world, "team")
 
 
 def test_settings_answers_only_get(client, world):
@@ -117,12 +121,12 @@ def test_someone_from_another_workspace_is_refused(client, world):
 # --- the strip ---------------------------------------------------------------------
 
 
-def test_an_owner_sees_the_four_tabs_in_order_and_brand_first(client, world):
+def test_an_owner_sees_every_tab_in_order_and_brand_first(client, world):
     response = _get(client, world.owner, world)
     html = response.content.decode()
 
     assert response.status_code == 200
-    assert _strip(html) == list(FIRST_FOUR)
+    assert _strip(html) == ALL_TABS
     assert "Team &amp; clients" in html
     # No tab asked for: the first one this person may use.
     assert 'data-testid="settings-panel-brand"' in html
@@ -149,10 +153,10 @@ def test_each_tab_renders_its_panel_for_an_owner(client, world, tab):
         assert f'data-testid="settings-panel-{key}"' not in html
 
 
-def test_a_manager_may_use_the_same_four(client, world):
+def test_a_manager_may_use_the_same_tabs(client, world):
     html = _get(client, world.manager, world).content.decode()
-    assert _strip(html) == list(FIRST_FOUR)
-    for tab in FIRST_FOUR:
+    assert _strip(html) == ALL_TABS
+    for tab in ALL_TABS:
         assert client.get(_settings(world, tab)).status_code == 200
 
 
@@ -161,8 +165,10 @@ def test_tabs_a_person_may_not_use_are_absent_and_refused(client, world, who):
     user = getattr(world, who)
     html = _get(client, user, world).content.decode()
 
-    # Brand (read for staff) and Team & clients (the roster is open to the organisation's members).
-    assert _strip(html) == ["brand", "team"]
+    # Brand (read for staff) and Team & clients (the roster is open to the organisation's members);
+    # Autopilot (create_posts), Notifications and Advanced are the last three tabs' own business.
+    assert _strip(html)[:2] == ["brand", "team"]
+    assert not {"accounts", "approvals"} & set(_strip(html))
     # Accounts needs manage_social_accounts, Approvals an owner or manager: refused by address too.
     assert client.get(_settings(world, "accounts")).status_code == 403
     assert client.get(_settings(world, "approvals")).status_code == 403
@@ -216,7 +222,9 @@ def test_an_editor_reads_the_brand_but_cannot_save_it(client, world):
 
 def test_the_accounts_tab_lists_the_accounts_and_connects_on_the_old_page(client, world):
     client.force_login(world.manager)
-    old = client.get(_url("social_accounts:list", world)).content.decode()
+    # The accounts page moved here (a GET answers 301); its body is the same partial.
+    old = client.get(_url("social_accounts:list", world))
+    assert old.status_code == 301 and old["Location"] == _settings(world, "accounts")
     html = client.get(_settings(world, "accounts")).content.decode()
 
     assert 'data-testid="settings-panel-accounts"' in html
@@ -224,13 +232,9 @@ def test_the_accounts_tab_lists_the_accounts_and_connects_on_the_old_page(client
     assert f'href="{_url("social_accounts:connect", world)}"' in html
     # Each card is the list page's own, with its actions at the old handlers.
     for account in (world.linkedin, world.x):
-        card = f'id="account-{account.id}"'
-        assert card in html and card in old
+        assert f'id="account-{account.id}"' in html
         assert _url("social_accounts:disconnect", world, account_id=account.id) in html
-    html, old = _no_csrf(html), _no_csrf(old)
-    start, old_start = html.index('id="accounts-list"'), old.index('id="accounts-list"')
-    end = "We check each connection every 6 hours."
-    assert html[start : html.index(end, start)] == old[old_start : old.index(end, old_start)]
+    assert 'id="accounts-list"' in html and "We check each connection every 6 hours." in html
 
 
 def test_the_accounts_tab_offers_the_first_connection_when_there_is_none(client, world):
@@ -250,14 +254,17 @@ def test_team_and_clients_counts_and_links_for_an_owner(client, world):
     html = _get(client, world.owner, world, "team").content.decode()
 
     members = re.search(r'data-testid="settings-team-members".*?</section>', html, re.S).group(0)
-    clients = re.search(r'data-testid="settings-team-clients".*?</section>', html, re.S).group(0)
+    clients = html[html.index('data-testid="settings-team-clients"') :]
     assert f'href="{reverse("members:list")}"' in members
     # Five people in the organisation (owner, manager, editor, viewer and the client), one client here.
     assert '<span class="ui-badge">5</span>' in members
-    assert f'href="{_url("client_portal_admin:client_list", world)}"' in clients
-    assert '<span class="ui-badge">1</span>' in clients
-    # The invite dialogs stay on their own pages.
-    assert "showInviteModal" not in html
+    # The client admin moved here (its page answers 301 to this tab): its list, invite and actions,
+    # each posting to the client admin's own handlers.
+    assert 'id="clients-list"' in clients and '<span class="ui-badge">1</span>' in clients
+    assert "client@example.com" in clients
+    assert reverse("client_portal_admin:invite_client", kwargs={"workspace_id": world.workspace.id}) in clients
+    # The team-member invite dialog stays on its own page (the two dialogs listen to every request).
+    assert reverse("members:invite") not in html
 
 
 def test_team_and_clients_shows_an_editor_only_the_roster(client, world):

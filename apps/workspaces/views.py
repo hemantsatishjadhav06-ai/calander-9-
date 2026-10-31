@@ -10,6 +10,7 @@ from apps.accounts.uploads import validate_profile_image
 from apps.common.validators import clean_display_name
 from apps.members.decorators import require_org_role
 from apps.members.models import OrgMembership, WorkspaceMembership
+from apps.studio import settings_links
 
 from .models import Workspace
 
@@ -67,6 +68,17 @@ def workspace_settings(request, workspace_id):
         WorkspaceMembership.WorkspaceRole.OWNER,
         WorkspaceMembership.WorkspaceRole.MANAGER,
     )
+
+    if settings_links.is_page_view(request):
+        # The name and logo live in Settings → Brand and the danger zone in Settings → Advanced (spec
+        # D1, D5). Settings is the agency team's: a plain client is refused here, never sent there.
+        from apps.studio.views import is_plain_client
+
+        if is_plain_client(membership):
+            raise PermissionDenied(
+                "Workspace settings are for the agency team. Your approvals are in the client portal."
+            )
+        return settings_links.moved(request, workspace.id, "brand")
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -153,22 +165,24 @@ def workspace_settings(request, workspace_id):
         messages.success(request, "Workspace settings updated.")
         return redirect("workspaces:settings", workspace_id=workspace.id)
 
-    active_count = Workspace.objects.filter(organization=workspace.organization, is_archived=False).count()
-    is_last_active = active_count <= 1 and not workspace.is_archived
-    can_archive = is_owner_or_manager and not workspace.is_archived and not is_last_active
-    can_delete = is_owner_or_manager and not is_last_active
-
     return render(
         request,
         "workspaces/settings.html",
-        {
-            "workspace": workspace,
-            "settings_active": "general",
-            "is_owner_or_manager": is_owner_or_manager,
-            "can_archive": can_archive,
-            "can_delete": can_delete,
-        },
+        {**workspace_settings_context(workspace, membership), "settings_active": "general"},
     )
+
+
+def workspace_settings_context(workspace, membership) -> dict:
+    """What the name, logo and danger zone show: this page, Settings → Brand and Settings → Advanced."""
+    is_owner_or_manager = can_manage_approvals(membership)
+    active_count = Workspace.objects.filter(organization=workspace.organization, is_archived=False).count()
+    is_last_active = active_count <= 1 and not workspace.is_archived
+    return {
+        "workspace": workspace,
+        "is_owner_or_manager": is_owner_or_manager,
+        "can_archive": is_owner_or_manager and not workspace.is_archived and not is_last_active,
+        "can_delete": is_owner_or_manager and not is_last_active,
+    }
 
 
 @login_required

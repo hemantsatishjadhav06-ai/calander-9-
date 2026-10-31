@@ -63,7 +63,7 @@ def tabs(workspace, active: str, perms: dict | None = None) -> list[dict[str, An
         ("overview", "Home", "studio:index"),
         ("routines", "Routines", "studio:routines"),
         ("team", "Team", "studio:team"),
-        ("settings", "Settings", "studio:settings_hub"),
+        ("settings", "Settings", "settings:index"),  # the Settings screen (the old hub answers 301 there)
     ]
     if perms is not None and not perms.get("create_posts"):
         items = [item for item in items if item[0] != "routines"]

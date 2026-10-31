@@ -8,45 +8,9 @@
     <header class="mb-6">
         <h1 class="ui-page-title">Set up</h1>
         <p class="ui-page-status">{% if left %}Finish these steps and your team works on its own, asking you only when it needs you.{% else %}Everything is set up. Your team works on its own and asks you only when it needs you.{% endif %}</p>
-        <div class="mt-4 flex items-center gap-3" aria-label="{{ done }} of {{ total }} steps done">
-            <div class="ui-progress flex-1" aria-hidden="true"><span style="width: {% widthratio done total 100 %}%"></span></div>
-            <p class="text-[13px] font-semibold text-ink-900 whitespace-nowrap tabular-nums" data-setup-progress>{{ done }} of {{ total }} steps done</p>
-        </div>
+        {% include "studio/partials/setup_progress.html" %}
     </header>
 
-    {# Only the first unfinished step's action is solid; every other step's action is secondary. #}
-    <ol class="ui-card p-0 overflow-hidden divide-y divide-ink-200" data-setup-rows>
-        {% for row in rows %}
-        <li class="flex flex-wrap sm:flex-nowrap items-start gap-x-4 gap-y-3 px-4 sm:px-5 py-4" data-setup-row="{{ row.key }}" data-setup-state="{{ row.state }}" data-testid="setup-row-{{ row.key }}">
-            <span class="mt-px flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center
-                {% if row.state == 'done' %}bg-success-500 text-white{% elif row.state == 'attention' %}bg-white text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]{% else %}bg-white text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]{% endif %}" aria-hidden="true">
-                {% if row.state == 'done' %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>{% elif row.state == 'attention' %}<span class="text-xs font-bold">!</span>{% else %}<span class="text-xs font-semibold tabular-nums">{{ forloop.counter }}</span>{% endif %}
-            </span>
-            <div class="flex-1 min-w-0 basis-[calc(100%-2.5rem)] sm:basis-auto">
-                <h2 class="text-sm font-semibold text-ink-900">{{ row.title }}<span class="sr-only"> — {% if row.state == 'done' %}done{% elif row.state == 'attention' %}needs attention{% else %}to do{% endif %}</span></h2>
-                <p class="mt-0.5 text-sm text-ink-700 break-words">{{ row.status }}</p>
-                {% if row.note %}<p class="text-[13px]/[18px] text-ink-600 mt-1 break-words">{{ row.note }}</p>{% endif %}
-                {% if row.detail %}<p class="ui-owner-box mt-2 break-words"><span class="font-semibold text-ink-900">For the owner:</span> {{ row.detail }}</p>{% endif %}
-                {% if row.link %}<p class="mt-1"><a href="{{ row.link.url }}" class="ui-link inline-flex items-center max-lg:min-h-11" data-setup-link="{{ row.key }}">{{ row.link.label }}</a></p>{% endif %}
-            </div>
-            {% if row.action %}
-            {% if row.state != 'done' %}{% cycle 'ui-btn-primary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' 'ui-btn-secondary' as setup_tone silent %}{% endif %}
-            <div class="flex-shrink-0 w-full sm:w-auto pl-10 sm:pl-0">
-                {% if row.action.method == 'post' %}
-                <form method="post" action="{{ row.action.url }}" x-data="{ busy: false }" x-on:submit="busy = true">
-                    {% csrf_token %}
-                    {% for name, value in row.action.fields.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
-                    <button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy" class="ui-btn {% if row.state == 'done' %}ui-btn-secondary{% else %}{{ setup_tone }}{% endif %} w-full sm:w-auto" data-testid="setup-action-{{ row.key }}">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></button>
-                </form>
-                {% else %}
-                <a href="{{ row.action.url }}" class="ui-btn {% if row.state == 'done' %}ui-btn-secondary{% else %}{{ setup_tone }}{% endif %} w-full sm:w-auto" data-testid="setup-action-{{ row.key }}">{{ row.action.label }}<span class="sr-only"> · {{ row.title }}</span></a>
-                {% endif %}
-            </div>
-            {% endif %}
-        </li>
-        {% endfor %}
-    </ol>
-
-    <p class="mt-4 flex items-start gap-1.5 text-xs text-ink-500"><svg class="mt-px w-3.5 h-3.5 flex-shrink-0 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg><span>Checked {{ checked_at|timezone:tzname|date:"j M, H:i" }} ({{ tzname }}). Nothing here approves, schedules or publishes a post: that always waits for a person.</span></p>
+    {% include "studio/partials/setup_checklist.html" %}
 </div>
 {% endblock %}

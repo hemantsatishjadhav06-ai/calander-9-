@@ -11,6 +11,7 @@ from django_ratelimit.decorators import ratelimit
 from apps.members import services as member_services
 from apps.members.decorators import require_workspace_role
 from apps.members.models import Invitation, OrgMembership, WorkspaceMembership
+from apps.studio import settings_links
 
 from . import services as portal_services
 from .models import MagicLinkToken
@@ -24,9 +25,16 @@ from .models import MagicLinkToken
 @require_workspace_role("manager")
 @require_GET
 def client_list(request, workspace_id):
-    """List all clients and pending client invitations for this workspace."""
-    workspace = request.workspace
+    """List all clients and pending client invitations for this workspace.
 
+    The list lives in Settings → Team & clients (spec D1, D5): after the same checks as before, the
+    page answers a 301 there. Its actions keep their addresses and land here, then there.
+    """
+    return settings_links.moved(request, request.workspace.id, "team")
+
+
+def client_list_context(request, workspace) -> dict:
+    """What the client admin shows (``partials/client_admin.html``): this page and Settings → Team & clients."""
     # Active clients (users with CLIENT role in this workspace)
     client_memberships = (
         WorkspaceMembership.objects.filter(
@@ -43,7 +51,7 @@ def client_list(request, workspace_id):
         workspace=workspace,
         expires_at__gt=now,
     ).select_related("user")
-    token_map = {}
+    token_map: dict = {}
     for t in active_tokens:
         # Keep the most recent token per user
         existing = token_map.get(t.user_id)
@@ -61,18 +69,11 @@ def client_list(request, workspace_id):
             }
         )
 
-    # Pending invitations with CLIENT role for this workspace
-    pending_invites = _get_pending_client_invites(request.org, workspace)
-
-    return render(
-        request,
-        "client_portal/admin/client_list.html",
-        {
-            "settings_active": "clients",
-            "clients_data": clients_data,
-            "pending_invites": pending_invites,
-        },
-    )
+    return {
+        "clients_data": clients_data,
+        # Pending invitations with CLIENT role for this workspace
+        "pending_invites": _get_pending_client_invites(request.org, workspace),
+    }
 
 
 # ---------------------------------------------------------------------------

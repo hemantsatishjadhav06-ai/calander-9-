@@ -99,9 +99,8 @@ def last_run(workspace) -> dict | None:
     }
 
 
-def _context(request, workspace, form=None) -> dict:
-    from .readiness import operational_readiness
-
+def form_context(request, workspace, form=None) -> dict:
+    """What the autopilot form shows (``partials/autopilot_form.html``): this page and Settings → Autopilot."""
     row = _settings_row(workspace)
     perms = _perms(request)
     if form is None:
@@ -119,18 +118,27 @@ def _context(request, workspace, form=None) -> dict:
         "row": row,
         "form": form,
         "tzname": workspace.effective_timezone or "UTC",
-        "tabs": dashboard.tabs(workspace, "autopilot", perms=perms),
         # Links from Set up, the Settings hub and the Telegram page land on the approvers and the budget.
         "advanced_open": bool(form.errors) or request.GET.get("open") == "advanced",
         "can_save": perms.get("manage_workspace_settings", False),
-        "can_plan": _can_plan(request, workspace),
-        "can_report": perms.get("create_posts", False),
         "weekdays": WEEKDAYS,
         "next_plan": next_plan,
         "plan_due_now": bool(next_plan and next_plan <= autopilot.local_now(workspace)),
-        "last": last_run(workspace),
         "spend": budget.month_spend(workspace),
         "budget": budget.monthly_budget(workspace),
+    }
+
+
+def _context(request, workspace, form=None) -> dict:
+    from .readiness import operational_readiness
+
+    perms = _perms(request)
+    return {
+        **form_context(request, workspace, form),
+        "tabs": dashboard.tabs(workspace, "autopilot", perms=perms),
+        "can_plan": _can_plan(request, workspace),
+        "can_report": perms.get("create_posts", False),
+        "last": last_run(workspace),
         "reports": reports.recent_reports(workspace, limit=3),
         "claude_ready": llm.is_configured(),
         "configuration_error": llm.configuration_error(),

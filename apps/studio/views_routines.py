@@ -69,16 +69,24 @@ def section(request, workspace, perms) -> dict:
     }
 
 
+def form_context(workspace, form=None) -> dict:
+    """What the free-form form shows (``partials/routine_form.html``): the form page and Settings → Advanced."""
+    return {
+        "workspace": workspace,
+        "cadences": CADENCES,
+        "weekdays": WEEKDAYS,
+        "tzname": workspace.effective_timezone or "UTC",
+        "form": form
+        or {"title": "", "instruction": "", "cadence": Routine.Cadence.WEEKDAYS, "weekday": "0", "time": "08:30"},
+    }
+
+
 def _context(request, workspace, *, form=None, error="") -> dict:
     perms = _perms(request)
     return {
-        "workspace": workspace,
         "tabs": dashboard.tabs(workspace, "routines", perms=perms),
         **section(request, workspace, perms),
-        "cadences": CADENCES,
-        "weekdays": WEEKDAYS,
-        "form": form
-        or {"title": "", "instruction": "", "cadence": Routine.Cadence.WEEKDAYS, "weekday": "0", "time": "08:30"},
+        **form_context(workspace, form),
         "error": error,
     }
 

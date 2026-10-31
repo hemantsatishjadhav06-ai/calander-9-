@@ -73,10 +73,14 @@ class TestAccountListView:
         assert response.status_code == 302
         assert "/accounts/" in response.url
 
-    def test_returns_200_for_authenticated_user(self, authenticated_client, workspace):
+    def test_moves_to_the_settings_accounts_tab(self, authenticated_client, workspace):
+        # The list lives in Settings → Accounts (spec D1, D5): a GET answers 301 there.
         url = reverse("social_accounts:list", kwargs={"workspace_id": workspace.id})
         response = authenticated_client.get(url)
-        assert response.status_code == 200
+        assert response.status_code == 301
+        settings_url = reverse("settings:index", kwargs={"workspace_id": workspace.id})
+        assert response["Location"] == f"{settings_url}?tab=accounts"
+        assert authenticated_client.get(response["Location"]).status_code == 200
 
     def test_shows_connected_accounts(self, authenticated_client, workspace):
         SocialAccount.objects.create(
@@ -86,12 +90,12 @@ class TestAccountListView:
             account_name="My Facebook Page",
         )
         url = reverse("social_accounts:list", kwargs={"workspace_id": workspace.id})
-        response = authenticated_client.get(url)
+        response = authenticated_client.get(url, follow=True)
         assert b"My Facebook Page" in response.content
 
     def test_shows_empty_state(self, authenticated_client, workspace):
         url = reverse("social_accounts:list", kwargs={"workspace_id": workspace.id})
-        response = authenticated_client.get(url)
+        response = authenticated_client.get(url, follow=True)
         assert b"No accounts connected yet" in response.content
 
 
@@ -832,7 +836,9 @@ class TestRetryWebhooksView:
         """
         self._account(workspace, connection_status=SocialAccount.ConnectionStatus.ERROR)
 
-        response = authenticated_client.get(reverse("social_accounts:list", kwargs={"workspace_id": workspace.id}))
+        response = authenticated_client.get(
+            reverse("social_accounts:list", kwargs={"workspace_id": workspace.id}), follow=True
+        )
 
         body = response.content.decode()
         assert "Real-time comments are off" not in body

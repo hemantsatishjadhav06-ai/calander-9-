@@ -24,6 +24,7 @@ from django_ratelimit.decorators import ratelimit
 from apps.common.validators import is_safe_url as _is_safe_url
 from apps.credentials.models import PlatformCredential, derive_is_configured
 from apps.members.decorators import require_permission
+from apps.studio import settings_links
 from apps.workspaces.models import Workspace
 
 from .models import MastodonAppRegistration, PlatformVisibility, SocialAccount
@@ -191,7 +192,13 @@ def account_list_context(request, workspace_id) -> dict:
 @login_required
 @require_permission("manage_social_accounts")
 def account_list(request, workspace_id):
-    """List connected social accounts for a workspace."""
+    """List connected social accounts for a workspace.
+
+    The list lives in Settings → Accounts (spec D1, D5): after the same checks as before, a GET
+    answers a 301 there. Handlers that finish here still land on the list through that redirect.
+    """
+    if settings_links.is_page_view(request):
+        return settings_links.moved(request, workspace_id, "accounts")
     return render(
         request,
         "social_accounts/list.html",

@@ -21,7 +21,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from . import budget, dashboard, images, llm, readiness, trust
+from . import budget, dashboard, images, llm, readiness, settings_links, trust
 from .forms import studio_accounts
 from .forms_agency import WEEKDAYS, eligible_leads
 from .models import AgencySettings, AgentRun
@@ -506,17 +506,22 @@ def setup(request, workspace_id):
 @login_required
 @require_GET
 def settings_hub(request, workspace_id):
+    """The old Settings hub: the same checks as before, then a 301 to Settings → Brand (spec D1, D5).
+
+    A plain client still gets 403 and someone signed out the login page, never the redirect.
+    """
     workspace = _workspace(request, workspace_id)
-    return render(
-        request,
-        "studio/settings_hub.html",
-        {
-            "workspace": workspace,
-            "cards": dashboard.settings_cards(workspace),
-            "tabs": dashboard.tabs(workspace, "settings", perms=_perms(request)),
-            "setup_url": _url("studio:setup", workspace_id=workspace.pk),
-        },
-    )
+    return settings_links.moved(request, workspace.pk, "brand")
+
+
+def health_context(request, workspace) -> dict[str, Any]:
+    """The Set up checklist as Settings → Advanced → Health shows it: the same rows as this page."""
+    return {
+        "checked_at": timezone.now(),
+        "tzname": workspace.effective_timezone or "UTC",
+        "setup_url": _url("studio:setup", workspace_id=workspace.pk),
+        **checklist(request, workspace),
+    }
 
 
 # ---------------------------------------------------------------------------

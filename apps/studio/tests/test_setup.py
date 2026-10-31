@@ -278,14 +278,19 @@ class TestAutopilotDefaults:
 # ---------------------------------------------------------------------------
 
 
-def test_the_settings_hub_links_every_settings_page(client, world):
+def test_the_settings_hub_moved_to_the_settings_screen(client, world):
+    """The hub's cards became Settings tabs (spec D5): the hub answers 301 to Brand, and Set up is a click away."""
     client.force_login(world.editor)
+    settings_url = reverse("settings:index", kwargs={"workspace_id": world.workspace.id})
 
-    html = client.get(_url("settings_hub", world)).content.decode()
+    response = client.get(_url("settings_hub", world))
 
-    for key in ("brand", "trust", "memory", "outcomes", "autopilot", "telegram", "budget"):
-        assert f'data-settings-card="{key}"' in html
-    assert "Open Set up" in html
+    assert response.status_code == 301 and response["Location"] == f"{settings_url}?tab=brand"
+    html = client.get(response["Location"]).content.decode()
+    for key in ("brand", "team", "autopilot", "notifications", "advanced"):
+        assert f'data-testid="settings-tab-{key}"' in html
+    advanced = client.get(f"{settings_url}?tab=advanced").content.decode()
+    assert "Open Set up" in advanced and _url("setup", world) in advanced
 
 
 def test_the_agency_tabs_are_home_routines_team_settings(world):
@@ -421,8 +426,10 @@ class TestHome:
 
         setup = client.get(_url("setup", world)).content.decode()
         assert setup.count(advanced) == 2  # the approvers' Change, and the budget's Change
-        hub = client.get(_url("settings_hub", world)).content.decode()
-        assert advanced in hub
+        # The Settings screen's Autopilot tab honours the same ?open=advanced (the hub that linked it moved there).
+        settings_url = reverse("settings:index", kwargs={"workspace_id": world.workspace.id})
+        tab = client.get(f"{settings_url}?tab=autopilot&open=advanced").content.decode()
+        assert "data-autopilot-advanced open>" in tab
         closed = client.get(_url("autopilot", world)).content.decode()
         assert "data-autopilot-advanced>" in closed and "data-autopilot-advanced open>" not in closed
         opened = client.get(advanced).content.decode()
@@ -586,7 +593,7 @@ def test_the_pages_pass_the_accessibility_sweep(client, world):
 
     client.force_login(world.owner)
     for name in ("setup", "settings_hub", "index"):
-        html = client.get(_url(name, world)).content.decode()
+        html = client.get(_url(name, world), follow=True).content.decode()  # the hub moved to Settings
         audit = _Audit()
         audit.feed(html)
         audit.finish()

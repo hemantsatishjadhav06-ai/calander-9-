@@ -15,29 +15,44 @@ context and the partial it shows. Adding a tab is adding an entry.
 - **Saving stays where it was:** every panel includes its page's own body, and
   every form in it posts to that page's handler with an explicit ``action=``,
   so a save behaves exactly as before. Nothing is posted to this screen.
+- **The old pages moved here:** the Settings hub, the workspace page, the accounts
+  list and the client admin answer a 301 to their tab on GET, after their own
+  checks (``settings_links.moved``); so do Verified facts and Creative memory
+  while the ``advanced_settings`` switch shows them in Advanced.
 """
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import BadRequest, PermissionDenied
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
-from django.urls import reverse
+from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET
 
+from apps.client_portal.views_admin import client_list_context
+from apps.common.features import request_features
 from apps.members.decorators import require_org_role, require_permission, require_workspace_role
-from apps.members.models import OrgMembership, WorkspaceMembership
+from apps.members.models import OrgMembership, WorkspaceMembership, has_org_permission
 from apps.members.views import is_internal_to_org
 from apps.social_accounts.views import account_list_context
-from apps.workspaces.views import approvals_settings_context, can_manage_approvals
+from apps.workspaces.views import approvals_settings_context, can_manage_approvals, workspace_settings_context
 
+from . import outcomes, readiness
 from .brand_defaults import ensure_profile
 from .forms import BrandProfileForm
-from .views import _workspace, brand_profile_context
+from .forms_trust import BrandClaimForm
+from .models import BrandClaim
+from .settings_links import tab_url
+from .views import _perms, _workspace, brand_profile_context
+from .views_autopilot import form_context as autopilot_form_context
+from .views_memory import memory_context
+from .views_routines import form_context as routine_form_context
+from .views_setup import health_context
+from .views_trust import can_verify, facts_context, may_read_facts
 
 
 @dataclass(frozen=True)
@@ -72,6 +87,7 @@ def _brand_allowed(request) -> bool:
 
 
 def _brand(request, workspace) -> dict:
+    """The brand profile, then the workspace's name and logo (the workspace page moved here)."""
     profile = ensure_profile(workspace)
     return brand_profile_context(request, workspace, profile, BrandProfileForm(instance=profile))
 
@@ -107,6 +123,8 @@ def _team_allowed(request) -> bool:
 
 
 def _team(request, workspace) -> dict:
+    """The roster's count and link (its page is the organisation's), and the client admin itself
+    (its page moved here) for a workspace manager."""
     show_members, show_clients = _roster_allowed(request), _clients_allowed(request)
     return {
         "show_members": show_members,
@@ -114,13 +132,7 @@ def _team(request, workspace) -> dict:
             OrgMembership.objects.filter(organization_id=workspace.organization_id).count() if show_members else 0
         ),
         "show_clients": show_clients,
-        "client_count": (
-            WorkspaceMembership.objects.filter(
-                workspace=workspace, workspace_role=WorkspaceMembership.WorkspaceRole.CLIENT
-            ).count()
-            if show_clients
-            else 0
-        ),
+        **(client_list_context(request, workspace) if show_clients else {}),
     }
 
 
@@ -135,12 +147,124 @@ def _approvals(request, workspace) -> dict:
     return approvals_settings_context(workspace, request.workspace_membership)
 
 
-#: The tabs, in the screen's order. Autopilot, Notifications and Advanced follow Approvals.
+# --- Autopilot: the autopilot page's create_posts; saving needs manage_workspace_settings, which the
+# form decides through can_save, as it does on its own page. The whole form, never split.
+
+
+def _autopilot_allowed(request) -> bool:
+    return _passes(require_permission("create_posts"), request)
+
+
+def _autopilot(request, workspace) -> dict:
+    return autopilot_form_context(request, workspace)
+
+
+# --- Notifications: per person, for every staff member. Links to the person's own notification
+# settings and to Telegram, with where each stands (two cheap reads, nothing created).
+
+
+def _notifications_allowed(request) -> bool:
+    return True
+
+
+def _notifications(request, workspace) -> dict:
+    from apps.notifications.models import QuietHours
+
+    return {
+        "quiet": QuietHours.objects.filter(user=request.user).first(),
+        "telegram": readiness.telegram_state(workspace, request.user),
+    }
+
+
+# --- Advanced: Health (Set up) is read by every staff member, like Set up; each section keeps its own
+# page's check. Verified facts, Creative memory and Outcomes show only with advanced_settings on.
+
+
+def _advanced_allowed(request) -> bool:
+    return True
+
+
+def _developers_allowed(request) -> bool:
+    """The API keys page's check (organisation owners and admins), for this workspace's organisation."""
+    org_membership = getattr(request, "org_membership", None)
+    if org_membership is None or org_membership.organization_id != request.workspace.organization_id:
+        return False
+    return has_org_permission(org_membership, "manage_api_keys")
+
+
+def _outcomes_allowed(request) -> bool:
+    """The outcomes page's check: staff who record outcomes or read analytics."""
+    membership = request.workspace_membership
+    if membership is None or membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT:
+        return False
+    return outcomes.can_record(membership) or bool(membership.effective_permissions.get("view_analytics"))
+
+
+def _facts(request, workspace) -> dict:
+    """Verified facts as its page shows them, with ``?claim=`` reopening a claim here."""
+    selected = None
+    if request.GET.get("claim"):
+        try:
+            claim_id = uuid.UUID(request.GET["claim"])
+        except (TypeError, ValueError, AttributeError):
+            raise BadRequest("Choose a valid workspace claim.") from None
+        selected = get_object_or_404(BrandClaim, pk=claim_id, workspace=workspace)
+    facts = facts_context(
+        request,
+        workspace,
+        form=BrandClaimForm(workspace=workspace, instance=selected),
+        selected=selected,
+        editable=can_verify(request, workspace),
+        claim_url=lambda claim: tab_url(workspace.pk, "advanced", query={"claim": str(claim)}, anchor="verified-facts"),
+    )
+    return {**facts, "claim_form": facts.pop("form")}
+
+
+def _advanced(request, workspace) -> dict:
+    perms = _perms(request)
+    membership = request.workspace_membership
+    power = request_features(request)["advanced_settings"]
+    show_routine_form = bool(perms.get("create_posts"))
+    show_facts = power and may_read_facts(request, workspace)
+    show_memory = power and show_routine_form  # Creative memory's own check is create_posts too
+    danger = workspace_settings_context(workspace, membership)
+    context = {
+        **health_context(request, workspace),
+        "show_routine_form": show_routine_form,
+        "show_facts": show_facts,
+        "show_memory": show_memory,
+        "show_outcomes": power and _outcomes_allowed(request),
+        "show_developers": _developers_allowed(request),
+        "show_danger_zone": danger["is_owner_or_manager"],
+        "can_archive": danger["can_archive"],
+        "can_delete": danger["can_delete"],
+    }
+    if show_routine_form:
+        routine = routine_form_context(workspace)
+        context.update(routine_form=routine["form"], cadences=routine["cadences"], weekdays=routine["weekdays"])
+    if show_memory:
+        context.update(memory_context(request, workspace))
+    if show_facts:
+        context.update(_facts(request, workspace))
+    return context
+
+
+#: The tabs, in the screen's order.
 TABS: tuple[Tab, ...] = (
     Tab("brand", "Brand", _brand_allowed, _brand, "settings/tabs/brand.html"),
     Tab("accounts", "Accounts", _accounts_allowed, _accounts, "settings/tabs/accounts.html"),
     Tab("team", "Team & clients", _team_allowed, _team, "settings/tabs/team.html"),
     Tab("approvals", "Approvals", _approvals_allowed, _approvals, "settings/tabs/approvals.html"),
+    Tab("autopilot", "Autopilot", _autopilot_allowed, _autopilot, "settings/tabs/autopilot.html"),
+    Tab(
+        "notifications",
+        "Notifications",
+        _notifications_allowed,
+        _notifications,
+        "settings/tabs/notifications.html",
+        no_store=True,
+    ),
+    Tab("advanced", "Advanced", _advanced_allowed, _advanced, "settings/tabs/advanced.html", no_store=True),
 )
 
 
@@ -159,7 +283,6 @@ def index(request, workspace_id):
     else:
         raise PermissionDenied("There is nothing in Settings for you to change.")
 
-    url = reverse("settings:index", kwargs={"workspace_id": workspace.id})
     response: HttpResponse = render(
         request,
         "settings/index.html",
@@ -167,7 +290,7 @@ def index(request, workspace_id):
             **active.build(request, workspace),
             "workspace": workspace,
             "settings_tabs": [
-                {"key": tab.key, "label": tab.label, "url": f"{url}?tab={tab.key}", "active": tab is active}
+                {"key": tab.key, "label": tab.label, "url": tab_url(workspace.id, tab.key), "active": tab is active}
                 for tab in usable
             ],
             "settings_tab": active.key,

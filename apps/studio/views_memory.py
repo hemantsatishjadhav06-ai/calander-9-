@@ -24,9 +24,10 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_POST
 from django_ratelimit.decorators import ratelimit
 
+from apps.common.features import request_features
 from apps.members.decorators import require_permission
 
-from . import budget, dashboard, engine, llm
+from . import budget, dashboard, engine, llm, settings_links
 from . import memory as creative_memory
 from .brand_defaults import ensure_profile
 from .forms_agency import HouseStyleForm, ReferenceUploadForm
@@ -87,7 +88,8 @@ def house_style_origin(profile) -> dict:
     return {"by": "person", "until": until if until and until > timezone.now() else None}
 
 
-def _context(request, workspace, *, house_form=None, upload_form=None) -> dict:
+def memory_context(request, workspace, *, house_form=None, upload_form=None) -> dict:
+    """What Creative memory shows (``partials/memory_body.html``): this page and Settings → Advanced."""
     profile = ensure_profile(workspace)
     perms = _perms(request)
     references = [
@@ -134,7 +136,11 @@ def _back(workspace):
 @require_GET
 def memory(request, workspace_id):
     workspace = _workspace(request, workspace_id)
-    return render(request, "studio/memory.html", _context(request, workspace))
+    # The page lives in Settings → Advanced while the advanced_settings switch shows it there (spec D1,
+    # D6); otherwise it keeps rendering here, so the thread's link to it keeps working.
+    if request_features(request)["advanced_settings"]:
+        return settings_links.moved(request, workspace.pk, "advanced", anchor="creative-memory")
+    return render(request, "studio/memory.html", memory_context(request, workspace))
 
 
 @login_required
@@ -148,7 +154,7 @@ def house_style(request, workspace_id):
         raise PermissionDenied("Only an owner or manager can change the house style.")
     form = HouseStyleForm(request.POST)
     if not form.is_valid():
-        return render(request, "studio/memory.html", _context(request, workspace, house_form=form), status=400)
+        return render(request, "studio/memory.html", memory_context(request, workspace, house_form=form), status=400)
     profile = ensure_profile(workspace)
     text = " ".join(form.cleaned_data["house_style"].split())
     if text == " ".join((profile.house_style or "").split()):
@@ -200,7 +206,7 @@ def upload_references(request, workspace_id):
         raise PermissionDenied("You don't have permission to upload media.")
     form = ReferenceUploadForm(request.POST, request.FILES)
     if not form.is_valid():
-        return render(request, "studio/memory.html", _context(request, workspace, upload_form=form), status=400)
+        return render(request, "studio/memory.html", memory_context(request, workspace, upload_form=form), status=400)
     note = " ".join(form.cleaned_data["note"].split())
     added, problems = 0, []
     for uploaded in form.cleaned_data["images"]:
