@@ -328,7 +328,7 @@
          x-data="{ sidebarCollapsed: window.bbSidebarStorage.get(), mobileMenuOpen: false, isDesktop: window.matchMedia('(min-width: 1024px)').matches }"
          x-init="window.matchMedia('(min-width: 1024px)').addEventListener('change', (e) => { isDesktop = e.matches; if (e.matches) mobileMenuOpen = false })"
          x-effect="window.bbSidebarStorage.set(sidebarCollapsed)"
-         @keydown.escape.window="if (mobileMenuOpen) { mobileMenuOpen = false; $nextTick(() => $refs.menuToggle && $refs.menuToggle.focus()) }">
+         @keydown.escape.window="mobileMenuOpen = false">
 
         <!-- Mobile backdrop overlay -->
         <div x-show="mobileMenuOpen" x-cloak
@@ -338,13 +338,13 @@
              x-transition:leave="transition ease-in duration-200"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
-             @click="mobileMenuOpen = false; $nextTick(() => $refs.menuToggle && $refs.menuToggle.focus())"
+             @click="mobileMenuOpen = false"
              class="fixed inset-0 bg-ink-950/35 z-30 lg:hidden"></div>
 
         <!-- Sidebar: pale ink-100 with a hairline edge; a 280px drawer below 1024px.
              Below 1024px the closed drawer is inert (out of the tab order and the accessibility tree);
-             open, it is a modal dialog that holds focus. Closing it hands focus back to the menu button;
-             opening New idea from it closes it first, without that hand-back, so the dialog keeps focus. -->
+             open, it is a modal dialog that holds focus and hands it back to the menu button on close.
+             Opening New idea from it closes it first; the dialog's own trap then puts focus in its title. -->
         <aside id="app-sidebar" class="flex flex-col flex-shrink-0 sidebar-initial
                       fixed inset-y-0 left-0 z-40 w-[280px] bg-ink-100 border-r border-ink-200
                       transition-transform duration-300 ease-out
@@ -357,9 +357,9 @@
                :role="isDesktop ? null : 'dialog'"
                :aria-modal="(!isDesktop && mobileMenuOpen) ? 'true' : null"
                :aria-label="isDesktop ? null : 'Menu'"
-               x-trap.noscroll.noreturn="!isDesktop && mobileMenuOpen"
+               x-trap.noscroll="!isDesktop && mobileMenuOpen"
                x-init="$el.classList.remove('sidebar-initial'); document.documentElement.classList.remove('sidebar-is-collapsed'); $nextTick(() => $el.classList.add('transition-all', 'duration-200'))"
-               @click="if (window.innerWidth < 1024 && $event.target.closest('a')) { mobileMenuOpen = false; $nextTick(() => $refs.menuToggle && $refs.menuToggle.focus()) }">
+               @click="if (window.innerWidth < 1024 && $event.target.closest('a')) { mobileMenuOpen = false }">
 
             <!-- Workspace switcher (top of sidebar) -->
             <div class="relative px-3 pt-3 pb-1" :class="sidebarCollapsed && 'px-2'" x-data="{ wsOpen: false }"
@@ -596,7 +596,7 @@
 
                                 <!-- Body -->
                                 <div class="idea-modal-body" @click="createGroupDropdownOpen = false; createTagDropdownOpen = false">
-                                    <input type="text" name="title" required class="idea-title-input" placeholder="Give your idea a title" aria-label="Idea title" x-ref="sidebarIdeaTitle" data-testid="idea-title">
+                                    <input type="text" name="title" required autofocus class="idea-title-input" placeholder="Give your idea a title" aria-label="Idea title" x-ref="sidebarIdeaTitle" data-testid="idea-title">
                                     <textarea name="description" data-testid="idea-description" class="idea-desc-input" placeholder="Let it flow... or" aria-label="Idea description"></textarea>
                                     <input type="file" name="media" x-ref="sidebarIdeaFileInput" accept="image/*,video/*,.gif" style="display:none" multiple
                                            @change="_handleFileSelect($event)">
@@ -911,7 +911,7 @@
         <div class="flex-1 flex flex-col overflow-hidden">
             <!-- Mobile top bar -->
             <div class="translucent-bar flex lg:hidden items-center gap-2 h-[52px] px-2 sm:px-4 flex-shrink-0 relative z-20">
-                <button data-testid="mobile-menu-toggle" x-ref="menuToggle" aria-label="Toggle menu" aria-controls="app-sidebar" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen; if (!mobileMenuOpen) $nextTick(() => $el.focus())"
+                <button data-testid="mobile-menu-toggle" aria-label="Toggle menu" aria-controls="app-sidebar" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen"
                         class="w-11 h-11 flex items-center justify-center rounded-lg text-ink-900 hover:bg-ink-900/5 transition-colors cursor-pointer"
                         title="Toggle menu">
                     <svg aria-hidden="true" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1273,8 +1273,9 @@
 
                 openCreateModal() {
                     this.newMenuOpen = false;
-                    // On a phone the menu drawer is a modal with its own focus trap; close it first so
-                    // it cannot pull focus back from the dialog's title.
+                    // On a phone the menu drawer is a modal with its own focus trap: close it first so it
+                    // cannot pull focus back. Its hand-back to the menu button is then overridden when the
+                    // dialog's trap starts, because the title carries autofocus (x-trap's initial focus).
                     this.mobileMenuOpen = false;
                     this.showCreateModal = true;
                     this.createSelectedGroup = this._defaultGroupId;
