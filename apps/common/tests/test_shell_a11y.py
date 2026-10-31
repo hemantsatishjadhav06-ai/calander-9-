@@ -3,6 +3,10 @@
 - Below 1024px the closed sidebar drawer was only moved off-screen, so twelve invisible controls sat
   in the tab order before the menu button, and opening it left focus behind the overlay. Closed, it
   is now inert; open, it is a modal dialog that traps focus and hands it back on close.
+- Opening New idea from the open phone drawer left the drawer's trap active behind the dialog, so it
+  pulled focus back from the dialog's title. Opening New idea now closes the drawer first; the drawer
+  hands focus back to the menu button itself (Escape, the backdrop, the button, a link) instead of
+  through its trap, so that close cannot steal focus from the dialog.
 - The workspace switcher and the New menu closed only on an outside click; Escape now closes them and
   returns focus to their button (and only stops the event while a menu is open, so Escape still
   closes the phone drawer).
@@ -47,12 +51,31 @@ class ShellA11yTests(TestCase):
     def test_closed_drawer_is_inert_and_open_drawer_traps_focus(self):
         aside = self._tag('id="app-sidebar"')
         self.assertIn(':inert="!isDesktop && !mobileMenuOpen"', aside)
-        self.assertIn('x-trap.noscroll="!isDesktop && mobileMenuOpen"', aside)
+        self.assertIn('x-trap.noscroll.noreturn="!isDesktop && mobileMenuOpen"', aside)
         self.assertIn(":role=\"isDesktop ? null : 'dialog'\"", aside)
         self.assertIn(":aria-modal=\"(!isDesktop && mobileMenuOpen) ? 'true' : null\"", aside)
         self.assertIn("isDesktop: window.matchMedia('(min-width: 1024px)').matches", self.html)
         toggle = self._tag('aria-label="Toggle menu"')
         self.assertIn('aria-controls="app-sidebar"', toggle)
+
+    def test_closing_the_drawer_hands_focus_back_to_the_menu_button(self):
+        give_back = "$nextTick(() => $refs.menuToggle && $refs.menuToggle.focus())"
+        toggle = self._tag('aria-label="Toggle menu"')
+        self.assertIn('x-ref="menuToggle"', toggle)
+        self.assertIn(
+            '@click="mobileMenuOpen = !mobileMenuOpen; if (!mobileMenuOpen) $nextTick(() => $el.focus())"', self.html
+        )
+        self.assertIn(
+            f'@keydown.escape.window="if (mobileMenuOpen) {{ mobileMenuOpen = false; {give_back} }}"', self.html
+        )
+        self.assertIn(f'@click="mobileMenuOpen = false; {give_back}"', self.html)
+        self.assertIn(f"$event.target.closest('a')) {{ mobileMenuOpen = false; {give_back} }}", self.html)
+
+    def test_new_idea_closes_the_phone_drawer_before_taking_focus(self):
+        start = self.html.index("openCreateModal() {")
+        body = self.html[start : self.html.index("closeCreateModal() {", start)]
+        self.assertLess(body.index("this.mobileMenuOpen = false;"), body.index("this.showCreateModal = true;"))
+        self.assertIn("this.$refs.sidebarIdeaTitle.focus()", body)
 
     def test_menus_close_on_escape_and_return_focus(self):
         self.assertIn(
