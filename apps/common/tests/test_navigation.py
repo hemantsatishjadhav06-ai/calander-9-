@@ -10,8 +10,8 @@ Spec R1 (docs/specs/02-cut-and-merge.md), plan T2 (docs/specs/phase-2.md).
   pages, Activity on the team, job and routine pages, Settings on every page a
   setting lives on today, Approvals on the approvals list, Calendar on the rest
   of the calendar, and Inbox, Analytics and Blog on their apps.
-- Approvals and Settings point at their new screens once those routes exist,
-  and at today's pages until then. Activity is ``studio:team``, whose path is
+- Approvals and Settings point at their own screens (``approvals:index`` and
+  ``settings:index``). Activity is ``studio:team``, whose path is
   ``/studio/activity/`` (spec D4).
 - The counts are the ones ``sidebar_context`` already computed: building the
   navigation reads nothing but the request's switches, which it shares.
@@ -25,7 +25,7 @@ import pytest
 from django.db import connection
 from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
-from django.urls import NoReverseMatch, ResolverMatch, resolve, reverse
+from django.urls import ResolverMatch, resolve, reverse
 from django.utils import timezone
 
 from apps.blog.models import BlogSite
@@ -212,17 +212,14 @@ def test_no_workspace_means_no_navigation(user):
     assert Nav().items == () and Nav().settings is None and Nav().phone == ()
 
 
-# --- the new screens: Approvals and Settings by their route once it exists, Activity by studio:team --
+# --- the screens: Approvals and Settings by their own routes, Activity by studio:team ------------
 
 
-def _reverse_as_if(missing=(), present=None):
-    """``reverse`` with the routes in *missing* absent and those in *present* added."""
+def _reverse_as_if(present):
+    """``reverse`` with the routes in *present* added."""
     real = reverse
-    present = present or {}
 
     def fake(viewname, *args, **kwargs):
-        if viewname in missing:
-            raise NoReverseMatch(f"{viewname} has no route yet")
         if viewname in present:
             return present[viewname]
         return real(viewname, *args, **kwargs)
@@ -231,21 +228,10 @@ def _reverse_as_if(missing=(), present=None):
 
 
 @pytest.mark.django_db
-def test_approvals_falls_back_to_the_calendars_approvals_tab(workspace, user):
-    request = _request(_url("studio:index", workspace), workspace, user)
-    with _reverse_as_if(missing={"approvals:index"}):
-        nav = _nav(request)
+def test_approvals_goes_to_its_own_screen(workspace, user):
+    nav = _nav(_request(_url("studio:index", workspace), workspace, user))
 
-    assert _item(nav, "approvals").url == _url("calendar:calendar", workspace) + "?mode=list&tab=approvals"
-
-
-@pytest.mark.django_db
-def test_approvals_goes_to_its_own_screen_once_the_route_exists(workspace, user):
-    request = _request(_url("studio:index", workspace), workspace, user)
-    with _reverse_as_if(present={"approvals:index": "/approvals-screen/"}):
-        nav = _nav(request)
-
-    assert _item(nav, "approvals").url == "/approvals-screen/"
+    assert _item(nav, "approvals").url == _url("approvals:index", workspace)
 
 
 @pytest.mark.django_db
@@ -260,21 +246,10 @@ def test_activity_is_the_team_route_at_its_activity_address(workspace, user):
 
 
 @pytest.mark.django_db
-def test_settings_falls_back_to_set_up(workspace, user):
-    request = _request(_url("studio:index", workspace), workspace, user)
-    with _reverse_as_if(missing={"settings:index"}):
-        nav = _nav(request)
+def test_settings_goes_to_its_own_screen(workspace, user):
+    nav = _nav(_request(_url("studio:index", workspace), workspace, user))
 
-    assert nav.settings.url == _url("studio:setup", workspace)
-
-
-@pytest.mark.django_db
-def test_settings_goes_to_its_own_screen_once_the_route_exists(workspace, user):
-    request = _request(_url("studio:index", workspace), workspace, user)
-    with _reverse_as_if(present={"settings:index": "/settings-screen/"}):
-        nav = _nav(request)
-
-    assert nav.settings.url == "/settings-screen/"
+    assert nav.settings.url == _url("settings:index", workspace)
 
 
 @pytest.mark.django_db

@@ -14,12 +14,12 @@ and shares with the templates' ``features``.
   opens the drawer. More is lit on a place the bar does not show. The post page
   and the composer have none: their own action bar sits where it would.
 - **One place is lit**, from ``request.resolver_match``; see ``_place``.
-- **The command palette** (``build_palette``) offers the same places, Settings
-  and the Settings tabs this person may use.
+- **The command palette** (``build_palette``) offers the places this person
+  may open (the same checks their pages make), Settings and the Settings tabs
+  this person may use.
 
-Activity is ``studio:team`` (its path is ``/studio/activity/``). Approvals and
-Settings point at their own screens, or at where that work was done before
-those routes existed.
+Activity is ``studio:team`` (its path is ``/studio/activity/``); Approvals is
+``approvals:index`` and Settings ``settings:index``.
 
 ``sidebar_context`` hands templates a lazy ``nav`` and ``nav_palette``: a page
 builds them once from the values the context already has, and an HTMX fragment,
@@ -32,7 +32,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from django.urls import NoReverseMatch, reverse
+from django.urls import reverse
 
 from apps.common.features import request_features
 
@@ -110,6 +110,12 @@ _NO_PHONE_BAR = frozenset({("studio", "detail"), ("composer", "compose"), ("comp
 # agency's pages (``studio.views._workspace``), Approvals and Settings.
 _REFUSED_TO_CLIENTS = frozenset({"home", "approvals", "activity", "settings"})
 
+# The permission a place's view requires (``require_permission`` on
+# ``inbox:feed`` and ``analytics:index``), read from the person's
+# ``effective_permissions`` exactly as the decorator reads it, so a custom role
+# is followed too.
+_PERMISSION = {"inbox": "use_inbox", "analytics": "view_analytics"}
+
 
 def _place(app: str, name: str, tab: str | None) -> str | None:
     """The key of the place a page belongs to, or None for a page outside them."""
@@ -142,15 +148,6 @@ def _has_phone_bar(request) -> bool:
     return match is None or (match.app_name, match.url_name) not in _NO_PHONE_BAR
 
 
-def _new_or_today(workspace_id, new: str, today: str, query: str = "") -> str:
-    """*new*'s URL once its route exists, else *today*'s with *query*."""
-    kwargs = {"workspace_id": workspace_id}
-    try:
-        return reverse(new, kwargs=kwargs)
-    except NoReverseMatch:
-        return reverse(today, kwargs=kwargs) + query
-
-
 def _count(context: Mapping[str, Any], key: str) -> int:
     return int(context.get(key) or 0)
 
@@ -177,7 +174,7 @@ def build_nav(request, context: Mapping[str, Any] | None = None) -> Nav:
         (
             "approvals",
             "Approvals",
-            _new_or_today(ws, "approvals:index", "calendar:calendar", "?mode=list&tab=approvals"),
+            reverse("approvals:index", kwargs=kwargs),
             _count(context, "sidebar_pending_approvals"),
         ),
         ("calendar", "Calendar", reverse("calendar:calendar", kwargs=kwargs), None),
@@ -191,9 +188,7 @@ def build_nav(request, context: Mapping[str, Any] | None = None) -> Nav:
 
     lit = _lit_place(request)
     items = tuple(NavItem(key, label, url, count, key == lit) for key, label, url, count in places)
-    settings = NavItem(
-        "settings", "Settings", _new_or_today(ws, "settings:index", "studio:setup"), None, lit == "settings"
-    )
+    settings = NavItem("settings", "Settings", reverse("settings:index", kwargs=kwargs), None, lit == "settings")
 
     shown = {item.key for item in items} | {"settings"}
     more = NavItem("more", "More", None, None, lit in shown and lit not in _PHONE_KEYS)
@@ -216,13 +211,25 @@ class PaletteEntry:
         return f"{self.label} {self.section}".strip().lower()
 
 
-def build_palette(request, nav: Nav) -> tuple[PaletteEntry, ...]:
-    """The places *nav* shows, then Settings and the tabs the Settings screen
-    would show this person (its own checks, ``views_settings.usable_tabs``).
+def _may_open(key: str, permissions: Mapping[str, Any], client: bool) -> bool:
+    """Whether a place's page lets this person in: a plain client is refused the
+    agency's screens, and the inbox and analytics need their permission."""
+    if client and key in _REFUSED_TO_CLIENTS:
+        return False
+    needed = _PERMISSION.get(key)
+    return needed is None or bool(permissions.get(needed, False))
 
-    A plain client is offered none of the screens that refuse them, and so no
-    Settings tab. Reading the tabs' checks costs at most one query, and only
-    when a page renders the palette.
+
+def build_palette(request, nav: Nav) -> tuple[PaletteEntry, ...]:
+    """The places *nav* shows that this person may open, then Settings and the
+    tabs the Settings screen would show them (its own checks,
+    ``views_settings.usable_tabs``).
+
+    A place is left out when its page would refuse the person: the checks are
+    ``_may_open``'s, on the membership's ``effective_permissions``. A plain
+    client is offered none of the screens that refuse them, and so no Settings
+    tab. Reading the tabs' checks costs at most one query, and only when a page
+    renders the palette.
     """
     if not nav.items:
         return ()
@@ -230,10 +237,11 @@ def build_palette(request, nav: Nav) -> tuple[PaletteEntry, ...]:
 
     membership = getattr(request, "workspace_membership", None)
     client = is_plain_client(membership)
+    permissions = membership.effective_permissions if membership is not None else {}
     entries = [
         PaletteEntry(item.key, item.label, item.url or "")
         for item in nav.items
-        if not (client and item.key in _REFUSED_TO_CLIENTS)
+        if _may_open(item.key, permissions, client)
     ]
     if client or membership is None or nav.settings is None:
         return tuple(entries)

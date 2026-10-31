@@ -17,8 +17,9 @@ Spec D8, R1 and R2 (docs/specs/02-cut-and-merge.md), plan T9 (docs/specs/phase-2
   and More (which opens the drawer), with room left under the page; the post
   page has none, so nothing covers its own Approve bar.
 - **Command palette:** a button and Ctrl/Cmd-K open a labelled, trapped dialog
-  that filters the places this person can open: the items, Settings and the
-  Settings tabs the Settings screen would show them.
+  that filters the places this person can open: the items whose pages let them
+  in (their permissions, the client rule), Settings and the Settings tabs the
+  Settings screen would show them. Every entry opens; every item left out refuses.
 - **Cost:** ``sidebar_context`` hands templates a lazy ``nav``; a page builds it
   once from the values the context already has, and an HTMX fragment never
   builds it.
@@ -39,7 +40,7 @@ from apps.common import context_processors, navigation
 from apps.common.features import FEATURE_KEYS
 from apps.composer.models import PlatformPost, Post
 from apps.credentials.models import PlatformCredential
-from apps.members.models import OrgMembership, WorkspaceMembership
+from apps.members.models import BUILTIN_ROLE_PERMISSIONS, CustomRole, OrgMembership, WorkspaceMembership
 from apps.notifications.engine import notify
 from apps.notifications.models import EventType
 from apps.organizations.models import Organization
@@ -60,6 +61,17 @@ LABELS = {
     "settings": "Settings",
 }
 PHONE = ["home", "approvals", "calendar", "inbox", "more"]
+# The sidebar's places each role's own permissions refuse (BUILTIN_ROLE_PERMISSIONS):
+# the inbox needs ``use_inbox``, analytics ``view_analytics``; a plain client is
+# refused the agency's screens, Approvals and Settings as well.
+REFUSED = {
+    "owner": set(),
+    "manager": set(),
+    "editor": set(),
+    "viewer": {"inbox"},
+    "contributor": {"inbox", "analytics"},
+    "client": {"home", "approvals", "inbox", "activity", "settings"},
+}
 
 
 def _person(email, name):
@@ -74,11 +86,11 @@ def _person(email, name):
 
 @pytest.fixture
 def team(db):
-    """One workspace with an owner, a manager, an editor, a viewer and a plain client."""
+    """One workspace with an owner, a manager, an editor, a viewer, a contributor and a plain client."""
     org = Organization.objects.create(name="Org")
     ws = Workspace.objects.create(organization=org, name="WS")
     people = {}
-    for role in (*STAFF, "client"):
+    for role in (*STAFF, "contributor", "client"):
         user = _person(f"{role}@example.com", role.title())
         OrgMembership.objects.create(user=user, organization=org, org_role="owner" if role == "owner" else "member")
         WorkspaceMembership.objects.create(user=user, workspace=ws, workspace_role=role)
@@ -438,6 +450,20 @@ def test_the_post_page_has_no_phone_bar_over_its_approve_bar(client, team):
 
 
 @pytest.mark.django_db
+def test_the_media_pages_folders_button_sits_above_the_phone_bar(client, team):
+    """The Calendar header links Media; on a phone its floating Folders button would sit on the bar's
+    Home tab (bar 56px plus the safe area, at z-20), so it rises by the bar's height plus its gap."""
+    _switches(team.ws)
+    html = _page(client, team.owner, _url("media_library:index", team.ws))
+
+    assert 'data-testid="phone-bar"' in html
+    toggle = _tag(html, 'data-testid="media-folders-toggle"')
+    assert "fixed" in toggle and "lg:hidden" in toggle
+    assert "bottom-4" not in toggle
+    assert "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" in toggle
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("edit", [False, True], ids=["new-post", "edit-post"])
 def test_the_composer_has_no_phone_bar_over_its_action_bar(client, team, edit):
     _switches(team.ws)
@@ -475,17 +501,81 @@ def test_the_palette_is_a_labelled_trapped_dialog_opened_by_a_button_and_ctrl_k(
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("role", STAFF)
+def test_the_sidebar_and_phone_go_to_buttons_are_one_and_the_same(client, team):
+    """One component in both places, so they cannot drift: only where each shows differs (its classes),
+    and both name the shortcut, which works at every width."""
+    _switches(team.ws)
+    html = _calendar(client, team)
+    sidebar = _tag(_sidebar(html), 'data-testid="palette-open"')
+    top = _tag(_top_bar(html), 'data-testid="palette-open"')
+
+    def without_class(tag):
+        return re.sub(r'\sclass="[^"]*"', "", tag)
+
+    assert without_class(sidebar) == without_class(top)
+    assert 'aria-keyshortcuts="Control+K Meta+K"' in top
+    assert "hidden lg:inline-flex" in sidebar and "hidden" not in re.search(r'class="([^"]*)"', top).group(1)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", (*STAFF, "contributor"))
 def test_the_palette_offers_the_places_and_the_settings_tabs_this_person_may_use(client, team, analytics_on, role):
+    """The sidebar's places this person's permissions open (the inbox needs ``use_inbox``,
+    analytics ``view_analytics``), then Settings and the tabs the Settings screen shows them."""
     _switches(team.ws)
     html = _calendar(client, team, role)
     tabs = client.get(_url("settings:index", team.ws)).context["settings_tabs"]
+    places = [key for key in _items(html) if key != "settings" and key not in REFUSED[role]]
 
-    assert _palette(html) == [*_items(html), *[f"settings-{tab['key']}" for tab in tabs]]
+    assert _palette(html) == [*places, "settings", *[f"settings-{tab['key']}" for tab in tabs]]
     assert _href(html, "palette-item-home") == _href(html, "nav-home")
     assert _href(html, "palette-item-settings") == _url("settings:index", team.ws)
     for tab in tabs:
         assert _href(html, f"palette-item-settings-{tab['key']}") == tab["url"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["viewer", "contributor", "client"])
+def test_the_palette_leaves_out_the_inbox_and_analytics_without_their_permission(client, team, analytics_on, role):
+    _switches(team.ws)
+    offered = _palette(_calendar(client, team, role))
+
+    assert "inbox" not in offered
+    assert ("analytics" in offered) is (role != "contributor")
+
+
+@pytest.mark.django_db
+def test_the_palette_follows_a_custom_roles_permissions_not_its_built_in_role(client, team, analytics_on):
+    """A viewer given a custom role with the inbox but not analytics is offered exactly that."""
+    _switches(team.ws)
+    role = CustomRole.objects.create(
+        organization=team.org,
+        name="Inbox only",
+        permissions={**BUILTIN_ROLE_PERMISSIONS["viewer"], "use_inbox": True, "view_analytics": False},
+    )
+    WorkspaceMembership.objects.filter(user=team.viewer, workspace=team.ws).update(custom_role=role)
+    offered = _palette(_calendar(client, team, "viewer"))
+
+    assert "inbox" in offered and "analytics" not in offered
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", (*STAFF, "contributor", "client"))
+def test_every_destination_the_palette_offers_opens_and_every_place_it_leaves_out_refuses(
+    client, team, analytics_on, role
+):
+    _switches(team.ws, blog=True)
+    html = _calendar(client, team, role)
+    offered = _palette(html)
+
+    for key in offered:
+        url = _href(html, f"palette-item-{key}")
+        assert client.get(url).status_code in {200, 301, 302}, (role, key, url)
+    left_out = [key for key in _items(html) if key not in offered]
+    assert set(left_out) == REFUSED[role]
+    for key in left_out:
+        url = _href(html, f"nav-{key}")
+        assert client.get(url).status_code == 403, (role, key, url)
 
 
 @pytest.mark.django_db
@@ -504,7 +594,7 @@ def test_a_plain_client_is_offered_no_agency_screen(client, team):
     offered = _palette(html)
 
     assert "calendar" in offered
-    for refused in ("home", "approvals", "activity", "settings"):
+    for refused in ("home", "approvals", "inbox", "activity", "settings"):
         assert refused not in offered, refused
     assert not [key for key in offered if key.startswith("settings-")]
 
