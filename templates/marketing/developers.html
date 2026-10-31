@@ -115,14 +115,20 @@
         <div class="mk-section-head reveal">
             <span class="mk-eyebrow">Model Context Protocol</span>
             <h2 class="mk-h2">Give an agent a seat <em class="mk-accent">at the calendar.</em></h2>
-            <p class="mk-lead">The MCP server speaks JSON-RPC 2.0 over Streamable HTTP at <code>POST {{ api_base_url }}/mcp</code> and implements <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code> and <code>ping</code>. Connect with a bearer key, or let a native connector such as Claude Desktop sign in through the built-in OAuth 2.1 server with dynamic client registration and PKCE.</p>
+            <p class="mk-lead">The MCP server speaks JSON-RPC 2.0 over Streamable HTTP at <code>POST {{ api_base_url }}/mcp</code> and implements <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code> and <code>ping</code>. Connect with a bearer key, or let a desktop assistant app that supports MCP sign in through the built-in OAuth 2.1 server with dynamic client registration and PKCE.</p>
         </div>
         <div class="mk-grid mk-grid--2" style="align-items: start;">
             <div class="reveal">
-                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>Claude Code</span><button class="mk-copy" type="button" data-copy="code-mcp">Copy</button></div><pre id="code-mcp">claude mcp add --transport http sm-bean \
-  <span class="s">"{{ api_base_url }}/mcp"</span> \
-  --header <span class="s">"Authorization: Bearer bb_studio_…"</span></pre></div>
-                <div class="mk-code" tabindex="0" style="margin-top: 16px;"><div class="mk-code__head"><span>Claude Desktop or any OAuth-capable connector</span></div><pre>Add a custom connector with the URL
+                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>Your MCP client, with a bearer key</span><button class="mk-copy" type="button" data-copy="code-mcp">Copy</button></div><pre id="code-mcp">{
+  "mcpServers": {
+    "sm-bean": {
+      "type": <span class="s">"http"</span>,
+      "url": <span class="s">"{{ api_base_url }}/mcp"</span>,
+      "headers": { "Authorization": <span class="s">"Bearer bb_studio_…"</span> }
+    }
+  }
+}</pre></div>
+                <div class="mk-code" tabindex="0" style="margin-top: 16px;"><div class="mk-code__head"><span>A desktop assistant app that supports MCP, or any OAuth-capable connector</span></div><pre>Add a custom connector with the URL
 <span class="s">{{ api_base_url }}/mcp</span>
 
 The client discovers

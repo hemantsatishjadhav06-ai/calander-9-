@@ -17,6 +17,8 @@ from apps.accounts.models import User
 from apps.notifications.models import EventType, Notification
 
 URL = "/request-invite/"
+#: Where a submission lands: the same page, asked for again with GET (POST, redirect, GET).
+SENT = URL + "?sent=1"
 
 VALID = {
     "name": "Ana Silva",
@@ -85,8 +87,9 @@ def test_a_submission_notifies_each_active_operator_exactly_once(client, mailout
     _person("gone@smbean.example", is_staff=True, is_active=False)
     _person("owner@agency.example")  # an ordinary account, not an operator
 
-    response = client.post(URL, VALID)
+    response = client.post(URL, VALID, follow=True)
 
+    assert response.redirect_chain == [(SENT, 302)]
     assert response.status_code == 200
     assert 'data-testid="request-invite-thanks"' in response.content.decode()
     invites = _invites()
@@ -105,6 +108,41 @@ def test_a_submission_notifies_each_active_operator_exactly_once(client, mailout
 
 
 @pytest.mark.django_db
+def test_a_submission_redirects_so_a_refresh_cannot_send_it_again(client, mailoutbox):
+    first = _person("op1@smbean.example", is_staff=True)
+    second = _person("op2@smbean.example", is_staff=True)
+
+    response = client.post(URL, VALID)
+
+    # POST, redirect, GET: the browser's history holds the GET, so a refresh repeats only that.
+    assert response.status_code == 302
+    assert response["Location"] == SENT
+    thanks = client.get(response["Location"])
+    assert thanks.status_code == 200
+    html = thanks.content.decode()
+    assert 'data-testid="request-invite-thanks"' in html
+    assert 'data-testid="request-invite-form"' not in html
+    assert sorted(_invites().values_list("user_id", flat=True)) == sorted([first.pk, second.pk])
+    # A refresh of the thank-you page creates nothing more.
+    assert client.get(SENT).status_code == 200
+    assert _invites().count() == 2
+    assert len(mailoutbox) == 2
+
+
+@pytest.mark.django_db
+def test_opening_the_thank_you_address_creates_nothing(client, mailoutbox, settings):
+    settings.SUPPORT_EMAIL = "support@smbean.example"
+    _person("op@smbean.example", is_staff=True)
+
+    response = client.get(SENT)
+
+    assert response.status_code == 200
+    assert 'data-testid="request-invite-thanks"' in response.content.decode()
+    assert not _invites().exists()
+    assert mailoutbox == []
+
+
+@pytest.mark.django_db
 def test_two_submissions_make_two_notifications_not_more(client):
     _person("op@smbean.example", is_staff=True)
 
@@ -119,9 +157,10 @@ def test_a_filled_honeypot_is_refused_silently(client, mailoutbox, settings):
     settings.SUPPORT_EMAIL = "support@smbean.example"
     _person("op@smbean.example", is_staff=True)
 
-    response = client.post(URL, {**VALID, "website": "https://spam.example"})
+    response = client.post(URL, {**VALID, "website": "https://spam.example"}, follow=True)
 
-    # The bot sees the same thank-you page and learns nothing.
+    # The bot gets the same redirect and thank-you page and learns nothing.
+    assert response.redirect_chain == [(SENT, 302)]
     assert response.status_code == 200
     assert 'data-testid="request-invite-thanks"' in response.content.decode()
     assert not _invites().exists()
@@ -156,11 +195,11 @@ def test_posts_are_rate_limited_by_client_ip(client):
 
     codes = [client.post(URL, VALID, REMOTE_ADDR="203.0.113.7").status_code for _ in range(11)]
 
-    assert codes[:10] == [200] * 10
+    assert codes[:10] == [302] * 10  # each one passed on, then redirected to the thank-you page
     assert codes[10] == 429
     assert _invites().count() == 10
     # Another address has its own allowance.
-    assert client.post(URL, VALID, REMOTE_ADDR="203.0.113.8").status_code == 200
+    assert client.post(URL, VALID, REMOTE_ADDR="203.0.113.8").status_code == 302
     assert _invites().count() == 11
 
 
@@ -169,8 +208,9 @@ def test_without_an_operator_one_email_goes_to_the_support_address(client, mailo
     settings.SUPPORT_EMAIL = "support@smbean.example"
     _person("owner@agency.example")
 
-    response = client.post(URL, VALID)
+    response = client.post(URL, VALID, follow=True)
 
+    assert response.redirect_chain == [(SENT, 302)]
     assert response.status_code == 200
     assert 'data-testid="request-invite-thanks"' in response.content.decode()
     assert not _invites().exists()
@@ -208,7 +248,7 @@ def test_the_request_never_reaches_telegram_or_a_prompt(client, django_capture_o
 
     # Run the after-commit hooks, where the Telegram mirror is queued.
     with django_capture_on_commit_callbacks(execute=True):
-        assert client.post(URL, VALID).status_code == 200
+        assert client.post(URL, VALID).status_code == 302
 
     notice = _invites().get()
     assert notification_event(notice.pk) == 0

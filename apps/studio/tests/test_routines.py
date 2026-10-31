@@ -831,7 +831,10 @@ class TestPage:
         assert _url("studio:routines_run_now", world, routine_id=routine.pk) in html
         assert _url("studio:routines_toggle", world, routine_id=routine.pk) in html
         assert _url("studio:routines_delete", world, routine_id=routine.pk) in html
-        assert 'aria-current="page"' in html and "Routines" in html
+        # Activity's Routines section, with the controls inside it (not only a tab that says "Routines").
+        assert 'id="routines"' in html and 'id="activity-routines-heading"' in html
+        section = html.index('id="routines"')
+        assert section < html.index(_url("studio:routines_run_now", world, routine_id=routine.pk))
         for word in ("AI Studio", "assistant", "operator", "CTO", "API_KEY"):
             assert word not in html
 
@@ -921,7 +924,8 @@ class TestPage:
         response = client.post(
             _url("studio:routines_toggle", world, routine_id=routine.pk), {"next": "https://evil.example/x"}
         )
-        assert response["Location"] == _url("studio:routines", world)
+        assert response.status_code == 302
+        assert response["Location"] == _url("studio:team", world) + "#routines"
 
     def test_run_now_is_rate_limited(self, client, world, settings, manager_agent, jobs):
         settings.RATELIMIT_ENABLE = True

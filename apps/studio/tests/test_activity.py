@@ -181,10 +181,8 @@ def test_a_preset_lands_back_on_activitys_routines(client, world):
 
     response = client.post(_url("studio:routines_create", world), {"suggestion": "morning"}, follow=True)
 
-    assert response.redirect_chain == [
-        (_url("studio:routines", world), 302),
-        (_url("studio:team", world) + "#routines", 301),
-    ]
+    # One hop: the preset form carries no ``next``, and the default is Activity's Routines section itself.
+    assert response.redirect_chain == [(_url("studio:team", world) + "#routines", 302)]
     html = response.content.decode()
     assert response.status_code == 200 and "Saved" in html and 'id="routines"' in html
     assert Routine.objects.get().title == "Morning briefing"

@@ -19,6 +19,7 @@ from django.conf import settings
 from django.core.mail import EmailMessage
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods
 from django_ratelimit.decorators import ratelimit
 
@@ -258,13 +259,17 @@ def request_invite(request: HttpRequest) -> HttpResponse:
 
     Each submission makes one ``invite_requested`` notification for every
     active staff user; with none, one email goes to ``SUPPORT_EMAIL``. A filled
-    honeypot gets the same thank-you page and nothing is sent. The requester's
-    words are untrusted: they are stored and shown escaped, and never reach a
-    prompt or Telegram (``apps.telegram.notifications.notification_event`` has
-    no branch for this event type).
+    honeypot gets the same redirect and thank-you page and nothing is sent.
+    Once a request is passed on (or silently refused), the POST answers a
+    redirect to ``?sent=1`` and the thank-you is shown on that GET, so a
+    browser refresh repeats only the GET and can never send it twice. The
+    requester's words are untrusted: they are stored and shown escaped, and
+    never reach a prompt or Telegram
+    (``apps.telegram.notifications.notification_event`` has no branch for this
+    event type).
     """
     form = RequestInviteForm(request.POST if request.method == "POST" else None)
-    sent = False
+    sent = request.method == "GET" and request.GET.get("sent") == "1"
     problem = ""
     status = 200
     if request.method == "POST":
@@ -272,13 +277,12 @@ def request_invite(request: HttpRequest) -> HttpResponse:
             problem = "too_many"
             status = 429
         elif form.is_bot:
-            sent = True
+            return _thanked()
         elif form.is_valid():
             if _pass_on_invite_request(form.cleaned_data):
-                sent = True
-            else:
-                problem = "unavailable"
-                status = 503
+                return _thanked()
+            problem = "unavailable"
+            status = 503
     return _page(
         request,
         "marketing/request_invite.html",
@@ -290,6 +294,11 @@ def request_invite(request: HttpRequest) -> HttpResponse:
         sent=sent,
         problem=problem,
     )
+
+
+def _thanked() -> HttpResponse:
+    """POST, redirect, GET: the thank-you is the same page asked for again with ``?sent=1``."""
+    return redirect(reverse("marketing:request_invite") + "?sent=1")
 
 
 def _pass_on_invite_request(data: dict) -> bool:

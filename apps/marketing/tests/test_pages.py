@@ -195,3 +195,20 @@ def test_the_linked_pages_name_no_model_or_vendor(client, url_name):
 
     for name in ("Claude", "Anthropic", "OpenRouter", "OpenAI", "GPT"):
         assert name not in html, name
+
+
+#: Model and vendor names (CLAUDE.md invariant 9), in any case: a command such as ``vendor mcp add`` counts too.
+VENDOR_NAMES = re.compile(r"claude|anthropic|openai|gpt|gemini|openrouter", re.IGNORECASE)
+
+
+@pytest.mark.django_db
+def test_the_developers_page_names_no_model_or_vendor(client):
+    response = client.get(reverse("marketing:developers"))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert VENDOR_NAMES.findall(html) == []
+    # The MCP section still says how to connect, in words that fit any client.
+    assert 'id="mcp"' in html and "/mcp" in html and "Bearer bb_studio_" in html
+    assert re.search(r"[Yy]our MCP client", html)
+    assert "a desktop assistant app that supports MCP" in html

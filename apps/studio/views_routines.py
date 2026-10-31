@@ -50,12 +50,13 @@ def _routine(workspace, routine_id) -> Routine:
 def _back(request, workspace):
     """Where a control returns to: the page it was pressed on (Home or Activity) when it is ours.
 
-    Otherwise the Routines address, which leads on to Activity's Routines section.
+    Otherwise (no ``next``, as on the presets, or one on another host) Activity's Routines section,
+    in one hop rather than through the old Routines address's 301.
     """
     destination = request.POST.get("next", "")
     if destination and url_has_allowed_host_and_scheme(destination, allowed_hosts={request.get_host()}):
         return redirect(destination)
-    return redirect("studio:routines", workspace_id=workspace.id)
+    return redirect(reverse("studio:team", kwargs={"workspace_id": workspace.id}) + "#routines")
 
 
 def section(request, workspace, perms) -> dict:
