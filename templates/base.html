@@ -981,7 +981,7 @@
             <div data-testid="palette-dialog" role="dialog" aria-modal="true" aria-label="Go to a page" x-trap.noscroll="open"
                  @keydown.escape.prevent.stop="close()" class="ui-modal overflow-hidden">
                 <div class="p-3 border-b border-ink-200">
-                    <input x-ref="input" type="text" data-testid="palette-input" class="ui-input" placeholder="Go to…" aria-label="Find a page"
+                    <input x-ref="input" type="text" data-testid="palette-input" class="ui-input" placeholder="Go to…" aria-label="Find a page" autofocus
                            autocomplete="off" spellcheck="false" x-model="query"
                            @keydown.arrow-down.prevent="move(1)" @keydown.enter.prevent="openFirst()">
                 </div>
@@ -1056,9 +1056,10 @@
                     return this.shown === 1 ? '1 page' : this.shown + ' pages';
                 },
                 show() {
-                    // The dialog's x-trap puts the focus in the field (its first control) and, on
-                    // closing, hands it back to whatever had it before; focusing the field here
-                    // first would make the field that element.
+                    // The dialog's x-trap puts the focus in the field (it carries autofocus, x-trap's
+                    // initial focus; WebKit does not find it as the first control) and, on closing,
+                    // hands it back to whatever had it before; focusing the field here first would
+                    // make the field that element.
                     this.query = '';
                     this.open = true;
                 },
