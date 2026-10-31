@@ -2,9 +2,13 @@
 
 A visitor leaves a name, an agency, an email and a note. Each active platform
 operator (``is_staff`` and ``is_active``) gets one ``invite_requested``
-notification per submission; with no operator, one email goes to
-``SUPPORT_EMAIL`` instead. The visitor's words are untrusted: they never reach a
-prompt and never reach Telegram.
+notification per submission, in the bell at once and by email in a daily
+digest, so strangers never spend the email allowance an operator's alerts need;
+with no operator, one email goes to ``SUPPORT_EMAIL`` instead. At most
+``REQUEST_INVITE_HOURLY_LIMIT`` an hour are passed on, from every address
+together, and each address (an IPv6 client's whole /64) has its own limit too.
+The visitor's words are untrusted: they never reach a prompt and never reach
+Telegram.
 """
 
 import pytest
@@ -14,7 +18,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.notifications.models import EventType, Notification
+from apps.notifications.models import Channel, EventType, Notification, NotificationDelivery
 
 URL = "/request-invite/"
 #: Where a submission lands: the same page, asked for again with GET (POST, redirect, GET).
@@ -103,8 +107,17 @@ def test_a_submission_notifies_each_active_operator_exactly_once(client, mailout
     assert VALID["note"] in notice.body
     # Nothing the visitor wrote becomes a link anywhere in the app.
     assert "action_url" not in notice.data
-    # The operators' own email channel carries it; the support fallback does not fire.
-    assert sorted(m.to[0] for m in mailoutbox) == ["op1@smbean.example", "op2@smbean.example"]
+    # The operators' own email channel carries it, in their daily digest rather than at once (see
+    # test_a_burst_of_requests_leaves_the_operators_alert_email_deliverable); the support fallback
+    # does not fire.
+    assert mailoutbox == []
+    queued = NotificationDelivery.objects.filter(
+        notification__in=invites, channel=Channel.EMAIL, batch_queued_at__isnull=False
+    )
+    assert sorted(queued.values_list("notification__user__email", flat=True)) == [
+        "op1@smbean.example",
+        "op2@smbean.example",
+    ]
 
 
 @pytest.mark.django_db
@@ -126,7 +139,8 @@ def test_a_submission_redirects_so_a_refresh_cannot_send_it_again(client, mailou
     # A refresh of the thank-you page creates nothing more.
     assert client.get(SENT).status_code == 200
     assert _invites().count() == 2
-    assert len(mailoutbox) == 2
+    assert NotificationDelivery.objects.filter(channel=Channel.EMAIL).count() == 2
+    assert mailoutbox == []  # the operators' email waits for their daily digest
 
 
 @pytest.mark.django_db
@@ -258,3 +272,105 @@ def test_the_request_never_reaches_telegram_or_a_prompt(client, django_capture_o
     assert not AgentRun.objects.exists()
     assert not AgencyJob.objects.exists()
     assert not Message.objects.exists()
+
+
+# --- the operators' email allowance, the site-wide cap and the IPv6 network -----------------------
+
+#: The outbound-email budget as production configures it (config/settings/base.py): every
+#: notification email to one person counts against 6 an hour and 20 a day.
+PRODUCTION_EMAIL = {
+    "EMAIL_BACKEND": "apps.common.mail.BudgetedEmailBackend",
+    "EMAIL_INNER_BACKEND": "django.core.mail.backends.locmem.EmailBackend",
+    "EMAIL_SENDING_ENABLED": True,
+    "EMAIL_DAILY_SEND_LIMIT": 2000,
+    "EMAIL_RECIPIENT_HOURLY_LIMIT": 6,
+    "EMAIL_RECIPIENT_DAILY_LIMIT": 20,
+}
+
+
+def _from(index):
+    """Another visitor, from another address, so the per-address limit never decides."""
+    return {"REMOTE_ADDR": f"198.51.100.{index}"}
+
+
+@pytest.mark.django_db
+def test_a_burst_of_requests_leaves_the_operators_alert_email_deliverable(client, settings, mailoutbox):
+    """Each request used to mail every operator at once, charged to the operator's own allowance:
+    a burst spent it, and the operator's next real alert was dropped by the budget."""
+    from apps.notifications.engine import notify, send_batched_email_digests
+
+    for name, value in PRODUCTION_EMAIL.items():
+        setattr(settings, name, value)
+    operator = _person("op@smbean.example", is_staff=True)
+
+    for index in range(10):
+        assert client.post(URL, {**VALID, "email": f"p{index}@agency.example"}, **_from(index)).status_code == 302
+    send_batched_email_digests()
+
+    assert _invites().filter(user=operator, shown_in_app=True).count() == 10  # every one is in the bell
+    assert notify(operator, EventType.AGENCY_ALERT, "Publishing stopped for Northwind") is not None
+    assert [m.subject for m in mailoutbox if m.subject.startswith("Publishing stopped for Northwind")], [
+        m.subject for m in mailoutbox
+    ]
+
+
+@pytest.mark.django_db
+def test_past_the_site_wide_cap_the_person_is_thanked_and_nobody_is_told(client, settings, mailoutbox, caplog):
+    """However many addresses the requests come from, at most REQUEST_INVITE_HOURLY_LIMIT an hour are
+    passed on. Past it the form still thanks the person, nothing is created, and the log says so
+    without a word of what they wrote."""
+    settings.REQUEST_INVITE_HOURLY_LIMIT = 3
+    settings.SUPPORT_EMAIL = "support@smbean.example"
+    _person("op@smbean.example", is_staff=True)
+
+    for index in range(3):
+        assert client.post(URL, {**VALID, "email": f"p{index}@agency.example"}, **_from(index)).status_code == 302
+    assert _invites().count() == 3
+
+    with caplog.at_level("WARNING", logger="apps.marketing.views"):
+        response = client.post(URL, {**VALID, "email": "late@agency.example"}, follow=True, **_from(9))
+
+    assert response.redirect_chain == [(SENT, 302)]
+    assert 'data-testid="request-invite-thanks"' in response.content.decode()
+    assert _invites().count() == 3
+    assert mailoutbox == []  # nor the support address
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "invite request" in logged.lower()
+    for typed in ("late@agency.example", VALID["name"], VALID["agency"], VALID["note"]):
+        assert typed not in logged, typed
+
+
+@pytest.mark.django_db
+def test_the_site_wide_cap_defaults_to_thirty_an_hour(client, settings):
+    _person("op@smbean.example", is_staff=True)
+
+    assert settings.REQUEST_INVITE_HOURLY_LIMIT == 30
+    for index in range(31):
+        client.post(URL, {**VALID, "email": f"p{index}@agency.example"}, **_from(index))
+
+    assert _invites().count() == 30
+
+
+@pytest.mark.django_db
+def test_a_bot_and_an_invalid_form_spend_nothing_of_the_site_wide_cap(client, settings):
+    settings.REQUEST_INVITE_HOURLY_LIMIT = 1
+    _person("op@smbean.example", is_staff=True)
+
+    client.post(URL, {**VALID, "website": "https://spam.example"}, **_from(1))
+    client.post(URL, {**VALID, "email": "not-an-address"}, **_from(2))
+    client.post(URL, VALID, **_from(3))
+
+    assert _invites().count() == 1
+
+
+@pytest.mark.django_db
+def test_two_ipv6_addresses_in_one_64_network_share_one_limit(client):
+    """An IPv6 client is handed a whole /64 network, so it is limited as one; IPv4 stays per address."""
+    _person("op@smbean.example", is_staff=True)
+
+    codes = [client.post(URL, VALID, REMOTE_ADDR=f"2001:db8:1:2::{index + 1:x}").status_code for index in range(10)]
+    assert codes == [302] * 10
+    assert client.post(URL, VALID, REMOTE_ADDR="2001:db8:1:2:ffff:ffff:ffff:fffe").status_code == 429
+    # Another /64 has its own allowance.
+    assert client.post(URL, VALID, REMOTE_ADDR="2001:db8:1:3::1").status_code == 302
+    assert _invites().count() == 11

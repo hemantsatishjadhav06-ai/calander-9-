@@ -21,12 +21,13 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods
+from django_ratelimit.core import is_ratelimited
 from django_ratelimit.decorators import ratelimit
 
 from apps.accounts.models import User
 from apps.accounts.views import dashboard
 from apps.common.mail import send_or_raise
-from apps.common.net import ratelimit_client_ip
+from apps.common.net import ratelimit_client_network
 from apps.notifications.engine import notify
 from apps.notifications.models import EventType
 
@@ -34,10 +35,14 @@ from .forms import RequestInviteForm
 
 logger = logging.getLogger(__name__)
 
-# Per client IP, counted on POST only. Generous enough for an agency's whole
-# office behind one address, small enough that a script cannot fill the
-# operators' inboxes (each request mails every operator).
+# Per client address (an IPv6 client's whole /64 network), counted on POST
+# only. Generous enough for an agency's whole office behind one address, small
+# enough that one script cannot fill the operators' bells.
 REQUEST_INVITE_RATE = "10/h"
+# Every address together: settings.REQUEST_INVITE_HOURLY_LIMIT requests an hour
+# are passed on, so many addresses cannot fill them either. The count lives
+# with the per-address ones (django-ratelimit's cache), under its own group.
+REQUEST_INVITE_SITE_GROUP = "marketing.request_invite.site"
 
 # The open-source codebase this product is built on. Shown in the footer
 # because the AGPL-3.0 licence asks derived works to keep that notice visible.
@@ -253,13 +258,17 @@ def pricing(request: HttpRequest) -> HttpResponse:
 
 
 @require_http_methods(["GET", "POST"])
-@ratelimit(key=ratelimit_client_ip, rate=REQUEST_INVITE_RATE, method="POST", block=False)
+@ratelimit(key=ratelimit_client_network, rate=REQUEST_INVITE_RATE, method="POST", block=False)
 def request_invite(request: HttpRequest) -> HttpResponse:
     """A short form that asks the platform operators for an invitation.
 
     Each submission makes one ``invite_requested`` notification for every
-    active staff user; with none, one email goes to ``SUPPORT_EMAIL``. A filled
-    honeypot gets the same redirect and thank-you page and nothing is sent.
+    active staff user; with none, one email goes to ``SUPPORT_EMAIL``. The
+    operators see it in the bell at once; their email is one message a day
+    (``apps.notifications.engine.DAILY_BATCHED_EVENTS``), so strangers can never
+    spend the email allowance their alerts need. A filled honeypot gets the
+    same redirect and thank-you page and nothing is sent, and so does a
+    request past the site-wide cap (``_over_the_site_wide_cap``).
     Once a request is passed on (or silently refused), the POST answers a
     redirect to ``?sent=1`` and the thank-you is shown on that GET, so a
     browser refresh repeats only the GET and can never send it twice. The
@@ -279,6 +288,8 @@ def request_invite(request: HttpRequest) -> HttpResponse:
         elif form.is_bot:
             return _thanked()
         elif form.is_valid():
+            if _over_the_site_wide_cap(request):
+                return _thanked()
             if _pass_on_invite_request(form.cleaned_data):
                 return _thanked()
             problem = "unavailable"
@@ -299,6 +310,29 @@ def request_invite(request: HttpRequest) -> HttpResponse:
 def _thanked() -> HttpResponse:
     """POST, redirect, GET: the thank-you is the same page asked for again with ``?sent=1``."""
     return redirect(reverse("marketing:request_invite") + "?sent=1")
+
+
+def _over_the_site_wide_cap(request: HttpRequest) -> bool:
+    """Count this request against every address's hourly allowance; True once it is spent.
+
+    Counted only for a request about to be passed on (a bot or an invalid form
+    spends nothing). Logged without a word of what the person wrote.
+    """
+    limit = int(getattr(settings, "REQUEST_INVITE_HOURLY_LIMIT", 30))
+    if not is_ratelimited(
+        request,
+        group=REQUEST_INVITE_SITE_GROUP,
+        key=lambda group, request: "every-address",
+        rate=f"{limit}/h",
+        method="POST",
+        increment=True,
+    ):
+        return False
+    logger.warning(
+        "An invite request was not passed on: the site-wide limit of %d an hour is reached.",
+        limit,
+    )
+    return True
 
 
 def _pass_on_invite_request(data: dict) -> bool:

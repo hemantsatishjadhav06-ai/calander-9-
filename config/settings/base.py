@@ -779,6 +779,10 @@ YOUTUBE_WEBHOOK_SECRET = env("YOUTUBE_WEBHOOK_SECRET", default="")
 # Rate limiting
 RATELIMIT_ENABLE = not DEBUG
 RATELIMIT_USE_CACHE = "default"
+# The most Request invite submissions passed on to the platform operators in an
+# hour, from every address together (apps/marketing/views.py). Past it the form
+# still thanks the person and nobody is told.
+REQUEST_INVITE_HOURLY_LIMIT = env.int("REQUEST_INVITE_HOURLY_LIMIT", default=30)
 
 
 # ---------------------------------------------------------------------------

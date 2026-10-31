@@ -103,3 +103,54 @@ def test_the_throttle_and_the_api_agree_on_the_address():
 
     request = req("10.0.0.1", "203.0.113.9")
     assert AuthRateLimitMiddleware._get_client_ip(request) == _client_ip(request) == "203.0.113.9"
+
+
+# --- the network key: one bucket per IPv6 /64 (Request invite) ------------------------------------
+#
+# An IPv6 client is usually handed a whole /64 network and can take a fresh address from it for each
+# request, so a per-address limit is no limit for them. ``ratelimit_client_network`` groups them by
+# that network and keeps IPv4 per address; ``ratelimit_client_ip``, which every other view uses, is
+# unchanged.
+
+
+@override_settings(BB_TRUSTED_PROXIES=())
+def test_the_network_key_groups_an_ipv6_client_by_its_64():
+    from apps.common.net import ratelimit_client_network
+
+    one = ratelimit_client_network("group", req("2001:db8:1:2::1"))
+    assert one == "2001:db8:1:2::/64"
+    assert ratelimit_client_network("group", req("2001:db8:1:2:ffff:ffff:ffff:fffe")) == one
+    assert ratelimit_client_network("group", req("2001:db8:1:3::1")) == "2001:db8:1:3::/64"
+
+
+@override_settings(BB_TRUSTED_PROXIES=())
+def test_the_network_key_keeps_ipv4_per_address():
+    from apps.common.net import ratelimit_client_network
+
+    assert ratelimit_client_network("group", req("203.0.113.7")) == "203.0.113.7"
+    assert ratelimit_client_network("group", req("203.0.113.8")) == "203.0.113.8"
+    # An IPv4 address written the IPv6 way is still that one IPv4 address, not a /64 of them.
+    assert ratelimit_client_network("group", req("::ffff:203.0.113.7")) == "203.0.113.7"
+
+
+@override_settings(BB_TRUSTED_PROXIES=("10.0.0.0/8",))
+def test_the_network_key_reads_the_client_behind_a_trusted_proxy():
+    from apps.common.net import ratelimit_client_network
+
+    assert ratelimit_client_network("group", req("10.0.0.1", "2001:db8:9:9::42")) == "2001:db8:9:9::/64"
+
+
+def test_the_network_key_without_an_address_is_empty():
+    from apps.common.net import ratelimit_client_network
+
+    request = RequestFactory().get("/")
+    request.META.pop("REMOTE_ADDR", None)
+    assert ratelimit_client_network("group", request) == ""
+
+
+@override_settings(BB_TRUSTED_PROXIES=())
+def test_every_other_view_keeps_its_per_address_key():
+    from apps.common.net import ratelimit_client_ip
+
+    assert ratelimit_client_ip("group", req("2001:db8:1:2::1")) == "2001:db8:1:2::1"
+    assert ratelimit_client_ip("group", req("2001:db8:1:2::2")) == "2001:db8:1:2::2"

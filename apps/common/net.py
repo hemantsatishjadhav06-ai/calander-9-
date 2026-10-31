@@ -155,6 +155,29 @@ def ratelimit_client_ip(group, request) -> str:
     return client_ip(request) or ""
 
 
+def ratelimit_client_network(group, request) -> str:
+    """django-ratelimit ``key`` callable: an IPv6 client's /64 network, an IPv4 client's address.
+
+    An IPv6 client is usually handed a whole /64 and can take a fresh address
+    from it for every request, so a per-address bucket is no limit at all for
+    them. Grouping by the /64 treats that network as the one client it is. IPv4
+    stays per address (an IPv4 address written the IPv6 way, ``::ffff:a.b.c.d``,
+    is that one address). Used where a stranger can make the app do work for
+    someone else, such as Request invite; every other view keeps
+    :func:`ratelimit_client_ip`, so their limits are unchanged.
+    """
+    address = client_ip(request) or ""
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return address
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.IPv6Network((ip, 64), strict=False))
+    return str(ip)
+
+
 def client_ip(request) -> str | None:
     """The originating client IP, honouring ``X-Forwarded-For`` only from a proxy we run.
 

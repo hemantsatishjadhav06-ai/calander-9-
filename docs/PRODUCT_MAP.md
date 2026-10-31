@@ -536,10 +536,16 @@ for old links, carry `noindex` and are linked from nowhere. The sitemap lists
 the three pages and the legal pages.
 
 - **Request invite:** name, agency, email and a note. CSRF, a hidden honeypot
-  (a bot gets the thank-you and nothing is sent) and at most 10 POSTs an hour
-  per client address. Each request makes one `invite_requested` notification
-  (in-app and email) for every active staff user; with none, one email goes to
-  `SUPPORT_EMAIL`; with neither, the page says it could not be passed on (503).
+  (a bot gets the thank-you and nothing is sent), at most 10 POSTs an hour per
+  client address (an IPv6 client's whole /64 counts as one) and at most
+  `REQUEST_INVITE_HOURLY_LIMIT` (30) requests an hour passed on from every
+  address together (past it the person is thanked, nobody is told, and the log
+  says so without their words). Each request makes one `invite_requested`
+  notification for every active staff user: in the bell at once, by email in
+  one message a day (after 08:00 UTC; quiet hours keep it in the bell), so it
+  never spends the email allowance their alerts need. With no staff user, one
+  email goes to `SUPPORT_EMAIL`; with neither, the page says it could not be
+  passed on (503).
   A sent request redirects to `?sent=1`, which thanks the person, so a refresh
   never sends it twice. The requester's words are shown escaped and never
   reach a prompt or Telegram.
