@@ -1,11 +1,15 @@
 """Routines: standing instructions in plain words, on their own schedule.
 
-``/workspace/<id>/studio/routines/``. For the agency's staff who may create
-posts (never a plain client — see ``views._workspace``): anyone on the team
-may write a routine and press Run now; pausing or deleting one is for the
-person who wrote it or someone who manages the workspace's settings. Every
-POST only changes rows or queues the same work a person could start by
-typing in the team thread; nothing here approves, schedules or publishes.
+The list and the three presets live in Activity's Routines section
+(``studio:team`` + ``#routines``, built with :func:`section`);
+``/workspace/<id>/studio/routines/`` answers a 301 there on GET, after its
+own checks (spec D4). Its POST handlers stay where they are. For the
+agency's staff who may create posts (never a plain client — see
+``views._workspace``): anyone on the team may write a routine and press Run
+now; pausing or deleting one is for the person who wrote it or someone who
+manages the workspace's settings. Every POST only changes rows or queues the
+same work a person could start by typing in the team thread; nothing here
+approves, schedules or publishes.
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 from django_ratelimit.decorators import ratelimit
@@ -43,11 +48,24 @@ def _routine(workspace, routine_id) -> Routine:
 
 
 def _back(request, workspace):
-    """Where a control returns to: the page it was pressed on (Home or Routines) when it is ours."""
+    """Where a control returns to: the page it was pressed on (Home or Activity) when it is ours.
+
+    Otherwise the Routines address, which leads on to Activity's Routines section.
+    """
     destination = request.POST.get("next", "")
     if destination and url_has_allowed_host_and_scheme(destination, allowed_hosts={request.get_host()}):
         return redirect(destination)
     return redirect("studio:routines", workspace_id=workspace.id)
+
+
+def section(request, workspace, perms) -> dict:
+    """The routines list and the presets (``partials/routine_presets.html``), for Activity and the form page."""
+    return {
+        "routines": routines.rows(workspace, viewer=request.user, perms=perms),
+        "suggestions": [{"key": key, **preset} for key, preset in routines.SUGGESTIONS.items()],
+        "tzname": workspace.effective_timezone or "UTC",
+        "can_manage": bool(perms.get("manage_workspace_settings")),
+    }
 
 
 def _context(request, workspace, *, form=None, error="") -> dict:
@@ -55,15 +73,12 @@ def _context(request, workspace, *, form=None, error="") -> dict:
     return {
         "workspace": workspace,
         "tabs": dashboard.tabs(workspace, "routines", perms=perms),
-        "routines": routines.rows(workspace, viewer=request.user, perms=perms),
-        "suggestions": [{"key": key, **preset} for key, preset in routines.SUGGESTIONS.items()],
+        **section(request, workspace, perms),
         "cadences": CADENCES,
         "weekdays": WEEKDAYS,
         "form": form
         or {"title": "", "instruction": "", "cadence": Routine.Cadence.WEEKDAYS, "weekday": "0", "time": "08:30"},
         "error": error,
-        "tzname": workspace.effective_timezone or "UTC",
-        "can_manage": bool(perms.get("manage_workspace_settings")),
     }
 
 
@@ -71,8 +86,13 @@ def _context(request, workspace, *, form=None, error="") -> dict:
 @require_permission("create_posts")
 @require_GET
 def routines_page(request, workspace_id):
+    """The old Routines page: the same checks as before, then a 301 to Activity's Routines section.
+
+    A viewer or a plain client still gets 403 and someone signed out the login page, never the
+    redirect; links already sent in Telegram, notifications and bookmarks keep working.
+    """
     workspace = _workspace(request, workspace_id)
-    return render(request, "studio/routines.html", _context(request, workspace))
+    return redirect(reverse("studio:team", kwargs={"workspace_id": workspace.id}) + "#routines", permanent=True)
 
 
 def _parse_time(value: str) -> dt.time | None:
