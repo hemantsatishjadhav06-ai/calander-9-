@@ -40,7 +40,7 @@ The filters and their publishList() scope are the Calendar list's own partials.
     </div>
 </div>
 {# Toast host: outside #tab-content so an approval action's list refresh doesn't tear down the toast #}
-{% include "approvals/partials/_toasts.html" %}
+{% include "approvals/partials/_toasts.html" with above_phone_bar=nav.phone %}
 {% endblock %}
 
 {% block extra_js %}

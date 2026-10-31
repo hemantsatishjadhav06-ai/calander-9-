@@ -36,6 +36,7 @@ from apps.common.navigation import Nav, NavItem, build_nav
 from apps.composer.models import PlatformPost, Post
 from apps.credentials.models import PlatformCredential
 from apps.inbox.models import InboxMessage
+from apps.members.models import CustomRole, WorkspaceMembership
 from apps.organizations.models import Organization
 from apps.social_accounts.models import AnalyticsPlatformConfig, SocialAccount
 from apps.studio.models import AgencySettings
@@ -423,6 +424,45 @@ def test_the_phone_bar_lights_more_for_places_it_does_not_show(workspace, user, 
     nav = _nav(_request(_url(name, workspace, **kwargs), workspace, user))
 
     assert [item.key for item in nav.phone if item.active] == ([lit] if lit else [])
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("role", "client_facing", "bar"),
+    [
+        pytest.param("owner", False, True, id="owner"),
+        pytest.param("viewer", False, True, id="viewer"),
+        pytest.param("client", False, False, id="client"),
+        pytest.param("editor", True, False, id="client-facing-custom-role"),
+    ],
+)
+@pytest.mark.parametrize("name", ["telegram:settings", "telegram:pair"])
+def test_the_telegram_pages_show_the_phone_bar_to_the_team_only(workspace, user, role, client_facing, bar, name):
+    """telegram/settings.html keeps the navigation from someone not on the team (the same rule,
+    ``internal_member``), and the page answers a pairing with itself, so every Telegram page agrees."""
+    custom = None
+    if client_facing:
+        custom = CustomRole.objects.create(
+            organization=workspace.organization, name="External", permissions={"client_facing": True}
+        )
+    membership = WorkspaceMembership.objects.create(
+        user=user, workspace=workspace, workspace_role=role, custom_role=custom
+    )
+    request = _request(_url(name, workspace), workspace, user)
+    request.workspace_membership = membership
+
+    nav = _nav(request)
+
+    assert [item.key for item in nav.phone] == (PHONE if bar else [])
+    assert [item.key for item in nav.items][:4] == ORDER[:4]  # the sidebar is the template's to hide
+
+
+@pytest.mark.django_db
+def test_onboarding_pages_have_no_phone_bar(workspace, user):
+    """A connection link's pages draw their own layout (onboarding/base.html), with no app shell."""
+    request = _request(reverse("onboarding:connection_page", kwargs={"token": "t"}), workspace, user)
+
+    assert _nav(request).phone == ()
 
 
 # --- counts: the ones the sidebar context already has -------------------------------

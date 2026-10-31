@@ -289,6 +289,8 @@
        the toasts clear while a selection is active, so a rejected bulk action
        doesn't render its own explanation on top of the bar it came from. */
     body.has-selection #bb-toast-host { bottom: 5.5rem; }
+    {% if nav.phone %}/* Below 1024px the selection bar sits above the phone bar (4.5rem and the safe area) and is 56px tall. */
+    @media (max-width: 1023px) { body.has-selection #bb-toast-host { bottom: calc(9rem + env(safe-area-inset-bottom)); } }{% endif %}
 
     {% include "calendar/partials/_publish_list_styles.html" %}
 </style>
@@ -303,17 +305,18 @@
     {% endif %}
 </div>
 {# Toast host — outside #tab-content so an approval action's list refresh doesn't tear down the toast #}
-{% include "approvals/partials/_toasts.html" %}
+{% include "approvals/partials/_toasts.html" with above_phone_bar=nav.phone %}
 
 {% comment %}Floating bulk-selection bar — outside the swapped regions so the
 selection survives grid reloads / tab switches. Shown when ≥1 chip/row is
-ticked (see the `sel` Alpine store).{% endcomment %}
+ticked (see the `sel` Alpine store). Below 1024px it sits above the phone bar
+(base.html: 58px and the safe area) where the bar shows; from 1024px it is unchanged.{% endcomment %}
 <div x-data="bulkBar()">
     {# Floating action bar: a dark surface, so white focus rings #}
     <div x-cloak x-show="$store.sel.count > 0"
          x-effect="document.body.classList.toggle('has-selection', $store.sel.count > 0)"
-         role="region" aria-label="Selected posts"
-         class="fixed bottom-6 max-sm:bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 max-w-[calc(100vw-2rem)] bg-ink-900 text-white rounded-xl shadow-lg pl-4 pr-1.5 py-1.5">
+         role="region" aria-label="Selected posts" data-testid="calendar-bulk-bar"
+         class="fixed {% if nav.phone %}bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6{% else %}bottom-6 max-sm:bottom-4{% endif %} left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 max-w-[calc(100vw-2rem)] bg-ink-900 text-white rounded-xl shadow-lg pl-4 pr-1.5 py-1.5">
         <span class="text-sm font-medium whitespace-nowrap tabular-nums" x-text="$store.sel.count + ' selected'" aria-live="polite"></span>
         <span class="w-px h-5 bg-white/20 mx-1.5" aria-hidden="true"></span>
         <button type="button" @click="ask('draft')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-white hover:bg-white/10 focus-visible:outline-white transition-colors disabled:opacity-50">Draft</button>

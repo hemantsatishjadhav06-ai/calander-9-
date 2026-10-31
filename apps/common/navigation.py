@@ -12,7 +12,11 @@ and shares with the templates' ``features``.
   switch). Settings is the gear, kept apart from the items.
 - **Phone bar:** Home, Approvals, Calendar, Inbox, and More, a button that
   opens the drawer. More is lit on a place the bar does not show. The post page
-  and the composer have none: their own action bar sits where it would.
+  and the composer have none: their own action bar sits where it would. Nor do
+  the Telegram pages for someone not on the team (they show that person no
+  navigation) or onboarding's connection pages (their own layout, no shell).
+  ``nav.phone`` is the one flag templates test for the bar: the room at the end
+  of the page and whatever else floats along the bottom follow it.
 - **One place is lit**, from ``request.resolver_match``; see ``_place``.
 - **The command palette** (``build_palette``) offers the places this person
   may open (the same checks their pages make), Settings and the Settings tabs
@@ -52,7 +56,7 @@ class NavItem:
 @dataclass(frozen=True)
 class Nav:
     """The sidebar's items, its gear and the phone bar; empty without a workspace.
-    ``phone`` is also empty on a page whose own bar takes the bottom of a phone."""
+    ``phone`` is also empty wherever the page shows no phone bar (``_has_phone_bar``)."""
 
     items: tuple[NavItem, ...] = ()
     settings: NavItem | None = None
@@ -106,6 +110,15 @@ _PHONE_KEYS = ("home", "approvals", "calendar", "inbox")
 # composer's action bar (composer/compose.html, which fills the screen).
 _NO_PHONE_BAR = frozenset({("studio", "detail"), ("composer", "compose"), ("composer", "compose_edit")})
 
+# Apps whose pages draw their own layout, without the app's shell: a client's
+# connection link (onboarding/base.html replaces base.html's layout block).
+_NO_SHELL_APPS = frozenset({"onboarding"})
+
+# Apps whose pages keep the navigation from someone who is not on the team:
+# telegram/settings.html shows them their own connection only. Every page of the
+# app answers with that template (a pairing code, a form error).
+_TEAM_NAVIGATION_APPS = frozenset({"telegram"})
+
 # Screens that refuse a plain client (they approve in the client portal): the
 # agency's pages (``studio.views._workspace``), Approvals and Settings.
 _REFUSED_TO_CLIENTS = frozenset({"home", "approvals", "activity", "settings"})
@@ -144,8 +157,19 @@ def _lit_place(request) -> str | None:
 
 
 def _has_phone_bar(request) -> bool:
+    """Whether the page shows the phone bar: not on a page with its own bottom bar,
+    a page without the shell, or a Telegram page for someone not on the team
+    (``internal_member``, the rule telegram/settings.html applies to its navigation)."""
     match = getattr(request, "resolver_match", None)
-    return match is None or (match.app_name, match.url_name) not in _NO_PHONE_BAR
+    if match is None:
+        return True
+    if (match.app_name, match.url_name) in _NO_PHONE_BAR or match.app_name in _NO_SHELL_APPS:
+        return False
+    if match.app_name in _TEAM_NAVIGATION_APPS:
+        from apps.telegram.permissions import internal_member
+
+        return internal_member(getattr(request, "workspace_membership", None))
+    return True
 
 
 def _count(context: Mapping[str, Any], key: str) -> int:

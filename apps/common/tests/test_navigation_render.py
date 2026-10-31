@@ -15,7 +15,10 @@ Spec D8, R1 and R2 (docs/specs/02-cut-and-merge.md), plan T9 (docs/specs/phase-2
   *Account*, so *Settings* means one place.
 - **Phone:** a bottom bar with Home, Approvals (with its count), Calendar, Inbox
   and More (which opens the drawer), with room left under the page; the post
-  page has none, so nothing covers its own Approve bar.
+  page has none, so nothing covers its own Approve bar, and the Telegram page
+  shows neither the bar nor its room to someone who is not on the team. What
+  else floats along the bottom (toasts, selection bars, the blog form's Save
+  bar) rises above the bar on phones and keeps its desktop place.
 - **Command palette:** a button and Ctrl/Cmd-K open a labelled, trapped dialog
   that filters the places this person can open: the items whose pages let them
   in (their permissions, the client rule), Settings and the Settings tabs the
@@ -36,6 +39,7 @@ from django.urls import resolve, reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.blog.models import BlogSite
 from apps.common import context_processors, navigation
 from apps.common.features import FEATURE_KEYS
 from apps.composer.models import PlatformPost, Post
@@ -475,6 +479,146 @@ def test_the_composer_has_no_phone_bar_over_its_action_bar(client, team, edit):
 
     assert 'data-testid="compose-save-draft"' in html
     assert 'data-testid="phone-bar' not in html and "data-phone-bar-room" not in html
+
+
+def _facing_client(team):
+    """Someone outside the team on a custom role marked client-facing (an editor's permissions)."""
+    role = CustomRole.objects.create(
+        organization=team.org,
+        name="External",
+        permissions={**BUILTIN_ROLE_PERMISSIONS["editor"], "client_facing": True},
+    )
+    user = _person("facing@example.com", "Facing")
+    WorkspaceMembership.objects.create(user=user, workspace=team.ws, workspace_role="editor", custom_role=role)
+    return user
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("who", "shown"),
+    [("owner", True), ("editor", True), ("client", False), ("client_facing", False)],
+)
+def test_the_telegram_page_leaves_room_for_the_phone_bar_only_where_it_shows_it(client, team, who, shown):
+    """The Telegram page keeps the navigation from someone who is not on the team, phone bar included.
+    The room at the end of main and the error toast's lift go with the bar, so their page does not end
+    in 64px of empty space with no bar under it."""
+    _switches(team.ws)
+    user = _facing_client(team) if who == "client_facing" else getattr(team, who)
+    html = _page(client, user, _url("telegram:settings", team.ws))
+
+    assert ('data-testid="phone-bar"' in html) is shown, who
+    assert ("data-phone-bar-room" in html) is shown, who
+    toast = _tag(html, 'data-testid="error-toast"')
+    assert (ABOVE_THE_BAR in toast) is shown, who
+
+
+# --- floating along the bottom: clear of the phone bar on phones, unchanged on desktop ----------------
+
+# Above the phone bar (58px: two 1px borders and its 56px items, plus the safe area) with the gap
+# the media page's Folders button already keeps (base.html; media_library/library_index.html).
+ABOVE_THE_BAR = "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]"
+# The approval toasts (approvals/partials/_toasts.html, plain CSS): the same lift below 1024px, and
+# above the calendar's selection bar (56px tall on a phone) while posts are selected.
+TOAST_HOST_ABOVE_THE_BAR = (
+    "@media (max-width: 1023px) { #bb-toast-host { bottom: calc(4.5rem + env(safe-area-inset-bottom)); } }"
+)
+TOASTS_ABOVE_THE_SELECTION = "@media (max-width: 1023px) { body.has-selection #bb-toast-host { bottom: calc(9rem + env(safe-area-inset-bottom)); } }"
+
+
+def _rises_on_phones(tag):
+    """*tag* sits above the phone bar below 1024px and 24px from the bottom from 1024px, as before."""
+    return ABOVE_THE_BAR in tag and "lg:bottom-6" in tag and "max-sm:bottom-4" not in tag
+
+
+def _unchanged(tag):
+    return "bottom-6 max-sm:bottom-4" in tag and ABOVE_THE_BAR not in tag
+
+
+@pytest.mark.django_db
+def test_the_error_toast_rises_above_the_phone_bar_where_the_bar_shows(client, team):
+    _switches(team.ws)
+    for url in (_url("studio:index", team.ws), _url("calendar:calendar", team.ws), _url("inbox:feed", team.ws)):
+        html = _page(client, team.owner, url)
+        assert 'data-testid="phone-bar"' in html, url
+        assert _rises_on_phones(_tag(html, 'data-testid="error-toast"')), url
+
+
+@pytest.mark.django_db
+def test_without_the_phone_bar_the_error_toast_keeps_its_place(client, team):
+    """The post page and the composer have their own bar instead of the phone bar."""
+    _switches(team.ws)
+    brief = StudioBrief.objects.create(
+        workspace=team.ws,
+        author=team.owner,
+        idea="A launch post",
+        status=StudioBrief.Status.READY,
+        proposed_publish_at=timezone.now() + timedelta(days=2),
+    )
+    for url in (_url("studio:detail", team.ws, brief_id=brief.id), _url("composer:compose", team.ws)):
+        html = _page(client, team.owner, url)
+        assert 'data-testid="phone-bar"' not in html, url
+        assert _unchanged(_tag(html, 'data-testid="error-toast"')), url
+
+
+@pytest.mark.django_db
+def test_the_calendars_selection_bar_and_toasts_rise_above_the_phone_bar(client, team):
+    _switches(team.ws)
+    html = _calendar(client, team)
+
+    assert _rises_on_phones(_tag(html, 'data-testid="calendar-bulk-bar"'))
+    assert TOAST_HOST_ABOVE_THE_BAR in html
+    # The rule that lifts the toasts over the selection bar keeps its desktop value and gains a phone one after it.
+    assert "body.has-selection #bb-toast-host { bottom: 5.5rem; }" in html
+    assert html.index(TOASTS_ABOVE_THE_SELECTION) > html.index("body.has-selection #bb-toast-host { bottom: 5.5rem; }")
+
+
+@pytest.mark.django_db
+def test_the_approvals_selection_bar_and_toasts_rise_above_the_phone_bar(client, team):
+    """The list is one partial on the Approvals screen and the calendar's Approvals tab, and the tab
+    loads it as an HTMX fragment, which never builds the navigation: its bar rises on phones without
+    asking whether the bar is there (both pages that show it have the phone bar)."""
+    _switches(team.ws)
+    _pending(team, 1)
+    for url in (_url("approvals:index", team.ws), _url("calendar:calendar", team.ws) + "?mode=list&tab=approvals"):
+        html = _page(client, team.owner, url)
+        assert 'data-testid="phone-bar"' in html, url
+        assert _rises_on_phones(_tag(html, 'data-testid="approvals-bulk-bar"')), url
+        assert TOAST_HOST_ABOVE_THE_BAR in html, url
+
+    fragment = client.get(_url("calendar:publish_tab_approvals", team.ws), HTTP_HX_REQUEST="true").content.decode()
+    assert _rises_on_phones(_tag(fragment, 'data-testid="approvals-bulk-bar"'))
+
+
+@pytest.mark.django_db
+def test_the_approval_toasts_keep_their_place_where_there_is_no_phone_bar(client, team):
+    _switches(team.ws)
+    html = _page(client, team.owner, _url("composer:compose", team.ws))
+
+    assert 'data-testid="toast-host"' in html and 'data-testid="phone-bar"' not in html
+    assert TOAST_HOST_ABOVE_THE_BAR not in html
+
+
+@pytest.mark.django_db
+def test_the_blog_forms_save_bar_docks_on_the_phone_bar(client, team):
+    """Sticky at the bottom of the page's scroller, which ends at main's 48px bottom padding on a phone:
+    10px more (and the safe area) puts it flush on the 58px phone bar. From 1024px it is unchanged."""
+    _switches(team.ws, blog=True)
+    BlogSite.objects.create(
+        workspace=team.ws,
+        name="Site",
+        kind=BlogSite.Kind.NEOPOLIS_STATIC,
+        site_url="https://example.com",
+        repo="org/site",
+        workflow_file="publish.yml",
+    )
+    html = _page(client, team.owner, _url("blog:create", team.ws))
+
+    assert 'data-testid="phone-bar"' in html
+    actions = _tag(html, 'data-testid="blog-form-actions"')
+    assert "sticky" in actions
+    classes = re.search(r'class="([^"]*)"', actions).group(1).split()
+    assert "bottom-[calc(0.625rem+env(safe-area-inset-bottom))]" in classes and "lg:bottom-0" in classes
+    assert "bottom-0" not in classes
 
 
 # --- the command palette --------------------------------------------------------------------------

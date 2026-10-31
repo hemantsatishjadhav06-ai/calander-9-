@@ -8,6 +8,9 @@ the pointer or keyboard focus is on the toast; errors and warnings stay until di
 error is announced as an alert. Every toast has a Dismiss button.
 Include this ONCE per page, OUTSIDE any htmx-refetched region, so a list refresh
 fired by the same response doesn't tear down the toast before it's seen.
+above_phone_bar: pass nav.phone from a page in the app shell; below 1024px the toasts then rise
+above the phone bar (base.html: 58px and the safe area). The composer and the client portal have
+no phone bar and pass nothing.
 {% endcomment %}
 <style nonce="{{ request.csp_nonce }}">
   @keyframes bb-toastPop { from { opacity:0; transform:translateY(8px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
@@ -24,6 +27,7 @@ fired by the same response doesn't tear down the toast before it's seen.
   /* The dark toast (design system: toast): ink-900, a status-coloured icon, white title, ink-300 detail. */
   #bb-toast-host { position:fixed; z-index:200; bottom:1.5rem; right:1.5rem; display:flex; flex-direction:column; align-items:flex-end; gap:.5rem; pointer-events:none; }
   @media (max-width: 639px) { #bb-toast-host { left:1rem; right:1rem; bottom:1rem; align-items:stretch; } }
+  {% if above_phone_bar %}@media (max-width: 1023px) { #bb-toast-host { bottom: calc(4.5rem + env(safe-area-inset-bottom)); } }{% endif %}
   .bb-toast { display:flex; align-items:flex-start; gap:.75rem; max-width:420px; padding:.75rem .875rem; border-radius:var(--radius-xl); background:var(--ink-900); color:#fff; box-shadow:var(--shadow-lg); animation:bb-toastPop 240ms var(--ease-out); pointer-events:auto; }
   .bb-toast-title { font-size:.875rem; font-weight:500; line-height:1.25rem; }
   .bb-toast-body { font-size:.8125rem; color:var(--ink-300); line-height:1.125rem; }
@@ -32,7 +36,7 @@ fired by the same response doesn't tear down the toast before it's seen.
   .bb-toast-close:focus-visible { outline:2px solid #fff; outline-offset:2px; }
   @media (max-width: 1023px) { .bb-toast-close { width:44px; height:44px; margin:-12px -12px -12px auto; } }
 </style>
-<div id="bb-toast-host" aria-live="polite" aria-atomic="true"></div>
+<div id="bb-toast-host" data-testid="toast-host" aria-live="polite" aria-atomic="true"></div>
 <script nonce="{{ request.csp_nonce }}">
 (function () {
   if (window.__bbToastInit) return;

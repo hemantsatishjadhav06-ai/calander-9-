@@ -288,13 +288,17 @@
       form and would fail completely silently. Put the attribute on each
       element that really does handle its own errors.
     {% endcomment %}
-    {# The dark toast (design system: toast). An error stays until it is dismissed, so nobody misses it. #}
-    <div x-data="{ show: false, message: '', timer: null }"
+    {% comment %}
+      The dark toast (design system: toast). An error stays until it is dismissed, so nobody misses it.
+      Below 1024px it rises above the phone bar wherever the bar shows (58px and the safe area, so
+      4.5rem leaves the gap the media page's Folders button keeps); from 1024px it is unchanged.
+    {% endcomment %}
+    <div x-data="{ show: false, message: '', timer: null }" data-testid="error-toast"
          x-show="show"
          x-cloak
          x-transition.opacity
          @htmx-error.window="message = $event.detail.message; show = true; clearTimeout(timer)"
-         class="fixed bottom-6 right-6 max-sm:inset-x-4 max-sm:bottom-4 z-[100] sm:max-w-[420px]"
+         class="fixed {% if nav.phone %}bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6{% else %}bottom-6 max-sm:bottom-4{% endif %} right-6 max-sm:inset-x-4 z-[100] sm:max-w-[420px]"
          role="alert" aria-live="assertive">
         <div class="ui-toast toast-enter">
             <svg class="w-[18px] h-[18px] flex-shrink-0 mt-px text-danger-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>
@@ -895,7 +899,8 @@
                   Below 1024px the phone bar is fixed along the bottom of the screen. This room at the end
                   of the page lets its last line scroll clear of the bar, whichever element scrolls: this
                   one, or main when a page lets its content run over (the calendar). Padding on main
-                  alone would not do for the second: the overflow runs past it.
+                  alone would not do for the second: the overflow runs past it. It tests the bar's own
+                  flag, nav.phone, so a page without the bar (build_nav decides) ends without the room.
                 {% endcomment %}
                 {% if nav.phone %}<div class="lg:hidden h-16 flex-shrink-0" aria-hidden="true" data-phone-bar-room></div>{% endif %}
                 </div>
@@ -904,9 +909,11 @@
             {% comment %}
               The phone bar (below 1024px): Home, Approvals with its count, Calendar, Inbox, and More,
               which opens the menu drawer above. build_nav leaves it out on the post page, whose own
-              Approve & schedule bar takes the bottom of the screen.
+              Approve & schedule bar takes the bottom of the screen, and wherever else a page shows
+              none. No block here on purpose: a template that hid the bar alone would leave its room
+              and the lifted toasts behind, so the decision stays in nav.phone.
             {% endcomment %}
-            {% block phone_bar %}{% spaceless %}
+            {% spaceless %}
             {% if nav.phone %}
             <nav data-testid="phone-bar" data-phone-bar aria-label="Sections" class="lg:hidden fixed inset-x-0 bottom-0 z-20 translucent-bar border-t border-ink-200 pb-[env(safe-area-inset-bottom)]">
                 <ul class="grid grid-cols-5">
@@ -931,7 +938,7 @@
                 </ul>
             </nav>
             {% endif %}
-            {% endspaceless %}{% endblock %}
+            {% endspaceless %}
         </div>
     </div>
 
