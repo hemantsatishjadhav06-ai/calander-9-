@@ -52,6 +52,8 @@ E2E_PINNED_ENVIRONMENT = {
     "EMAIL_DAILY_SEND_LIMIT": "-1",
     "EMAIL_RECIPIENT_HOURLY_LIMIT": "-1",
     "EMAIL_RECIPIENT_DAILY_LIMIT": "-1",
+    # Request invite's site-wide cap at its default: the marketing spec sends one request.
+    "REQUEST_INVITE_HOURLY_LIMIT": "30",
     "ACCOUNT_EMAIL_VERIFICATION": "none",
     "SIGNUP_MODE": "open",
     "SIGNUP_ALLOWLIST": "",
