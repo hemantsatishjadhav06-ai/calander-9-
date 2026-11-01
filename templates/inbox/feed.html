@@ -79,7 +79,7 @@
 
     /* Bulk action bar */
     .bulk-bar {
-        background: var(--ink-900); color: #fff; padding: 8px 12px 8px 16px;
+        background: var(--surface-inverse); color: var(--text-on-inverse); padding: 8px 12px 8px 16px;
         display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
         font-size: 13px; font-weight: 500;
         animation: slideUp 200ms var(--ease-out);
@@ -91,7 +91,7 @@
         transition: background-color var(--dur-instant) var(--ease-out);
     }
     .bulk-bar button:hover { background: rgb(255 255 255 / .12); }
-    .bulk-bar button:focus-visible { outline-color: #fff; }
+    .bulk-bar button:focus-visible { outline-color: var(--text-on-inverse); }
     @media (max-width: 1023px) { .bulk-bar button { min-height: 44px; } }
     @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     @media (prefers-reduced-motion: reduce) { .bulk-bar { animation: none; } }

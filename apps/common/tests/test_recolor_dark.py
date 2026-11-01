@@ -7,6 +7,9 @@ whose light value is the literal they replace, and light rendering cannot move:
 * the inventory of solid dark fills: every ``bg-ink-800|900|950`` on main is listed below with its
   decision, *inverse* (stays dark in both themes: ``bg-inverse``/``text-on-inverse``), *flips*
   (``text-on-fill`` on it) or *light scope* (a platform preview, kept as the platform shows it);
+* the same for a template's own CSS: each rule that paints a dark fill under its text, inverse
+  (``var(--surface-inverse)``/``var(--text-on-inverse)``) or flips (``var(--on-fill)``), which the
+  check cannot decide by itself and so flags while its text is still white;
 * each rewrite, input against output; each check, a temporary template that makes ``--check`` fail
   and name the file; the styles.css rule (no colour literal outside Layer 1 but the palette lock);
 * the contrast pairs these need: edges that stay edges in dark, marks on a card, the toggle knob, and
@@ -15,6 +18,7 @@ whose light value is the literal they replace, and light rendering cannot move:
 
 from __future__ import annotations
 
+import functools
 import re
 from dataclasses import replace
 from pathlib import Path
@@ -157,6 +161,78 @@ def test_the_selection_bars_keep_their_light_look_in_both_themes():
         assert 'data-theme-scope="light"' in bar.tag
 
 
+#: Every rule a template's own CSS writes with a fill that flips under white text on main, with its
+#: decision by role, as the class inventory above: the toasts, the third selection bar, a tooltip and
+#: the selected filter chips are inverse; today's day number and the intelligence pages' primary
+#: button flip (text on the fill). (template, selector of the rule that paints the fill)
+CSS_DARK_FILLS: tuple[tuple[str, str, str], ...] = (
+    ("approvals/partials/_toasts.html", ".bb-toast", INVERSE),
+    ("inbox/feed.html", ".bulk-bar", INVERSE),
+    ("composer/compose.html", ".toast-saved", INVERSE),
+    ("intelligence/playground.html", ".intel-tooltip", INVERSE),
+    ("media_library/library_index.html", ".ml-filter-pill.active", INVERSE),
+    ("media_library/shared_library.html", ".ml-filter-pill.active", INVERSE),
+    ("composer/create_landing.html", ".tag-chip", INVERSE),
+    (
+        "intelligence/_panel_research_content_gaps.html",
+        'label > input[type="checkbox"]:checked + .cg-gap-pill',
+        INVERSE,
+    ),
+    ("calendar/calendar.html", ".cal-day.today .day-num", FLIPS),
+    ("organizations/cross_calendar.html", ".cross-cal-day.today .day-num", FLIPS),
+    ("intelligence/_cta_styles.html", ".intel-cta-primary", FLIPS),
+)
+
+
+@functools.cache
+def _bare_css_partials() -> frozenset[str]:
+    return frozenset(recolor.css_partials(sorted(TEMPLATES.rglob("*.html"))))
+
+
+def _css_rules(template: str) -> list[recolor.CssRule]:
+    text = (TEMPLATES / template).read_text(encoding="utf-8")
+    return recolor.css_rules(text, css=template in _bare_css_partials())
+
+
+@pytest.mark.parametrize(("template", "selector", "decision"), CSS_DARK_FILLS)
+def test_each_dark_fill_in_template_css_carries_its_decision(template, selector, decision):
+    rules = _css_rules(template)
+    (rule,) = [r for r in rules if r.selector == selector and any(p == "background" for p, _, _ in r.declarations)]
+    values = {prop: value.strip() for prop, _, value in rule.declarations}
+    if decision == INVERSE:
+        assert values.get("background") == "var(--surface-inverse)", rule
+        assert values.get("color") == "var(--text-on-inverse)", rule
+        # The children keep white (the palette lock); an outline on the surface is its text colour.
+        for child in rules:
+            if any(part.strip().startswith(selector + " ") for part in child.selector.split(",")):
+                for prop, _, value in child.declarations:
+                    if prop.startswith("outline"):
+                        assert not re.search(r"#fff\b|\bwhite\b", value, re.I), child
+    else:
+        assert recolor.css_fill(values.get("background", "")) == recolor.FLIP, rule
+        assert values.get("color") == "var(--on-fill)", rule
+
+
+def test_every_dark_fill_with_text_in_template_css_is_in_the_inventory():
+    """A rule that paints a dark fill (one that flips, or the inverse surface) and sets its text needs a
+    decision here, unless its text is already the text on a fill."""
+    listed = {(template, selector) for template, selector, _ in CSS_DARK_FILLS}
+    unlisted = []
+    for path in sorted(TEMPLATES.rglob("*.html")):
+        name = recolor.template_name(path)
+        for rule in _css_rules(name):
+            values = {prop: value.strip() for prop, _, value in rule.declarations}
+            background = values.get("background", values.get("background-color", ""))
+            dark = recolor.css_fill(background) in (recolor.FLIP, recolor.INVERSE)
+            if (
+                dark
+                and values.get("color", "var(--on-fill)") != "var(--on-fill)"
+                and (name, rule.selector) not in listed
+            ):
+                unlisted.append(f"{name}: {rule.selector}")
+    assert unlisted == []
+
+
 def test_the_previews_sit_in_the_light_scope_and_keep_the_platforms_white():
     text = (TEMPLATES / "composer/partials/preview_panel.html").read_text(encoding="utf-8")
     (card,) = [element for element in recolor.elements(text) if "preview-card" in element.classes]
@@ -220,6 +296,16 @@ def dark(text: str, name: str = "x/page.html") -> str:
             '<div class="bg-ink-900 text-white"><button class="text-danger-300 hover:text-danger-200">Delete</button></div>',
             '<div data-theme-scope="light" class="bg-inverse text-on-inverse">'
             '<button class="text-danger-300 hover:text-danger-200">Delete</button></div>',
+        ),
+        # ... and so does an inverse element whose own text uses such a step.
+        (
+            '<div class="bg-inverse text-danger-200">Delete</div>',
+            '<div data-theme-scope="light" class="bg-inverse text-danger-200">Delete</div>',
+        ),
+        # A class string whose other branch paints its own fill is not judged by that branch's text.
+        (
+            "<b :class=\"on ? 'bg-inverse text-on-inverse' : 'bg-surface text-ink-700 hover:bg-ink-25'\"></b>",
+            "<b :class=\"on ? 'bg-inverse text-on-inverse' : 'bg-surface text-ink-700 hover:bg-ink-25'\"></b>",
         ),
         # Scrims: ink-950 at any opacity and ink-900 from 30 % are behind dialogs or over photos.
         ('<div class="ui-overlay bg-ink-950/35"></div>', '<div class="ui-overlay bg-scrim/35"></div>'),
@@ -424,6 +510,19 @@ def test_the_fixture_tree_is_clean(tree, capsys):
             '<div class="bg-inverse text-on-inverse"><b class="hover:text-danger-200"></b></div>',
             "hover:text-danger-200 flips on an inverse surface",
         ),
+        # The inverse element's own text is on the inverse surface too.
+        ('<div class="bg-inverse text-brand-700">x</div>', "text-brand-700 flips on an inverse surface"),
+        # White on a fill that flips, written in the template's own CSS (a rule, or a style= attribute).
+        ("<style>.bar { background: var(--ink-900); color: #fff; }</style>", "color: #fff on a fill that flips"),
+        (
+            "<style>@media (min-width: 1px) { .tip { color: white; background-color: var(--neutral-800) } }</style>",
+            "color: white on a fill that flips",
+        ),
+        ('<p style="background: var(--ink-700); color: #FFFFFF">x</p>', "color: #FFFFFF on a fill that flips"),
+        (
+            "<style>.cta { background: var(--brand-700); color: #fff !important; }</style>",
+            "color: #fff on a fill that flips",
+        ),
         ('<div class="border border-ink-300"></div>', "border-ink-300 is a text grey in dark"),
         ("<style>.a{border:1px solid var(--ink-300)}</style>", "border: var(--ink-300) is a text grey in dark"),
         ('<p style="outline-color: var(--ink-300)">x</p>', "outline-color: var(--ink-300) is a text grey in dark"),
@@ -462,6 +561,21 @@ def test_a_bare_css_partial_s_ink_300_edge_fails(tree, capsys):
     assert "_script.html" not in out  # a script is not CSS
 
 
+def test_white_on_a_dark_fill_in_template_css_names_the_line_of_the_white(tree, capsys):
+    tree("base.html", '<html><link href="css/dist/styles.css">{% block content %}{% endblock %}</html>')
+    tree(
+        "inbox/page.html",
+        '{% extends "base.html" %}{% block content %}<style>\n'
+        "  .bar {\n    background: var(--ink-900);\n    color: #fff;\n  }\n"
+        '  {% include "inbox/_bar.html" %}\n</style>{% endblock %}',
+    )
+    tree("inbox/_bar.html", "/* The bar's chip. */\n.chip { background: var(--ink-950);\n  color: white; }\n")
+    code, out = run_check(capsys)
+    assert code == 1
+    assert "templates/inbox/page.html:4: color: #fff on a fill that flips" in out
+    assert "templates/inbox/_bar.html:3: color: white on a fill that flips" in out
+
+
 @pytest.mark.parametrize(
     "markup",
     [
@@ -475,6 +589,17 @@ def test_a_bare_css_partial_s_ink_300_edge_fails(tree, capsys):
         '<div data-theme-scope="light" class="bg-inverse"><b class="hover:text-danger-200"></b></div>',
         '<div class="bg-scrim/60 text-white"><i class="bg-white/20"></i></div>',
         '<span class="pi-linkedin text-white"></span>',
+        '<span class="bg-inverse text-on-inverse hover:text-white"><i class="text-ink-300"></i></span>',
+        "<b :class=\"on ? 'bg-inverse text-on-inverse' : 'bg-surface text-ink-700'\"></b>",
+        '<b class="bg-inverse text-on-inverse focus-visible:outline-brand-700 ring-1 ring-ink-200"></b>',
+        # Template CSS: the inverse surface with white children, text on a fill, white over a photo's
+        # scrim, white with no fill in its rule, a kept line and the light scope.
+        "<style>.bar { background: var(--surface-inverse); color: var(--text-on-inverse); }\n"
+        ".bar button { color: #fff; outline-color: var(--text-on-inverse); }</style>",
+        "<style>.today { background: var(--ink-900); color: var(--on-fill); }</style>",
+        "<style>.x { background: rgb(14 17 20 / .6); color: #fff; } .y { color: white; }</style>",
+        "<style>.d { background: var(--ink-900); color: #fff; } /* recolor: keep */</style>",
+        '<div data-theme-scope="light"><p style="background: var(--ink-900); color: #fff">x</p></div>',
     ],
 )
 def test_what_the_checks_accept(tree, capsys, markup):
@@ -494,9 +619,14 @@ def test_a_page_without_the_stylesheet_may_use_white(tree, capsys):
         ("<style>.a { color: #123456; }</style>", "part.html:2", "#123456"),
         ('<p style="color: rgb(1 2 3)">x</p>', "part.html:2", "rgb("),
         ("<p :style=\"'background: #fff'\">x</p>", "part.html:2", "#fff"),
+        ('<p :style="`color: #123456; width: ${w}%`">x</p>', "part.html:2", "#123456"),
         ('<svg><path fill="#123456"/></svg>', "part.html:2", "#123456"),
         ('<p class="bg-[#123456]">x</p>', "part.html:2", "#123456"),
         ('<img class="shadow-[0_1px_2px_rgb(1_2_3/.24)]">', "part.html:2", "rgb("),
+        # A named colour is a literal too.
+        ("<style>.a { color: white; }</style>", "part.html:2", "white"),
+        ('<p style="background: Black">x</p>', "part.html:2", "Black"),
+        ('<svg><path stroke="white"/></svg>', "part.html:2", "white"),
         # A partial a <style> block includes is CSS from its first line (as calendar's filter styles).
         ('<style>{% include "studio/_styles.html" %}</style>', "_styles.html:2", "#123456"),
     ],
@@ -528,6 +658,9 @@ def test_a_raw_colour_in_a_dark_ready_page_s_tree_fails(tree, capsys, monkeypatc
         '<div data-theme-scope="light"><p style="color: #123456">x</p><svg><path fill="#FF0000"/></svg></div>',
         '<p class="bg-[#0A66C2]">in</p><svg><path fill="#FF0000"/></svg>',  # a platform's own colours
         '{% include "social_accounts/partials/_platform_icon.html" %}',
+        # A named colour's letters inside a property, a token or a file name are not one.
+        '<p style="white-space: nowrap; color: var(--color-white)">x</p>',
+        "<style>.a { white-space: pre; background: url(/img/black-bg.svg); }</style>",
     ],
 )
 def test_raw_colours_the_rule_exempts(tree, capsys, monkeypatch, markup):

@@ -56,7 +56,7 @@ import argparse
 import difflib
 import re
 import sys
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -711,6 +711,7 @@ ARBITRARY_SHADOW_RE = re.compile(r"(?<![\w-])shadow-\[([^\]\s]+)\]")
 SHADOW_INK_RE = re.compile(r"rgba?\(14[,_\s]+17[,_\s]+20[,_\s/]+([\d.]+)\)")
 CSS_EDGE_PROPERTY_RE = re.compile(r"^(?:border(?:-[a-z-]+)?|outline(?:-color)?|box-shadow|column-rule(?:-color)?)$")
 CSS_DECLARATION_RE = re.compile(r"([-\w]+)\s*:([^;{}]*)")
+STYLE_ANY_ATTR_RE = re.compile(r"""\s(?:x-bind)?:?style=(["'])(.*?)\1""", re.S)
 INCLUDE_RE = re.compile(r"""{%\s*include\s+["']([^"']+)["']""")
 INK300_VAR_RE = re.compile(r"var\(\s*--ink-300\s*\)")
 EDGE_TOKEN = "var(--border-hover)"
@@ -730,6 +731,29 @@ def _mask(text: str) -> str:
     text = re.sub(r"{%\s*comment\b.*?%}.*?{%\s*endcomment\s*%}", _blank, text, flags=re.S)
     text = re.sub(r"<!--.*?-->", _blank, text, flags=re.S)
     return re.sub(r"{#.*?#}|{{.*?}}|{%.*?%}", _blank, text, flags=re.S)
+
+
+def _mask_css_comments(css: str) -> str:
+    """*css* with its comments blanked (same length); a ``/*`` inside a string is not a comment."""
+    out = list(css)
+    quote = ""
+    index = 0
+    while index < len(css):
+        char = css[index]
+        if quote:
+            quote = "" if char == quote else quote
+        elif char in "\"'":
+            quote = char
+        elif css.startswith("/*", index):
+            end = css.find("*/", index + 2)
+            end = len(css) if end < 0 else end + 2
+            for blank in range(index, end):
+                if out[blank] != "\n":
+                    out[blank] = " "
+            index = end
+            continue
+        index += 1
+    return "".join(out)
 
 
 @dataclass
@@ -952,6 +976,51 @@ def _flips_on_inverse(token: Token, constant: frozenset[str]) -> bool:
     return bool(SCALE_STEP_RE.match(token.colour)) and token.colour not in constant
 
 
+def _on_own_fill(token: Token) -> bool:
+    """A colour an element draws on its own fill: not the fill itself, and not a ring or an outline,
+    which are drawn outside it, on what is around it."""
+    return token.util not in ("bg", "ring", "outline")
+
+
+def _sole_inverse(own: dict[str, set[str]]) -> bool:
+    """The element's base fill is the inverse surface and nothing else. A class string whose branches
+    paint other fills (``on ? 'bg-inverse text-on-inverse' : 'bg-surface text-ink-700'``) is not
+    judged by its own colours: they may belong to another branch."""
+    return own.get("", set()) == {INVERSE}
+
+
+def _on_inverse_tokens(found: list[Element], element: Element, own: dict[str, set[str]]) -> Iterator[Token]:
+    """What an inverse element draws on its surface: its own colours on its fill (when the inverse
+    surface is its only fill) and its children's, outside the light scope."""
+    if _sole_inverse(own):
+        yield from (token for token in element.tokens if _on_own_fill(token))
+    for child in found:
+        if element.start < child.start < element.close and not child.in_light_scope:
+            yield from child.tokens
+
+
+def _white_on_flip(token: Token, own: dict[str, set[str]], around: set[str]) -> bool:
+    """``text-white``, ``bg-white/NN`` or ``hover:bg-white/NN`` drawn on a fill that flips, where white
+    (which does not) would sit on a light fill in dark. Text reads the element's fill for its state (the
+    base fill when the state paints none) or, when the element paints none, the nearest ancestor's
+    (unless that is inverse or dark); a white tint reads any of the element's fills and the ancestor's.
+    One decision for the codemod (``text-on-fill``) and the check."""
+    if token.util == "text" and token.colour == "white":
+        state_fill = own.get(token.state) or own.get("", set())
+        return FLIP in state_fill or (not state_fill and FLIP in around and not ({INVERSE, DARK} & around))
+    if token.util == "bg" and token.colour == "white" and token.mod:
+        own_fill = {kind for kinds in own.values() for kind in kinds}
+        return not ({INVERSE, DARK} & around) and (FLIP in own_fill or FLIP in around)
+    return False
+
+
+def _unwritten_flip_states(element: Element, own: dict[str, set[str]]) -> list[str]:
+    """The states whose own fill flips and that write no text colour: a base ``text-white`` shows on
+    them (the codemod adds ``<state>:text-on-fill``; the check flags the white)."""
+    written = {token.state for token in element.tokens if token.util == "text"}
+    return [state for state, kinds in own.items() if state and FLIP in kinds and state not in written]
+
+
 def _scrim(m: re.Match) -> str:
     chain, step, alpha = m.group(1), m.group(2), int(m.group(3))
     if step == "950" or alpha >= 30:
@@ -980,24 +1049,112 @@ def _rewrite_outside(text: str, pattern: re.Pattern, repl, ranges: list[tuple[in
     return pattern.sub(guarded, text)
 
 
-def css_spans(text: str, *, css: bool = False) -> list[tuple[int, int]]:
-    """Where a template writes CSS: each ``<style>`` block's body and ``style=`` (or ``:style=``)
-    value, or the whole template when it is bare CSS (*css*: a partial a ``<style>`` block includes)."""
+def css_spans(text: str, *, css: bool = False) -> list[tuple[int, int, bool]]:
+    """Where a template writes CSS, (start, end, a style sheet): each ``<style>`` block's body (a sheet
+    of rules) and ``style=`` (or ``:style=``) value (one rule's declarations), or the whole template
+    when it is bare CSS (*css*: a partial a ``<style>`` block includes)."""
     if css:
-        return [(0, len(text))]
-    spans = [(m.start(2), m.end(2)) for m in STYLE_BLOCK_RE.finditer(text)]
-    return spans + [(m.start(2), m.end(2)) for m in STYLE_ANY_ATTR_RE.finditer(text)]
+        return [(0, len(text), True)]
+    spans = [(m.start(2), m.end(2), True) for m in STYLE_BLOCK_RE.finditer(text)]
+    return spans + [(m.start(2), m.end(2), False) for m in STYLE_ANY_ATTR_RE.finditer(text)]
+
+
+@dataclass
+class CssRule:
+    """One block of a template's CSS: its selector (``""`` for a ``style=`` value) and its own
+    declarations, (property, where its value starts in the template, the value)."""
+
+    selector: str
+    declarations: list[tuple[str, int, str]]
+
+
+def _blocks(css: str) -> list[tuple[int, int]]:
+    """(``{``, its ``}``) of each block in *css*, inner blocks before the block holding them."""
+    stack: list[int] = []
+    found: list[tuple[int, int]] = []
+    for index, char in enumerate(css):
+        if char == "{":
+            stack.append(index)
+        elif char == "}" and stack:
+            found.append((stack.pop(), index))
+    return found
+
+
+def _declarations(css: str, offset: int) -> list[tuple[str, int, str]]:
+    """(property, where its value starts, the value) of each declaration in *css*, which starts at
+    *offset* in its template."""
+    return [(m.group(1).lower(), offset + m.start(2), m.group(2)) for m in CSS_DECLARATION_RE.finditer(css)]
+
+
+def _rules_in(css: str, offset: int) -> list[CssRule]:
+    """The rules of a style sheet (comments and template tags already blanked) that starts at *offset*
+    in its template; a nested block's declarations are its own, not its parent's."""
+    blocks = _blocks(css)
+    rules = []
+    for open_, close in blocks:
+        body = list(css[open_ + 1 : close])
+        for inner_open, inner_close in blocks:
+            if open_ < inner_open and inner_close < close:
+                for index in range(inner_open - open_ - 1, inner_close - open_):
+                    body[index] = " " if body[index] != "\n" else "\n"
+        prelude_start = max(css.rfind(char, 0, open_) for char in "{};") + 1
+        selector = " ".join(css[prelude_start:open_].split())
+        rules.append(CssRule(selector, _declarations("".join(body), offset + open_ + 1)))
+    return rules
+
+
+def css_rules(text: str, *, css: bool = False) -> list[CssRule]:
+    """The rules of a template's CSS (``css_spans``), read with comments and template tags blanked: a
+    colon or a brace in a tag or a comment does not count. A ``style=`` value is one rule, read whole:
+    the braces of an Alpine value (an object, a template literal's ``${…}``) are not blocks. A value is
+    the blanked one, as long as the text it stands for."""
+    masked = _mask(text)
+    rules = []
+    for start, end, sheet in css_spans(text, css=css):
+        css_text = _mask_css_comments(masked[start:end])
+        rules += _rules_in(css_text, start) if sheet else [CssRule("", _declarations(css_text, start))]
+    return rules
 
 
 def css_declarations(text: str, *, css: bool = False) -> list[tuple[str, int, str]]:
-    """(property, where its value starts, the value) of each declaration in a template's CSS
-    (``css_spans``), read with comments and template tags blanked: a colon in a tag or a comment does
-    not start one. The value is the blanked one, as long as the text it stands for."""
-    masked = _mask(text)
+    """(property, where its value starts, the value) of each declaration in a template's CSS, in the
+    order written (a selector such as ``a:hover`` is not one)."""
+    return sorted((d for rule in css_rules(text, css=css) for d in rule.declarations), key=lambda d: d[1])
+
+
+CSS_VAR_RE = re.compile(r"^\s*var\(\s*--([a-z]+(?:-[a-z]+)*(?:-\d+)?)\s*\)\s*(?:!\s*important\s*)?$", re.I)
+CSS_WHITE_RE = re.compile(r"^\s*(#fff(?:f|fff|fffff)?|white)\s*(?:!\s*important\s*)?$", re.I)
+
+
+def css_fill(value: str) -> str | None:
+    """What a CSS ``background`` value paints, as ``fill_kind`` reads a ``bg-*`` utility: the inverse
+    surface, a fill that flips (``var(--ink-900)``; the ``--neutral-*`` aliases are the ink steps) or a
+    light fill. Anything but one token (a gradient, an image, a literal) is not judged here."""
+    m = CSS_VAR_RE.match(value)
+    if not m:
+        return None
+    name = m.group(1).lower()
+    if name == "surface-inverse":
+        return INVERSE
+    return fill_kind("bg", re.sub(r"^neutral-", "ink-", name), "")
+
+
+def css_white_on_flip(text: str, ranges: list[tuple[int, int]], *, css: bool = False) -> list[tuple[int, str]]:
+    """(line, problem) for each rule of a template's CSS that writes white text (``#fff``, ``white``)
+    on its own background that flips: white does not flip, so in dark it sits on a light fill. Outside
+    the light scope's *ranges* and ``recolor: keep`` lines."""
     found = []
-    for start, end in css_spans(text, css=css):
-        for declaration in CSS_DECLARATION_RE.finditer(_mask_css_comments(masked[start:end])):
-            found.append((declaration.group(1).lower(), start + declaration.start(2), declaration.group(2)))
+    for rule in css_rules(text, css=css):
+        background = ""
+        for prop, _, value in rule.declarations:
+            if prop in ("background", "background-color"):
+                background = value  # the last one wins
+        if css_fill(background) != FLIP:
+            continue
+        for prop, start, value in rule.declarations:
+            white = CSS_WHITE_RE.match(value) if prop == "color" else None
+            if white and not (_in(ranges, start) or _kept(text, start + white.start(1))):
+                found.append((_line_of(text, start + white.start(1)), f"color: {white.group(1)} on a fill that flips"))
     return found
 
 
@@ -1115,39 +1272,29 @@ def _dark_in_context(text: str, name: str) -> str:
             ):
                 edits.append((token.start, token.end, _token_text(token, "inverse")))
             elif token.util == "text" and token.colour == "white":
-                if FLIP in state_fill:
+                if _white_on_flip(token, own, around):
                     edits.append((token.start, token.end, _token_text(token, "on-fill")))
                 elif INVERSE in state_fill and index in inverse:
                     edits.append((token.start, token.end, _token_text(token, "on-inverse")))
-                elif not state_fill and FLIP in around and not ({INVERSE, DARK} & around):
-                    edits.append((token.start, token.end, _token_text(token, "on-fill")))
                 elif not token.state:
                     base_white = token
             elif token.util == "bg" and token.colour == "white" and token.mod:
                 if {INVERSE, DARK} & around:
                     continue
-                own_fill = {kind for kinds in own.values() for kind in kinds}
-                colour = "on-fill" if FLIP in own_fill or FLIP in around else "surface"
+                colour = "on-fill" if _white_on_flip(token, own, around) else "surface"
                 edits.append((token.start, token.end, _token_text(token, colour)))
             elif token.colour == "white" and token.util.startswith(("ring", "outline", "border", "divide")):
                 edge = _edge_colour(own.get("", set()) - {LIGHT}, around)
                 if edge:
                     edits.append((token.start, token.end, _token_text(token, edge)))
         if base_white is not None:
-            written = {token.state for token in element.tokens if token.util == "text"}
-            extra = [
-                f" {state}text-on-fill"
-                for state, kinds in own.items()
-                if state and FLIP in kinds and state not in written
-            ]
+            extra = [f" {state}text-on-fill" for state in _unwritten_flip_states(element, own)]
             if extra:
                 edits.append((base_white.end, base_white.end, "".join(extra)))
-        # An inverse surface whose children use a step that flips keeps its light look in both themes.
+        # An inverse surface whose own text or children use a step that flips keeps its light look in
+        # both themes.
         if (index in inverse or any(t.util == "bg" and t.colour == "inverse" for t in element.tokens)) and any(
-            _flips_on_inverse(token, constant)
-            for child in found
-            if element.start < child.start < element.close and not child.in_light_scope
-            for token in child.tokens
+            _flips_on_inverse(token, constant) for token in _on_inverse_tokens(found, element, own)
         ):
             at = element.start + 1 + len(element.name)
             edits.append((at, at, f" {SCOPE_ATTR}"))
@@ -1274,10 +1421,12 @@ def dark_problems(text: str, *, css: bool = False) -> list[tuple[int, str]]:
     """(line, problem) for a template that loads the stylesheet: what would read wrong in dark.
 
     bg-white outside the light scope; text-white, bg-white/NN or hover:bg-white/NN on an element whose
-    own fill or nearest ancestor's fill flips; a colour that flips on an inverse surface (without the
-    light scope that keeps its light look); an ink-300 edge, in a utility or in the template's CSS (a
-    ``<style>`` block, ``style=``, or the whole template when *css* says it is bare CSS, included inside
-    a parent's ``<style>`` block). ``recolor: keep`` lines are accepted.
+    own fill or nearest ancestor's fill flips, and white text on a background that flips in a rule of
+    the template's CSS; a colour that flips on an inverse surface, an ancestor's or the element's own
+    (without the light scope that keeps its light look); an ink-300 edge, in a utility or in the
+    template's CSS. The template's CSS is its ``<style>`` blocks and ``style=`` values, or the whole
+    template when *css* says it is bare CSS, included inside a parent's ``<style>`` block.
+    ``recolor: keep`` lines are accepted.
     """
     found_elements = elements(text)
     ranges = _scope_ranges(found_elements)
@@ -1286,39 +1435,39 @@ def dark_problems(text: str, *, css: bool = False) -> list[tuple[int, str]]:
         (_line_of(text, start), f"{prop}: var(--ink-300) is a text grey in dark")
         for start, _, prop in ink300_css_edges(text, ranges, css=css)
     ]
+    problems += css_white_on_flip(text, ranges, css=css)
     fills = [_own_fills(element) for element in found_elements]
     constant = constant_steps()
     for element, own in zip(found_elements, fills, strict=True):
         if element.in_light_scope:
             continue
         around = _ancestor_fill(fills, element)
-        on_inverse = INVERSE in around
-        written = {token.state for token in element.tokens if token.util == "text"}
+        own_inverse = _sole_inverse(own)
         for token in element.tokens:
             if _kept(text, token.start):
                 continue
             line = _line_of(text, token.start)
-            state_fill = own.get(token.state) or own.get("", set())
             if token.util == "text" and token.colour == "white":
-                flips = FLIP in state_fill or (not state_fill and FLIP in around and not ({INVERSE, DARK} & around))
-                if not flips and not token.state:
-                    flips = any(state and FLIP in kinds and state not in written for state, kinds in own.items())
+                flips = _white_on_flip(token, own, around) or (
+                    not token.state and bool(_unwritten_flip_states(element, own))
+                )
                 if flips:
                     problems.append((line, f"{token.text} on a fill that flips"))
-            elif token.util == "bg" and token.colour == "white" and token.mod:
-                own_fill = {kind for kinds in own.values() for kind in kinds}
-                if not ({INVERSE, DARK} & around) and (FLIP in own_fill or FLIP in around):
-                    problems.append((line, f"{token.text} on a fill that flips"))
+            elif _white_on_flip(token, own, around):
+                problems.append((line, f"{token.text} on a fill that flips"))
+            on_inverse = INVERSE in around or (own_inverse and _on_own_fill(token))
             if on_inverse and _flips_on_inverse(token, constant):
                 problems.append((line, f"{token.text} flips on an inverse surface"))
     return sorted(problems)
 
 
+#: A colour literal: a hex, ``rgb()``/``hsl()``, or the named ``white`` and ``black`` (as a word of the
+#: value, not in ``white-space``, ``var(--color-white)`` or a file name).
 RAW_COLOUR_RE = re.compile(
     r"(?<![&\w{])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])|(?<![a-zA-Z-])(?:rgba?|hsla?)\("
+    r"|(?<![\w.$/#-])(?i:white|black)(?![\w./-])"
 )
 SVG_COLOUR_ATTR_RE = re.compile(r"""\s(?:fill|stroke|stop-color|flood-color|lighting-color|color)=(["'])(.*?)\1""")
-STYLE_ANY_ATTR_RE = re.compile(r"""\s(?:x-bind)?:?style=(["'])(.*?)\1""", re.S)
 ARBITRARY_RE = re.compile(r"(?<![\w-])[a-z][\w-]*-\[[^\]\s]+\]")
 
 
@@ -1345,29 +1494,6 @@ def raw_colour_problems(text: str, *, css: bool = False) -> list[tuple[int, str]
                 continue
             found.add((_line_of(text, m.start()), f"raw colour {literal}"))
     return sorted(found)
-
-
-def _mask_css_comments(css: str) -> str:
-    """*css* with its comments blanked (same length); a ``/*`` inside a string is not a comment."""
-    out = list(css)
-    quote = ""
-    index = 0
-    while index < len(css):
-        char = css[index]
-        if quote:
-            quote = "" if char == quote else quote
-        elif char in "\"'":
-            quote = char
-        elif css.startswith("/*", index):
-            end = css.find("*/", index + 2)
-            end = len(css) if end < 0 else end + 2
-            for blank in range(index, end):
-                if out[blank] != "\n":
-                    out[blank] = " "
-            index = end
-            continue
-        index += 1
-    return "".join(out)
 
 
 def dark_ready_templates() -> set[str]:

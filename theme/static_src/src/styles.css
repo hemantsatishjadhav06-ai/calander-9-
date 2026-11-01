@@ -7,6 +7,11 @@
 @source "../../../apps/**/templates/**/*.html";
 @source "../../../apps/**/*.py";
 @source "../../../static/js/*.js";
+/* Tests are not markup: their fixture strings (the utilities recolor forbids among them) stay out. */
+@source not "../../../apps/**/tests/**";
+@source not "../../../apps/**/test_*.py";
+@source not "../../../apps/**/tests.py";
+@source not "../../../apps/**/conftest.py";
 
 /* ═══════════════════════════════════════════════════════════════════════
    SM Bean design tokens: "Quiet graphite + Pine" (design system v2, Oct 2026)
