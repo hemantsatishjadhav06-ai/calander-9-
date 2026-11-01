@@ -17,11 +17,12 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
+import time
 from collections.abc import Callable
 from typing import Any
 
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import transaction
+from django.db import OperationalError, transaction
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
@@ -73,19 +74,42 @@ def harness_only(view: Callable[..., HttpResponse]) -> Callable[..., HttpRespons
     return csrf_exempt(wrapped)
 
 
+# A fixture runs while the harness's worker thread keeps working on the same rows, so Postgres can
+# end a fixture's transaction as one side of a deadlock. Postgres asks the loser to run again; the
+# fixture's transaction is rolled back whole, so running it again is safe.
+_DEADLOCK_ATTEMPTS = 3
+_DEADLOCK_PAUSE_SECONDS = 0.2
+
+
+def _is_deadlock(exc: BaseException) -> bool:
+    if not isinstance(exc, OperationalError):
+        return False
+    cause = exc.__cause__
+    if getattr(cause, "sqlstate", None) == "40P01":
+        return True
+    return str(exc).startswith("deadlock detected")
+
+
 def _run(step: registry.Step, payload: dict[str, Any], *, atomic: bool) -> JsonResponse:
-    try:
-        if atomic:
-            with transaction.atomic():
+    attempts = _DEADLOCK_ATTEMPTS if atomic else 1
+    for attempt in range(1, attempts + 1):
+        try:
+            if atomic:
+                with transaction.atomic():
+                    result = step(payload)
+            else:
                 result = step(payload)
-        else:
-            result = step(payload)
-    except registry.PayloadError as exc:
-        return _json({"error": str(exc)}, status=400)
-    except Exception as exc:
-        logger.exception("e2e step failed")
-        return _json({"error": f"{type(exc).__name__}: {exc}"}, status=500)
-    return _json(result)
+        except registry.PayloadError as exc:
+            return _json({"error": str(exc)}, status=400)
+        except Exception as exc:
+            if attempt < attempts and _is_deadlock(exc):
+                logger.warning("e2e step met a deadlock; running it again (attempt %s of %s)", attempt + 1, attempts)
+                time.sleep(_DEADLOCK_PAUSE_SECONDS * attempt)
+                continue
+            logger.exception("e2e step failed")
+            return _json({"error": f"{type(exc).__name__}: {exc}"}, status=500)
+        return _json(result)
+    raise AssertionError("unreachable: the last attempt always returns")
 
 
 @harness_only

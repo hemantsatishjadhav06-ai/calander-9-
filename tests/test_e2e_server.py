@@ -738,6 +738,50 @@ def test_registered_fixture_and_probe_are_callable_by_name(client, e2e_urls, scr
 
 
 @pytest.mark.django_db
+def test_a_fixture_that_meets_a_deadlock_runs_again(client, e2e_urls, scratch_registry, monkeypatch):
+    """Postgres ends one side of a deadlock and asks for a retry; the worker may hold the other side."""
+    from django.db.utils import OperationalError
+
+    from tests.e2e.server import views
+
+    registry = scratch_registry
+    monkeypatch.setattr(views, "_DEADLOCK_PAUSE_SECONDS", 0)
+    calls = {"once": 0, "always": 0, "other": 0}
+
+    @registry.fixture("selftest_deadlock_once")
+    def deadlock_once(payload: dict[str, Any]) -> dict[str, Any]:
+        calls["once"] += 1
+        if calls["once"] == 1:
+            raise OperationalError("deadlock detected\nDETAIL:  Process 1 waits for ShareLock on transaction 2")
+        return {"ok": True}
+
+    @registry.fixture("selftest_deadlock_always")
+    def deadlock_always(payload: dict[str, Any]) -> dict[str, Any]:
+        calls["always"] += 1
+        raise OperationalError("deadlock detected")
+
+    @registry.fixture("selftest_other_error")
+    def other_error(payload: dict[str, Any]) -> dict[str, Any]:
+        calls["other"] += 1
+        raise OperationalError("server closed the connection unexpectedly")
+
+    response = _post_json(client, "/__e2e__/fixture/selftest_deadlock_once", {})
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert calls["once"] == 2
+
+    response = _post_json(client, "/__e2e__/fixture/selftest_deadlock_always", {})
+    assert response.status_code == 500
+    assert "deadlock detected" in response.json()["error"]
+    assert calls["always"] == 3
+
+    # Only a deadlock is retried: any other failure answers at once.
+    response = _post_json(client, "/__e2e__/fixture/selftest_other_error", {})
+    assert response.status_code == 500
+    assert calls["other"] == 1
+
+
+@pytest.mark.django_db
 def test_unknown_names_bad_bodies_and_wrong_methods(client, e2e_urls):
     assert _post_json(client, "/__e2e__/fixture/no_such_fixture", {}).status_code == 404
     assert client.get("/__e2e__/probe/no_such_probe").status_code == 404
