@@ -278,11 +278,18 @@ class _Display:
     utility: str
     low: int  # from this width (``lg:`` is 1024)
     high: int  # below this width (``max-lg:`` is 1024)
-    order: int  # its place in the cascade: at rest, then ``max-*``, then ``sm:`` … ``2xl:`` in order
+
+    @property
+    def order(self) -> tuple[int, int]:
+        """Its place in the cascade, as Tailwind 4 writes the rules: at rest first, then ``max-*`` from
+        the widest down (``max-lg:`` before ``max-sm:``), then ``sm:`` … ``2xl:``; a ``max-*`` stacked
+        on a breakpoint comes after that breakpoint alone (``md:max-lg:`` after ``md:``, before ``lg:``).
+        The later rule wins where both apply."""
+        return (self.low, -self.high)
 
     @property
     def responsive(self) -> bool:
-        return self.order > -2
+        return self.low > 0 or self.high < UNBOUNDED_PX
 
 
 def _display(word: str) -> _Display | None:
@@ -300,8 +307,7 @@ def _display(word: str) -> _Display | None:
             high = min(high, BREAKPOINT_PX[variant[4:]])
         else:
             return None
-    order = low if low else (-1 if high < UNBOUNDED_PX else -2)
-    return _Display(utility, low, high, order)
+    return _Display(utility, low, high)
 
 
 def _shows_at(classes: frozenset[str], width: int) -> bool:
@@ -584,6 +590,16 @@ def test_what_is_not_a_primary_of_the_page(html):
         ('<button class="ui-btn ui-btn-primary max-xl:hidden">x</button>', {PHONE: 0, DESKTOP: 1}),
         ('<button class="ui-btn ui-btn-primary max-md:hidden">x</button>', {PHONE: 1, DESKTOP: 1}),
         ('<button class="ui-btn ui-btn-primary max-lg:hidden 2xl:hidden">x</button>', {PHONE: 0, DESKTOP: 1}),
+        # Tailwind writes max-* from the widest down (max-lg, max-md, max-sm), so the narrower one wins.
+        ('<button class="ui-btn ui-btn-primary max-lg:hidden max-sm:flex">x</button>', {PHONE: 1, DESKTOP: 1}),
+        ('<button class="ui-btn ui-btn-primary max-lg:hidden max-md:flex">x</button>', {PHONE: 1, DESKTOP: 1}),
+        ('<button class="ui-btn ui-btn-primary max-sm:hidden max-lg:flex">x</button>', {PHONE: 1, DESKTOP: 1}),
+        ('<button class="ui-btn ui-btn-primary hidden max-lg:flex">x</button>', {PHONE: 1, DESKTOP: 0}),
+        # A min and a max stacked come after the min alone: md:max-lg:hidden wins over md:inline-flex.
+        (
+            '<button class="ui-btn ui-btn-primary hidden md:inline-flex md:max-lg:hidden">x</button>',
+            {PHONE: 0, DESKTOP: 1},
+        ),
         # A state variant does not decide where it shows at rest.
         ('<button class="ui-btn ui-btn-primary lg:hidden lg:group-hover:flex">x</button>', {PHONE: 1, DESKTOP: 0}),
         ('<button class="ui-btn ui-btn-primary print:hidden">x</button>', {PHONE: 1, DESKTOP: 1}),
