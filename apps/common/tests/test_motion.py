@@ -30,10 +30,9 @@ from pathlib import Path
 import pytest
 
 from apps.common import screens
-from tools import recolor
+from apps.common.tests.test_components import _css_rules, gated_tree
 
 ROOT = Path(__file__).resolve().parents[3]
-STYLES = ROOT / "theme" / "static_src" / "src" / "styles.css"
 BASE = ROOT / "templates" / "base.html"
 
 REDUCE = "@media (prefers-reduced-motion: reduce)"
@@ -58,29 +57,6 @@ GLOBAL_RULE = (
 Rule = tuple[tuple[str, ...], str, str]
 
 
-def css_rules(css: str) -> list[Rule]:
-    """``(the at-rules around it, its prelude, its declarations)`` for every rule holding declarations,
-    keyframe steps included (their prelude is ``from``, ``to`` or a percentage)."""
-    css = recolor._mask_css_comments(css)
-    found: list[Rule] = []
-    stack: list[tuple[str, int]] = []
-    start = 0
-    for index, char in enumerate(css):
-        if char == "{":
-            stack.append((" ".join(css[start:index].split()), index))
-            start = index + 1
-        elif char == "}":
-            if stack:
-                prelude, opening = stack.pop()
-                body = css[opening + 1 : index]
-                if "{" not in body and not prelude.startswith("@"):
-                    found.append((tuple(p for p, _ in stack), prelude, " ".join(body.split())))
-            start = index + 1
-        elif char == ";":
-            start = index + 1
-    return found
-
-
 def declarations(body: str) -> dict[str, str]:
     """A rule's declarations by property (the last one wins, as in the browser)."""
     found: dict[str, str] = {}
@@ -91,10 +67,10 @@ def declarations(body: str) -> dict[str, str]:
     return found
 
 
-def root_tokens(css: str) -> dict[str, str]:
+def root_tokens(rules: Sequence[Rule]) -> dict[str, str]:
     """Every custom property set on a bare ``:root`` outside any at-rule (the light Layer 2)."""
     found: dict[str, str] = {}
-    for around, prelude, body in css_rules(css):
+    for around, prelude, body in rules:
         if prelude == ":root" and not around:
             found.update({k: v for k, v in declarations(body).items() if k.startswith("--")})
     return found
@@ -135,21 +111,22 @@ def times(property_name: str, value: str) -> list[str]:
 MOTION_PROPERTIES = ("transition", "transition-duration", "animation", "animation-duration")
 
 
-def motion_rules(css: str) -> list[Rule]:
+def motion_rules(rules: Sequence[Rule]) -> list[Rule]:
     """The rules whose selector names a ``.motion-…`` class, outside the reduced-motion block."""
-    return [rule for rule in css_rules(css) if ".motion-" in rule[1] and REDUCE not in rule[0]]
+    return [rule for rule in rules if ".motion-" in rule[1] and REDUCE not in rule[0]]
 
 
 @pytest.fixture(scope="module")
-def css() -> str:
-    return STYLES.read_text(encoding="utf-8")
+def rules() -> list[Rule]:
+    """styles.css rule by rule, keyframe steps included (``test_components``' walker)."""
+    return _css_rules()
 
 
 # ── The tokens ─────────────────────────────────────────────────────────────────────────────────
 
 
-def test_the_motion_tokens_and_their_values(css):
-    tokens = root_tokens(css)
+def test_the_motion_tokens_and_their_values(rules):
+    tokens = root_tokens(rules)
     assert tokens.get("--dur-snap") == "200ms"
     assert tokens.get("--dur-exit") == "calc(var(--dur-snap) * .7)"
     assert milliseconds("var(--dur-exit)", tokens) == pytest.approx(140.0)
@@ -166,12 +143,12 @@ def test_the_motion_tokens_and_their_values(css):
 
 
 @pytest.mark.parametrize(("selector", "token"), CLASSES.items())
-def test_each_motion_class_runs_on_its_token(css, selector, token):
-    rules = [body for around, prelude, body in motion_rules(css) if prelude == selector and not around]
-    assert rules, f"styles.css has no {selector} rule"
+def test_each_motion_class_runs_on_its_token(rules, selector, token):
+    bodies = [body for around, prelude, body in motion_rules(rules) if prelude == selector and not around]
+    assert bodies, f"styles.css has no {selector} rule"
     found = [
         duration
-        for body in rules
+        for body in bodies
         for name, value in declarations(body).items()
         if name in MOTION_PROPERTIES
         for duration in times(name, value)
@@ -179,10 +156,10 @@ def test_each_motion_class_runs_on_its_token(css, selector, token):
     assert found and set(found) == {f"var({token})"}, (selector, found)
 
 
-def test_every_motion_class_runs_on_the_fast_or_snap_tokens_and_never_longer_than_200ms(css):
-    tokens = root_tokens(css)
+def test_every_motion_class_runs_on_the_fast_or_snap_tokens_and_never_longer_than_200ms(rules):
+    tokens = root_tokens(rules)
     seen = 0
-    for _around, prelude, body in motion_rules(css):
+    for _around, prelude, body in motion_rules(rules):
         for name, value in declarations(body).items():
             if name not in MOTION_PROPERTIES:
                 continue
@@ -193,8 +170,7 @@ def test_every_motion_class_runs_on_the_fast_or_snap_tokens_and_never_longer_tha
     assert seen >= len(CLASSES)
 
 
-def test_a_message_rises_6px_as_it_fades_in(css):
-    rules = css_rules(css)
+def test_a_message_rises_6px_as_it_fades_in(rules):
     rise = declarations(next(body for around, prelude, body in rules if prelude == ".motion-rise" and not around))
     name = rise["animation"].split()[0]
     steps = {prelude: declarations(body) for around, prelude, body in rules if around == (f"@keyframes {name}",)}
@@ -202,12 +178,12 @@ def test_a_message_rises_6px_as_it_fades_in(css):
     assert steps.get("to", {"opacity": "1", "transform": "none"}) == {"opacity": "1", "transform": "none"}, steps
 
 
-def test_a_sheet_comes_up_from_the_bottom_on_phones_and_in_from_the_right_from_1024px(css):
-    rules = motion_rules(css)
+def test_a_sheet_comes_up_from_the_bottom_on_phones_and_in_from_the_right_from_1024px(rules):
+    motion = motion_rules(rules)
 
     def transform(selector: str, around: tuple[str, ...]) -> str | None:
         found = [
-            declarations(body).get("transform") for a, prelude, body in rules if prelude == selector and a == around
+            declarations(body).get("transform") for a, prelude, body in motion if prelude == selector and a == around
         ]
         return found[-1] if found else None
 
@@ -215,14 +191,14 @@ def test_a_sheet_comes_up_from_the_bottom_on_phones_and_in_from_the_right_from_1
     assert transform(".motion-sheet-out", (DESKTOP,)) == "translateX(100%)"
     assert transform(".motion-sheet-in", ()) == "none"
     for selector in (".motion-sheet-enter", ".motion-sheet-leave"):
-        body = next(body for a, prelude, body in rules if prelude == selector and not a)
+        body = next(body for a, prelude, body in motion if prelude == selector and not a)
         assert declarations(body)["transition"].startswith("transform "), (selector, body)
 
 
-def test_the_approve_fill_and_the_chip_snap_transition_what_they_change(css):
-    rules = motion_rules(css)
-    fill = declarations(next(body for a, prelude, body in rules if prelude == ".motion-fill" and not a))
-    snap = declarations(next(body for a, prelude, body in rules if prelude == ".motion-snap" and not a))
+def test_the_approve_fill_and_the_chip_snap_transition_what_they_change(rules):
+    motion = motion_rules(rules)
+    fill = declarations(next(body for a, prelude, body in motion if prelude == ".motion-fill" and not a))
+    snap = declarations(next(body for a, prelude, body in motion if prelude == ".motion-snap" and not a))
     filled = {part.split()[0] for part in fill["transition"].split(",")}
     assert {"background-color", "color"} <= filled and "transform" not in filled, fill
     assert {part.split()[0] for part in snap["transition"].split(",")} == {"transform"}, snap
@@ -231,20 +207,20 @@ def test_the_approve_fill_and_the_chip_snap_transition_what_they_change(css):
 # ── Their reduced-motion forms, and the global rule ────────────────────────────────────────────
 
 
-def _reduced(css: str) -> dict[str, dict[str, str]]:
+def _reduced(rules: Sequence[Rule]) -> dict[str, dict[str, str]]:
     """What the reduced-motion block sets, by each selector of its rules."""
     found: dict[str, dict[str, str]] = {}
-    for around, prelude, body in css_rules(css):
+    for around, prelude, body in rules:
         if around == (REDUCE,):
             for selector in prelude.split(","):
                 found.setdefault(selector.strip(), {}).update(declarations(body))
     return found
 
 
-def test_every_motion_class_has_its_reduced_motion_form(css):
-    reduced = _reduced(css)
+def test_every_motion_class_has_its_reduced_motion_form(rules):
+    reduced = _reduced(rules)
     moving = set()
-    for _around, prelude, body in motion_rules(css):
+    for _around, prelude, body in motion_rules(rules):
         if any(name in MOTION_PROPERTIES for name in declarations(body)):
             moving.update(selector.strip() for selector in prelude.split(","))
     assert moving >= set(CLASSES), moving
@@ -256,11 +232,9 @@ def test_every_motion_class_has_its_reduced_motion_form(css):
     assert reduced.get(".motion-sheet-out", {}).get("transform") == "none !important"
 
 
-def test_the_global_reduced_motion_rule_is_unchanged(css):
-    rules = [
-        body for around, prelude, body in css_rules(css) if around == (REDUCE,) and prelude == "*, *::before, *::after"
-    ]
-    assert rules == [GLOBAL_RULE]
+def test_the_global_reduced_motion_rule_is_unchanged(rules):
+    found = [body for around, prelude, body in rules if around == (REDUCE,) and prelude == "*, *::before, *::after"]
+    assert found == [GLOBAL_RULE]
 
 
 # ── base.html: no local motion block ───────────────────────────────────────────────────────────
@@ -291,27 +265,17 @@ def test_base_html_keeps_no_keyframes_and_no_local_reduced_motion_block():
     assert not findings, "Move it into styles.css (spec D7):\n" + "\n".join(findings)
 
 
-def test_the_progress_bar_moved_into_the_stylesheet_with_its_reduced_form(css):
-    rules = css_rules(css)
+def test_the_progress_bar_moved_into_the_stylesheet_with_its_reduced_form(rules):
     bar = [declarations(body) for around, prelude, body in rules if prelude == "#htmx-progress" and not around]
     assert bar and bar[0]["transition"] == "width .2s var(--ease-out), opacity .25s ease", bar
     assert [declarations(body) for around, prelude, body in rules if prelude == "#htmx-progress.active"] == [
         {"opacity": "1"}
     ]
-    assert _reduced(css).get("#htmx-progress") == {"transition": "opacity .1s"}
+    assert _reduced(rules).get("#htmx-progress") == {"transition": "opacity .1s"}
     assert "#htmx-progress{" not in BASE.read_text(encoding="utf-8")
 
 
 # ── The guard on the gated screens ─────────────────────────────────────────────────────────────
-
-
-def gated_tree(registry: Mapping[str, screens.Screen] | None = None, dirs: Sequence[Path] | None = None) -> list[str]:
-    """Every template in the tree of a gated screen: its roots, its fragments and what they reach."""
-    names: list[str] = []
-    for screen in (screens.SCREENS if registry is None else registry).values():
-        if screen.gated:
-            names += [n for n in screens.template_tree((*screen.templates, *screen.fragments), dirs) if n not in names]
-    return names
 
 
 def guard_findings(
