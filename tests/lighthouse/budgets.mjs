@@ -81,3 +81,34 @@ export function evaluate(samples, config) {
     .map(([metric, limit]) => ({ metric, actual: medians[metric], limit }));
   return { passed: failures.length === 0, medians, limits, failures };
 }
+
+// The seeded workspace the runner's owner session opens (tests/e2e/server/seed.py, WORKSPACE_A_ID).
+export const SEEDED_WORKSPACE = '/workspace/00000000-0000-4000-8000-00000000000a/';
+
+// A named per-screen target (tests/lighthouse/targets.mjs): exactly one registered entry with that
+// name, a slug because it names the report files, a page of the seeded workspace written exactly as it
+// is requested, the test id that says the page is ready and the interaction measured on it. Public and
+// portal pages need their own session and are refused until screens 10 and 11 allow them.
+export function validateTarget(name, registry) {
+  const label = JSON.stringify(String(name).slice(0, 60));
+  const matches = registry.filter((target) => target?.name === name);
+  if (typeof name !== 'string' || !matches.length) {
+    throw new Error(`Unknown Lighthouse target ${label}; known targets: ${registry.map((target) => target.name).join(', ')}.`);
+  }
+  if (matches.length > 1) throw new Error(`Lighthouse target ${label} is registered twice.`);
+  const target = matches[0];
+  if (!/^[a-z][a-z0-9-]{0,39}$/.test(name)) throw new Error(`Lighthouse target ${label} needs a lower-case slug name: it names the report files.`);
+  const { path } = target;
+  if (typeof path !== 'string' || !path.startsWith(SEEDED_WORKSPACE)) {
+    throw new Error(`Lighthouse target ${label} must stay in the seeded workspace; public and portal pages are refused until screens 10 and 11 allow them.`);
+  }
+  const url = new URL(path, 'http://127.0.0.1');
+  if (url.origin !== 'http://127.0.0.1' || `${url.pathname}${url.search}` !== path) {
+    throw new Error(`Lighthouse target ${label} must name its page exactly: no dot segments, backslashes, spaces or fragment.`);
+  }
+  if (typeof target.testId !== 'string' || !/^[A-Za-z0-9._-]+$/.test(target.testId)) {
+    throw new Error(`Lighthouse target ${label} needs the test id that says its page is ready.`);
+  }
+  if (typeof target.interact !== 'function') throw new Error(`Lighthouse target ${label} needs the interaction measured on its page.`);
+  return target;
+}
