@@ -164,6 +164,7 @@ These are the `:root` variables in Layer 2 of `theme/static_src/src/styles.css`.
 | System line | – | centred 12/16 ink-500 between ink-200 hairlines |
 | Toast / tooltip | – | ink-900 fill, white text, ink-300 detail, brand-300 action |
 | Legacy status names | `--success-50/500/700`, `--warning-50/500/700`, `--info-50/500/700`, `--error-50/200/500/600/700`, `--error-soft`, `--warning-soft`, `--success-soft` | re-pointed to the new scales (`--error-*` → danger) |
+| On a fill / inverse surface / its text / scrim | `--on-fill` (`text-on-fill`), `--surface-inverse` (`bg-inverse`), `--text-on-inverse` (`text-on-inverse`), `--scrim` (`bg-scrim/NN`) | `#FFFFFF` / ink-900 / `#FFFFFF` / ink-950; dark values in §21 |
 | Retired | `--shadow-primary` (none), `--accent-*` (re-pointed to status), `--brand-green-*` (re-pointed to brand), `--color-illustration-*` (neutral) | kept only so nothing breaks |
 
 ---
@@ -555,9 +556,236 @@ One stroke set (the inline Feather/Lucide-style SVGs already in the templates): 
 
 Sentence case everywhere (buttons, labels, statuses, tabs). No model or vendor names in visible copy; describe the step ("Add the writing key to the web and worker services") and show exact setting names in mono only where the owner must type them. Dates and times in the owner's time zone, "Mon 26 Oct, 10:10". Status words come from the fixed list in 10.5. Numbers are tabular.
 
-## 21. Dark mode later (out of scope now)
+## 21. Dark mode
 
-Light mode is the product. The tokens are ready: utilities read Layer 1 variables inline (`@theme inline`), so a later `[data-theme="dark"]` block redefines `--ink-*`, `--brand-*`, status scales and Layer 2 surfaces/text and every `bg-ink-*`, `text-brand-*` class follows. Two prerequisites: codemod `bg-white` (315 uses) → `bg-surface` and `text-white` on fills → an on-primary token; and choose dark steps (links brand-300, primary fill brand-500 with ink-950 text) and re-check every pair in section 23 against the dark surfaces. The toast and tooltip are already dark and verified.
+Light is what everyone sees until a page is declared ready: a page turns dark only when it is listed in `DARK_READY` (`apps/common/screens.py`), which each screen does at its own gate once its browser specs pass axe in dark on three devices (spec D2). An undeclared page renders light whatever the device or the person's choice.
+
+**How it is chosen.** A declared page's `<html>` carries `data-theme-ready`. `:root[data-theme="dark"]` holds the dark theme, and the same declarations sit under `@media (prefers-color-scheme: dark)` for `:root[data-theme-ready]:not([data-theme="light"])`, so a declared page follows a dark device without JavaScript and a person's Light choice wins over the device. *Appearance* in the account menu (System, Light, Dark, kept on the device) sets `data-theme` through the nonce'd script in `<head>` before the first paint (spec D2); without it, the media block alone applies. The contrast test holds the media block and the attribute block equal, declaration by declaration.
+
+**How it works.** Layer 1 is redefined, so every `bg-ink-*`, `text-brand-*` and `ring-success-*` utility follows without edits (they are declared `@theme inline` and read the variable where they are used). Each step keeps its role (§3): ink-0 is the card, ink-50 the canvas (the darkest step), ink-950 the strongest text; brand-700 is the primary fill and the link; status 50 is the soft fill, 500 the icon and the solid dot, 600 the chip text. So in dark the scales run from dark (0–200) to light (600–950). Layer 2 sets only what does not follow Layer 1 (the second table below) and writes no colour of its own: it points at a Layer 1 step or mixes one with `color-mix(in srgb, …)`.
+
+**What the checker decided.** Every value below came from `tools/contrast.py`; no pair was accepted under its bar.
+
+- The primary is a lighter Pine, brand-700 `#4CAD8C`, with dark text through `--on-fill` (7.01:1). One step is both the fill and the link (5.79:1 or more on every surface); the earlier sketch here split them (links at brand-300, the fill at brand-500), which would have given one role two steps.
+- Success leans a little toward leaf-yellow in dark (hue 142, 500 and 600 lighter), so Pine and an "Approved" chip's text stay 14.0 apart (OKLab ΔE ×100; 14.2 in light, §3.5).
+- The 300 steps keep their light values. Their role is text and icons on the inverse surface (toast detail ink-300, toast action brand-300, the status icons on a toast, *Delete* and *Reject all* in danger-300 on the selection bars), and that surface stays dark in both themes.
+- `--surface-inverse` in dark is ink-200 `#2A2E34`, a raised dark grey, so a toast or tooltip still stands off the canvas (1.41:1) and the cards (1.32:1). Because ink-300 must read on it (4.58:1), ink-300 is a text-grade grey in dark: a secondary button's edge, a hover edge and a table header rule read stronger than in light (6.03:1 on a card, against 1.52:1). ink-400 and ink-500 sit just above it, so the order 300 < 400 < 500 holds.
+- Status icons are checked on the card, row hover, canvas and their own chip, as §23 checked them. In light, success-500 on ink-100 is 2.93:1, so a status icon never sits on the sidebar or a neutral chip.
+- Not yet measured in dark: §23's colour-vision tables. For normal vision, the closest pair of status icons is info-500 against ink-500 at 8.9 (OKLab ΔE ×100); the simulation was not re-run.
+
+**New tokens.** Their light values are exactly what they replace, so light cannot move (the contrast test checks it).
+
+| Token | Utility | Light | Dark | For |
+|---|---|---|---|---|
+| `--on-fill` | `text-on-fill` | ink-0 `#FFFFFF` | ink-50 `#0C0F13` | text and icons on a solid fill: brand 700–900, danger 500–600, ink 800–900, a status 500 disc (where `text-white` sat on a fill) |
+| `--surface-inverse` | `bg-inverse` | ink-900 `#1C1F24` | ink-200 `#2A2E34` | dark in both themes: toast, tooltip, chart tip, the selection bars |
+| `--text-on-inverse` | `text-on-inverse` | ink-0 `#FFFFFF` | ink-950 `#F2F3F6` | text on it (`text-white` written on its children stays) |
+| `--scrim` | `bg-scrim/NN` | ink-950 `#0E1114` | ink-50 `#0C0F13` | behind dialogs and sheets |
+
+**The light content scope.** `data-theme-scope="light"` on the root of a platform preview or a creative re-declares the light Layer 1 and Layer 2 and `color-scheme: light`, so everything inside it reads light values in both themes and looks the way the platform shows it (the composer's previews, `components/post_preview.html`; each screen that shows a preview asserts in dark that its computed background is still white). The contrast test holds the scope equal to the light `:root`, property by property, and resolves it the way a browser inherits. It resets tokens, not inherited properties: an element inside the scope that inherits `color` from outside keeps the outer colour, so a preview sets its own text colour.
+
+**In a page declared ready,** write no `bg-white` outside the light scope (use `bg-surface`), no `text-white` on a fill that flips (use `text-on-fill`), and no raw colour in a template, style block or `style=`; F1 extends `python tools/recolor.py --check` to enforce these (spec D2).
+
+**The tables.** `python tools/contrast.py --markdown`, pasted verbatim. `python tools/contrast.py` exits 1 if any pair fails in either theme, if a token has no dark value, if the two dark blocks differ or if the light scope differs from the light `:root`; `apps/common/tests/test_contrast.py` runs the same checks.
+
+#### Layer 1 in both themes
+
+| Scale | 0 | 25 | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ink light | `#FFFFFF` | `#FBFCFD` | `#F6F7F8` | `#EDEFF2` | `#E1E4E8` | `#CED2D7` | `#83888F` | `#656B73` | `#52575F` | `#3E434A` | `#2E3238` | `#1C1F24` | `#0E1114` |
+| ink dark | `#14171C` | `#191C20` | `#0C0F13` | `#1E2127` | `#2A2E34` | `#91969D` | `#959AA1` | `#9CA1A9` | `#B3B8BF` | `#C8CCD3` | `#D7DBE0` | `#E5E8EC` | `#F2F3F6` |
+| brand light |  |  | `#EFFAF5` | `#DDF3EA` | `#BFE7D6` | `#94D2BA` | `#62B194` | `#388E71` | `#1E7057` | `#115641` | `#0D4534` | `#0B3629` | `#062118` |
+| brand dark |  |  | `#12261F` | `#113529` | `#0F4232` | `#94D2BA` | `#34856A` | `#369375` | `#3EA080` | `#4CAD8C` | `#68C2A2` | `#85D4B6` | `#BFE9D8` |
+| success light |  |  | `#EDFCED` | `#DAF8DA` | `#BCF0BC` | `#95E097` | `#6CC871` | `#429E4A` | `#317F38` | `#28682D` | `#215525` | `#193F1B` | `#0E2810` |
+| success dark |  |  | `#162614` | `#1A3218` | `#22471E` | `#95E097` | `#4F9B48` | `#6AC361` | `#82D67A` | `#A0E298` | `#B5ECAF` | `#CDF3C8` | `#E2F8DF` |
+| warning light |  |  | `#FFF7EB` | `#FFEED4` | `#FFDDAE` | `#FFCA82` | `#FCAA38` | `#9B5A00` | `#7F4700` | `#683904` | `#552C04` | `#432105` | `#2C1302` |
+| warning dark |  |  | `#2E200F` | `#3C280E` | `#573606` | `#FFCA82` | `#B47825` | `#E19A3D` | `#F2B366` | `#FCC687` | `#FFD5A4` | `#FFE2BD` | `#FFEED9` |
+| danger light |  |  | `#FFF3F1` | `#FFE4E0` | `#FFCDC6` | `#FEA69C` | `#EF675C` | `#991618` | `#7C1213` | `#6A0E0E` | `#570E0D` | `#450D0B` | `#2C0806` |
+| danger dark |  |  | `#341916` | `#461D19` | `#642722` | `#FEA69C` | `#C35047` | `#ED756A` | `#FB988D` | `#FFB4AB` | `#FFC7BF` | `#FFD9D3` | `#FFE7E4` |
+| info light |  |  | `#EFF8FD` | `#DDF1FC` | `#BEE3F8` | `#95CDEB` | `#4F9CC2` | `#035A7B` | `#044E6B` | `#064058` | `#073548` | `#082A3A` | `#041B26` |
+| info dark |  |  | `#12242E` | `#102F3E` | `#0F4359` | `#95CDEB` | `#4189AD` | `#57A9D2` | `#81C5E8` | `#A0D7F4` | `#B7E2F9` | `#CEEDFE` | `#E2F5FF` |
+
+#### Layer 2 tokens the dark theme sets
+
+| Token | Light | Dark |
+|---|---|---|
+| `color-scheme` | `light` | `dark` |
+| `--on-fill` | `var(--ink-0)` | `var(--ink-50)` |
+| `--surface-inverse` | `var(--ink-900)` | `var(--ink-200)` |
+| `--text-on-inverse` | `var(--ink-0)` | `var(--ink-950)` |
+| `--scrim` | `var(--ink-950)` | `var(--ink-50)` |
+| `--primary-halo` | `rgb(30 112 87 / .18)` | `color-mix(in srgb, var(--brand-600) 32%, transparent)` |
+| `--surface-sticky` | `rgb(246 247 248 / .92)` | `color-mix(in srgb, var(--ink-50) 92%, transparent)` |
+| `--overlay` | `rgb(14 17 20 / .36)` | `color-mix(in srgb, var(--scrim) 64%, transparent)` |
+| `--text-inverse` | `#FFFFFF` | `var(--text-on-inverse)` |
+| `--color-illustration-card` | `#FFFFFF` | `var(--ink-0)` |
+| `--shadow-xs` | `0 1px 2px rgba(14, 17, 20, .05)` | `0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent)` |
+| `--shadow-sm` | `0 1px 2px rgba(14, 17, 20, .04), 0 1px 3px rgba(14, 17, 20, .06)` | `0 1px 2px color-mix(in srgb, var(--scrim) 36%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 48%, transparent)` |
+| `--shadow-md` | `0 4px 12px -2px rgba(14, 17, 20, .08), 0 2px 4px -1px rgba(14, 17, 20, .04)` | `0 4px 12px -2px color-mix(in srgb, var(--scrim) 56%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 36%, transparent)` |
+| `--shadow-lg` | `0 12px 32px -8px rgba(14, 17, 20, .16), 0 4px 8px -2px rgba(14, 17, 20, .06)` | `0 12px 32px -8px color-mix(in srgb, var(--scrim) 72%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 40%, transparent)` |
+| `--shadow-xl` | `0 24px 64px -12px rgba(14, 17, 20, .24), 0 8px 16px -4px rgba(14, 17, 20, .08)` | `0 24px 64px -12px color-mix(in srgb, var(--scrim) 80%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 48%, transparent)` |
+| `--shadow-button` | `0 1px 2px rgba(14, 17, 20, .12), inset 0 1px 0 rgba(255, 255, 255, .12)` | `0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink-950) 16%, transparent)` |
+| `--shadow-nav-active` | `0 1px 2px rgba(14, 17, 20, .06), 0 0 0 1px rgba(14, 17, 20, .04)` | `0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent), 0 0 0 1px color-mix(in srgb, var(--ink-950) 6%, transparent)` |
+| `--shadow-segment` | `0 1px 2px rgba(14, 17, 20, .08), 0 0 0 .5px rgba(14, 17, 20, .06)` | `0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), 0 0 0 .5px color-mix(in srgb, var(--ink-950) 8%, transparent)` |
+| `--shadow-creative` | `inset 0 0 0 1px rgba(14, 17, 20, .06)` | `inset 0 0 0 1px color-mix(in srgb, var(--ink-950) 8%, transparent)` |
+
+#### Text on surfaces
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| title ink-950 on card ink-0 | 4.50:1 | `#0E1114` on `#FFFFFF` | 18.94:1 | `#F2F3F6` on `#14171C` | 16.19:1 | PASS |
+| title ink-950 on sheet ink-25 | 4.50:1 | `#0E1114` on `#FBFCFD` | 18.44:1 | `#F2F3F6` on `#191C20` | 15.41:1 | PASS |
+| title ink-950 on canvas ink-50 | 4.50:1 | `#0E1114` on `#F6F7F8` | 17.65:1 | `#F2F3F6` on `#0C0F13` | 17.31:1 | PASS |
+| title ink-950 on sidebar ink-100 | 4.50:1 | `#0E1114` on `#EDEFF2` | 16.44:1 | `#F2F3F6` on `#1E2127` | 14.54:1 | PASS |
+| title ink-950 on selected row brand-50 | 4.50:1 | `#0E1114` on `#EFFAF5` | 17.73:1 | `#F2F3F6` on `#12261F` | 14.31:1 | PASS |
+| text ink-900 on card ink-0 | 4.50:1 | `#1C1F24` on `#FFFFFF` | 16.52:1 | `#E5E8EC` on `#14171C` | 14.61:1 | PASS |
+| text ink-900 on sheet ink-25 | 4.50:1 | `#1C1F24` on `#FBFCFD` | 16.09:1 | `#E5E8EC` on `#191C20` | 13.91:1 | PASS |
+| text ink-900 on canvas ink-50 | 4.50:1 | `#1C1F24` on `#F6F7F8` | 15.41:1 | `#E5E8EC` on `#0C0F13` | 15.63:1 | PASS |
+| text ink-900 on sidebar ink-100 | 4.50:1 | `#1C1F24` on `#EDEFF2` | 14.34:1 | `#E5E8EC` on `#1E2127` | 13.12:1 | PASS |
+| text ink-900 on selected row brand-50 | 4.50:1 | `#1C1F24` on `#EFFAF5` | 15.47:1 | `#E5E8EC` on `#12261F` | 12.92:1 | PASS |
+| body-2 ink-700 on card ink-0 | 4.50:1 | `#3E434A` on `#FFFFFF` | 9.97:1 | `#C8CCD3` on `#14171C` | 11.15:1 | PASS |
+| body-2 ink-700 on sheet ink-25 | 4.50:1 | `#3E434A` on `#FBFCFD` | 9.71:1 | `#C8CCD3` on `#191C20` | 10.61:1 | PASS |
+| body-2 ink-700 on canvas ink-50 | 4.50:1 | `#3E434A` on `#F6F7F8` | 9.29:1 | `#C8CCD3` on `#0C0F13` | 11.92:1 | PASS |
+| body-2 ink-700 on sidebar ink-100 | 4.50:1 | `#3E434A` on `#EDEFF2` | 8.65:1 | `#C8CCD3` on `#1E2127` | 10.01:1 | PASS |
+| body-2 ink-700 on selected row brand-50 | 4.50:1 | `#3E434A` on `#EFFAF5` | 9.33:1 | `#C8CCD3` on `#12261F` | 9.85:1 | PASS |
+| secondary ink-600 on card ink-0 | 4.50:1 | `#52575F` on `#FFFFFF` | 7.27:1 | `#B3B8BF` on `#14171C` | 9.00:1 | PASS |
+| secondary ink-600 on sheet ink-25 | 4.50:1 | `#52575F` on `#FBFCFD` | 7.08:1 | `#B3B8BF` on `#191C20` | 8.57:1 | PASS |
+| secondary ink-600 on canvas ink-50 | 4.50:1 | `#52575F` on `#F6F7F8` | 6.78:1 | `#B3B8BF` on `#0C0F13` | 9.63:1 | PASS |
+| secondary ink-600 on sidebar ink-100 | 4.50:1 | `#52575F` on `#EDEFF2` | 6.31:1 | `#B3B8BF` on `#1E2127` | 8.08:1 | PASS |
+| secondary ink-600 on selected row brand-50 | 4.50:1 | `#52575F` on `#EFFAF5` | 6.81:1 | `#B3B8BF` on `#12261F` | 7.96:1 | PASS |
+| tertiary ink-500 on card ink-0 | 4.50:1 | `#656B73` on `#FFFFFF` | 5.38:1 | `#9CA1A9` on `#14171C` | 6.92:1 | PASS |
+| tertiary ink-500 on sheet ink-25 | 4.50:1 | `#656B73` on `#FBFCFD` | 5.24:1 | `#9CA1A9` on `#191C20` | 6.58:1 | PASS |
+| tertiary ink-500 on canvas ink-50 | 4.50:1 | `#656B73` on `#F6F7F8` | 5.01:1 | `#9CA1A9` on `#0C0F13` | 7.39:1 | PASS |
+| tertiary ink-500 on sidebar ink-100 | 4.50:1 | `#656B73` on `#EDEFF2` | 4.67:1 | `#9CA1A9` on `#1E2127` | 6.21:1 | PASS |
+| tertiary ink-500 on selected row brand-50 | 4.50:1 | `#656B73` on `#EFFAF5` | 5.04:1 | `#9CA1A9` on `#12261F` | 6.11:1 | PASS |
+| link brand-700 on card ink-0 | 4.50:1 | `#115641` on `#FFFFFF` | 8.64:1 | `#4CAD8C` on `#14171C` | 6.56:1 | PASS |
+| link brand-700 on sheet ink-25 | 4.50:1 | `#115641` on `#FBFCFD` | 8.41:1 | `#4CAD8C` on `#191C20` | 6.24:1 | PASS |
+| link brand-700 on canvas ink-50 | 4.50:1 | `#115641` on `#F6F7F8` | 8.05:1 | `#4CAD8C` on `#0C0F13` | 7.01:1 | PASS |
+| link brand-700 on sidebar ink-100 | 4.50:1 | `#115641` on `#EDEFF2` | 7.50:1 | `#4CAD8C` on `#1E2127` | 5.89:1 | PASS |
+| link brand-700 on selected row brand-50 | 4.50:1 | `#115641` on `#EFFAF5` | 8.09:1 | `#4CAD8C` on `#12261F` | 5.79:1 | PASS |
+| link hover brand-800 on card ink-0 | 4.50:1 | `#0D4534` on `#FFFFFF` | 10.95:1 | `#68C2A2` on `#14171C` | 8.41:1 | PASS |
+| link hover brand-800 on sheet ink-25 | 4.50:1 | `#0D4534` on `#FBFCFD` | 10.66:1 | `#68C2A2` on `#191C20` | 8.00:1 | PASS |
+| link hover brand-800 on canvas ink-50 | 4.50:1 | `#0D4534` on `#F6F7F8` | 10.21:1 | `#68C2A2` on `#0C0F13` | 8.99:1 | PASS |
+| link hover brand-800 on sidebar ink-100 | 4.50:1 | `#0D4534` on `#EDEFF2` | 9.50:1 | `#68C2A2` on `#1E2127` | 7.55:1 | PASS |
+| link hover brand-800 on selected row brand-50 | 4.50:1 | `#0D4534` on `#EFFAF5` | 10.25:1 | `#68C2A2` on `#12261F` | 7.43:1 | PASS |
+| title ink-950 on the sticky bar over navy | 4.50:1 | `#0E1114` on `#E5E6E8` | 15.16:1 | `#F2F3F6` on `#0D1116` | 17.07:1 | PASS |
+| title ink-950 on the sticky bar over orange | 4.50:1 | `#0E1114` on `#F6ECE6` | 16.29:1 | `#F2F3F6` on `#1F1713` | 15.90:1 | PASS |
+| title ink-950 on the sticky bar over white | 4.50:1 | `#0E1114` on `#F7F8F9` | 17.81:1 | `#F2F3F6` on `#1F2226` | 14.39:1 | PASS |
+| text ink-900 on the sticky bar over navy | 4.50:1 | `#1C1F24` on `#E5E6E8` | 13.23:1 | `#E5E8EC` on `#0D1116` | 15.41:1 | PASS |
+| text ink-900 on the sticky bar over orange | 4.50:1 | `#1C1F24` on `#F6ECE6` | 14.21:1 | `#E5E8EC` on `#1F1713` | 14.35:1 | PASS |
+| text ink-900 on the sticky bar over white | 4.50:1 | `#1C1F24` on `#F7F8F9` | 15.54:1 | `#E5E8EC` on `#1F2226` | 12.99:1 | PASS |
+| body-2 ink-700 on the sticky bar over navy | 4.50:1 | `#3E434A` on `#E5E6E8` | 7.98:1 | `#C8CCD3` on `#0D1116` | 11.75:1 | PASS |
+| body-2 ink-700 on the sticky bar over orange | 4.50:1 | `#3E434A` on `#F6ECE6` | 8.57:1 | `#C8CCD3` on `#1F1713` | 10.95:1 | PASS |
+| body-2 ink-700 on the sticky bar over white | 4.50:1 | `#3E434A` on `#F7F8F9` | 9.38:1 | `#C8CCD3` on `#1F2226` | 9.91:1 | PASS |
+| secondary ink-600 on the sticky bar over navy | 4.50:1 | `#52575F` on `#E5E6E8` | 5.82:1 | `#B3B8BF` on `#0D1116` | 9.49:1 | PASS |
+| secondary ink-600 on the sticky bar over orange | 4.50:1 | `#52575F` on `#F6ECE6` | 6.25:1 | `#B3B8BF` on `#1F1713` | 8.84:1 | PASS |
+| secondary ink-600 on the sticky bar over white | 4.50:1 | `#52575F` on `#F7F8F9` | 6.84:1 | `#B3B8BF` on `#1F2226` | 8.00:1 | PASS |
+| link brand-700 on the sticky bar over navy | 4.50:1 | `#115641` on `#E5E6E8` | 6.92:1 | `#4CAD8C` on `#0D1116` | 6.91:1 | PASS |
+| link brand-700 on the sticky bar over orange | 4.50:1 | `#115641` on `#F6ECE6` | 7.43:1 | `#4CAD8C` on `#1F1713` | 6.44:1 | PASS |
+| link brand-700 on the sticky bar over white | 4.50:1 | `#115641` on `#F7F8F9` | 8.12:1 | `#4CAD8C` on `#1F2226` | 5.83:1 | PASS |
+| link hover brand-800 on the sticky bar over navy | 4.50:1 | `#0D4534` on `#E5E6E8` | 8.77:1 | `#68C2A2` on `#0D1116` | 8.86:1 | PASS |
+| link hover brand-800 on the sticky bar over orange | 4.50:1 | `#0D4534` on `#F6ECE6` | 9.42:1 | `#68C2A2` on `#1F1713` | 8.26:1 | PASS |
+| link hover brand-800 on the sticky bar over white | 4.50:1 | `#0D4534` on `#F7F8F9` | 10.30:1 | `#68C2A2` on `#1F2226` | 7.47:1 | PASS |
+
+#### On a fill
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| on-fill on brand-700 | 4.50:1 | `#FFFFFF` on `#115641` | 8.64:1 | `#0C0F13` on `#4CAD8C` | 7.01:1 | PASS |
+| on-fill on brand-800 | 4.50:1 | `#FFFFFF` on `#0D4534` | 10.95:1 | `#0C0F13` on `#68C2A2` | 8.99:1 | PASS |
+| on-fill on brand-900 | 4.50:1 | `#FFFFFF` on `#0B3629` | 13.34:1 | `#0C0F13` on `#85D4B6` | 11.06:1 | PASS |
+| on-fill on danger-500 | 4.50:1 | `#FFFFFF` on `#991618` | 8.46:1 | `#0C0F13` on `#ED756A` | 6.73:1 | PASS |
+| on-fill on danger-600 | 4.50:1 | `#FFFFFF` on `#7C1213` | 10.75:1 | `#0C0F13` on `#FB988D` | 9.13:1 | PASS |
+| on-fill on ink-800 | 4.50:1 | `#FFFFFF` on `#2E3238` | 12.89:1 | `#0C0F13` on `#D7DBE0` | 13.81:1 | PASS |
+| on-fill on ink-900 | 4.50:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#0C0F13` on `#E5E8EC` | 15.63:1 | PASS |
+| on-fill icon on a solid success-500 disc | 3.00:1 | `#FFFFFF` on `#429E4A` | 3.38:1 | `#0C0F13` on `#6AC361` | 8.77:1 | PASS |
+| on-fill icon on a solid warning-500 disc | 3.00:1 | `#FFFFFF` on `#9B5A00` | 5.45:1 | `#0C0F13` on `#E19A3D` | 8.13:1 | PASS |
+| on-fill icon on a solid info-500 disc | 3.00:1 | `#FFFFFF` on `#035A7B` | 7.63:1 | `#0C0F13` on `#57A9D2` | 7.33:1 | PASS |
+
+#### Tinted buttons, chips and callouts
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| tinted button brand-700 on brand-100 | 4.50:1 | `#115641` on `#DDF3EA` | 7.44:1 | `#4CAD8C` on `#113529` | 4.90:1 | PASS |
+| tinted button hover brand-800 on brand-200 | 4.50:1 | `#0D4534` on `#BFE7D6` | 8.14:1 | `#68C2A2` on `#0F4232` | 5.32:1 | PASS |
+| success chip text success-600 on success-50 | 4.50:1 | `#317F38` on `#EDFCED` | 4.68:1 | `#82D67A` on `#162614` | 8.97:1 | PASS |
+| warning chip text warning-600 on warning-50 | 4.50:1 | `#7F4700` on `#FFF7EB` | 7.05:1 | `#F2B366` on `#2E200F` | 8.59:1 | PASS |
+| danger chip text danger-600 on danger-50 | 4.50:1 | `#7C1213` on `#FFF3F1` | 9.90:1 | `#FB988D` on `#341916` | 7.70:1 | PASS |
+| info chip text info-600 on info-50 | 4.50:1 | `#044E6B` on `#EFF8FD` | 8.46:1 | `#81C5E8` on `#12242E` | 8.41:1 | PASS |
+| success alert body success-700 on success-50 | 4.50:1 | `#28682D` on `#EDFCED` | 6.35:1 | `#A0E298` on `#162614` | 10.46:1 | PASS |
+| warning alert body warning-700 on warning-50 | 4.50:1 | `#683904` on `#FFF7EB` | 9.08:1 | `#FCC687` on `#2E200F` | 10.20:1 | PASS |
+| danger alert body danger-700 on danger-50 | 4.50:1 | `#6A0E0E` on `#FFF3F1` | 11.50:1 | `#FFB4AB` on `#341916` | 9.54:1 | PASS |
+| info alert body info-700 on info-50 | 4.50:1 | `#064058` on `#EFF8FD` | 10.37:1 | `#A0D7F4` on `#12242E` | 10.26:1 | PASS |
+| neutral chip ink-700 on ink-100 | 4.50:1 | `#3E434A` on `#EDEFF2` | 8.65:1 | `#C8CCD3` on `#1E2127` | 10.01:1 | PASS |
+| count badge ink-700 on ink-200 | 4.50:1 | `#3E434A` on `#E1E4E8` | 7.82:1 | `#C8CCD3` on `#2A2E34` | 8.47:1 | PASS |
+| ink-900 body on a success-50 callout | 4.50:1 | `#1C1F24` on `#EDFCED` | 15.54:1 | `#E5E8EC` on `#162614` | 12.93:1 | PASS |
+
+#### Status text
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| success text success-600 on card ink-0 | 4.50:1 | `#317F38` on `#FFFFFF` | 4.97:1 | `#82D67A` on `#14171C` | 10.14:1 | PASS |
+| success text success-600 on canvas ink-50 | 4.50:1 | `#317F38` on `#F6F7F8` | 4.64:1 | `#82D67A` on `#0C0F13` | 10.84:1 | PASS |
+| warning text warning-600 on card ink-0 | 4.50:1 | `#7F4700` on `#FFFFFF` | 7.49:1 | `#F2B366` on `#14171C` | 9.76:1 | PASS |
+| warning text warning-600 on canvas ink-50 | 4.50:1 | `#7F4700` on `#F6F7F8` | 6.98:1 | `#F2B366` on `#0C0F13` | 10.44:1 | PASS |
+| danger text danger-600 on card ink-0 | 4.50:1 | `#7C1213` on `#FFFFFF` | 10.75:1 | `#FB988D` on `#14171C` | 8.53:1 | PASS |
+| danger text danger-600 on canvas ink-50 | 4.50:1 | `#7C1213` on `#F6F7F8` | 10.03:1 | `#FB988D` on `#0C0F13` | 9.13:1 | PASS |
+| info text info-600 on card ink-0 | 4.50:1 | `#044E6B` on `#FFFFFF` | 9.10:1 | `#81C5E8` on `#14171C` | 9.48:1 | PASS |
+| info text info-600 on canvas ink-50 | 4.50:1 | `#044E6B` on `#F6F7F8` | 8.49:1 | `#81C5E8` on `#0C0F13` | 10.14:1 | PASS |
+| success icon-as-text success-500 on card ink-0 | 3.00:1 | `#429E4A` on `#FFFFFF` | 3.38:1 | `#6AC361` on `#14171C` | 8.20:1 | PASS |
+| warning icon-as-text warning-500 on card ink-0 | 4.50:1 | `#9B5A00` on `#FFFFFF` | 5.45:1 | `#E19A3D` on `#14171C` | 7.61:1 | PASS |
+| danger icon-as-text danger-500 on card ink-0 | 4.50:1 | `#991618` on `#FFFFFF` | 8.46:1 | `#ED756A` on `#14171C` | 6.29:1 | PASS |
+| info icon-as-text info-500 on card ink-0 | 4.50:1 | `#035A7B` on `#FFFFFF` | 7.63:1 | `#57A9D2` on `#14171C` | 6.85:1 | PASS |
+
+#### Inverse surfaces (toast, tooltip, chart tip, selection bars)
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| text-on-inverse on surface-inverse | 4.50:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#F2F3F6` on `#2A2E34` | 12.30:1 | PASS |
+| white (palette lock) on surface-inverse | 4.50:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#FFFFFF` on `#2A2E34` | 13.65:1 | PASS |
+| detail and icons ink-300 on surface-inverse | 4.50:1 | `#CED2D7` on `#1C1F24` | 10.88:1 | `#91969D` on `#2A2E34` | 4.58:1 | PASS |
+| action brand-300 on surface-inverse | 4.50:1 | `#94D2BA` on `#1C1F24` | 9.59:1 | `#94D2BA` on `#2A2E34` | 7.92:1 | PASS |
+| success-300 on surface-inverse | 3.00:1 | `#95E097` on `#1C1F24` | 10.53:1 | `#95E097` on `#2A2E34` | 8.70:1 | PASS |
+| warning-300 on surface-inverse | 3.00:1 | `#FFCA82` on `#1C1F24` | 11.03:1 | `#FFCA82` on `#2A2E34` | 9.11:1 | PASS |
+| danger-300 on surface-inverse | 4.50:1 | `#FEA69C` on `#1C1F24` | 8.77:1 | `#FEA69C` on `#2A2E34` | 7.24:1 | PASS |
+| info-300 on surface-inverse | 3.00:1 | `#95CDEB` on `#1C1F24` | 9.61:1 | `#95CDEB` on `#2A2E34` | 7.93:1 | PASS |
+
+#### Non-text: control edges, focus, status icons (3:1)
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| control border on card ink-0 | 3.00:1 | `#83888F` on `#FFFFFF` | 3.57:1 | `#959AA1` on `#14171C` | 6.34:1 | PASS |
+| control border on sheet ink-25 | 3.00:1 | `#83888F` on `#FBFCFD` | 3.47:1 | `#959AA1` on `#191C20` | 6.04:1 | PASS |
+| control border on canvas ink-50 | 3.00:1 | `#83888F` on `#F6F7F8` | 3.33:1 | `#959AA1` on `#0C0F13` | 6.78:1 | PASS |
+| control border on sidebar ink-100 | 3.00:1 | `#83888F` on `#EDEFF2` | 3.10:1 | `#959AA1` on `#1E2127` | 5.69:1 | PASS |
+| control border on selected row brand-50 | 3.00:1 | `#83888F` on `#EFFAF5` | 3.34:1 | `#959AA1` on `#12261F` | 5.61:1 | PASS |
+| focus ring on card ink-0 | 3.00:1 | `#1E7057` on `#FFFFFF` | 5.98:1 | `#3EA080` on `#14171C` | 5.60:1 | PASS |
+| focus ring on sheet ink-25 | 3.00:1 | `#1E7057` on `#FBFCFD` | 5.82:1 | `#3EA080` on `#191C20` | 5.33:1 | PASS |
+| focus ring on canvas ink-50 | 3.00:1 | `#1E7057` on `#F6F7F8` | 5.58:1 | `#3EA080` on `#0C0F13` | 5.99:1 | PASS |
+| focus ring on sidebar ink-100 | 3.00:1 | `#1E7057` on `#EDEFF2` | 5.19:1 | `#3EA080` on `#1E2127` | 5.03:1 | PASS |
+| focus ring on selected row brand-50 | 3.00:1 | `#1E7057` on `#EFFAF5` | 5.60:1 | `#3EA080` on `#12261F` | 4.95:1 | PASS |
+| focus ring on tinted button brand-100 | 3.00:1 | `#1E7057` on `#DDF3EA` | 5.15:1 | `#3EA080` on `#113529` | 4.18:1 | PASS |
+| focus ring on the sticky bar over navy | 3.00:1 | `#1E7057` on `#E5E6E8` | 4.79:1 | `#3EA080` on `#0D1116` | 5.90:1 | PASS |
+| focus ring on the sticky bar over orange | 3.00:1 | `#1E7057` on `#F6ECE6` | 5.14:1 | `#3EA080` on `#1F1713` | 5.50:1 | PASS |
+| focus ring on the sticky bar over white | 3.00:1 | `#1E7057` on `#F7F8F9` | 5.63:1 | `#3EA080` on `#1F2226` | 4.98:1 | PASS |
+| success-500 icon on card ink-0 | 3.00:1 | `#429E4A` on `#FFFFFF` | 3.38:1 | `#6AC361` on `#14171C` | 8.20:1 | PASS |
+| success-500 icon on sheet ink-25 | 3.00:1 | `#429E4A` on `#FBFCFD` | 3.29:1 | `#6AC361` on `#191C20` | 7.81:1 | PASS |
+| success-500 icon on canvas ink-50 | 3.00:1 | `#429E4A` on `#F6F7F8` | 3.15:1 | `#6AC361` on `#0C0F13` | 8.77:1 | PASS |
+| success-500 icon on success-50 chip | 3.00:1 | `#429E4A` on `#EDFCED` | 3.17:1 | `#6AC361` on `#162614` | 7.26:1 | PASS |
+| warning-500 icon on card ink-0 | 3.00:1 | `#9B5A00` on `#FFFFFF` | 5.45:1 | `#E19A3D` on `#14171C` | 7.61:1 | PASS |
+| warning-500 icon on sheet ink-25 | 3.00:1 | `#9B5A00` on `#FBFCFD` | 5.30:1 | `#E19A3D` on `#191C20` | 7.24:1 | PASS |
+| warning-500 icon on canvas ink-50 | 3.00:1 | `#9B5A00` on `#F6F7F8` | 5.08:1 | `#E19A3D` on `#0C0F13` | 8.13:1 | PASS |
+| warning-500 icon on warning-50 chip | 3.00:1 | `#9B5A00` on `#FFF7EB` | 5.12:1 | `#E19A3D` on `#2E200F` | 6.69:1 | PASS |
+| danger-500 icon on card ink-0 | 3.00:1 | `#991618` on `#FFFFFF` | 8.46:1 | `#ED756A` on `#14171C` | 6.29:1 | PASS |
+| danger-500 icon on sheet ink-25 | 3.00:1 | `#991618` on `#FBFCFD` | 8.24:1 | `#ED756A` on `#191C20` | 5.99:1 | PASS |
+| danger-500 icon on canvas ink-50 | 3.00:1 | `#991618` on `#F6F7F8` | 7.89:1 | `#ED756A` on `#0C0F13` | 6.73:1 | PASS |
+| danger-500 icon on danger-50 chip | 3.00:1 | `#991618` on `#FFF3F1` | 7.79:1 | `#ED756A` on `#341916` | 5.67:1 | PASS |
+| info-500 icon on card ink-0 | 3.00:1 | `#035A7B` on `#FFFFFF` | 7.63:1 | `#57A9D2` on `#14171C` | 6.85:1 | PASS |
+| info-500 icon on sheet ink-25 | 3.00:1 | `#035A7B` on `#FBFCFD` | 7.43:1 | `#57A9D2` on `#191C20` | 6.52:1 | PASS |
+| info-500 icon on canvas ink-50 | 3.00:1 | `#035A7B` on `#F6F7F8` | 7.11:1 | `#57A9D2` on `#0C0F13` | 7.33:1 | PASS |
+| info-500 icon on info-50 chip | 3.00:1 | `#035A7B` on `#EFF8FD` | 7.09:1 | `#57A9D2` on `#12242E` | 6.08:1 | PASS |
+
+Pairs checked: 126 in each theme; failures: 0.
 
 ## 22. White-label guard
 
@@ -568,6 +796,8 @@ Light mode is the product. The tokens are ready: utilities read Layer 1 variable
 ## 23. Verified contrast and colour-vision tables
 
 Computed in the design round (WCAG 2.x relative luminance; OKLab ΔE ×100; Machado 2009 colour-vision simulation at full severity) from the exact hexes in Layer 1 of `styles.css`. Output pasted verbatim. "Sticky bar over navy" is the translucent bar (ink-50 at 92%) blended over a Neopolis navy creative `#1E2533`, the worst case a scrolling bar can sit on.
+
+**How the contrast rows are made now.** `tools/contrast.py` reads Layer 1 and Layer 2 from `styles.css` for both themes, resolves `var()` chains and `color-mix(in srgb, …)`, blends the translucent sticky bar over a creative in 8-bit sRGB as the screen paints it, and computes the WCAG 2.x relative-luminance ratio (text 4.5:1, large text and non-text 3:1). `apps/common/tests/test_contrast.py` proves the method on five rows below, reproduced to two decimals (title ink-950 on white 18.94, tertiary ink-500 on ink-100 4.67, control border ink-400 on ink-100 3.10, white on brand-700 8.64, text ink-900 on the sticky bar over navy 13.23), and fails when any pair in the checker's list falls under its bar in either theme. The checker's list carries this section's text pairs, the fills, chips, inverse surfaces and 3:1 marks in both themes; its tables are in §21. The tables below stay as the October record of the light design, with the ΔE and colour-vision tables the checker does not compute.
 
 #### Text (body and small text need 4.5:1; large 3:1)
 
