@@ -259,6 +259,16 @@ def dark(text: str, name: str = "x/page.html") -> str:
             "<style>.a { border: 1px solid var(--border-hover); box-shadow: inset 0 0 0 1px var(--border-hover); "
             "color: var(--ink-300); }</style>",
         ),
+        # ... and in an arbitrary-value class (a copy of a component's recipe); a text colour stays.
+        (
+            '<input class="file:bg-surface file:shadow-[inset_0_0_0_1px_var(--ink-300)] text-[var(--ink-300)]">'
+            '<b class="x group-has-[[data-c]]/t:shadow-[inset_0_0_0_1px_var(--ink-300),var(--shadow-xs)]"></b>'
+            '<i class="[&_input]:file:border-[var(--ink-300)] ring-[var(--ink-300)] outline-[var(--ink-300)]"></i>',
+            '<input class="file:bg-surface file:shadow-[inset_0_0_0_1px_var(--border-hover)] text-[var(--ink-300)]">'
+            '<b class="x group-has-[[data-c]]/t:shadow-[inset_0_0_0_1px_var(--border-hover),var(--shadow-xs)]"></b>'
+            '<i class="[&_input]:file:border-[var(--border-hover)] ring-[var(--border-hover)] '
+            'outline-[var(--border-hover)]"></i>',
+        ),
         # An arbitrary shadow written as a literal reads its token.
         (
             '<img class="w-7 shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]">',
@@ -276,6 +286,31 @@ def test_each_rewrite(before, after):
     assert dark(after) == after  # idempotent
 
 
+BARE_CSS = (
+    "{% comment %}The filters' styles.{% endcomment %}/* Filters */\n"
+    "    .f,\n    .g {\n        color: var(--ink-800);\n        border: 1px solid var(--ink-300);\n    }\n"
+    "    .h .g { border-color: var(--ink-300); color: var(--ink-300); } /* not { border: var(--ink-300) } */\n"
+)
+
+
+def test_a_partial_of_bare_css_moves_its_edges_too():
+    """A partial included inside a parent's <style> block is CSS from its first line."""
+    after = BARE_CSS.replace("solid var(--ink-300)", "solid var(--border-hover)").replace(
+        "border-color: var(--ink-300)", "border-color: var(--border-hover)"
+    )
+    assert recolor.recolor_dark(BARE_CSS, name="x/_styles.html", css=True) == after
+    assert recolor.recolor_dark(after, name="x/_styles.html", css=True) == after
+
+
+def test_a_partial_is_css_when_a_style_block_includes_it(tmp_path):
+    (tmp_path / "page.html").write_text(
+        '<style nonce="{{ request.csp_nonce }}">\n  {% include "x/_styles.html" %}\n</style>\n'
+        '<script>{% include "x/_script.html" %}</script>{% include "x/_part.html" %}',
+        encoding="utf-8",
+    )
+    assert recolor.css_partials([tmp_path / "page.html"]) == {"x/_styles.html"}
+
+
 def test_named_inverse_elements_are_inverse_only_where_named():
     tip = '<span class="pointer-events-none absolute left-3 -top-6 opacity-0 bg-ink-800 text-white">Tip</span>'
     assert dark(tip, "composer/compose.html") == tip.replace("bg-ink-800 text-white", "bg-inverse text-on-inverse")
@@ -291,6 +326,14 @@ def test_python_and_js_class_strings_move_too():
     assert recolor.transform(Path("static/js/x.js"), js, tokens=True, defined=set()) == (
         "el.className = 'rounded bg-surface ring-1 ring-line-strong';"
     )
+
+
+def test_a_template_s_name_is_the_part_after_templates():
+    """As the loader knows it, from an absolute or a relative path; outside templates/, the file name."""
+    assert recolor.template_name(TEMPLATES / "studio" / "index.html") == "studio/index.html"
+    assert recolor.template_name(recolor.ROOT / "apps/x/templates/x/page.html") == "x/page.html"
+    assert recolor.template_name(Path("templates/email/x.html")) == "email/x.html"
+    assert recolor.template_name(Path("apps/x/forms.py")) == "forms.py"
 
 
 def test_pages_without_the_stylesheet_keep_white():
@@ -359,6 +402,12 @@ def test_the_fixture_tree_is_clean(tree, capsys):
             "hover:text-danger-200 flips on an inverse surface",
         ),
         ('<div class="border border-ink-300"></div>', "border-ink-300 is a text grey in dark"),
+        ("<style>.a{border:1px solid var(--ink-300)}</style>", "border: var(--ink-300) is a text grey in dark"),
+        ('<p style="outline-color: var(--ink-300)">x</p>', "outline-color: var(--ink-300) is a text grey in dark"),
+        (
+            '<b class="file:shadow-[inset_0_0_0_1px_var(--ink-300)]"></b>',
+            "shadow-[inset_0_0_0_1px_var(--ink-300)] is a text grey in dark",
+        ),
     ],
 )
 def test_each_check_fails_and_names_the_file(tree, capsys, markup, message):
@@ -369,10 +418,35 @@ def test_each_check_fails_and_names_the_file(tree, capsys, markup, message):
     assert f"templates/studio/bad.html:2: {message}" in out
 
 
+def test_a_bare_css_partial_s_ink_300_edge_fails(tree, capsys):
+    """A partial whose content is CSS, included inside a parent's <style> block, is template CSS too."""
+    tree("base.html", '<html><link href="css/dist/styles.css">{% block content %}{% endblock %}</html>')
+    tree(
+        "calendar/page.html",
+        '{% extends "base.html" %}{% block content %}<style>\n{% include "calendar/partials/_filters.html" %}\n'
+        '</style><script>{% include "calendar/partials/_script.html" %}</script>{% endblock %}',
+    )
+    tree(
+        "calendar/partials/_filters.html",
+        "{% comment %}The filters' styles.{% endcomment %}/* Filters */\n"
+        "    .f { color: var(--ink-300); }\n    .g { border: 1px solid var(--ink-300); }\n",
+    )
+    tree("calendar/partials/_script.html", "function f() {\n  return { border: 'var(--ink-300)' };\n}\n")
+    code, out = run_check(capsys)
+    assert code == 1
+    assert "templates/calendar/partials/_filters.html:3: border: var(--ink-300) is a text grey in dark" in out
+    assert ":2:" not in out  # a text colour in ink-300 is not an edge
+    assert "_script.html" not in out  # a script is not CSS
+
+
 @pytest.mark.parametrize(
     "markup",
     [
         '<div data-theme-scope="light"><div class="bg-white"><b class="bg-ink-900 text-white"></b></div></div>',
+        "<style>.a { color: var(--ink-300); border: 1px solid var(--border-hover); }</style>",
+        "<style>.a { border-color: var(--ink-300); } /* recolor: keep */</style>",
+        '<div data-theme-scope="light"><p style="border: 1px solid var(--ink-300)">x</p></div>',
+        '<p class="text-[var(--ink-300)] shadow-[inset_0_0_0_1px_var(--border-hover)]">x</p>',
         '<span class="bg-ink-900 text-white">A</span> {# recolor: keep #}',
         '<div class="bg-inverse text-on-inverse"><b class="text-white hover:bg-white/10 text-ink-300 text-danger-300"></b></div>',
         '<div data-theme-scope="light" class="bg-inverse"><b class="hover:text-danger-200"></b></div>',

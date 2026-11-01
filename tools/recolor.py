@@ -701,9 +701,19 @@ INK300_EDGE_RE = re.compile(
     r"(?<![\w-])((?:[a-z0-9-]+:|\[[^\]\s]+\]:)*!?)"
     r"(border(?:-[xytrbl])?|ring|divide(?:-[xy])?|outline|stroke)-ink-300(?![\w/-])"
 )
+#: An arbitrary-value edge class that draws in ink-300 (a copy of a component's recipe, such as
+#: ``file:shadow-[inset_0_0_0_1px_var(--ink-300)]``).
+INK300_ARBITRARY_RE = re.compile(
+    r"(?<![\w-])(?:(?:inset-)?(?:shadow|ring)|ring-offset|outline|stroke|border(?:-[xytrbl])?|divide(?:-[xy])?)"
+    r"-\[[^\]\s]*var\(--ink-300\)[^\]\s]*\]"
+)
 ARBITRARY_SHADOW_RE = re.compile(r"(?<![\w-])shadow-\[([^\]\s]+)\]")
 SHADOW_INK_RE = re.compile(r"rgba?\(14[,_\s]+17[,_\s]+20[,_\s/]+([\d.]+)\)")
 CSS_EDGE_PROPERTY_RE = re.compile(r"^(?:border(?:-[a-z-]+)?|outline(?:-color)?|box-shadow|column-rule(?:-color)?)$")
+CSS_DECLARATION_RE = re.compile(r"([-\w]+)\s*:([^;{}]*)")
+INCLUDE_RE = re.compile(r"""{%\s*include\s+["']([^"']+)["']""")
+INK300_VAR_RE = re.compile(r"var\(\s*--ink-300\s*\)")
+EDGE_TOKEN = "var(--border-hover)"
 CLASS_ATTR_RE = re.compile(r"""(?<![\w.-])((?:x-bind)?:?class)\s*=\s*(["'])(.*?)\2""", re.S)
 TAG_OPEN_RE = re.compile(r"<(/?)([a-zA-Z][\w:-]*)")
 VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
@@ -970,23 +980,43 @@ def _rewrite_outside(text: str, pattern: re.Pattern, repl, ranges: list[tuple[in
     return pattern.sub(guarded, text)
 
 
-def _css_edges(css: str) -> str:
-    """``var(--ink-300)`` drawn as an edge (border, outline, box-shadow) in template CSS -> the edge token."""
+def css_spans(text: str, *, css: bool = False) -> list[tuple[int, int]]:
+    """Where a template writes CSS: each ``<style>`` block's body and ``style=`` (or ``:style=``)
+    value, or the whole template when it is bare CSS (*css*: a partial a ``<style>`` block includes)."""
+    if css:
+        return [(0, len(text))]
+    spans = [(m.start(2), m.end(2)) for m in STYLE_BLOCK_RE.finditer(text)]
+    return spans + [(m.start(2), m.end(2)) for m in STYLE_ANY_ATTR_RE.finditer(text)]
 
-    def declaration(m: re.Match) -> str:
-        if not CSS_EDGE_PROPERTY_RE.match(m.group(1).lower()):
-            return m.group(0)
-        return m.group(0).replace("var(--ink-300)", "var(--border-hover)")
 
-    return re.sub(r"([-\w]+)(\s*:[^;{}]*)", declaration, css)
+def ink300_css_edges(
+    text: str, ranges: list[tuple[int, int]] | None = None, *, css: bool = False
+) -> list[tuple[int, int, str]]:
+    """(start, end, property) of each ``var(--ink-300)`` a template's CSS draws as an edge (border,
+    outline, box-shadow, column rule), outside the light scope's *ranges* and ``recolor: keep`` lines."""
+    ranges = ranges or []
+    masked = _mask(text)
+    found = []
+    for start, end in css_spans(text, css=css):
+        for declaration in CSS_DECLARATION_RE.finditer(_mask_css_comments(masked[start:end])):
+            prop = declaration.group(1).lower()
+            if not CSS_EDGE_PROPERTY_RE.match(prop):
+                continue
+            offset = start + declaration.start(2)
+            for m in INK300_VAR_RE.finditer(declaration.group(2)):
+                if not (_in(ranges, offset + m.start()) or _kept(text, offset + m.start())):
+                    found.append((offset + m.start(), offset + m.end(), prop))
+    return sorted(found)
 
 
 def dark_class_strings(text: str, ranges: list[tuple[int, int]] | None = None) -> str:
-    """The rules that need no element: bg-white, scrims, ink-300 edges, literal arbitrary shadows."""
+    """The rules that need no element: bg-white, scrims, ink-300 edges (named and arbitrary-value
+    utilities), literal arbitrary shadows."""
     ranges = ranges or []
     text = _rewrite_outside(text, SOLID_WHITE_RE, r"\1bg-surface", ranges)
     text = _rewrite_outside(text, SCRIM_SRC_RE, _scrim, ranges)
     text = _rewrite_outside(text, INK300_EDGE_RE, r"\1\2-line-strong", ranges)
+    text = _rewrite_outside(text, INK300_ARBITRARY_RE, lambda m: INK300_VAR_RE.sub(EDGE_TOKEN, m.group(0)), ranges)
     return _rewrite_outside(text, ARBITRARY_SHADOW_RE, _arbitrary_shadow, ranges)
 
 
@@ -1009,22 +1039,13 @@ def _edge_colour(own: set[str], around: set[str]) -> str | None:
     return "on-fill" if FLIP in around else "surface"
 
 
-def recolor_dark(text: str, *, name: str = "") -> str:
-    """The dark pass over a template that loads the stylesheet (*name* as the loader knows it)."""
-    ranges = _scope_ranges(elements(text))
-    text = dark_class_strings(text, ranges)
-    text = STYLE_BLOCK_RE.sub(lambda m: m.group(1) + _keep_lines(_css_edges, m.group(2)) + m.group(3), text)
-    text = STYLE_ATTR_RE.sub(
-        lambda m: (
-            m.group(0) if _kept(text, m.start()) else m.group(1) + m.group(2) + _css_edges(m.group(3)) + m.group(2)
-        ),
-        text,
-    )
+def recolor_dark(text: str, *, name: str = "", css: bool = False) -> str:
+    """The dark pass over a template that loads the stylesheet (*name* as the loader knows it; *css*
+    when it is bare CSS, included inside a parent's ``<style>`` block)."""
+    text = dark_class_strings(text, _scope_ranges(elements(text)))
+    for start, end, _ in reversed(ink300_css_edges(text, _scope_ranges(elements(text)), css=css)):
+        text = text[:start] + EDGE_TOKEN + text[end:]
     return _dark_in_context(text, name)
-
-
-def _keep_lines(fn, chunk: str) -> str:
-    return "\n".join(line if KEEP_LINE_RE.search(line) else fn(line) for line in chunk.split("\n"))
 
 
 def _decide(text: str, name: str) -> tuple[list[Element], list[dict[str, set[str]]], set[int]]:
@@ -1125,9 +1146,22 @@ EXTENDS_RE = re.compile(r"""{%\s*extends\s+["']([^"']+)["']""")
 
 
 def template_name(path: Path) -> str:
-    parts = path.relative_to(ROOT).parts
-    idx = parts.index("templates")
-    return "/".join(parts[idx + 1 :])
+    """The template's name as the loader knows it (the part after ``templates/``), or the file name
+    for a path outside a ``templates`` directory."""
+    parts = path.relative_to(ROOT).parts if path.is_relative_to(ROOT) else path.parts
+    if "templates" not in parts:
+        return path.name
+    return "/".join(parts[parts.index("templates") + 1 :])
+
+
+def css_partials(paths: Iterable[Path]) -> set[str]:
+    """The templates another template includes inside a ``<style>`` block: their content is bare CSS."""
+    names: set[str] = set()
+    for path in paths:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for block in STYLE_BLOCK_RE.finditer(_mask(text)):  # a <style> in a comment is not one
+            names.update(INCLUDE_RE.findall(text, block.start(2), block.end(2)))
+    return names
 
 
 def classify_templates(paths: Iterable[Path]) -> dict[Path, bool]:
@@ -1169,16 +1203,7 @@ def target_files() -> tuple[list[Path], list[Path], list[Path]]:
     return html, js, py
 
 
-def _loader_name(path: Path) -> str:
-    """The template's name as the loader knows it (the part after ``templates/``), or the file name."""
-    parts = path.parts
-    if "templates" not in parts:
-        return path.name
-    index = len(parts) - 1 - parts[::-1].index("templates")
-    return "/".join(parts[index + 1 :])
-
-
-def transform(path: Path, text: str, *, tokens: bool, defined: set[str]) -> str:
+def transform(path: Path, text: str, *, tokens: bool, defined: set[str], css: bool = False) -> str:
     if path.suffix == ".py":
         form_file = path.name.startswith(("forms", "widgets"))
         return dark_class_strings(recolor_classes(text, python_form_file=form_file))
@@ -1186,7 +1211,7 @@ def transform(path: Path, text: str, *, tokens: bool, defined: set[str]) -> str:
     if path.suffix == ".html":
         out = recolor_html_colours(out, tokens=tokens, defined=defined)
         if tokens:  # pages that do not load the stylesheet (emails, legal, error) keep their literals
-            out = recolor_dark(out, name=_loader_name(path))
+            out = recolor_dark(out, name=template_name(path), css=css)
     else:
         out = dark_class_strings(out)
     return out
@@ -1205,12 +1230,14 @@ def leftovers(paths: Iterable[Path]) -> list[str]:
 
 
 def class_string_problems(text: str, ranges: list[tuple[int, int]] | None = None) -> list[tuple[int, str]]:
-    """(line, problem) for the rules that need no element: bg-white and ink-300 edges."""
+    """(line, problem) for the rules that need no element: bg-white and ink-300 edges (named and
+    arbitrary-value utilities)."""
     ranges = ranges or []
     found = []
     for pattern, message in (
         (SOLID_WHITE_RE, "{token} outside the light scope"),
         (INK300_EDGE_RE, "{token} is a text grey in dark"),
+        (INK300_ARBITRARY_RE, "{token} is a text grey in dark"),
     ):
         for m in pattern.finditer(text):
             if not (_in(ranges, m.start()) or _kept(text, m.start())):
@@ -1218,16 +1245,22 @@ def class_string_problems(text: str, ranges: list[tuple[int, int]] | None = None
     return found
 
 
-def dark_problems(text: str) -> list[tuple[int, str]]:
+def dark_problems(text: str, *, css: bool = False) -> list[tuple[int, str]]:
     """(line, problem) for a template that loads the stylesheet: what would read wrong in dark.
 
     bg-white outside the light scope; text-white, bg-white/NN or hover:bg-white/NN on an element whose
     own fill or nearest ancestor's fill flips; a colour that flips on an inverse surface (without the
-    light scope that keeps its light look); an ink-300 edge. ``recolor: keep`` lines are accepted.
+    light scope that keeps its light look); an ink-300 edge, in a utility or in the template's CSS (a
+    ``<style>`` block, ``style=``, or the whole template when *css* says it is bare CSS, included inside
+    a parent's ``<style>`` block). ``recolor: keep`` lines are accepted.
     """
     found_elements = elements(text)
     ranges = _scope_ranges(found_elements)
     problems = class_string_problems(text, ranges)
+    problems += [
+        (_line_of(text, start), f"{prop}: var(--ink-300) is a text grey in dark")
+        for start, _, prop in ink300_css_edges(text, ranges, css=css)
+    ]
     fills = [_own_fills(element) for element in found_elements]
     constant = constant_steps()
     for element, own in zip(found_elements, fills, strict=True):
@@ -1370,8 +1403,8 @@ def styles_problems(css: str) -> list[str]:
     return [f"{STYLES_REL}:{line}: {problem}" for line, problem in sorted(found)]
 
 
-def dark_findings(paths: Iterable[Path], kinds: dict[Path, bool]) -> list[str]:
-    """What the dark rules find in *paths*, one line each."""
+def dark_findings(paths: Iterable[Path], kinds: dict[Path, bool], partials: Iterable[str] = ()) -> list[str]:
+    """What the dark rules find in *paths*, one line each (*partials*: the bare-CSS templates)."""
     ready = dark_ready_templates()
     lines: list[str] = []
     for path in paths:
@@ -1382,8 +1415,8 @@ def dark_findings(paths: Iterable[Path], kinds: dict[Path, bool]) -> list[str]:
         if path.suffix == ".html":
             if not kinds.get(path, True):
                 continue  # emails and standalone pages keep their literal colours
-            found = dark_problems(text)
-            name = _loader_name(path)
+            name = template_name(path)
+            found = dark_problems(text, css=name in partials)
             if name in ready and Path(name).name != "_platform_icon.html":
                 found += raw_colour_problems(text)
         else:
@@ -1444,6 +1477,7 @@ def main(argv: list[str] | None = None) -> int:
 
     html, js, py = target_files()
     kinds = classify_templates(html)
+    partials = css_partials(html)
     defined = defined_tokens()
     targets = [p.resolve() for p in args.paths] if args.paths else html + js + py
     styles = (ROOT / STYLES_REL).resolve()
@@ -1453,7 +1487,13 @@ def main(argv: list[str] | None = None) -> int:
         if path.suffix == ".css":
             continue  # styles.css is checked, never rewritten (its tokens are written by hand)
         before = path.read_text(encoding="utf-8")
-        after = transform(path, before, tokens=kinds.get(path, True), defined=defined)
+        after = transform(
+            path,
+            before,
+            tokens=kinds.get(path, True),
+            defined=defined,
+            css=path.suffix == ".html" and template_name(path) in partials,
+        )
         if after == before:
             continue
         changed.append(path)
@@ -1474,7 +1514,7 @@ def main(argv: list[str] | None = None) -> int:
         tests = sorted(p for p in (ROOT / "apps").rglob("*.py") if "tests" in p.parts or p.name.startswith("test_"))
         left = leftovers(html + js + py + tests) if not args.paths else leftovers(targets)
         images = orange_screenshots(MARKETING_IMAGES) if not args.paths else []
-        dark = dark_findings(targets, kinds)
+        dark = dark_findings(targets, kinds, partials)
         if not args.paths or styles in targets:
             dark += styles_problems(styles.read_text(encoding="utf-8")) if styles.exists() else []
         for name in rel:

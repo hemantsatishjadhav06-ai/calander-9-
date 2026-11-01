@@ -580,8 +580,10 @@ audit of the shell (type, spacing, cards) at 390 and 1440 px; must-fix findings 
 `CHANGELOG.md` entry "Phase 3 · Foundations": tested SHA, CI run, commands and results, audit findings
 and fixes, Lighthouse medians (local and C12), the E2E shards' and the visual job's wall times against
 their limits, `pairs:diff`'s result, the protected-test guard green, the working days used against
-the estimate, the F4 note (T8), and that `frontend-design` was unavailable and `impeccable`'s shape
-step stood in. **Stop: screen 1 starts after the owner signs off the shell pair.**
+the estimate, the F4 note (T8), the two light movements T3 made by design on no `pairs:diff` page
+(the composer's tooltip from ink-800 to the inverse surface, ink-900; the analytics drawer's
+media-kind badge in `analytics/_post_detail.html` from `bg-ink-900/80` to `bg-scrim/80`, ink-950 at
+80 %), and that `frontend-design` was unavailable and `impeccable`'s shape step stood in. **Stop: screen 1 starts after the owner signs off the shell pair.**
 
 ## Part B — Screen 1 · New post sheet (size L)
 

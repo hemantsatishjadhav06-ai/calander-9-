@@ -66,7 +66,7 @@ Send renders as a secondary button, and on a post or article page (whose decisio
                         {% if thread.can_upload_reference %}
                         <div>
                             <label for="{{ thread.dom_id }}-upload" class="ui-label">Or attach a photo here</label>
-                            <input id="{{ thread.dom_id }}-upload" type="file" name="reference_upload" accept="image/jpeg,image/png,image/webp" class="block w-full text-[13px] text-ink-700 file:mr-3 file:h-8 max-lg:file:h-11 file:rounded-lg file:border-0 file:bg-surface file:px-3 file:text-[13px] file:font-semibold file:text-ink-900 file:shadow-[inset_0_0_0_1px_var(--ink-300)] hover:file:bg-ink-25">
+                            <input id="{{ thread.dom_id }}-upload" type="file" name="reference_upload" accept="image/jpeg,image/png,image/webp" class="block w-full text-[13px] text-ink-700 file:mr-3 file:h-8 max-lg:file:h-11 file:rounded-lg file:border-0 file:bg-surface file:px-3 file:text-[13px] file:font-semibold file:text-ink-900 file:shadow-[inset_0_0_0_1px_var(--border-hover)] hover:file:bg-ink-25">
                         </div>
                         {% endif %}
                         <div>
@@ -88,7 +88,7 @@ Send renders as a secondary button, and on a post or article page (whose decisio
                 </label>
                 {% endif %}
                 <button type="submit" data-testid="thread-composer-send"
-                        class="ml-auto ui-btn ui-btn-sm {% if 'thread-brief-' in thread.dom_id or 'thread-blog-' in thread.dom_id %}ui-btn-secondary{% else %}ui-btn-primary group-has-[[data-confirm-brief]]/thread:bg-surface group-has-[[data-confirm-brief]]/thread:text-ink-900 group-has-[[data-confirm-brief]]/thread:shadow-[inset_0_0_0_1px_var(--ink-300),var(--shadow-xs)] group-has-[[data-confirm-brief]]/thread:hover:bg-ink-25{% endif %}">Send</button>
+                        class="ml-auto ui-btn ui-btn-sm {% if 'thread-brief-' in thread.dom_id or 'thread-blog-' in thread.dom_id %}ui-btn-secondary{% else %}ui-btn-primary group-has-[[data-confirm-brief]]/thread:bg-surface group-has-[[data-confirm-brief]]/thread:text-ink-900 group-has-[[data-confirm-brief]]/thread:shadow-[inset_0_0_0_1px_var(--border-hover),var(--shadow-xs)] group-has-[[data-confirm-brief]]/thread:hover:bg-ink-25{% endif %}">Send</button>
             </div>
         </div>
     </form>

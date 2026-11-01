@@ -15,7 +15,7 @@ default): the level of its headings (Settings → Advanced passes 4).
         {% csrf_token %}
         <div class="min-w-0">
             <label for="{{ upload_form.images.id_for_label }}" class="ui-label">{{ upload_form.images.label }}</label>
-            <div class="text-[13px] text-ink-700 [&_input[type=file]]:block [&_input[type=file]]:w-full [&_input[type=file]]:text-[13px] [&_input[type=file]]:file:mr-3 [&_input[type=file]]:file:h-9 [&_input[type=file]]:file:rounded-lg [&_input[type=file]]:file:border-0 [&_input[type=file]]:file:bg-surface [&_input[type=file]]:file:px-3.5 [&_input[type=file]]:file:font-semibold [&_input[type=file]]:file:text-ink-900 [&_input[type=file]]:file:shadow-[inset_0_0_0_1px_var(--ink-300)]">{{ upload_form.images }}</div>
+            <div class="text-[13px] text-ink-700 [&_input[type=file]]:block [&_input[type=file]]:w-full [&_input[type=file]]:text-[13px] [&_input[type=file]]:file:mr-3 [&_input[type=file]]:file:h-9 [&_input[type=file]]:file:rounded-lg [&_input[type=file]]:file:border-0 [&_input[type=file]]:file:bg-surface [&_input[type=file]]:file:px-3.5 [&_input[type=file]]:file:font-semibold [&_input[type=file]]:file:text-ink-900 [&_input[type=file]]:file:shadow-[inset_0_0_0_1px_var(--border-hover)]">{{ upload_form.images }}</div>
             {% if upload_form.images.errors %}<p class="ui-error">{{ upload_form.images.errors|join:" " }}</p>{% endif %}
         </div>
         <div class="min-w-0 max-lg:[&_input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden])]:min-h-11 max-lg:[&_select]:min-h-11">

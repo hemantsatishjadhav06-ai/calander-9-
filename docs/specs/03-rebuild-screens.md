@@ -935,6 +935,17 @@ when that screen starts.
   are not rebuilt. Default: yes for the beta, as R3, a named Phase 3 step after screen 11 with a dark
   axe run per page. Otherwise those pages stay light for the beta, or R3 moves to Phase 4 as an
   addition to its checklist.
+- *(owner)* **iOS Safari 16.0 and 16.1.** Section 5 supports iOS Safari 16+, but `color-mix()`
+  arrived in 16.2. F1's Layer 2 and components mix colours with it where main wrote `rgba()`
+  literals, and the minifier's fallback for a browser without it is the colour unmixed, opaque: a
+  ghost button's hover paints ink-950 under ink-900 text (`.ui-btn-ghost:hover`), `--overlay` is the
+  solid scrim, `--primary-halo` solid brand-600, and every shadow is drawn in the solid scrim colour.
+  Tailwind v4 already targets Safari 16.4+ and falls back the same way for each `/NN` opacity
+  utility, so on main a `bg-ink-950/35` overlay was already opaque there; the pairs diff runs on
+  Chromium and cannot see either. Default: accept, and record that full fidelity starts at iOS
+  Safari 16.4 (Tailwind's floor); 16.0–16.3 keep working with opaque overlays and shadows, untested.
+  Otherwise F1 adds an `rgba()` fallback declaration before each mixed light token (literals in
+  Layer 2, against D2), or section 5's floor moves to 16.4.
 - *(owner)* **Calendar's Approvals tab.** Phase 2 kept it "until Phase 3 rebuilds Calendar"; goldens
   05, 05-06 and 06 and a plain client's Approvals link use it. Default: it stays; from screen 3 a
   plain client there sees only the client sign-off, never *Approve & schedule*.
