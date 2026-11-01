@@ -239,15 +239,9 @@
     <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:bg-surface focus:px-4 focus:py-3 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-semibold focus:text-ink-900">Skip to content</a>
     {% csrf_token %}
     <!-- Global HTMX loading indicator: a thin top progress bar shown during
-         any HTMX request (calendar/analytics/publish swaps had no feedback). -->
+         any HTMX request (calendar/analytics/publish swaps had no feedback).
+         Its styles and reduced form are in styles.css. -->
     <div id="htmx-progress" aria-hidden="true"></div>
-    <style>
-      #htmx-progress{position:fixed;top:0;left:0;height:2px;width:0;max-width:100%;
-        background:var(--primary);z-index:9999;opacity:0;pointer-events:none;
-        transition:width .2s var(--ease-out), opacity .25s ease;}
-      #htmx-progress.active{opacity:1;}
-      @media (prefers-reduced-motion: reduce){ #htmx-progress{ transition:opacity .1s; } }
-    </style>
     <script nonce="{{ request.csp_nonce }}">
       (function(){
         var timer;

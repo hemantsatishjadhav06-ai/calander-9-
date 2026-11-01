@@ -255,27 +255,30 @@ Removed: the orange glow (`0 4px 14px rgba(249,115,22,.28)`), every `translateY`
 | Token | Duration | Use |
 |---|---|---|
 | `--dur-instant` | 100ms | hover/press colour, button `:active` scale(.98) |
-| `--dur-fast` | 160ms | pill cross-fade, dropdown open, checkbox, toggle, count step |
-| `--dur-base` | 220ms | disclosure (grid rows 0fr→1fr) + chevron, popover, row collapse |
-| `--dur-slow` | 320ms | modal/sheet, sidebar collapse 240→60px, mobile drawer, Set up tick draw |
-| message in | 240ms | new chat message |
+| `--dur-fast` | 160ms | pill cross-fade, dropdown open, checkbox, toggle, count step, status cross-fade |
+| `--dur-snap` | 200ms | a rebuilt screen's micro-interactions and sheets: the approve fill, a message arriving, the calendar chip's snap, the row collapse or card exit; a sheet or drawer entering |
+| `--dur-exit` | 140ms | a rebuilt screen's sheet or drawer leaving: `calc(var(--dur-snap) * .7)` |
+| `--dur-base` | 220ms | pages not rebuilt: disclosure (grid rows 0fr→1fr) + chevron, popover, row collapse |
+| `--dur-slow` | 320ms | pages not rebuilt: modal/sheet, sidebar collapse 240→60px, mobile drawer, Set up tick draw |
 | live pulse | 2s loop | working dot and working stage node only |
+
+**New motion uses `--dur-fast` or `--dur-snap` only** (spec D7), and a leave `--dur-exit`: nothing on a rebuilt screen runs longer than 200ms. `--dur-base` and `--dur-slow` stay for the pages not rebuilt, and a rebuilt screen's templates never name them. The motion classes in `styles.css` carry it: `.motion-rise` (a message arriving: opacity and a 6px rise, 200ms), `.motion-sheet-*` (a sheet's `x-transition` classes: `motion-sheet-enter` / `-leave` for the phases, `motion-sheet-out` / `-in` for the positions; up from the bottom below 1024px, in from the right from 1024px; in 200ms, out 140ms), `.motion-fill` (the approve fill, 200ms) and `.motion-snap` (the calendar chip settling into its slot, 200ms). Keyframes and reduced-motion blocks live in `styles.css`, never in a template (`base.html`'s progress bar moved there); `apps/common/tests/test_motion.py` checks the tokens, the classes and the templates of every gated screen.
 
 Easings: enter `cubic-bezier(0.22, 1, 0.36, 1)` (`--ease-out`); size changes `cubic-bezier(0.65, 0, 0.35, 1)` (`--ease-in-out`); exit `cubic-bezier(0.4, 0, 1, 1)` at 70% of the enter duration (`--ease-exit`); toggle knob only `cubic-bezier(0.34, 1.3, 0.64, 1)` (`--ease-spring`).
 
 Transitions that carry meaning:
-- **New message:** opacity 0→1 + translateY(6px)→0, 240ms; the "The team is writing" line fades out as the message fades in. Consecutive messages from one agent group under one avatar.
+- **New message:** opacity 0→1 + translateY(6px)→0, 200ms (`.motion-rise`, `--dur-snap`); the "The team is writing" line fades out as the message fades in. Consecutive messages from one agent group under one avatar.
 - **Status change** (Working → Ready for approval): 160ms cross-fade of colour, icon and word; the spinner is replaced, never popped. Announced with `aria-live="polite"`.
-- **Approve & schedule** (section 12.3): spinner ≥ 300ms → "Scheduled · Mon 10:10" (info) → hold 1.2s → row collapses 220ms → counts step → two-line toast with Undo.
+- **Approve & schedule** (section 12.3): spinner while the request is in flight (shown ≥ 300ms) → the button fills with "Scheduled · Mon 10:10" (info) in 200ms → hold 1.2s to read it → the row collapses or the card leaves in 200ms → counts step → two-line toast with Undo.
 - **Brief started:** a 2px indeterminate info-500 line runs along the brief card's bottom edge until the first agent step arrives.
 - **Auto-start countdown:** "Starting in 10 s · Stop" with a 2px info-500 line draining over 10s.
 - **Count badges** roll down one digit (4px slide + fade, 160ms).
 - **Set up step done:** ring fills success-500, tick draws (stroke-dashoffset 24→0, 320ms), progress widens 320ms, "5 of 11" → "6 of 11".
 - **HTMX:** 2px brand-700 bar at the top, width 200ms, fades out 250ms.
-- **Popover** translateY(-4px) + opacity 160ms; **modal** scale(.98) + opacity 220ms; **phone sheet** translateY(100%)→0 320ms.
+- **Popover** translateY(-4px) + opacity 160ms; **modal** scale(.98) + opacity 220ms (pages not rebuilt); **sheet** on a rebuilt screen (`.motion-sheet-*`): translateY(100%)→0 below 1024px, translateX(100%)→0 from 1024px, enters in 200ms (`--dur-snap`) and leaves in 140ms (`--dur-exit`, `--ease-exit`); a page not rebuilt keeps its phone sheet's 320ms.
 - **Skeleton** shimmer 1.4s linear, shown only after a 300ms delay.
 
-**Reduced motion** (`prefers-reduced-motion: reduce`): all transforms, slides, scales and loops are removed (global rule in Part B of `styles.css`); opacity fades of ≤ 120ms may stay (`.fade-safe`); the row collapse is instant; the working pulse and stage-node pulse stop (the filled dot and the word "Working" remain); spinners become a static ring beside the word; typing dots become the text "The team is writing…"; the skeleton is a static ink-100 block; the countdown updates text only; progress and HTMX bars appear without width animation; smooth scrolling is off.
+**Reduced motion** (`prefers-reduced-motion: reduce`): all transforms, slides, scales and loops are removed (global rule in Part B of `styles.css`, which cuts every animation and transition to 0.01ms); opacity fades of ≤ 120ms may stay (`.fade-safe`); the row collapse is instant; the working pulse and stage-node pulse stop (the filled dot and the word "Working" remain); spinners become a static ring beside the word; typing dots become the text "The team is writing…"; the skeleton is a static ink-100 block; the countdown updates text only; progress and HTMX bars appear without width animation; smooth scrolling is off. Every motion class has its own reduced form in the same block, so it does not run at all: a message appears without rising, the approve fill swaps at once (the words still show), the chip moves without its snap, and a sheet appears and goes in place with no transform. Each rebuilt screen names the reduced form of its new motion; `tests/e2e/self/reduced-motion.spec.ts` opens the shell's Go to and notifications drawer under reduce and finds nothing moving longer than 0.01ms (screens 1–3 add the sheet, a new message and the approve fill).
 
 ---
 
@@ -451,12 +454,12 @@ Container `rounded-xl border border-ink-400 bg-white p-3 pb-2.5 focus-within:bor
 
 ### 12.3 Approve sequence (Today, Approvals, portal)
 
-1. Click the tinted "Approve & schedule": width-locked 14px spinner (shown ≥ 300ms).
-2. The button cross-fades (160ms) into an info pill with a calendar icon: "Scheduled · Mon 10:10". **Not** success green, so a Pine action and a green status are never side by side.
-3. Hold 1.2s, then the row collapses (height via grid rows + opacity, 220ms in-out).
+1. Click the tinted "Approve & schedule": a width-locked 14px spinner shows while the request is in flight. It shows for at least 300ms: a display time that stops a flash, not motion.
+2. The button fills with the server's words in 200ms (`.motion-fill`, `--dur-snap`) and becomes an info pill with a calendar icon: "Scheduled · Mon 10:10". **Not** success green, so a Pine action and a green status are never side by side. The words are the server's answer, never a time the browser worked out (spec D13).
+3. Hold 1.2s: reading time, before the list reload replaces the row or card. Then the row collapses (height via grid rows + opacity) or the card leaves, in 200ms (`--dur-snap`).
 4. The "waiting for you" count and the sidebar badge step together (4px slide + fade, 160ms); `aria-live="polite"` announces "Scheduled for Monday 26 October, 10:10".
 5. Two-line toast: "Scheduled for Mon 26 Oct, 10:10" / "Same tower. A fairer number. · LinkedIn" + Undo (6s, pauses on hover/focus).
-Reduced motion: the swap and collapse are instant; the toast still appears.
+Reduced motion: the fill and the exit are instant; the words still show, and the toast still appears.
 
 ---
 

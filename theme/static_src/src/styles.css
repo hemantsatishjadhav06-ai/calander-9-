@@ -317,6 +317,10 @@
   --dur-fast: 160ms;
   --dur-base: 220ms;
   --dur-slow: 320ms;
+  /* A rebuilt screen's motion runs on --dur-fast or --dur-snap only (spec D7); --dur-base and
+     --dur-slow stay for the pages not rebuilt. A sheet or drawer leaves at 70 % of its entrance. */
+  --dur-snap: 200ms;
+  --dur-exit: calc(var(--dur-snap) * .7);
 
   /* Fonts */
   --font-display: var(--brand-font-display);
@@ -1320,6 +1324,42 @@ body.has-selection .ui-fab, body.has-approval-selection .ui-fab { visibility: hi
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .toast-enter { animation: toast-in 240ms var(--ease-out); }
 
+/* The HTMX progress bar (base.html's #htmx-progress): 2px at the top while a request runs, its width
+   200ms, its fade 250ms. Moved here from base.html's own style block, as every local motion block is
+   (spec D7); its reduced form is in the block below. */
+#htmx-progress {
+  position: fixed; top: 0; left: 0; height: 2px; width: 0; max-width: 100%;
+  background: var(--primary); z-index: 9999; opacity: 0; pointer-events: none;
+  transition: width .2s var(--ease-out), opacity .25s ease;
+}
+#htmx-progress.active { opacity: 1; }
+
+/* ── Motion for the rebuilt screens (spec D7; DESIGN_SYSTEM §8) ──
+   Each runs on --dur-snap (200ms), a leaving sheet on --dur-exit (140ms), and each has its reduced
+   form in the block below, where nothing here moves. Unlayered, so the class wins over a transition a
+   component or a utility sets on the same element.
+   - .motion-rise: a message arriving, opacity and a 6px rise.
+   - .motion-sheet-*: a sheet's x-transition classes. enter "motion-sheet-enter", enter-start
+     "motion-sheet-out", enter-end "motion-sheet-in"; leave "motion-sheet-leave", leave-start
+     "motion-sheet-in", leave-end "motion-sheet-out". It comes up from the bottom below 1024px and in
+     from the right from 1024px.
+   - .motion-fill: the approve button filling with the server's words (§12.3).
+   - .motion-snap: the calendar chip settling into its new slot (its transform back to none). */
+@keyframes motion-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.motion-rise { animation: motion-rise var(--dur-snap) var(--ease-out); }
+.motion-sheet-enter { transition: transform var(--dur-snap) var(--ease-out); }
+.motion-sheet-leave { transition: transform var(--dur-exit) var(--ease-exit); }
+.motion-sheet-out { transform: translateY(100%); }
+.motion-sheet-in { transform: none; }
+@media (min-width: 1024px) {
+  .motion-sheet-out { transform: translateX(100%); }
+}
+.motion-fill {
+  transition: background-color var(--dur-snap) var(--ease-out), color var(--dur-snap) var(--ease-out),
+              border-color var(--dur-snap) var(--ease-out), box-shadow var(--dur-snap) var(--ease-out);
+}
+.motion-snap { transition: transform var(--dur-snap) var(--ease-out); }
+
 /* Reduced motion: no transforms, no loops; state words carry the meaning */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -1332,6 +1372,12 @@ body.has-selection .ui-fab, body.has-approval-selection .ui-fab { visibility: hi
   .live-dot--working, .stage-node::after, .animate-spin, .ui-spinner { animation: none !important; }
   .skeleton { animation: none !important; background: var(--ink-100); }
   .skeleton-delay { opacity: 1; }
+  #htmx-progress { transition: opacity .1s; }
+  /* The motion classes do not run at all: a message appears, the fill swaps, the chip moves without
+     its snap, and a sheet appears and goes in place. */
+  .motion-rise { animation: none !important; }
+  .motion-sheet-enter, .motion-sheet-leave, .motion-fill, .motion-snap { transition: none !important; }
+  .motion-sheet-out { transform: none !important; }
 }
 
 /* Windows High Contrast / forced colours: states drawn with box-shadow get a real outline */
