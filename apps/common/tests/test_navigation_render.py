@@ -664,7 +664,9 @@ def test_the_palette_is_a_labelled_trapped_dialog_opened_by_a_button_and_ctrl_k(
     assert "x-trap.noscroll.noautofocus.noreturn" in dialog
     component = html[html.index("function commandPalette(") :]
     assert "this.opener = document.activeElement" in component
-    assert "this.$nextTick(() => this.$refs.input.focus())" in component
+    assert "this.$nextTick(() => this.holdFocus(" in component
+    hold = component[component.index("holdFocus(tries) {") :]
+    assert "this.$refs.dialog.contains(document.activeElement)" in hold and "this.$refs.input.focus()" in hold
     assert "opener.focus()" in component
     for key in ("ctrl.k", "meta.k"):
         assert re.search(rf"@keydown\.{re.escape(key)}[\w.]*window", html) or re.search(

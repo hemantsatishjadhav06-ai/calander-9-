@@ -983,7 +983,7 @@
          @open-palette.window="show()" @keydown.ctrl.k.window.prevent="toggle()" @keydown.meta.k.window.prevent="toggle()">
         <div x-show="open" x-cloak class="fixed inset-0 z-[110] flex items-start justify-center px-4 pt-[12vh]">
             <div class="ui-overlay" @click="close()"></div>
-            <div data-testid="palette-dialog" role="dialog" aria-modal="true" aria-label="Go to a page" x-trap.noscroll.noautofocus.noreturn="open"
+            <div data-testid="palette-dialog" x-ref="dialog" role="dialog" aria-modal="true" aria-label="Go to a page" x-trap.noscroll.noautofocus.noreturn="open"
                  @keydown.escape.prevent.stop="close()" class="ui-modal overflow-hidden">
                 <div class="p-3 border-b border-ink-200">
                     <input x-ref="input" type="text" data-testid="palette-input" class="ui-input" placeholder="Go to…" aria-label="Find a page"
@@ -1073,7 +1073,15 @@
                     this.opener = document.activeElement;
                     this.query = '';
                     this.open = true;
-                    this.$nextTick(() => this.$refs.input.focus());
+                    this.$nextTick(() => this.holdFocus(6));
+                },
+                // Put the focus in the field, and for a few frames after opening put it back if the
+                // browser moved it out of the dialog (WebKit did, after both a click and a key).
+                // Focus the person moved inside the dialog (an arrow to a link) is left alone.
+                holdFocus(tries) {
+                    if (!this.open) return;
+                    if (!this.$refs.dialog.contains(document.activeElement)) this.$refs.input.focus();
+                    if (tries > 0) setTimeout(() => this.holdFocus(tries - 1), 50);
                 },
                 close() {
                     this.open = false;
