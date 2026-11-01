@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import type { Harness } from '../support/harness';
+import { isPhone } from '../support/nav';
 import { expect, test } from '../support/test';
 import { expectReadSize, readSize } from '../support/type';
 
@@ -23,10 +24,6 @@ const PLACES: Place[] = [
   { name: 'Calendar month', path: (w) => `/workspace/${w}/calendar/?mode=calendar&view=month`, ready: 'calendar-shell' },
   { name: 'Calendar list', path: (w) => `/workspace/${w}/calendar/?mode=list&tab=queue`, ready: 'publish-tab-queue' },
 ];
-
-function isPhoneProject(page: Page): boolean {
-  return (page.viewportSize()?.width ?? 0) < 1024;
-}
 
 /** A post waiting for review (an Approvals row and Home's Today) and a scheduled one (the Calendar). */
 async function somethingToShow(harness: Harness): Promise<void> {
@@ -63,7 +60,7 @@ async function underTheFloor(page: Page, floor: number): Promise<string[]> {
 }
 
 test('the body reads at 16 px on a phone and 15 px on a desktop at 1440 x 900', async ({ page, harness, as }) => {
-  if (!isPhoneProject(page)) await page.setViewportSize(DESKTOP);
+  if (!isPhone(page)) await page.setViewportSize(DESKTOP);
   await as('owner');
   await open(page, harness, PLACES[0]);
 
@@ -72,20 +69,20 @@ test('the body reads at 16 px on a phone and 15 px on a desktop at 1440 x 900', 
     const style = getComputedStyle(element);
     return { size: parseFloat(style.fontSize), leading: parseFloat(style.lineHeight) };
   });
-  expect(body.size, `the body token at ${width}px`).toBe(isPhoneProject(page) ? 16 : 15);
+  expect(body.size, `the body token at ${width}px`).toBe(isPhone(page) ? 16 : 15);
   expect(readSize(width)).toBe(body.size);
-  expect(body.leading, `the body's leading at ${width}px`).toBeCloseTo(isPhoneProject(page) ? 24 : 22, 1);
+  expect(body.leading, `the body's leading at ${width}px`).toBeCloseTo(isPhone(page) ? 24 : 22, 1);
   await expectReadSize(page.locator('body'), 'the body');
 });
 
 test('page and card titles use the display cut at 700', async ({ page, harness, as }) => {
-  if (!isPhoneProject(page)) await page.setViewportSize(DESKTOP);
+  if (!isPhone(page)) await page.setViewportSize(DESKTOP);
   await as('owner');
   await open(page, harness, PLACES[0]);
 
   for (const [what, heading] of [
-    ['the page title', page.locator('h1.ui-page-title')],
-    ["Today's card title", page.locator('#today-heading')],
+    ['the page title', page.getByRole('heading', { level: 1 })],
+    ["Today's card title", page.getByTestId('home-today').getByRole('heading', { level: 2 })],
   ] as const) {
     const style = await heading.evaluate((element) => {
       const computed = getComputedStyle(element);
@@ -98,7 +95,7 @@ test('page and card titles use the display cut at 700', async ({ page, harness, 
 });
 
 test('nothing a person reads on Home, Approvals and the Calendar is under 13 px', async ({ page, harness, as }) => {
-  if (!isPhoneProject(page)) await page.setViewportSize(DESKTOP);
+  if (!isPhone(page)) await page.setViewportSize(DESKTOP);
   await somethingToShow(harness);
   await as('owner');
   for (const place of PLACES) {

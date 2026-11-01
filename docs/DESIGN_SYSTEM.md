@@ -205,7 +205,7 @@ Georgia (app) and Instrument Serif + Inter (marketing, 5 files, 95,428 bytes) ar
 Rules:
 - Hierarchy by size and weight only. Negative tracking only at 20px and above.
 - **No uppercase, no wide tracking.** Group labels are 13/600 ink-500 in sentence case ("Waiting for you", "Done since yesterday", "Brief").
-- Words are never smaller than 13px, wherever the stylesheet loads and on the standalone pages that do not load it (accept invite, the magic-link pages, legal, error, unsubscribe), and in the Analytics chart's canvas text. `apps/common/tests/test_type_floor.py` fails on any `text-[Npx]` under 13, any `font-size` under 13px and any `--text-*` token under 0.8125rem in templates, `static/js` and the stylesheets. Its two named allowlists: emails (the one exception: they do not load the stylesheet and keep literal values) and the public site's `marketing.css` with `templates/marketing/` (until screen 11). Inputs are 16px below 1024px (stops iOS zoom).
+- Words are never smaller than 13px, wherever the stylesheet loads and on the standalone pages that do not load it (accept invite, the magic-link pages, legal, error, unsubscribe), and in the Analytics chart's canvas text. `apps/common/tests/test_type_floor.py` fails on any `text-[Npx]` under 13, any `font-size` under 13px and any `--text-*` token under 0.8125rem in templates, `static/js` and the stylesheets. Its two named allowlists: emails (the one exception: they do not load the stylesheet and keep literal values) and the public site's `marketing.css` (until screen 11; its pages in `templates/marketing/` set no small size and are not excused). Inputs are 16px below 1024px (stops iOS zoom).
 - `tabular-nums` on counts, badges, times, dates in lists, budgets, "5 of 11 done", tables, chart axes and the calendar grid; proportional figures in prose.
 - Reading measure ≤ 72ch; thread column ≤ 720px.
 
@@ -402,7 +402,7 @@ Overlay `fixed inset-0 bg-ink-950/35`. Dialog `w-full max-w-[560px] rounded-2xl 
 
 | Part | Treatment |
 |---|---|
-| Sidebar | `w-60` (collapsed `w-[60px]`), `bg-ink-100 border-r border-ink-200 px-3 py-3 flex flex-col gap-0.5`. Workspace switcher: 28px mark (client icon, or `bg-ink-900` with a white initial, `rounded-[7px]`), name 14/600. "New" = secondary button, full width. Nav items `.sidebar-nav-item` (32px tall, 44px on touch; icon 18px stroke 1.75 ink-500; label 14/500 ink-700; hover `bg-ink-900/5`; active = white pill + `--shadow-nav-active` + 600 ink-950 label + brand-700 icon + `aria-current="page"`). Section label `.sidebar-section-label` 12/600 ink-500 sentence case. Badges `.sidebar-badge` (neutral) / `.sidebar-badge.is-turn` (Approvals). Footer: 28px ink-200 avatar, name 13/600, role 12 ink-500. |
+| Sidebar | `w-60` (collapsed `w-[60px]`), `bg-ink-100 border-r border-ink-200 px-3 py-3 flex flex-col gap-0.5`. Workspace switcher: 28px mark (client icon, or `bg-ink-900` with a white initial, `rounded-[7px]`), name 14/600. "New" = secondary button, full width. Nav items `.sidebar-nav-item` (32px tall, 44px on touch; icon 18px stroke 1.75 ink-500; label 14/500 ink-700; hover `bg-ink-900/5`; active = white pill + `--shadow-nav-active` + 600 ink-950 label + brand-700 icon + `aria-current="page"`). Section label `.sidebar-section-label` 13/600 ink-500 sentence case. Badges `.sidebar-badge` (neutral) / `.sidebar-badge.is-turn` (Approvals). Footer: 28px ink-200 avatar, name 13/600, role 13 ink-500. |
 | Main | `flex-1 min-w-0 bg-ink-50 px-10 pt-8 pb-16 max-lg:px-6 max-sm:px-4`; the inset white sheet is removed: cards sit directly on the canvas. |
 | Page header | `text-h1 text-ink-950` → status line `mt-1.5 text-sm text-ink-600` with `·` separators in ink-400 and underlined links → segmented tabs `mt-5` → content `mt-6`. |
 | Phone top bar | 52px `.translucent-bar sticky top-0`: menu icon, workspace 16/600, spacer, Go to and the bell (`.ui-btn-icon`). The Approvals count is in the phone bar (11.1). Drawer 280px over `bg-ink-950/35`. |
@@ -417,7 +417,7 @@ Overlay `fixed inset-0 bg-ink-950/35`. Dialog `w-full max-w-[560px] rounded-2xl 
 - **Sidebar:** "New", then six places in this order: Home, Approvals, Calendar, Inbox, Analytics, Activity, and Blog as a seventh only with its switch. Each is a `.sidebar-nav-item` with its 18px icon (`components/nav_icon.html`). Approvals carries `.sidebar-badge.is-turn` and names its count in `aria-label` ("Approvals, 3 waiting"); Inbox a neutral `.sidebar-badge`. No section labels and no *More* disclosure. One place is lit.
 - **The gear:** Settings is a `.sidebar-nav-item` with the gear icon, pushed to the bottom of the nav (`mt-auto`), lit on Settings and on every page a setting lives on. The account menu below it says **Account** for the person's own settings.
 - **Bell and Go to:** two `.ui-btn-icon`s in the sidebar header (desktop) and again in the phone top bar; each page shows one of the two copies. The bell's unread count is a neutral `.sidebar-badge` at its top right, never Pine. It opens a right-hand drawer (white, `max-w-sm`, `shadow-xl`, over `.ui-overlay`).
-- **Phone bar (below 1024px):** `fixed inset-x-0 bottom-0 z-20 .translucent-bar border-t border-ink-200`, plus the bottom safe area; five equal columns: Home, Approvals, Calendar, Inbox, More. Each is at least 56px tall, icon over an 11/16 500 label; the lit one has an ink-950 label, a brand-700 icon and `aria-current="page"`, the rest ink-600 and an ink-500 icon. Approvals' count is `.sidebar-badge.is-turn` over its icon. More is a button that opens the drawer. A 64px spacer ends the page so its last line scrolls clear; toasts, selection bars and sticky save bars sit above the bar. The post page and the composer show no phone bar, so their own action bar keeps the bottom edge.
+- **Phone bar (below 1024px):** `fixed inset-x-0 bottom-0 z-20 .translucent-bar border-t border-ink-200`, plus the bottom safe area; five equal columns: Home, Approvals, Calendar, Inbox, More. Each is at least 56px tall, icon over a 13/16 500 label; the lit one has an ink-950 label, a brand-700 icon and `aria-current="page"`, the rest ink-600 and an ink-500 icon. Approvals' count is `.sidebar-badge.is-turn` over its icon. More is a button that opens the drawer. A 64px spacer ends the page so its last line scrolls clear; toasts, selection bars and sticky save bars sit above the bar. The post page and the composer show no phone bar, so their own action bar keeps the bottom edge.
 - **Go to (command palette):** a `.ui-modal` dialog over `.ui-overlay`, 12vh from the top: a `.ui-input` ("Go to…"), then the places as `.ui-menu-item`s, a Settings tab with "Settings" after it in `text-xs text-ink-600`; "Nothing matches." when the filter empties it. Focus is trapped while it is open and returns where it was on Escape.
 
 ---
@@ -427,7 +427,7 @@ Overlay `fixed inset-0 bg-ink-950/35`. Dialog `w-full max-w-[560px] rounded-2xl 
 | Element | Treatment |
 |---|---|
 | **You** (person bubble) | right-aligned, `max-w-[78%] rounded-[18px] rounded-br-md bg-ink-100 px-3.5 py-2.5 text-body-lg text-ink-900`; meta "You · 15:35" `text-xs font-medium text-ink-500 text-right` above. No longer a filled orange bubble. |
-| **Account manager / specialist** | left, no bubble: 28px `bg-ink-900 text-white` avatar (11/600 initials), name `text-[13px] font-semibold text-ink-900` + "· 15:35" ink-500; body `text-body-lg text-ink-900`. Consecutive messages group under one avatar. Action cards (brief, draft, routine) nest below at `rounded-xl`. Full width on phones. Specialist avatars are neutral (`bg-ink-100 text-ink-700`); colour is never per agent. |
+| **Account manager / specialist** | left, no bubble: 28px `bg-ink-900 text-white` avatar (13/600 initials), name `text-[13px] font-semibold text-ink-900` + "· 15:35" ink-500; body `text-body-lg text-ink-900`. Consecutive messages group under one avatar. Action cards (brief, draft, routine) nest below at `rounded-xl`. Full width on phones. Specialist avatars are neutral (`bg-ink-100 text-ink-700`); colour is never per agent. |
 | Client | left, `bg-white ring-1 ring-ink-200 rounded-[18px] rounded-bl-md`, name + neutral "Client" tag. |
 | Teammate | left, `bg-ink-50 ring-1 ring-ink-200`. |
 | **Internal note** | `rounded-xl bg-ink-25 border border-dashed border-ink-400 px-3.5 py-2.5`; 14px lock + "Note for the team" `text-xs font-semibold text-ink-700`. "Not sent" is carried by the dashed shape, so warning keeps its one meaning. |
@@ -460,12 +460,12 @@ Hero card (`rounded-2xl p-5`), 372px right column on desktop. Header "Today" `te
 
 | Group | Row |
 |---|---|
-| Waiting for you | 44×55 creative thumb · title 14/600 (2-line clamp) · meta 12 ink-500 with 14px platform glyphs (≥ 8px from any button) · tinted "Approve & schedule" sm + ghost "Review" sm. After approval the row shows the info "Scheduled" pill, then collapses. |
+| Waiting for you | 44×55 creative thumb · title 14/600 (2-line clamp) · meta 13 ink-500 with 14px platform glyphs (≥ 8px from any button) · tinted "Approve & schedule" sm + ghost "Review" sm. After approval the row shows the info "Scheduled" pill, then collapses. |
 | Done since yesterday | 16px success-500 check + 13px ink-700 text + ink-500 time; repeats grouped ("3 drafts ready"); collapses after 3 ("Show 4 more"). |
 | Needs a look | 16px danger-500 triangle + text + underlined link "Run it again". |
 | Footer | "Next planned run: Fri 23 Oct, 10:30" `text-xs text-ink-500`. |
 
-Group labels 12/600 ink-500, sentence case, 18px top margin. On phones Today comes first only when something is waiting; otherwise it collapses to one line ("Nothing waiting · next run Fri 10:30").
+Group labels 13/600 ink-500, sentence case, 18px top margin. On phones Today comes first only when something is waiting; otherwise it collapses to one line ("Nothing waiting · next run Fri 10:30").
 
 ---
 
@@ -507,7 +507,7 @@ Connectors are 2px: success-500 between reached nodes, ink-200 ahead (decorative
 Form: one magnitude series over time → bars, one hue (dataviz rule: colour comes last; status colours stay reserved).
 - Card header "Last 24 hours" + caption "Tasks finished"; three hero numbers above (28/700 ink-950 tabular: tasks done, stopped, posts ready).
 - `.hour-chart`: 24 bars, 2px gaps, 96px tall, 4px rounded tops anchored to an ink-300 baseline; bars ink-400 (3.57:1), **current hour ink-900**, stopped tasks stacked on top in danger-500 with a 2px surface gap. No gridlines. Never Pine (the accent is not a data colour).
-- Axis: `.chart-axis` 12/500 ink-500 tabular, every 6 hours + "Now".
+- Axis: `.chart-axis` 13/500 ink-500 tabular, every 6 hours + "Now".
 - Legend always present (three series roles): Done · Stopped · This hour, with 10px swatches; text stays in ink.
 - Hover/focus: bar darkens to ink-600 and shows `.chart-tip` ("10:00–11:00 · 6 done · 0 stopped").
 - Accessibility: the chart is `role="img"` with a one-sentence `aria-label` summary ("Busiest at 10:00 with 6. One task stopped at 14:00.") plus a "Show as table" disclosure with the 24 rows.
@@ -518,7 +518,7 @@ Desktop (`.timeline`, 150px tall): a 1px ink-300 axis from Now to +24h; a 2px in
 
 | Event | Marker | Caption |
 |---|---|---|
-| Scheduled post | 16px info-500 disc + white calendar glyph | title 12/600 ink-900 (≤ 168px, ellipsis) + platform glyph + time |
+| Scheduled post | 16px info-500 disc + white calendar glyph | title 13/600 ink-900 (≤ 168px, ellipsis) + platform glyph + time |
 | Routine run | 12px ink-700 diamond | name + "Routine · 09:00" |
 | Approval due | 16px ring 2px warning-500 + clock | "Approve by 18:00" + count |
 | Run that stopped | 9px danger-500 square | name + "Stopped" |

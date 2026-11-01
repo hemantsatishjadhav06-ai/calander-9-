@@ -14,7 +14,7 @@ colours, not their small sizes). The guard reads source, so it sees every branch
 It walks the template directory itself rather than recolor's token classifier, which skips the pages
 that do not load the stylesheet. Two named allowlists excuse what the spec leaves for later, each
 entry with its reason: emails (the owner's one exception) and the public site (screen 11). Each must
-still excuse something, so it is removed when its files come under the floor.
+excuse something, entry by entry, so an entry is removed when its files come under the floor.
 
 Tailwind's own ``text-xs`` is 12 px unless ``styles.css`` redefines it, which a test below pins with
 the rest of D3's tokens: the running-text token (16/24 below 1024 px, 15/22 from 1024 px, on
@@ -44,10 +44,10 @@ EMAILS: dict[str, str] = {
 }
 
 #: The public site has its own stylesheet; its 19 sub-13 px rules move with screen 11, which removes
-#: these entries (spec D3).
+#: this entry (spec D3). Its pages (``templates/marketing/``) set no small size of their own, so they
+#: are not excused: a new one there fails like anywhere else.
 MARKETING: dict[str, str] = {
     "static/css/marketing.css": "the public site's stylesheet: its small rules move in screen 11",
-    "templates/marketing/": "the public site's pages: rebuilt in screen 11",
 }
 
 ALLOWLISTS: dict[str, dict[str, str]] = {"emails": EMAILS, "marketing": MARKETING}
@@ -113,9 +113,13 @@ def all_findings() -> list[Finding]:
     return findings
 
 
+def _excuses(entry: str, path: str) -> bool:
+    return path == entry or (entry.endswith("/") and path.startswith(entry))
+
+
 def allowlist_for(path: str) -> str | None:
     for name, entries in ALLOWLISTS.items():
-        if any(path == entry or (entry.endswith("/") and path.startswith(entry)) for entry in entries):
+        if any(_excuses(entry, path) for entry in entries):
             return name
     return None
 
@@ -125,13 +129,14 @@ def test_nothing_is_set_under_13px() -> None:
     assert not small, "Sizes under 13 px (use text-xs, which is 13/18, or 13 px):\n" + "\n".join(map(str, small))
 
 
-@pytest.mark.parametrize("name", sorted(ALLOWLISTS))
-def test_each_allowlist_names_real_files_and_still_excuses_something(name: str) -> None:
-    for entry, reason in ALLOWLISTS[name].items():
-        assert (ROOT / entry).exists(), f"{name}: {entry} does not exist"
-        assert reason.strip(), f"{name}: {entry} needs its reason"
-    excused = [finding for finding in all_findings() if allowlist_for(finding.path) == name]
-    assert excused, f"The {name} allowlist excuses nothing now: remove it (spec D3)."
+@pytest.mark.parametrize(
+    ("name", "entry"), [(name, entry) for name, entries in sorted(ALLOWLISTS.items()) for entry in entries]
+)
+def test_each_allowlist_entry_names_real_files_and_still_excuses_something(name: str, entry: str) -> None:
+    assert (ROOT / entry).exists(), f"{name}: {entry} does not exist"
+    assert ALLOWLISTS[name][entry].strip(), f"{name}: {entry} needs its reason"
+    excused = [finding for finding in all_findings() if _excuses(entry, finding.path)]
+    assert excused, f"{name}: {entry} excuses nothing now: remove the entry (spec D3)."
 
 
 def test_the_guard_reads_the_standalone_pages_and_the_app_script() -> None:
