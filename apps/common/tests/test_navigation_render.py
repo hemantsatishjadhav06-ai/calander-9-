@@ -659,9 +659,13 @@ def test_the_palette_is_a_labelled_trapped_dialog_opened_by_a_button_and_ctrl_k(
     assert "@keydown.escape" in dialog
     field = _tag(html, 'data-testid="palette-input"')
     assert field.startswith("<input") and "aria-label=" in field
-    # x-trap uses an autofocus control as the dialog's first focus. Without it WebKit left the focus
-    # outside the field when the palette opened from its button (CI, iPhone 13).
-    assert "autofocus" in field
+    # The palette places the focus itself (into the field, back to its opener); the trap only keeps
+    # Tab inside. Left to the trap, WebKit did not land the focus in the field (CI, iPhone 13).
+    assert "x-trap.noscroll.noautofocus.noreturn" in dialog
+    component = html[html.index("function commandPalette(") :]
+    assert "this.opener = document.activeElement" in component
+    assert "this.$nextTick(() => this.$refs.input.focus())" in component
+    assert "opener.focus()" in component
     for key in ("ctrl.k", "meta.k"):
         assert re.search(rf"@keydown\.{re.escape(key)}[\w.]*window", html) or re.search(
             rf"@keydown\.window[\w.]*{re.escape(key)}", html

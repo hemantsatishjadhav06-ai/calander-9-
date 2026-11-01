@@ -983,10 +983,10 @@
          @open-palette.window="show()" @keydown.ctrl.k.window.prevent="toggle()" @keydown.meta.k.window.prevent="toggle()">
         <div x-show="open" x-cloak class="fixed inset-0 z-[110] flex items-start justify-center px-4 pt-[12vh]">
             <div class="ui-overlay" @click="close()"></div>
-            <div data-testid="palette-dialog" role="dialog" aria-modal="true" aria-label="Go to a page" x-trap.noscroll="open"
+            <div data-testid="palette-dialog" role="dialog" aria-modal="true" aria-label="Go to a page" x-trap.noscroll.noautofocus.noreturn="open"
                  @keydown.escape.prevent.stop="close()" class="ui-modal overflow-hidden">
                 <div class="p-3 border-b border-ink-200">
-                    <input x-ref="input" type="text" data-testid="palette-input" class="ui-input" placeholder="Go to…" aria-label="Find a page" autofocus
+                    <input x-ref="input" type="text" data-testid="palette-input" class="ui-input" placeholder="Go to…" aria-label="Find a page"
                            autocomplete="off" spellcheck="false" x-model="query"
                            @keydown.arrow-down.prevent="move(1)" @keydown.enter.prevent="openFirst()">
                 </div>
@@ -1064,15 +1064,23 @@
                     if (!this.open) return '';
                     return this.shown === 1 ? '1 page' : this.shown + ' pages';
                 },
+                opener: null,
                 show() {
-                    // The dialog's x-trap puts the focus in the field (it carries autofocus, x-trap's
-                    // initial focus; WebKit does not find it as the first control) and, on closing,
-                    // hands it back to whatever had it before; focusing the field here first would
-                    // make the field that element.
+                    // The palette places the focus itself: into the field on opening and back to
+                    // whatever opened it on closing. Its x-trap only keeps Tab inside the dialog
+                    // (noautofocus, noreturn), because WebKit did not land the trap's own initial
+                    // and returning focus where Chromium does.
+                    this.opener = document.activeElement;
                     this.query = '';
                     this.open = true;
+                    this.$nextTick(() => this.$refs.input.focus());
                 },
-                close() { this.open = false; },
+                close() {
+                    this.open = false;
+                    var opener = this.opener;
+                    this.opener = null;
+                    if (opener && opener !== document.body && opener.isConnected) this.$nextTick(() => opener.focus());
+                },
                 toggle() { if (this.open) this.close(); else this.show(); },
                 visible() {
                     return Array.prototype.filter.call(
