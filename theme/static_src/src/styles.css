@@ -609,9 +609,11 @@
 /* ═══════════════════════════════════════════════════════════════
    SIDEBAR - uses CSS variables that Tailwind can't express
    ═══════════════════════════════════════════════════════════════ */
+/* 12px inside the 8px gutter (base.html): the icon sits at 20px, on the workspace mark's and the account
+   avatar's column, and the label 12px after it (the mark and the avatar keep the same 12px gap). */
 .sidebar-nav-item {
-  display: flex; align-items: center; gap: 10px;
-  min-height: 32px; padding: 6px 10px;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 32px; padding: 6px 12px;
   border-radius: var(--radius-lg);
   font-size: 0.875rem; line-height: 1.25rem; font-weight: 500;
   color: var(--ink-700);
@@ -1188,7 +1190,7 @@ span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--te
 
   /* Menus and popovers */
   .ui-menu { border-radius: var(--radius-xl); background: var(--surface-0); padding: 4px; box-shadow: var(--shadow-lg), 0 0 0 1px var(--ink-200); }
-  .ui-menu-item { display: flex; width: 100%; min-height: 34px; align-items: center; gap: 8px; border-radius: var(--radius-lg); padding: 0 10px; font-size: 0.875rem; color: var(--ink-900); text-align: left; text-decoration: none; cursor: pointer; }
+  .ui-menu-item { display: flex; width: 100%; min-height: 34px; align-items: center; gap: 8px; border-radius: var(--radius-lg); padding: 0 12px; font-size: 0.875rem; color: var(--ink-900); text-align: left; text-decoration: none; cursor: pointer; }
   .ui-menu-item:hover { background: var(--ink-50); }
   .ui-menu-item svg { width: 16px; height: 16px; flex: none; color: var(--ink-500); }
   .ui-menu-item.is-danger { color: var(--danger-500); }

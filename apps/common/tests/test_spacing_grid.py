@@ -259,6 +259,25 @@ def test_gated_screens_space_on_the_8px_grid() -> None:
     assert not findings, "Spacing off the 8 px grid in a gated screen (spec D4):\n" + "\n".join(map(str, findings))
 
 
+def test_the_shell_spaces_on_the_8px_grid() -> None:
+    """The shell (``base.html`` and every template it includes) is on the grid before any screen is gated.
+
+    Every screen extends ``base.html``, so screen 1's gate reads the shell through its tree, and the owner
+    signs the shell pair off at the foundations gate (plan T13). The rule is the gated screens' rule:
+    steps 1 and 3 only inside a control or as an icon-and-label gap, no fractional or ``px`` steps.
+    """
+    tree = screens.template_tree(("base.html",))
+    assert tree[0] == "base.html", tree
+    findings: list[Finding] = []
+    for name in tree:
+        path = screens.find_template(name)
+        assert path is not None, name
+        findings += off_grid(path.read_text(encoding="utf-8"), name)
+    assert not findings, f"{len(findings)} spacing utilities off the 8 px grid in the shell (spec D4):\n" + "\n".join(
+        map(str, findings)
+    )
+
+
 def test_the_guard_reads_every_template_of_a_gated_screen_and_nothing_else(tmp_path: Path) -> None:
     def write(name: str, body: str) -> None:
         path = tmp_path / name

@@ -236,7 +236,7 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="text-ink-900 min-h-screen bg-ink-50">
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:bg-surface focus:px-4 focus:py-3 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-semibold focus:text-ink-900">Skip to content</a>
+    <a href="#main-content" data-control class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:bg-surface focus:px-4 focus:py-3 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-semibold focus:text-ink-900">Skip to content</a>
     {% csrf_token %}
     <!-- Global HTMX loading indicator: a thin top progress bar shown during
          any HTMX request (calendar/analytics/publish swaps had no feedback).
@@ -296,9 +296,9 @@
          class="fixed {% if nav.phone %}bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6{% else %}bottom-6 max-sm:bottom-4{% endif %} right-6 max-sm:inset-x-4 z-[100] sm:max-w-[420px]"
          role="alert" aria-live="assertive">
         <div class="ui-toast toast-enter">
-            <svg class="w-[18px] h-[18px] flex-shrink-0 mt-px text-danger-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>
+            <svg class="w-[18px] h-5 flex-shrink-0 text-danger-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>
             <p class="flex-1 min-w-0 break-words" x-text="message"></p>
-            <button type="button" @click="show = false" class="-m-1.5 flex-shrink-0 grid place-items-center w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg cursor-pointer text-ink-300 hover:text-white hover:bg-white/10 focus-visible:outline-on-inverse" aria-label="Dismiss">
+            <button type="button" @click="show = false" data-control class="-m-2 flex-shrink-0 grid place-items-center w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg cursor-pointer text-ink-300 hover:text-white hover:bg-white/10 focus-visible:outline-on-inverse" aria-label="Dismiss">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
@@ -344,11 +344,13 @@
         <!-- Sidebar: pale ink-100 with a hairline edge; a 280px drawer below 1024px.
              Below 1024px the closed drawer is inert (out of the tab order and the accessibility tree);
              open, it is a modal dialog that holds focus and hands it back to the menu button on close.
-             Opening New idea from it closes it first; the dialog's own trap then puts focus in its title. -->
+             Opening New idea from it closes it first; the dialog's own trap then puts focus in its title.
+             From 1024px lg:z-30 keeps its menus above the page: collapsed to 60px, the workspace and account
+             menus open wider than the sidebar, and main (later in the page) painted over them. -->
         <aside id="app-sidebar" class="flex flex-col flex-shrink-0 sidebar-initial
                       fixed inset-y-0 left-0 z-40 w-[280px] bg-ink-100 border-r border-ink-200
                       transition-transform duration-300 ease-out
-                      lg:relative lg:z-auto lg:translate-x-0"
+                      lg:relative lg:z-30 lg:translate-x-0"
                :class="[
                    sidebarCollapsed ? 'lg:w-[60px] sidebar-collapsed' : 'lg:w-60',
                    mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
@@ -363,12 +365,12 @@
 
             <!-- Sidebar header: the workspace switcher, then (desktop) Go to and the notifications bell.
                  Below 1024px those two live in the top bar instead. -->
-            <div class="sidebar-head relative px-3 pt-3 pb-1 flex items-center gap-1" :class="sidebarCollapsed && 'px-2 flex-col'" x-data="{ wsOpen: false }"
+            <div class="sidebar-head relative px-2 pt-2 flex items-center" :class="sidebarCollapsed && 'flex-col'" x-data="{ wsOpen: false }"
                  @keydown.escape="if (wsOpen) { $event.stopPropagation(); wsOpen = false; $refs.wsBtn.focus() }"
                  @focusout="if (wsOpen && $event.relatedTarget && !$el.contains($event.relatedTarget)) wsOpen = false">
-                <button x-ref="wsBtn" aria-haspopup="true" :aria-expanded="wsOpen" @click="wsOpen = !wsOpen"
-                        class="sidebar-ws-btn flex-1 min-w-0 flex items-center gap-2.5 px-2 py-1.5 min-h-10 max-lg:min-h-11 text-left rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer"
-                        :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-2.5 px-2'">
+                <button x-ref="wsBtn" aria-haspopup="true" :aria-expanded="wsOpen" @click="wsOpen = !wsOpen" data-control
+                        class="sidebar-ws-btn flex-1 min-w-0 flex items-center gap-3 px-3 py-1 min-h-10 max-lg:min-h-11 text-left rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer"
+                        :class="sidebarCollapsed && 'justify-center !px-2'">
                     {% with current_ws=request.workspace %}
                     {% if current_ws %}
                     {% if current_ws.icon %}
@@ -400,10 +402,10 @@
                      x-transition:leave="transition ease-in duration-75"
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0"
-                     class="absolute left-3 right-3 top-full mt-1 bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 p-1 z-50">
+                     data-control="menu" class="absolute left-2 right-2 top-full mt-2 min-w-[220px] bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 p-1 z-50">
                     {% for ws in sidebar_workspaces %}
                     <a href="{% url 'calendar:calendar' workspace_id=ws.id %}"
-                       class="flex items-center gap-2.5 px-2.5 py-1.5 min-h-[34px] max-lg:min-h-11 text-sm rounded-lg hover:bg-ink-50 transition-colors {% if request.workspace and ws.id == request.workspace.id %}bg-ink-50 font-semibold text-ink-950{% else %}text-ink-900{% endif %}">
+                       class="flex items-center gap-3 px-2 py-1 min-h-10 max-lg:min-h-11 text-sm rounded-lg hover:bg-ink-50 transition-colors {% if request.workspace and ws.id == request.workspace.id %}bg-ink-50 font-semibold text-ink-950{% else %}text-ink-900{% endif %}">
                         {% if ws.icon %}
                         <img src="{{ ws.icon.url }}" alt="" class="w-7 h-7 rounded-[7px] object-cover flex-shrink-0 shadow-[var(--shadow-creative)]">
                         {% else %}
@@ -417,12 +419,12 @@
                         {% endif %}
                     </a>
                     {% empty %}
-                    <p class="px-2.5 py-2 text-sm text-ink-500">No workspaces</p>
+                    <p class="px-2 py-2 text-sm text-ink-500">No workspaces</p>
                     {% endfor %}
                     {% if can_create_workspace %}
                     <div class="border-t border-ink-200 mt-1 pt-1">
                         <button @click="wsOpen = false; $dispatch('open-create-ws')"
-                                class="flex items-center gap-2.5 px-2.5 py-1.5 min-h-[34px] max-lg:min-h-11 text-sm text-ink-900 rounded-lg hover:bg-ink-50 transition-colors w-full cursor-pointer">
+                                class="flex items-center gap-3 px-2 py-1 min-h-10 max-lg:min-h-11 text-sm text-ink-900 rounded-lg hover:bg-ink-50 transition-colors w-full cursor-pointer">
                             <div class="w-7 h-7 rounded-[7px] flex items-center justify-center border border-dashed border-ink-400 flex-shrink-0">
                                 <svg class="w-3.5 h-3.5 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                             </div>
@@ -433,7 +435,7 @@
                     {% if request.workspace %}
                     <div class="border-t border-ink-200 mt-1 pt-1">
                         <a href="{% url 'workspaces:settings' workspace_id=request.workspace.id %}"
-                           class="flex items-center gap-2.5 px-2.5 py-1.5 min-h-[34px] max-lg:min-h-11 text-sm text-ink-900 rounded-lg hover:bg-ink-50 transition-colors w-full cursor-pointer">
+                           class="flex items-center gap-3 px-2 py-1 min-h-10 max-lg:min-h-11 text-sm text-ink-900 rounded-lg hover:bg-ink-50 transition-colors w-full cursor-pointer">
                             <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0">
                                 <svg class="w-4 h-4 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                             </div>
@@ -449,13 +451,13 @@
 
             <!-- + New CTA -->
             {% if request.workspace %}
-            <div class="sidebar-new-wrap px-3 pt-2 pb-2" :class="sidebarCollapsed && 'px-2'"
+            <div class="sidebar-new-wrap px-2 pt-2 pb-2"
                  x-data="sidebarNewMenu()">
                 <div class="relative"
                      @keydown.escape="if (newMenuOpen) { $event.stopPropagation(); newMenuOpen = false; $refs.newBtn.focus() }"
                      @focusout="if (newMenuOpen && $event.relatedTarget && !$el.contains($event.relatedTarget)) newMenuOpen = false">
                     <button x-ref="newBtn" data-testid="sidebar-new-toggle" aria-haspopup="true" :aria-expanded="newMenuOpen" @click="newMenuOpen = !newMenuOpen"
-                            class="btn-outline w-full flex items-center justify-center gap-1.5 cursor-pointer"
+                            class="btn-outline w-full flex items-center justify-center gap-2 cursor-pointer"
                             :style="sidebarCollapsed ? 'padding-left:1.15rem;padding-right:1.15rem' : ''">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         <span class="sidebar-new-label" x-show="!sidebarCollapsed">New</span>
@@ -469,9 +471,9 @@
                          x-transition:leave="transition ease-in duration-75"
                          x-transition:leave-start="opacity-100 scale-100"
                          x-transition:leave-end="opacity-0 scale-95"
-                         class="absolute left-0 right-0 top-full mt-1.5 min-w-[220px] bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
+                         data-control="menu" class="absolute left-0 right-0 top-full mt-2 min-w-[220px] bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
                         <a href="{% url 'composer:compose' workspace_id=request.workspace.id %}"
-                           class="flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-ink-50 transition-colors">
+                           class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-ink-50 transition-colors">
                             <div class="w-9 h-9 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0">
                                 <svg class="w-[18px] h-[18px] text-ink-700" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                             </div>
@@ -481,7 +483,7 @@
                             </div>
                         </a>
                         <button type="button" data-testid="sidebar-new-idea" @click="openCreateModal()"
-                                class="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-ink-50 transition-colors cursor-pointer">
+                                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-ink-50 transition-colors cursor-pointer">
                             <div class="w-9 h-9 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0">
                                 <svg class="w-[18px] h-[18px] text-ink-700" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                             </div>
@@ -539,7 +541,7 @@
                                     <div class="flex items-center gap-2">
                                         <!-- Column selector dropdown -->
                                         <div class="relative" @click.away="createGroupDropdownOpen = false">
-                                            <button aria-haspopup="true" :aria-expanded="createGroupDropdownOpen" type="button" class="idea-pill-btn" @click="createGroupDropdownOpen = !createGroupDropdownOpen; createTagDropdownOpen = false">
+                                            <button aria-haspopup="true" :aria-expanded="createGroupDropdownOpen" type="button" data-control class="idea-pill-btn" @click="createGroupDropdownOpen = !createGroupDropdownOpen; createTagDropdownOpen = false">
                                                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                                                 <span x-text="createGroupLabel()"></span>
                                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
@@ -558,17 +560,17 @@
 
                                         <!-- Tags dropdown -->
                                         <div class="relative" @click.away="createTagDropdownOpen = false">
-                                            <button aria-haspopup="true" :aria-expanded="createTagDropdownOpen" type="button" class="idea-pill-btn" @click="createTagDropdownOpen = !createTagDropdownOpen; createGroupDropdownOpen = false; if(createTagDropdownOpen) $nextTick(() => $refs.sidebarCreateTagSearchInput.focus())">
+                                            <button aria-haspopup="true" :aria-expanded="createTagDropdownOpen" type="button" data-control class="idea-pill-btn" @click="createTagDropdownOpen = !createTagDropdownOpen; createGroupDropdownOpen = false; if(createTagDropdownOpen) $nextTick(() => $refs.sidebarCreateTagSearchInput.focus())">
                                                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                                                 <span>Tags</span>
                                                 <span x-show="createSelectedTags.length" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-xs font-semibold tabular-nums bg-ink-200 text-ink-700" x-text="createSelectedTags.length"></span>
                                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
                                             </button>
-                                            <div x-show="createTagDropdownOpen" x-cloak x-transition class="idea-pill-dropdown">
-                                                <div class="px-1 pt-0.5 pb-1.5 mb-1 border-b border-ink-200">
+                                            <div x-show="createTagDropdownOpen" x-cloak x-transition data-control="menu" class="idea-pill-dropdown">
+                                                <div class="px-1 pt-1 pb-2 mb-1 border-b border-ink-200">
                                                     <input type="text" x-ref="sidebarCreateTagSearchInput" x-model="createTagSearch"
                                                            @keydown.enter.prevent="if (createTagSearch.trim() && !filteredCreateTags.includes(createTagSearch.trim())) { persistAndToggleCreateTag(createTagSearch.trim()); } else if (filteredCreateTags.length === 1) { toggleCreateTag(filteredCreateTags[0]); createTagSearch = ''; }"
-                                                           class="w-full text-sm px-2.5 h-8 rounded-lg border border-ink-400 bg-surface placeholder:text-ink-500"
+                                                           class="w-full text-sm px-2 h-8 rounded-lg border border-ink-400 bg-surface placeholder:text-ink-500"
                                                            placeholder="Search or create tag..." aria-label="Search or create tag">
                                                 </div>
                                                 <template x-for="tag in filteredCreateTags" :key="tag">
@@ -580,7 +582,7 @@
                                                     </label>
                                                 </template>
                                                 <template x-if="!createTagSearch.trim() && !allTags.length">
-                                                    <div class="px-2.5 py-2 text-xs text-ink-500">No tags yet. Type to create one.</div>
+                                                    <div class="px-3 py-2 text-xs text-ink-500">No tags yet. Type to create one.</div>
                                                 </template>
                                                 <template x-if="createTagSearch.trim() && !filteredCreateTags.includes(createTagSearch.trim())">
                                                     <div class="border-t border-ink-200 mt-1 pt-1">
@@ -666,8 +668,8 @@
                                                  x-transition:enter-end="opacity-100 scale-100"
                                                  class="emoji-picker-popup">
                                                 <div class="emoji-picker-search">
-                                                    <input type="text" data-testid="idea-emoji-search" placeholder="Search emoji..." aria-label="Search emoji" x-model="_emojiSearch"
-                                                           class="w-full px-2.5 h-8 text-sm rounded-lg border border-ink-400 bg-surface placeholder:text-ink-500"
+                                                    <input type="text" data-testid="idea-emoji-search" placeholder="Search emoji..." aria-label="Search emoji" x-model="_emojiSearch" data-control
+                                                           class="w-full px-3 h-8 text-sm rounded-lg border border-ink-400 bg-surface placeholder:text-ink-500"
                                                            @click.stop>
                                                 </div>
                                                 <div class="emoji-picker-grid">
@@ -726,7 +728,7 @@
             {% endif %}
 
             <!-- Navigation: the places from apps/common/navigation.build_nav, then Settings, the gear, at the bottom. -->
-            <nav class="sidebar-nav flex-1 overflow-y-auto pt-1 pb-3 px-3 flex flex-col gap-0.5" :class="sidebarCollapsed ? 'px-2' : 'px-3'" aria-label="Main" data-testid="sidebar-nav">
+            <nav class="sidebar-nav flex-1 overflow-y-auto pt-2 pb-2 px-2 flex flex-col" aria-label="Main" data-testid="sidebar-nav">
                 {% block sidebar_nav %}{% spaceless %}
                 {% for item in nav.items %}
                 {# Every link carries its name (and count) in aria-label: the collapsed sidebar hides the label and the badge. #}
@@ -748,12 +750,11 @@
             </nav>
 
             <!-- Organization footer -->
-            <div class="sidebar-org-footer relative px-3 py-3" x-data="{ orgMenuOpen: false }"
-                 :class="sidebarCollapsed ? 'px-2 py-2' : 'px-3 py-3'">
+            <div class="sidebar-org-footer relative px-2 py-2" x-data="{ orgMenuOpen: false }">
                 <!-- Expanded: single row with org button + collapse toggle -->
-                <div class="sidebar-org-expanded flex items-center gap-1" x-show="!sidebarCollapsed">
-                    <button aria-haspopup="true" :aria-expanded="orgMenuOpen" @click="orgMenuOpen = !orgMenuOpen"
-                            class="flex-1 flex items-center gap-2.5 px-2 py-1.5 min-h-11 rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer min-w-0">
+                <div class="sidebar-org-expanded flex items-center gap-2" x-show="!sidebarCollapsed">
+                    <button aria-haspopup="true" :aria-expanded="orgMenuOpen" @click="orgMenuOpen = !orgMenuOpen" data-control
+                            class="flex-1 flex items-center gap-3 px-3 py-1 min-h-11 rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer min-w-0">
                         {% if user.avatar %}
                         <img src="{{ user.avatar.url }}" alt="" class="w-7 h-7 rounded-full object-cover flex-shrink-0">
                         {% else %}
@@ -797,16 +798,16 @@
                      x-transition:leave="transition ease-in duration-75"
                      x-transition:leave-start="opacity-100 scale-100"
                      x-transition:leave-end="opacity-0 scale-95"
-                     class="absolute bottom-full left-3 right-3 mb-2 min-w-[220px] bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
+                     data-control="menu" class="absolute bottom-full left-2 right-2 mb-2 min-w-[220px] bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
 
                     <!-- User info -->
-                    <div class="px-2.5 pt-2.5 pb-2">
+                    <div class="px-3 pt-3 pb-2">
                         <p class="text-[13px] text-ink-500 truncate">{{ user.email }}</p>
-                        <p class="text-sm font-semibold text-ink-900 mt-0.5">{{ request.org.name|default:"My Organization" }}</p>
+                        <p class="text-sm font-semibold text-ink-900 mt-1">{{ request.org.name|default:"My Organization" }}</p>
                     </div>
 
                     <!-- Manage Team button -->
-                    <div class="px-1.5 pb-2">
+                    <div class="px-1 pb-2">
                         <a href="{% url 'members:list' %}"
                            class="ui-btn ui-btn-secondary ui-btn-sm w-full">
                             <svg class="w-4 h-4 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
@@ -824,15 +825,15 @@
                     </div>
 
                     <!-- Appearance: System, Light or Dark, kept on this device by the head script (components/theme_script.html). The menu reads the choice each time it opens, so a choice made in another tab shows here. -->
-                    <div class="border-t border-ink-200 mt-1 px-1.5 pt-2 pb-1.5" x-data="{ appearance: 'system' }" x-effect="if (orgMenuOpen) appearance = bbTheme.preference()">
+                    <div class="border-t border-ink-200 mt-1 px-1 pt-2 pb-2" x-data="{ appearance: 'system' }" x-effect="if (orgMenuOpen) appearance = bbTheme.preference()">
                         <fieldset{% if not theme_ready %} aria-describedby="appearance-note"{% endif %}>
-                            <legend class="px-1 text-[13px] leading-[18px] font-medium text-ink-600">Appearance</legend>
-                            <div class="ui-segmented mt-1.5 flex w-full">
+                            <legend class="px-2 text-[13px] leading-[18px] font-medium text-ink-600">Appearance</legend>
+                            <div class="ui-segmented mt-2 flex w-full">
                                 <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="system" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-system">System</label>
                                 <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="light" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-light">Light</label>
                                 <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="dark" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-dark">Dark</label>
                             </div>
-                            {% if not theme_ready %}<p id="appearance-note" class="mt-1.5 px-1 text-[13px] leading-[18px] text-ink-600">This page stays light for now.</p>{% endif %}
+                            {% if not theme_ready %}<p id="appearance-note" class="mt-2 px-2 text-[13px] leading-[18px] text-ink-600">This page stays light for now.</p>{% endif %}
                         </fieldset>
                     </div>
 
@@ -888,13 +889,13 @@
             {% comment %}data-phone-bar-scroll (main and the scroller inside it): below 1024px each keeps the phone
                bar's height clear at the bottom (scroll-padding-bottom, styles.css), so a control focused from the
                keyboard never scrolls in under the bar (WCAG 2.4.11). Only where the bar shows (nav.phone).{% endcomment %}
-            <main id="main-content" data-testid="main-content" tabindex="-1" class="relative flex-1 min-w-0 bg-ink-50 px-4 pt-5 pb-12 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-16 overflow-y-auto flex flex-col focus:outline-none"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
+            <main id="main-content" data-testid="main-content" tabindex="-1" class="relative flex-1 min-w-0 bg-ink-50 px-4 pt-4 pb-12 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-16 overflow-y-auto flex flex-col focus:outline-none"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
                 {% block page_header %}{% endblock %}
                 {% if messages %}
-                <div class="mb-5 space-y-2 w-full max-w-[1180px] mx-auto">
+                <div class="mb-6 space-y-2 w-full max-w-[1180px] mx-auto">
                     {% for message in messages %}
-                    <div role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}" aria-live="{% if message.tags == 'error' %}assertive{% else %}polite{% endif %}" class="flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm ring-1 ring-inset {% if message.tags == 'error' %}bg-danger-50 text-danger-700 ring-danger-200{% elif message.tags == 'success' %}bg-success-50 text-success-700 ring-success-200{% elif message.tags == 'warning' %}bg-warning-50 text-warning-700 ring-warning-200{% else %}bg-info-50 text-info-700 ring-info-200{% endif %}">
-                        {% if message.tags == 'error' %}<svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>{% elif message.tags == 'success' %}<svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>{% elif message.tags == 'warning' %}<svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-warning-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>{% else %}<svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-info-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>{% endif %}
+                    <div role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}" aria-live="{% if message.tags == 'error' %}assertive{% else %}polite{% endif %}" class="flex items-start gap-2 rounded-xl p-4 text-sm ring-1 ring-inset {% if message.tags == 'error' %}bg-danger-50 text-danger-700 ring-danger-200{% elif message.tags == 'success' %}bg-success-50 text-success-700 ring-success-200{% elif message.tags == 'warning' %}bg-warning-50 text-warning-700 ring-warning-200{% else %}bg-info-50 text-info-700 ring-info-200{% endif %}">
+                        {% if message.tags == 'error' %}<svg class="w-4 h-5 flex-shrink-0 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>{% elif message.tags == 'success' %}<svg class="w-4 h-5 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>{% elif message.tags == 'warning' %}<svg class="w-4 h-5 flex-shrink-0 text-warning-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>{% else %}<svg class="w-4 h-5 flex-shrink-0 text-info-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>{% endif %}
                         <div class="min-w-0 flex-1">{{ message }}</div>
                     </div>
                     {% endfor %}
@@ -903,9 +904,10 @@
                 {% comment %}relative: the scrollers are the containing block, so an absolutely placed element
                    in the page (every sr-only label) scrolls and clips with it instead of stretching the
                    window past the app shell into blank canvas.
-                   -m-1 p-1: a 4px gutter inside the clip box, so the 2px focus ring at a 2px offset is never
-                   cut off on a full-width button, a card or a breadcrumb that touches the edge.{% endcomment %}
-                <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-1 p-1" data-testid="page-scroller"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
+                   -m-2 p-2: an 8px gutter inside the clip box (on the 8px grid; the content does not move), so the
+                   2px focus ring at a 2px offset is never cut off on a full-width button, a card or a
+                   breadcrumb that touches the edge.{% endcomment %}
+                <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-2 p-2" data-testid="page-scroller"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
                 {% block content %}{% endblock %}
                 {% comment %}
                   Below 1024px the phone bar is fixed along the bottom of the screen. This room at the end
@@ -933,15 +935,15 @@
                     {% for item in nav.phone %}
                     <li>
                         {% if item.url %}
-                        <a href="{{ item.url }}" data-testid="phone-bar-{{ item.key }}" class="relative flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-xs leading-4 font-medium rounded-lg {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}
+                        <a href="{{ item.url }}" data-testid="phone-bar-{{ item.key }}" data-control class="relative flex flex-col items-center justify-center gap-1 min-h-14 px-1 text-xs leading-4 font-medium rounded-lg {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}
                            aria-label="Approvals{% if item.count %}, {{ item.count }} waiting{% endif %}"{% endif %}>
                             {% if item.active %}{% include "components/nav_icon.html" with key=item.key icon_class="text-brand-700" %}{% else %}{% include "components/nav_icon.html" with key=item.key icon_class="text-ink-500" %}{% endif %}
                             <span>{{ item.label }}</span>
-                            {% if item.count %}<span class="sidebar-badge{% if item.key == "approvals" %} is-turn{% endif %} absolute top-1 left-1/2 !ml-1.5">{{ item.count }}</span>{% endif %}
+                            {% if item.count %}<span class="sidebar-badge{% if item.key == "approvals" %} is-turn{% endif %} absolute top-1 left-1/2 !ml-2">{{ item.count }}</span>{% endif %}
                         </a>
                         {% else %}
-                        <button type="button" data-testid="phone-bar-{{ item.key }}" aria-controls="app-sidebar" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = true"
-                                class="w-full flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-xs leading-4 font-medium rounded-lg cursor-pointer {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}">
+                        <button type="button" data-testid="phone-bar-{{ item.key }}" aria-controls="app-sidebar" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = true" data-control
+                                class="w-full flex flex-col items-center justify-center gap-1 min-h-14 px-1 text-xs leading-4 font-medium rounded-lg cursor-pointer {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}">
                             {% if item.active %}{% include "components/nav_icon.html" with key=item.key icon_class="text-brand-700" %}{% else %}{% include "components/nav_icon.html" with key=item.key icon_class="text-ink-500" %}{% endif %}
                             <span>{{ item.label }}</span>
                         </button>
@@ -966,14 +968,14 @@
             <div class="ui-overlay" @click="notificationsOpen = false"></div>
             <div data-testid="notifications-drawer" role="dialog" aria-modal="true" aria-label="Notifications" x-trap.noscroll="notificationsOpen"
                  class="relative flex flex-col w-full max-w-[100vw] sm:max-w-sm h-full bg-surface shadow-xl">
-                <div class="flex justify-end px-3 pt-3">
+                <div class="flex justify-end px-2 pt-2">
                     <button type="button" class="ui-btn ui-btn-icon" @click="notificationsOpen = false" aria-label="Close notifications">
                         <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
                 <div id="notification-drawer-content" class="flex flex-col flex-1 min-h-0"
                      hx-get="{% url 'notifications:drawer' %}" hx-trigger="open-notifications from:window" hx-swap="innerHTML">
-                    <p class="px-5 text-sm text-ink-600">Loading notifications…</p>
+                    <p class="px-4 text-sm text-ink-600">Loading notifications…</p>
                 </div>
             </div>
         </div>
@@ -995,13 +997,13 @@
             <div class="ui-overlay" @click="close()"></div>
             <div data-testid="palette-dialog" x-ref="dialog" role="dialog" aria-modal="true" aria-label="Go to a page" x-trap.noscroll.noautofocus.noreturn="open"
                  @keydown.escape.prevent.stop="close()" @focusout="lost($event)" class="ui-modal overflow-hidden">
-                <div class="p-3 border-b border-ink-200">
+                <div class="p-2 border-b border-ink-200">
                     <input x-ref="input" type="text" data-testid="palette-input" class="ui-input" placeholder="Go to…" aria-label="Find a page"
                            autocomplete="off" spellcheck="false" x-model="query"
                            @keydown.arrow-down.prevent="move(1)" @keydown.enter.prevent="openFirst()">
                 </div>
                 {# One line per entry: this list is on every page. The arrow keys bubble up from its links. #}
-                <ul x-ref="list" class="max-h-[60vh] overflow-y-auto p-1" aria-label="Pages" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)">
+                <ul x-ref="list" class="max-h-[60vh] overflow-y-auto p-2" aria-label="Pages" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)">
                     {% for entry in nav_palette %}<li x-show="matches({{ forloop.counter0 }})"><a href="{{ entry.url }}" data-testid="palette-item-{{ entry.key }}" class="ui-menu-item"><span class="flex-1 min-w-0 truncate">{{ entry.label }}</span>{% if entry.section %}<span class="text-xs text-ink-600">{{ entry.section }}</span>{% endif %}</a></li>{% endfor %}
                 </ul>
                 <p x-show="!shown" x-cloak class="px-4 pb-4 text-sm text-ink-600">Nothing matches.</p>

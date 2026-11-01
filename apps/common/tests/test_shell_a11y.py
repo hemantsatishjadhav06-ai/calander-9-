@@ -92,7 +92,7 @@ class ShellA11yTests(TestCase):
 
     def test_scroller_leaves_room_for_focus_rings(self):
         self.assertIn(
-            'class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-1 p-1"', self.html
+            'class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-2 p-2"', self.html
         )
 
     def _link_text(self, testid):
