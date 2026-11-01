@@ -230,6 +230,7 @@ test('Go to opens with its button and Ctrl/Cmd-K, filters, opens a page with Ent
   await expect(dialog).toBeVisible();
   await expect(field).toBeFocused();
   await page.keyboard.type('inbox');
+  await expect(field, 'every letter typed reached the field').toHaveValue('inbox');
   await expect(page.getByTestId('palette-item-inbox')).toBeVisible();
   await expect(page.getByTestId('palette-item-calendar')).toBeHidden();
   await page.keyboard.press('ArrowDown');
@@ -242,8 +243,35 @@ test('Go to opens with its button and Ctrl/Cmd-K, filters, opens a page with Ent
   await page.keyboard.press('ControlOrMeta+k');
   await expect(field).toBeFocused();
   await page.keyboard.type('calendar');
+  await expect(field, 'every letter typed reached the field').toHaveValue('calendar');
   await expect(page.getByTestId('palette-item-calendar')).toBeVisible();
+  await expect(page.getByTestId('palette-item-home')).toBeHidden();
   await Promise.all([page.waitForURL(`**/workspace/${workspace}/calendar/`), page.keyboard.press('Enter')]);
   await expectLit(page, 'calendar');
   await axe(page, 'Calendar, opened from Go to');
+});
+
+test('Go to keeps the focus in its field for as long as it is open', async ({ page, as, harness }) => {
+  const { workspace_a: workspace } = harness.ids;
+  await as('owner');
+  await page.goto(`/workspace/${workspace}/inbox/`);
+  const button = page.getByTestId('palette-open').filter({ visible: true });
+  const field = page.getByTestId('palette-input');
+
+  await page.keyboard.press('ControlOrMeta+k');
+  await expect(field).toBeFocused();
+  // Well after opening, something outside takes the focus: it comes back to the field.
+  await page.waitForTimeout(500);
+  await button.focus();
+  await expect(field, 'focus that lands outside the dialog returns to the field').toBeFocused();
+  // The focus leaves for nowhere: it comes back too, and typing still reaches the field.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await expect(field, 'focus that leaves the dialog for nowhere returns to the field').toBeFocused();
+  await page.keyboard.type('cal');
+  await expect(field).toHaveValue('cal');
+  // Once closed, nothing pulls the focus back.
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('palette-dialog')).toBeHidden();
+  await button.focus();
+  await expect(button).toBeFocused();
 });

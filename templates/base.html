@@ -975,16 +975,18 @@
     {% comment %}
       Go to (the command palette, spec R2): the Go to button or Ctrl/Cmd-K opens it. Typing filters the
       places this person can open (navigation.build_palette); the arrow keys or Tab move through them,
-      Enter opens one, Escape closes it and the focus goes back where it was (x-trap).
+      Enter opens one, Escape closes it and the focus goes back where it was. While it is open the
+      focus stays in it (guard, lost); x-trap only keeps Tab inside.
     {% endcomment %}
     {% block command_palette %}{% spaceless %}
     {% if nav_palette %}
     <div x-data="commandPalette([{% for entry in nav_palette %}'{{ entry.search|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}])"
-         @open-palette.window="show()" @keydown.ctrl.k.window.prevent="toggle()" @keydown.meta.k.window.prevent="toggle()">
+         @open-palette.window="show()" @keydown.ctrl.k.window.prevent="toggle()" @keydown.meta.k.window.prevent="toggle()"
+         @focusin.window.capture="guard($event)">
         <div x-show="open" x-cloak class="fixed inset-0 z-[110] flex items-start justify-center px-4 pt-[12vh]">
             <div class="ui-overlay" @click="close()"></div>
             <div data-testid="palette-dialog" x-ref="dialog" role="dialog" aria-modal="true" aria-label="Go to a page" x-trap.noscroll.noautofocus.noreturn="open"
-                 @keydown.escape.prevent.stop="close()" class="ui-modal overflow-hidden">
+                 @keydown.escape.prevent.stop="close()" @focusout="lost($event)" class="ui-modal overflow-hidden">
                 <div class="p-3 border-b border-ink-200">
                     <input x-ref="input" type="text" data-testid="palette-input" class="ui-input" placeholder="Go to…" aria-label="Find a page"
                            autocomplete="off" spellcheck="false" x-model="query"
@@ -1073,15 +1075,27 @@
                     this.opener = document.activeElement;
                     this.query = '';
                     this.open = true;
-                    this.$nextTick(() => this.holdFocus(6));
+                    this.$nextTick(() => this.placeFocus(10));
                 },
-                // Put the focus in the field, and for a few frames after opening put it back if the
-                // browser moved it out of the dialog (WebKit did, after both a click and a key).
-                // Focus the person moved inside the dialog (an arrow to a link) is left alone.
-                holdFocus(tries) {
-                    if (!this.open) return;
-                    if (!this.$refs.dialog.contains(document.activeElement)) this.$refs.input.focus();
-                    if (tries > 0) setTimeout(() => this.holdFocus(tries - 1), 50);
+                // Put the focus in the field, trying again on the next frames until it lands (the
+                // dialog may not be shown yet when the first try runs).
+                placeFocus(tries) {
+                    if (!this.open || this.$refs.dialog.contains(document.activeElement)) return;
+                    this.$refs.input.focus();
+                    if (tries > 0) requestAnimationFrame(() => this.placeFocus(tries - 1));
+                },
+                // While the palette is open the focus stays in it, for as long as it is open: focus
+                // that lands outside goes back to the field (guard), and so does focus that leaves
+                // the dialog for nowhere (lost). WebKit moved the focus out after opening, and the
+                // trap, told not to place the focus, has no node to send it back to.
+                guard(event) {
+                    if (this.open && !this.$refs.dialog.contains(event.target)) this.$refs.input.focus();
+                },
+                lost(event) {
+                    if (!this.open || event.relatedTarget) return;
+                    setTimeout(() => {
+                        if (this.open && !this.$refs.dialog.contains(document.activeElement)) this.$refs.input.focus();
+                    }, 0);
                 },
                 close() {
                     this.open = false;
@@ -1090,21 +1104,24 @@
                     if (opener && opener !== document.body && opener.isConnected) this.$nextTick(() => opener.focus());
                 },
                 toggle() { if (this.open) this.close(); else this.show(); },
-                visible() {
+                // The links the typed words match. The list holds one link per entry, in the
+                // entries' order, so this reads the query, never the layout.
+                shownLinks() {
+                    var self = this;
                     return Array.prototype.filter.call(
                         this.$refs.list.querySelectorAll('a'),
-                        function (link) { return link.getClientRects().length > 0; }
+                        function (link, index) { return self.matches(index); }
                     );
                 },
                 move(step) {
-                    var links = this.visible();
+                    var links = this.shownLinks();
                     if (!links.length) return;
                     var next = links.indexOf(document.activeElement) + step;
                     if (next < 0) { this.$refs.input.focus(); return; }
                     links[Math.min(next, links.length - 1)].focus();
                 },
                 openFirst() {
-                    var first = this.visible()[0];
+                    var first = this.shownLinks()[0];
                     if (first) first.click();
                 },
             };

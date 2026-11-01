@@ -664,10 +664,27 @@ def test_the_palette_is_a_labelled_trapped_dialog_opened_by_a_button_and_ctrl_k(
     assert "x-trap.noscroll.noautofocus.noreturn" in dialog
     component = html[html.index("function commandPalette(") :]
     assert "this.opener = document.activeElement" in component
-    assert "this.$nextTick(() => this.holdFocus(" in component
-    hold = component[component.index("holdFocus(tries) {") :]
-    assert "this.$refs.dialog.contains(document.activeElement)" in hold and "this.$refs.input.focus()" in hold
+    assert "this.$nextTick(() => this.placeFocus(" in component
+    place = component[component.index("placeFocus(tries) {") :]
+    assert "this.$refs.dialog.contains(document.activeElement)" in place and "this.$refs.input.focus()" in place
     assert "opener.focus()" in component
+    # While it is open the focus stays in the dialog, with no time limit: focus that lands outside goes
+    # back to the field, and so does focus that leaves for nowhere. WebKit moved it out after opening,
+    # and the trap, told not to place the focus, has nowhere to send it back to (CI, iPhone 13).
+    root = _tag(html, 'x-data="commandPalette(')
+    assert '@focusin.window.capture="guard($event)"' in root
+    assert '@focusout="lost($event)"' in dialog
+    guard = component[component.index("guard(event) {") :]
+    assert "this.$refs.dialog.contains(event.target)" in guard and "this.$refs.input.focus()" in guard
+    lost = component[component.index("lost(event) {") :]
+    assert "event.relatedTarget" in lost and "this.$refs.input.focus()" in lost
+    # Enter and the arrows choose among the entries the typed words match, not among what the browser
+    # has laid out: the list's links are in the entries' order.
+    assert "getClientRects" not in component
+    shown = component[component.index("shownLinks() {") :]
+    assert "self.matches(index)" in shown
+    assert "this.shownLinks()[0]" in component[component.index("openFirst() {") :]
+    assert "this.shownLinks()" in component[component.index("move(step) {") :]
     for key in ("ctrl.k", "meta.k"):
         assert re.search(rf"@keydown\.{re.escape(key)}[\w.]*window", html) or re.search(
             rf"@keydown\.window[\w.]*{re.escape(key)}", html
