@@ -525,8 +525,11 @@ visual Home two seconds apart are byte-identical; the same masked screenshots wi
 First baseline: `tests/e2e/visual/shell.spec.ts` (the visual workspace's Home, light, three projects)
 proves the run before any screen depends on it; it is committed at the F gate.
 Verify: C1 `tests/test_e2e_steps_visual.py tests/test_e2e_server.py`, C3, C8
-`tests/e2e/self/visual-harness.spec.ts`; push, run C12 `visual-baselines` on the branch, download the
-artifact, commit; the next CI run shows the sharded E2E job and the visual job green, with their times.
+`tests/e2e/self/visual-harness.spec.ts`; push, run C12 `visual-baselines` on the branch (its `commit`
+job pushes the images back as `visual: baselines for <specs> (run <id>)`; this environment cannot
+download CI artifacts); a push made with the workflow's token starts no CI run, so the branch's next
+push shows the sharded E2E job and the visual job green, with their times. Until a baseline exists the
+visual job ends with a notice (`visual-baselines-present`).
 
 **T11. Lighthouse per-screen targets (F6).** Files: new `tests/lighthouse/targets.mjs` (the three CI
 targets moved out of `run.mjs:184-188` with their interactions from `:100-142` as they are, each `{
@@ -805,9 +808,10 @@ each snapped as the sheet's region where it can, the shell masked; both schemes;
 reduced motion; masks). This screen also changes what `tests/e2e/visual/shell.spec.ts` shows (the New
 menu leaves the sidebar, the floating button arrives on Home), so its files are refreshed in the same
 run. Push, run C12 `visual-baselines` on the branch for both specs (re-label only if dispatch is
-refused), download the artifact, copy both specs' files into `tests/e2e/__screenshots__/visual/`, and
-commit them alone as `visual: new post sheet baselines (screen 1), shell refreshed`, with the shell's
-before/after pair attached. Verify: the visual job compares and passes on that commit.
+refused); its `commit` job pushes both specs' files to `tests/e2e/__screenshots__/visual/` as one
+commit, `visual: baselines for <specs> (run <id>)`, and the shell's before/after pair is attached at
+the gate. Verify: that push starts no CI run (it is made with the workflow's token), so the visual job
+compares and passes on the branch's next push.
 
 **T25. Audits, docs and the gate.** `impeccable` audit and `design-is` audit of the trigger, both
 modes and the idea form at 390 and 1440 px in both schemes; each must-fix finding fixed with its failing
