@@ -75,8 +75,10 @@ def harness_only(view: Callable[..., HttpResponse]) -> Callable[..., HttpRespons
 
 
 # A fixture runs while the harness's worker thread keeps working on the same rows, so Postgres can
-# end a fixture's transaction as one side of a deadlock. Postgres asks the loser to run again; the
-# fixture's transaction is rolled back whole, so running it again is safe.
+# end a fixture's transaction as one side of a deadlock (issue #24). Postgres asks the loser to run
+# again. The fixture's database work is rolled back whole; work outside the database that ran before
+# the deadlock (mail sent after an inner block, cache counters) runs again with it. Each retry is
+# logged with the fixture's name and what Postgres said, so an absorbed deadlock can still be traced.
 _DEADLOCK_ATTEMPTS = 3
 _DEADLOCK_PAUSE_SECONDS = 0.2
 
@@ -90,7 +92,7 @@ def _is_deadlock(exc: BaseException) -> bool:
     return str(exc).startswith("deadlock detected")
 
 
-def _run(step: registry.Step, payload: dict[str, Any], *, atomic: bool) -> JsonResponse:
+def _run(step: registry.Step, payload: dict[str, Any], *, atomic: bool, name: str) -> JsonResponse:
     attempts = _DEADLOCK_ATTEMPTS if atomic else 1
     for attempt in range(1, attempts + 1):
         try:
@@ -103,7 +105,13 @@ def _run(step: registry.Step, payload: dict[str, Any], *, atomic: bool) -> JsonR
             return _json({"error": str(exc)}, status=400)
         except Exception as exc:
             if attempt < attempts and _is_deadlock(exc):
-                logger.warning("e2e step met a deadlock; running it again (attempt %s of %s)", attempt + 1, attempts)
+                logger.warning(
+                    "e2e fixture %s met a deadlock; running it again (attempt %s of %s): %s",
+                    name,
+                    attempt + 1,
+                    attempts,
+                    exc.__cause__ or exc,
+                )
                 time.sleep(_DEADLOCK_PAUSE_SECONDS * attempt)
                 continue
             logger.exception("e2e step failed")
@@ -139,7 +147,7 @@ def run_fixture(request: HttpRequest, name: str) -> HttpResponse:
         return _json({"error": "The body must be a JSON object."}, status=400)
     if not isinstance(payload, dict):
         return _json({"error": "The body must be a JSON object."}, status=400)
-    return _run(step, payload, atomic=True)
+    return _run(step, payload, atomic=True, name=name)
 
 
 @harness_only
@@ -150,4 +158,4 @@ def run_probe(request: HttpRequest, name: str) -> HttpResponse:
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
     params = {key: request.GET.get(key) for key in request.GET}
-    return _run(step, params, atomic=False)
+    return _run(step, params, atomic=False, name=name)

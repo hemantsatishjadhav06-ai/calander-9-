@@ -738,15 +738,36 @@ def test_registered_fixture_and_probe_are_callable_by_name(client, e2e_urls, scr
 
 
 @pytest.mark.django_db
-def test_a_fixture_that_meets_a_deadlock_runs_again(client, e2e_urls, scratch_registry, monkeypatch):
+def test_a_fixture_that_meets_a_deadlock_runs_again(client, e2e_urls, scratch_registry, monkeypatch, caplog):
     """Postgres ends one side of a deadlock and asks for a retry; the worker may hold the other side."""
+    import psycopg.errors
     from django.db.utils import OperationalError
 
     from tests.e2e.server import views
 
     registry = scratch_registry
     monkeypatch.setattr(views, "_DEADLOCK_PAUSE_SECONDS", 0)
-    calls = {"once": 0, "always": 0, "other": 0}
+    calls = {"once": 0, "always": 0, "other": 0, "coded": 0}
+
+    @registry.fixture("selftest_deadlock_coded")
+    def deadlock_coded(payload: dict[str, Any]) -> dict[str, Any]:
+        # How Django hands psycopg's error on: the wrapper's text, the driver's error as the cause.
+        calls["coded"] += 1
+        if calls["coded"] == 1:
+            try:
+                raise psycopg.errors.DeadlockDetected("Process 27876 waits for ShareLock on transaction 11186")
+            except psycopg.errors.DeadlockDetected as driver_error:
+                raise OperationalError("the database ended this transaction") from driver_error
+        return {"ok": True}
+
+    with caplog.at_level("WARNING", logger="tests.e2e.views"):
+        response = _post_json(client, "/__e2e__/fixture/selftest_deadlock_coded", {})
+    assert response.status_code == 200
+    assert calls["coded"] == 2
+    # A retried deadlock still leaves its trace: which fixture, and what Postgres said.
+    retried = [record.getMessage() for record in caplog.records if "running it again" in record.getMessage()]
+    assert len(retried) == 1
+    assert "selftest_deadlock_coded" in retried[0] and "waits for ShareLock" in retried[0]
 
     @registry.fixture("selftest_deadlock_once")
     def deadlock_once(payload: dict[str, Any]) -> dict[str, Any]:
