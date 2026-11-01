@@ -1084,6 +1084,12 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-segment[aria-current="page"], .ui-segment[aria-selected="true"], .ui-segment.is-active {
     background: var(--surface-0); color: var(--ink-950); font-weight: 600; box-shadow: var(--shadow-segment);
   }
+  /* A segment that is a choice (Appearance): <label class="ui-segment relative"><input type="radio"
+     class="absolute inset-0 size-full opacity-0">Light</label>. The invisible radio covers the segment, so
+     a tap lands on it; the checked one looks selected and the keyboard's ring is drawn on the segment.
+     Rules of their own: a browser without :has() drops only these, not the ones above. */
+  .ui-segment:has(> input:checked) { background: var(--surface-0); color: var(--ink-950); font-weight: 600; box-shadow: var(--shadow-segment); }
+  .ui-segment:has(> input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
   @media (max-width: 1023px) { .ui-segment { min-height: 44px; } }
 
   /* Section tabs (Queue / Drafts / Approvals / Sent): ink underline, never the accent */
@@ -1271,6 +1277,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .sidebar-nav-item[aria-current="page"], .sidebar-nav-item.active,
   .ui-segment[aria-current="page"], .ui-btn-secondary, .ui-pill,
   [aria-selected="true"], [aria-pressed="true"], [aria-checked="true"][role="radio"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .ui-segment:has(> input:checked) { outline: 2px solid Highlight; outline-offset: -2px; }
   .live-dot, .stage-node, .receipt-node, .hour-bar, .hour-bar-fail { forced-color-adjust: none; }
   /* Toggles are drawn with background colours only, which forced colours flatten to Canvas: give the
      track an edge, the knob a system colour, and "on" the Highlight fill so on and off stay apart. */

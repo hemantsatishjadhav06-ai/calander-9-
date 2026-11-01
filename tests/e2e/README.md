@@ -11,6 +11,7 @@ tests/e2e/
                fade to finish), nav.ts (move through the navigation the way each device shows it),
                global-setup.ts (the end-of-run network check)
   self/        the harness's own checks (axe helper, network guard, session fixture, phone bar overlap)
+               and theme.spec.ts (Phase 3's Appearance and the head script)
   golden/      the golden paths, one file each (NN-name.spec.ts)
   screens/     the screens Phase 2 added or moved, one file each (navigation, approvals, settings,
                activity, switches, marketing); docs/specs/02-cut-and-merge.md D10
@@ -101,6 +102,15 @@ Keyboard scrolling uses `support/scroll.ts`: install a bounded native `scrollend
 send one key, then await completion before scrolling on the other axis. The movement assertions
 remain separate; starting to move is not evidence that the previous native animation has finished.
 The helper neither sleeps nor repeats input, and it removes listeners and timers on completion or failure.
+
+## Dark readiness
+
+A page turns dark only when it is declared in `apps/common/screens.py` (`DARK_READY`). A spec that
+needs a dark page before its screen's gate declares it asks the server with the fixture `dark_ready`
+(`server/steps/p3.py`, pinned by `tests/test_e2e_steps_p3.py`): `{"add": ["app_name:url_name", …]}`
+adds pages for the next request in this process, `{"clear": true}` puts back the code's own set, and
+both answer `{"ready": […]}`. Clear it in `test.afterEach`, as `self/theme.spec.ts` does, so no other
+spec meets a page it did not declare. The device's scheme is `page.emulateMedia({ colorScheme })`.
 
 ## Pairs and the light diff
 

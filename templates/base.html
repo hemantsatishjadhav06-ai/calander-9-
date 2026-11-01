@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
     <link rel="stylesheet" href="{% static 'js/vendor/flatpickr.min.css' %}">
     <script nonce="{{ request.csp_nonce }}">
+        {% include "components/theme_script.html" %}
         window.bbSidebarStorage = {
             get() { try { return localStorage.getItem('sidebarCollapsed') === 'true'; } catch (e) { return false; } },
             set(value) { try { localStorage.setItem('sidebarCollapsed', value); } catch (e) { /* Storage is optional. */ } },
@@ -826,6 +827,19 @@
                             <svg class="w-4 h-4 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             Account
                         </a>
+                    </div>
+
+                    <!-- Appearance: System, Light or Dark, kept on this device by the head script (components/theme_script.html). The menu reads the choice each time it opens, so a choice made in another tab shows here. -->
+                    <div class="border-t border-ink-200 mt-1 px-1.5 pt-2 pb-1.5" x-data="{ appearance: 'system' }" x-effect="if (orgMenuOpen) appearance = bbTheme.preference()">
+                        <fieldset>
+                            <legend class="px-1 text-[13px] leading-[18px] font-medium text-ink-600">Appearance</legend>
+                            <div class="ui-segmented mt-1.5 flex w-full">
+                                <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="system" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-system">System</label>
+                                <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="light" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-light">Light</label>
+                                <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="dark" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-dark">Dark</label>
+                            </div>
+                            {% if not theme_ready %}<p class="mt-1.5 px-1 text-[13px] leading-[18px] text-ink-600">This page stays light for now.</p>{% endif %}
+                        </fieldset>
                     </div>
 
                     <div class="border-t border-ink-200 mt-1 pt-1">

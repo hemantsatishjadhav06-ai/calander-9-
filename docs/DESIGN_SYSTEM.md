@@ -364,6 +364,7 @@ base `inline-flex items-center gap-1.5 h-[22px] pl-[7px] pr-2 rounded-full text-
 ### 10.6 Tabs
 
 - Peer views (Home / Routines / Team / Settings; List / Calendar) are a **segmented control**: track `inline-flex p-0.5 rounded-[9px] bg-ink-900/5` (`role="tablist"`); segment `px-3.5 py-[5px] rounded-[7px] text-[13px] font-medium text-ink-600 aria-selected:bg-white aria-selected:text-ink-950 aria-selected:font-semibold aria-selected:shadow-[var(--shadow-segment)]`.
+- A **choice** drawn as a segmented control (Appearance in the account menu: System / Light / Dark) is a `<fieldset>` named by its `<legend>`, each segment a `<label class="ui-segment relative">` around a real radio (`absolute inset-0 size-full opacity-0`) that covers it: a tap lands on the radio, the arrow keys move the choice, `.ui-segment:has(> input:checked)` draws the selected segment and `:has(> input:focus-visible)` the focus ring.
 - Section tabs (Queue / Drafts / Approvals / Sent; the Settings screen's seven tabs, each a link with `aria-current="page"`): `flex gap-6 border-b border-ink-200`; tab `h-10 -mb-px border-b-2 border-transparent text-sm font-medium text-ink-600 hover:text-ink-900 aria-selected:border-ink-900 aria-selected:text-ink-950 aria-selected:font-semibold`; counts are neutral badges. Tabs never use the accent.
 
 ### 10.7 Tables

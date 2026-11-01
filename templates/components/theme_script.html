@@ -1,0 +1,62 @@
+/* Appearance: System, Light or Dark, kept on this device in localStorage.theme (System by default).
+   base.html and the client portal's base paste it into a nonce'd script in the head, so it runs
+   before the first paint. data-theme ("light" or "dark") is set only on a page declared dark-ready
+   (data-theme-ready on <html>, apps/common/screens.py); "light" lets the choice win over a dark
+   device. A page not declared never gets it and stays light. System follows the device as it
+   changes; a choice made in another tab arrives through the storage event. When the page's theme
+   changes, bb:themechange fires on window with detail { theme, preference }, and charts draw again.
+   Without JavaScript the stylesheet's media block alone applies (styles.css). Storage that cannot
+   be read counts as System; a choice that cannot be kept still applies to this page.
+   Plain JavaScript only (tests/js/theme_resolve.test.cjs runs this file as it is). */
+(function () {
+    var KEY = 'theme';
+    var CHOICES = ['system', 'light', 'dark'];
+    var root = document.documentElement;
+    var device = null;
+    try { device = window.matchMedia('(prefers-color-scheme: dark)'); } catch (e) { device = null; }
+
+    function stored() {
+        try {
+            var value = window.localStorage.getItem(KEY);
+            return CHOICES.indexOf(value) >= 0 ? value : 'system';
+        } catch (e) { return 'system'; }
+    }
+
+    var preference = stored();
+    var shown = null;
+
+    function paint() {
+        var ready = root.hasAttribute('data-theme-ready');
+        var wanted = preference === 'system' ? (device && device.matches ? 'dark' : 'light') : preference;
+        var theme = ready ? wanted : 'light';
+        if (ready) { root.setAttribute('data-theme', theme); } else { root.removeAttribute('data-theme'); }
+        var changed = shown !== null && theme !== shown;
+        shown = theme;
+        if (changed) {
+            window.dispatchEvent(new CustomEvent('bb:themechange', { detail: { theme: theme, preference: preference } }));
+        }
+    }
+
+    window.bbTheme = {
+        /* 'system', 'light' or 'dark': what the person chose on this device. */
+        preference: function () { return preference; },
+        /* 'light' or 'dark': what this page shows. */
+        theme: function () { return shown; },
+        set: function (value) {
+            if (CHOICES.indexOf(value) < 0) { return; }
+            preference = value;
+            try { window.localStorage.setItem(KEY, value); } catch (e) { /* Kept for this page only. */ }
+            paint();
+        },
+    };
+
+    paint();
+    if (device) {
+        if (device.addEventListener) { device.addEventListener('change', paint); } else if (device.addListener) { device.addListener(paint); }
+    }
+    window.addEventListener('storage', function (event) {
+        if (event.key !== null && event.key !== KEY) { return; }
+        preference = stored();
+        paint();
+    });
+})();

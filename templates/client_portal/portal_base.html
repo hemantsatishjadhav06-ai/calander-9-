@@ -11,6 +11,9 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
     <link rel="manifest" href="{% static 'favicon/site.webmanifest' %}">
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
+    <script nonce="{{ request.csp_nonce }}">
+        {% include "components/theme_script.html" %}
+    </script>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="min-h-screen bg-ink-50 text-ink-900">

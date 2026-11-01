@@ -79,7 +79,9 @@ and the workspace's switches; `templates/base.html` draws it.
   places: a plain client none of the agency's screens, with Approvals as the
   Calendar's Approvals tab.
 - **Sidebar footer**: the account menu: Manage Team (`members:list`), Account
-  (`accounts:settings`, the person's own settings), sign out.
+  (`accounts:settings`, the person's own settings), Appearance (System, Light or
+  Dark, kept on this device; a page not yet declared dark-ready says "This page
+  stays light for now."), sign out.
 - **Phone** (below 1024px): the top bar holds the menu button, the workspace's
   name, Go to and the bell. The **phone bar** along the bottom holds Home,
   Approvals (with its count), Calendar, Inbox and More, each as the sidebar
