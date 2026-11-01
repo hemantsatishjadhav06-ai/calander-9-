@@ -3,18 +3,22 @@
 The counter reads a page's rendered HTML (``primary_findings``) and checks two things.
 
 **At most one primary per view and breakpoint.** A primary is an element carrying ``ui-btn-primary``
-or ``ui-fab`` (in ``class`` or a bound ``:class``/``x-bind:class``: a state that turns a button
-primary still counts), or a solid ``bg-brand-700`` button or link (``<a>``, ``<button>``, a submit
-input, ``role="button"``) that is not a control showing its checked state (``role`` switch, checkbox,
-radio, tab or option; ``aria-pressed``, ``aria-checked`` or ``aria-selected``), where Pine marks the
-choice, not an act (DESIGN_SYSTEM.md 3.2). The views are the page (everything outside
-``role="dialog"`` and ``role="alertdialog"`` subtrees and ``<template>``) and each dialog (its own
-subtree, nested dialogs and templates left out); a dialog with ``data-view`` panels is one view per
-panel, each panel with whatever in the dialog sits outside every panel. The breakpoints are phones
-(below 1024 px) and desktop (from 1024 px): an element counts at both unless it or an ancestor hides
-it at one, ``lg:hidden`` (or ``sm:``/``md:hidden``) on desktop, ``max-lg:hidden`` or ``hidden`` with
-an ``lg:`` display utility (``hidden lg:flex``) on phones. Anything else, hidden at rest included,
-counts: a script may show it.
+or ``ui-fab`` (in ``class`` or in a string of a bound ``:class``/``x-bind:class``, compact or not: a
+state that turns a button primary still counts), or a solid ``bg-brand-700`` button or link (``<a>``,
+``<button>``, a submit input, ``role="button"``) that is not a control showing its checked state
+(``role`` switch, checkbox, radio, tab or option; ``aria-pressed``, ``aria-checked`` or
+``aria-selected``), where Pine marks the choice, not an act (DESIGN_SYSTEM.md 3.2). The views are the
+page (everything outside ``role="dialog"`` and ``role="alertdialog"`` subtrees and ``<template>``)
+and each dialog (its own subtree, nested dialogs and templates left out). A ``<template
+x-teleport="body">`` renders (Alpine moves its content to the body), so its content is a dialog of its
+own, and a dialog inside it is one more; other templates (``x-if``, ``x-for``) are not counted. A
+dialog with ``data-view`` panels is one view per panel, each panel with whatever in the dialog sits
+outside every panel. The breakpoints are phones (below 1024 px) and desktop (from 1024 px), each read
+at the widths where Tailwind's breakpoints start (0, 640 and 768 px; 1024, 1280 and 1536 px): an
+element counts at a breakpoint when, at one of its widths, neither it nor an ancestor is hidden by its
+breakpoint display utilities (``lg:hidden`` hides it on desktop, ``hidden lg:flex`` on phones;
+``md:hidden lg:flex`` and ``lg:hidden xl:flex`` show it at both). An element with no breakpoint
+display utility counts at both, hidden at rest included: a script may show it.
 
 **Each primary in its place** (D5, with the owner's defaults: item and form decisions sit at the end
 of the item or form on a desktop; Activity and Analytics have none):
@@ -50,31 +54,38 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.common import screens
+from apps.common.tests.test_navigation_render import ABOVE_THE_BAR
+from apps.common.tests.test_spacing_grid import BOUND_STRING_RE
 from apps.members.models import OrgMembership, WorkspaceMembership
 from apps.organizations.models import Organization
 from apps.workspaces.models import Workspace
 
-# Above the phone bar: the same class string test_navigation_render.py pins for the toasts and the bars.
-ABOVE_THE_BAR = "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]"
-#: The floating button's phone placement: fixed, 16 px from the right, above the phone bar.
+#: The floating button's phone placement: fixed, 16 px from the right, above the phone bar
+#: (``ABOVE_THE_BAR``, the class string test_navigation_render.py pins for the toasts and the bars).
 FAB_ON_PHONES = frozenset({"fixed", "right-4", ABOVE_THE_BAR})
 HEADER_SLOT = "header"
 
 PHONE = "below 1024px"
 DESKTOP = "from 1024px"
 BREAKPOINTS = (PHONE, DESKTOP)
+#: Where Tailwind's breakpoints start. Every width between two of them shows the same classes, so the
+#: start of each stretch stands for it: 0, 640 and 768 px are the phone, 1024, 1280 and 1536 px desktop.
+BREAKPOINT_PX = {"sm": 640, "md": 768, "lg": 1024, "xl": 1280, "2xl": 1536}
+WIDTHS = {PHONE: (0, 640, 768), DESKTOP: (1024, 1280, 1536)}
+UNBOUNDED_PX = 10**6
+DISPLAY_RE = re.compile(
+    r"hidden|block|flex|grid|inline|inline-block|inline-flex|inline-grid|table|table-cell|table-row|"
+    r"list-item|contents|flow-root"
+)
 
 VOID = frozenset(
     {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 )
 DIALOG_ROLES = frozenset({"dialog", "alertdialog"})
+NAME_ATTRS = ("data-testid", "aria-label", "aria-labelledby", "id")
 #: Controls whose Pine fill shows a checked state, not an act.
 STATE_ROLES = frozenset({"switch", "checkbox", "radio", "tab", "option", "menuitemcheckbox", "menuitemradio"})
 STATE_ATTRS = ("aria-pressed", "aria-checked", "aria-selected")
-DESKTOP_HIDDEN = frozenset({"sm:hidden", "md:hidden", "lg:hidden"})
-DISPLAYS = r"(?:block|flex|grid|inline|inline-block|inline-flex|inline-grid|table|contents|flow-root)"
-SHOWN_FROM_DESKTOP = re.compile(rf"(?:lg|xl|2xl):{DISPLAYS}")
-SHOWN_ON_PHONES = re.compile(rf"(?:sm|md):{DISPLAYS}")
 
 
 # ── A small tree of the rendered HTML ──────────────────────────────────────────────────────────
@@ -95,8 +106,10 @@ class Node:
 
     @property
     def bound_classes(self) -> frozenset[str]:
-        """The class names a bound ``:class`` or ``x-bind:class`` may add."""
-        words = f"{self.attrs.get(':class', '')} {self.attrs.get('x-bind:class', '')}".split()
+        """The class names a bound ``:class`` or ``x-bind:class`` may add: the words of its strings
+        (``{'ui-btn-primary':ready}``, ``ready?'ui-btn-primary':'ui-btn-secondary'``)."""
+        expression = f"{self.attrs.get(':class', '')} {self.attrs.get('x-bind:class', '')}"
+        words = " ".join(string.group(2) for string in BOUND_STRING_RE.finditer(expression)).split()
         return frozenset(word.strip("'\"{}()[],:?!") for word in words)
 
     def ancestors(self) -> Iterator[Node]:
@@ -114,7 +127,7 @@ class Node:
         return " ".join(" ".join(parts).split())
 
     def name(self) -> str:
-        for key in ("data-testid", "aria-label", "aria-labelledby", "id"):
+        for key in NAME_ATTRS:
             if self.attrs.get(key):
                 return self.attrs[key]
         return self.text()[:40] or self.tag
@@ -169,6 +182,12 @@ def _is_dialog(node: Node) -> bool:
     return node.attrs.get("role") in DIALOG_ROLES
 
 
+def _is_teleported(node: Node) -> bool:
+    """``<template x-teleport="body">``: Alpine renders its content (moved to the body), so it counts as a
+    dialog of its own; any other ``<template>`` (``x-if``, ``x-for``) is not counted."""
+    return node.tag == "template" and "x-teleport" in node.attrs
+
+
 def _members(top: Node) -> Iterator[Node]:
     """The elements of *top*'s own view: no nested dialog and nothing inside a ``<template>``."""
     for child in top.children:
@@ -179,12 +198,21 @@ def _members(top: Node) -> Iterator[Node]:
 
 
 def _dialogs(node: Node) -> Iterator[Node]:
+    """Every dialog and teleported template under *node* (each a view of its own), outer before inner."""
     for child in node.children:
-        if child.tag in ("#text", "template"):
+        if child.tag == "#text" or (child.tag == "template" and not _is_teleported(child)):
             continue
-        if _is_dialog(child):
+        if _is_dialog(child) or _is_teleported(child):
             yield child
         yield from _dialogs(child)
+
+
+def _view_name(top: Node) -> str:
+    """``dialog '<name>'``; a teleported template takes the name of the first named element inside it."""
+    if not _is_teleported(top):
+        return f"dialog {top.name()!r}"
+    named = next((node for node in elements(top) if any(node.attrs.get(key) for key in NAME_ATTRS)), top)
+    return f"teleported {named.name()!r}"
 
 
 @dataclass
@@ -195,14 +223,15 @@ class View:
 
 
 def views(html: str) -> list[View]:
-    """The page, then each dialog (one view per ``data-view`` panel when it has panels)."""
+    """The page, then each dialog and teleported template (one view per ``data-view`` panel when it has
+    panels)."""
     root = parse(html)
     found = [View("the page", list(_members(root)), True)]
     for dialog in _dialogs(root):
         members = list(_members(dialog))
         panels = [member for member in members if "data-view" in member.attrs]
         if not panels:
-            found.append(View(f"dialog {dialog.name()!r}", members, False))
+            found.append(View(_view_name(dialog), members, False))
             continue
 
         def panel_of(member: Node, dialog: Node = dialog) -> Node | None:
@@ -216,7 +245,7 @@ def views(html: str) -> list[View]:
         for panel in panels:
             found.append(
                 View(
-                    f"dialog {dialog.name()!r}, panel {panel.attrs['data-view']!r}",
+                    f"{_view_name(dialog)}, panel {panel.attrs['data-view']!r}",
                     [member for member in members if panel_of(member) in (None, panel)],
                     False,
                 )
@@ -242,22 +271,61 @@ def is_primary(node: Node) -> bool:
     return node.attrs.get("role") not in STATE_ROLES and not any(attr in node.attrs for attr in STATE_ATTRS)
 
 
+@dataclass(frozen=True)
+class _Display:
+    """One display utility (``hidden``, ``flex`` …) and the widths its breakpoint variants apply it at."""
+
+    utility: str
+    low: int  # from this width (``lg:`` is 1024)
+    high: int  # below this width (``max-lg:`` is 1024)
+    order: int  # its place in the cascade: at rest, then ``max-*``, then ``sm:`` … ``2xl:`` in order
+
+    @property
+    def responsive(self) -> bool:
+        return self.order > -2
+
+
+def _display(word: str) -> _Display | None:
+    """*word* as a display utility, or None (not one, or under a state variant: ``hover:``,
+    ``group-hover:``, ``print:``, ``data-[…]:`` do not decide where it shows at rest)."""
+    *variants, utility = word.split(":")
+    utility = utility.strip("!")
+    if not DISPLAY_RE.fullmatch(utility):
+        return None
+    low, high = 0, UNBOUNDED_PX
+    for variant in variants:
+        if variant in BREAKPOINT_PX:
+            low = max(low, BREAKPOINT_PX[variant])
+        elif variant.startswith("max-") and variant[4:] in BREAKPOINT_PX:
+            high = min(high, BREAKPOINT_PX[variant[4:]])
+        else:
+            return None
+    order = low if low else (-1 if high < UNBOUNDED_PX else -2)
+    return _Display(utility, low, high, order)
+
+
+def _shows_at(classes: frozenset[str], width: int) -> bool:
+    """Whether an element with *classes* shows at *width*. One that sets no breakpoint display shows at
+    every width, ``hidden`` at rest included: a script may show it."""
+    displays = [display for display in map(_display, classes) if display is not None]
+    if not any(display.responsive for display in displays):
+        return True
+    applying = sorted(
+        (display for display in displays if display.low <= width < display.high),
+        key=lambda display: (display.order, display.utility),
+    )
+    return not applying or applying[-1].utility != "hidden"
+
+
 def shown_at(node: Node) -> tuple[str, ...]:
-    """The breakpoints at which neither *node* nor an ancestor hides it."""
-    phone = desktop = True
-    for each in node.lineage():
-        classes = each.classes
-        if classes & DESKTOP_HIDDEN:
-            desktop = False
-        if "max-lg:hidden" in classes:
-            phone = False
-        if (
-            "hidden" in classes
-            and any(SHOWN_FROM_DESKTOP.fullmatch(word) for word in classes)
-            and not any(SHOWN_ON_PHONES.fullmatch(word) for word in classes)
-        ):
-            phone = False
-    return tuple(breakpoint for breakpoint, shown in ((PHONE, phone), (DESKTOP, desktop)) if shown)
+    """The breakpoints at which *node* shows: at some width of the breakpoint, neither it nor an
+    ancestor is hidden at that width (``md:hidden lg:flex`` shows on phones below 768px and on desktop)."""
+    lineage = [each.classes for each in node.lineage()]
+    return tuple(
+        breakpoint
+        for breakpoint in BREAKPOINTS
+        if any(all(_shows_at(classes, width) for classes in lineage) for width in WIDTHS[breakpoint])
+    )
 
 
 def _in_decision_bar(node: Node) -> bool:
@@ -456,6 +524,9 @@ def _counts(html: str) -> dict[str, dict[str, int]]:
         '<span role="button" class="bg-brand-700">Send</span>',
         "<button class=\"ui-btn\" :class=\"ready ? 'ui-btn-primary' : 'ui-btn-secondary'\">Send</button>",
         '<button class="ui-btn" x-bind:class="{ \'ui-btn-primary\': ready }">Send</button>',
+        '<button class="ui-btn" :class="{\'ui-btn-primary\':ready}">Send</button>',
+        "<button class=\"ui-btn\" :class=\"ready?'ui-btn-primary':'ui-btn-secondary'\">Send</button>",
+        '<button class="ui-btn" x-bind:class=\'ready&&"ui-fab"\'>New post</button>',
         '<button class="ui-btn ui-btn-primary hidden">Shown by a script</button>',
         '<div x-show="open" x-cloak><button class="ui-btn ui-btn-primary">Later</button></div>',
     ],
@@ -501,10 +572,103 @@ def test_what_is_not_a_primary_of_the_page(html):
         ('<button class="ui-btn ui-btn-primary hidden sm:inline-flex">x</button>', {PHONE: 1, DESKTOP: 1}),
         ('<button class="ui-btn ui-btn-primary hidden sm:flex lg:hidden">x</button>', {PHONE: 1, DESKTOP: 0}),
         ('<button class="ui-btn ui-btn-primary xl:hidden">x</button>', {PHONE: 1, DESKTOP: 1}),
+        # Hidden at one breakpoint and shown again at a larger one: each breakpoint reads its own state.
+        ('<button class="ui-btn ui-btn-primary md:hidden lg:flex">x</button>', {PHONE: 1, DESKTOP: 1}),
+        (
+            '<div class="lg:hidden xl:flex"><button class="ui-btn ui-btn-primary">x</button></div>',
+            {PHONE: 1, DESKTOP: 1},
+        ),
+        ('<button class="ui-btn ui-btn-primary hidden md:flex lg:hidden xl:flex">x</button>', {PHONE: 1, DESKTOP: 1}),
+        ('<button class="ui-btn ui-btn-primary sm:hidden lg:inline-flex">x</button>', {PHONE: 1, DESKTOP: 1}),
+        ('<button class="ui-btn ui-btn-primary hidden lg:flex xl:hidden">x</button>', {PHONE: 0, DESKTOP: 1}),
+        ('<button class="ui-btn ui-btn-primary max-xl:hidden">x</button>', {PHONE: 0, DESKTOP: 1}),
+        ('<button class="ui-btn ui-btn-primary max-md:hidden">x</button>', {PHONE: 1, DESKTOP: 1}),
+        ('<button class="ui-btn ui-btn-primary max-lg:hidden 2xl:hidden">x</button>', {PHONE: 0, DESKTOP: 1}),
+        # A state variant does not decide where it shows at rest.
+        ('<button class="ui-btn ui-btn-primary lg:hidden lg:group-hover:flex">x</button>', {PHONE: 1, DESKTOP: 0}),
+        ('<button class="ui-btn ui-btn-primary print:hidden">x</button>', {PHONE: 1, DESKTOP: 1}),
     ],
 )
 def test_breakpoint_classes_decide_where_a_primary_counts(html, expected):
     assert _counts(html)["the page"] == expected
+
+
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        # Shown from 1280px inside a wrapper shown from 1280px to 1535px: desktop only.
+        (
+            '<div class="hidden xl:block"><button class="ui-btn ui-btn-primary 2xl:hidden">x</button></div>',
+            {PHONE: 0, DESKTOP: 1},
+        ),
+        # The wrapper shows below 640px and the button from 768px: never both at once.
+        (
+            '<div class="sm:hidden"><button class="ui-btn ui-btn-primary hidden md:flex">x</button></div>',
+            {PHONE: 0, DESKTOP: 0},
+        ),
+        # The wrapper shows below 1024px, the button from 1024px.
+        (
+            '<div class="lg:hidden"><button class="ui-btn ui-btn-primary hidden lg:flex">x</button></div>',
+            {PHONE: 0, DESKTOP: 0},
+        ),
+        # Hidden at rest by the wrapper (a script may show it), shown from 1024px by its own classes.
+        (
+            '<div class="hidden" x-show="open"><button class="ui-btn ui-btn-primary hidden lg:flex">x</button></div>',
+            {PHONE: 0, DESKTOP: 1},
+        ),
+    ],
+)
+def test_an_element_and_its_ancestors_show_at_the_same_width(html, expected):
+    assert _counts(html)["the page"] == expected
+
+
+def test_a_teleported_template_is_a_dialog_of_its_own():
+    """``<template x-teleport="body">`` renders (Alpine moves it to the body); ``x-if`` and ``x-for`` do not."""
+    html = (
+        f"{SLOT_WITH_FAB}"
+        '<template x-teleport="body">'
+        '  <div x-show="open" class="fixed inset-0 z-50" style="background: var(--overlay);">'
+        '    <div role="dialog" aria-modal="true" aria-labelledby="invite-title">'
+        '      <h2 id="invite-title">Invite</h2>'
+        '      <form><div data-decision-bar><button type="submit" class="ui-btn ui-btn-primary">Send invitation</button></div></form>'
+        "    </div>"
+        "  </div>"
+        "</template>"
+        '<template x-teleport="body">'
+        '  <div class="ui-menu" data-testid="post-menu"><a class="ui-menu-item">Edit</a>'
+        '    <button class="ui-btn ui-btn-primary">Delete</button><button class="ui-btn ui-btn-primary">Archive</button>'
+        "  </div>"
+        "</template>"
+        '<template x-if="open"><button class="ui-btn ui-btn-primary">Not rendered</button></template>'
+        '<template x-for="row in rows"><button class="ui-btn ui-btn-primary">Not rendered</button></template>'
+    )
+    counts = _counts(html)
+    assert counts["the page"] == {PHONE: 1, DESKTOP: 1}
+    assert counts["dialog 'invite-title'"] == {PHONE: 1, DESKTOP: 1}
+    assert counts["teleported 'post-menu'"] == {PHONE: 2, DESKTOP: 2}
+    findings = primary_findings(html)
+    assert {f.view for f in findings} == {"teleported 'post-menu'"}, findings
+    assert [f.reason.split(":")[0] for f in findings if f.breakpoint == PHONE] == [
+        "2 primaries",
+        "'Delete'",
+        "'Archive'",
+    ]
+    # A floating button in teleported content is not the screen's: a teleported template is a dialog.
+    fab = primary_findings(f'<template x-teleport="body"><div data-primary-slot="header">{FAB}</div></template>')
+    assert fab and all("inside a dialog" in f.reason for f in fab), fab
+
+
+def test_a_real_teleported_dialog_is_counted(rf):
+    """members/partials/invite_modal.html wraps its dialog in ``<template x-teleport="body">``."""
+    html = render_to_string(
+        "members/partials/invite_modal.html",
+        {"org_role_choices": [("member", "Member")], "org_workspaces": [], "workspace_role_choices": []},
+        request=rf.get("/"),
+    )
+    assert '<template x-teleport="body">' in html
+    counts = _counts(f"<main>{html}</main>")
+    assert counts["the page"] == {PHONE: 0, DESKTOP: 0}
+    assert counts["dialog 'invite-member-modal-title'"] == {PHONE: 1, DESKTOP: 1}
 
 
 def test_a_phone_primary_and_a_desktop_primary_are_one_per_breakpoint():

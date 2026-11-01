@@ -12,12 +12,14 @@ spacing utility (``p``, ``px``, ``py``, ``pt`` …, ``m`` …, ``gap``, ``gap-x|
 * an arbitrary value with a length that is not a multiple of 8 px (``p-[13px]``, ``top-[calc(100%+4px)]``;
   a percentage, a viewport unit, ``env()`` or ``var()`` is not a length on the grid and passes).
 
-Steps 1 and 3 (4 px and 12 px) pass in two places only, the ones ``SMALL_STEP_ALLOWLIST`` names: inside
-a control (the element itself or an ancestor in the same template carries one of ``CONTROL_CLASSES``
-or the ``data-control`` marker) and as the gap of an icon-and-label pair (an element whose children
-are one ``aria-hidden`` svg and words). Classes come from ``class``, ``:class`` and ``x-bind:class``,
-every branch of a template tag included, and from the ``*class*="…"`` arguments of an include or with
-tag (their element is in another file, so they get no exemption).
+Steps 1 and 3 (4 px and 12 px) pass only in the places ``SMALL_STEP_ALLOWLIST`` names, and the guard
+reads that list as its rule: inside a control (the element itself or an ancestor in the same template
+carries one of the ``control:`` classes, ``ui-btn`` and the rest, or the ``data-control`` marker) and
+as the gap of an icon-and-label pair (an element whose children are one ``aria-hidden`` svg and
+words). Classes come from ``class`` (every branch of a template tag included), from the strings of a
+bound ``:class`` or ``x-bind:class`` (``{'mt-4':open}``, ``open?'pb-4':'pb-2'``), and from the
+``*class*="…"`` arguments of an include or with tag (their element is in another file, so they get no
+exemption).
 
 The list of gated screens is empty until screen 1's gate; each rule is proved here on fixture strings,
 and the wiring on fixture templates. The card padding is set in CSS, not by a utility, so the guard
@@ -47,31 +49,34 @@ ROOT_PX = 16
 #: The steps that pass in the allowlisted places only (4 px and 12 px, spec D4).
 SMALL_STEPS = frozenset({1, 3})
 
-#: A control: an element carrying one of these classes (or ``<class>-…``, so ``ui-btn-sm`` and
-#: ``ui-pill-success`` count; ``ui-tabs`` and ``ui-table`` do not), or one of its descendants.
-CONTROL_CLASSES: dict[str, str] = {
-    "ui-btn": "a button's padding and the space between its icon and its words",
-    "ui-input": "a field's own padding",
-    "ui-select": "the select control's toggle, panel and options",
-    "ui-chip": "a chip's padding and its icon gap",
-    "ui-tab": "a tab's padding and its icon gap",
-    "ui-pill": "a status pill's padding and its icon gap",
-}
-CONTROL_MARKER = "data-control"
-
-#: Where steps 1 and 3 may appear, and why (the explicit allowlist the plan asks for).
+#: Where steps 1 and 3 may appear, and why: the explicit allowlist the plan asks for, and the rule the
+#: guard applies (``_in_control`` and ``_icon_and_label`` read it when they run). ``control:<class>``
+#: passes an element carrying that class (or ``<class>-…``, so ``ui-btn-sm`` and ``ui-pill-success``
+#: count; ``ui-tabs`` and ``ui-table`` do not) and everything inside it in the same template;
+#: ``control:[<attribute>]`` does the same for an element marked with that attribute; ``icon-and-label``
+#: passes the gap of an element whose children are one ``aria-hidden`` svg and words.
 SMALL_STEP_ALLOWLIST: dict[str, str] = {
-    **{f"control:{name}": reason for name, reason in CONTROL_CLASSES.items()},
-    f"control:[{CONTROL_MARKER}]": "a control drawn without the shared classes marks itself",
+    "control:ui-btn": "a button's padding and the space between its icon and its words",
+    "control:ui-input": "a field's own padding",
+    "control:ui-select": "the select control's toggle, panel and options",
+    "control:ui-chip": "a chip's padding and its icon gap",
+    "control:ui-tab": "a tab's padding and its icon gap",
+    "control:ui-pill": "a status pill's padding and its icon gap",
+    "control:[data-control]": "a control drawn without the shared classes marks itself",
     "icon-and-label": "the gap of an element whose children are one aria-hidden svg and its words",
 }
+CONTROL = "control:"
+ICON_AND_LABEL = "icon-and-label"
 
 SPACING_PREFIXES = r"p[xytrblse]?|m[xytrblse]?|gap(?:-[xy])?|space-[xy]|inset(?:-[xy])?|top|right|bottom|left|start|end"
 UTILITY_RE = re.compile(rf"!?-?(?P<prefix>{SPACING_PREFIXES})-(?P<value>.+?)!?")
 GAP_PREFIXES = frozenset({"gap", "gap-x", "gap-y", "space-x", "space-y"})
 LENGTH_RE = re.compile(r"(?<![\d.a-zA-Z])(\d*\.?\d+)(px|rem|em)(?![a-zA-Z])")
 ARIA_HIDDEN_RE = re.compile(r"""\saria-hidden(?:\s*=\s*(["'])true\1)?(?=[\s/>])""")
-MARKER_RE = re.compile(rf"\s{CONTROL_MARKER}(?=[\s=/>])")
+#: A string in a bound class (``:class``, ``x-bind:class``): a binding is a script expression, so the
+#: class names it may add are its strings (``{'mt-4':open}``, ``open?'pb-4':'pb-2'``, a template
+#: literal); the words around them are names and operators. Read before the value is split into words.
+BOUND_STRING_RE = re.compile(r"""(['"`])(.*?)\1""", re.S)
 #: ``{% include "x.html" with extra_class="…" %}`` and ``{% with icon_class="…" %}``.
 TAG_CLASS_ARG_RE = re.compile(r"""\b\w*class\w*\s*=\s*(["'])(.*?)\1""")
 TEMPLATE_TAG_RE = re.compile(r"{%\s*(?:include|with)\b.*?%}", re.S)
@@ -90,10 +95,6 @@ class Finding:
 
     def __str__(self) -> str:
         return f"{self.path}:{self.line}: {self.word} ({self.reason})"
-
-
-def _blank(match: re.Match[str]) -> str:
-    return re.sub(r"[^\n]", " ", match.group(0))
 
 
 def _utility(word: str) -> tuple[str, str] | None:
@@ -145,18 +146,38 @@ def _end(text: str, element: recolor.Element) -> int:
     return len(text) if closing == -1 else closing + 1
 
 
+def _controls() -> tuple[tuple[str, ...], tuple[re.Pattern[str], ...]]:
+    """The control classes and the marker attributes ``SMALL_STEP_ALLOWLIST`` names, as it stands now."""
+    names: list[str] = []
+    markers: list[re.Pattern[str]] = []
+    for entry in SMALL_STEP_ALLOWLIST:
+        if not entry.startswith(CONTROL):
+            continue
+        name = entry.removeprefix(CONTROL)
+        if name.startswith("[") and name.endswith("]"):
+            markers.append(re.compile(rf"\s{re.escape(name[1:-1])}(?=[\s=/>])"))
+        else:
+            names.append(name)
+    return tuple(names), tuple(markers)
+
+
 def _in_control(found: Sequence[recolor.Element], index: int) -> bool:
+    """True when the element or an ancestor is a control the allowlist names."""
+    names, markers = _controls()
     for place in (index, *found[index].ancestors):
         element = found[place]
-        if MARKER_RE.search(element.tag):
+        if any(marker.search(element.tag) for marker in markers):
             return True
-        if any(word == name or word.startswith(name + "-") for word in element.classes for name in CONTROL_CLASSES):
+        if any(word == name or word.startswith(name + "-") for word in element.classes for name in names):
             return True
     return False
 
 
 def _icon_and_label(text: str, found: Sequence[recolor.Element], index: int) -> bool:
-    """True when the element's children are one aria-hidden svg and words (text, or plain text elements)."""
+    """True when the allowlist names the pair and the element's children are one aria-hidden svg and
+    words (text, or plain text elements)."""
+    if ICON_AND_LABEL not in SMALL_STEP_ALLOWLIST:
+        return False
     element = found[index]
     children = _children(found, index)
     icons = [child for child in children if found[child].name == "svg"]
@@ -190,9 +211,16 @@ def off_grid(text: str, path: str = "<string>") -> list[Finding]:
 
     for index, element in enumerate(found):
         for attribute in recolor.CLASS_ATTR_RE.finditer(masked, element.start, element.tag_end):
-            for word in re.finditer(r"\S+", attribute.group(3)):
-                check(word.group(0).strip("'\"{}(),:"), attribute.start(3) + word.start(), index)
-    for tag in TEMPLATE_TAG_RE.finditer(COMMENT_RE.sub(_blank, text)):
+            value, start = attribute.group(3), attribute.start(3)
+            parts = (
+                [(value, start)]
+                if attribute.group(1) == "class"
+                else [(string.group(2), start + string.start(2)) for string in BOUND_STRING_RE.finditer(value)]
+            )
+            for part, offset in parts:
+                for word in re.finditer(r"\S+", part):
+                    check(word.group(0).strip("'\"{}(),:"), offset + word.start(), index)
+    for tag in TEMPLATE_TAG_RE.finditer(COMMENT_RE.sub(recolor._blank, text)):
         for argument in TAG_CLASS_ARG_RE.finditer(tag.group(0)):
             for word in re.finditer(r"\S+", argument.group(2)):
                 check(word.group(0), tag.start() + argument.start(2) + word.start(), None)
@@ -330,6 +358,10 @@ def test_the_guard_reads_every_template_of_a_gated_screen_and_nothing_else(tmp_p
         # Every place a class is written.
         "<div :class=\"{ 'mt-3': open }\">",
         "<div x-bind:class=\"open ? 'pb-5' : 'pb-4'\">",
+        "<div :class=\"{'mt-5':open}\">",
+        "<div :class=\"open?'pb-5':'pb-4'\">",
+        '<div x-bind:class=\'open?"gap-1.5":"gap-2"\'>',
+        "<div :class=\"`mt-5 ${open ? 'pb-4' : ''}`\">",
         '<div class="{% if wide %}px-5{% else %}px-4{% endif %}">',
         '<div\n    class="flex\n           mt-7">',
         '{% include "components/button.html" with extra_class="mt-3" %}',
@@ -384,6 +416,10 @@ def test_the_guard_flags_off_grid_spacing(source: str) -> None:
         '{% comment %}<div class="p-3">{% endcomment %}<div class="p-4">',
         '<div class="mt-4"><!-- <p class="mt-5"> --></div>',
         '{% comment %}{% include "components/button.html" with extra_class="mt-3" %}{% endcomment %}',
+        # A binding's words outside its strings are names and operators, not classes.
+        "<div :class=\"{'mt-4':open,'pb-2':!open, hidden: !shown}\">",
+        "<div :class=\"open?'pb-4':'pb-2'\">",
+        '<button class="ui-btn" :class="{\'gap-1\':compact}">Go ahead</button>',
     ],
 )
 def test_the_guard_passes_the_grid_and_the_allowlisted_places(source: str) -> None:
@@ -414,6 +450,11 @@ def test_a_finding_names_the_line_the_utility_is_on() -> None:
     assert str(off_grid(source, "x.html")[0]) == "x.html:4: pb-5 (step 5 is 20 px, off the 8 px grid)"
 
 
+def test_a_finding_in_a_compact_binding_names_the_class_and_its_line() -> None:
+    source = "<div\n  :class=\"{'mt-4':a,\n           'mb-5':b}\">x</div>"
+    assert [(finding.line, finding.word) for finding in off_grid(source)] == [(3, "mb-5")]
+
+
 def test_the_allowlist_names_each_place_with_its_reason() -> None:
     assert sorted(SMALL_STEPS) == [1, 3]
     assert set(SMALL_STEP_ALLOWLIST) == {
@@ -427,6 +468,40 @@ def test_the_allowlist_names_each_place_with_its_reason() -> None:
         "icon-and-label",
     }
     assert all(reason.strip() for reason in SMALL_STEP_ALLOWLIST.values())
+
+
+@pytest.mark.parametrize(
+    ("entry", "source"),
+    [
+        ("control:ui-btn", '<button class="ui-btn ui-btn-sm gap-1 px-3">Go ahead</button>'),
+        ("control:ui-input", '<input class="ui-input px-3 py-1">'),
+        (
+            "control:ui-select",
+            '<div class="ui-select-panel p-1"><button class="ui-select-option px-3">One</button></div>',
+        ),
+        ("control:ui-chip", '<button class="ui-chip gap-1 px-3">Filter</button>'),
+        ("control:ui-tab", '<a class="ui-tab px-3 py-1">Queue</a>'),
+        ("control:ui-pill", '<span class="ui-pill ui-pill-success gap-1 px-3">Approved</span>'),
+        (
+            "control:[data-control]",
+            '<div data-control="segmented" class="p-1"><button class="px-3">Week</button></div>',
+        ),
+        ("icon-and-label", '<span class="flex gap-1"><svg aria-hidden="true"></svg>Approved</span>'),
+    ],
+)
+def test_the_allowlist_is_the_rule(entry: str, source: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each place passes steps 1 and 3 because the allowlist names it: take its entry out and it is flagged."""
+    assert not off_grid(source), off_grid(source)
+    monkeypatch.delitem(SMALL_STEP_ALLOWLIST, entry)
+    assert off_grid(source), f"{source} still passes without {entry!r}"
+
+
+def test_a_place_added_to_the_allowlist_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    sources = ['<div class="ui-stepper px-3 py-1">-</div>', '<div data-segmented class="p-1">x</div>']
+    assert all(off_grid(source) for source in sources)
+    monkeypatch.setitem(SMALL_STEP_ALLOWLIST, "control:ui-stepper", "a stepper's own padding")
+    monkeypatch.setitem(SMALL_STEP_ALLOWLIST, "control:[data-segmented]", "a segmented control marks itself")
+    assert not [finding for source in sources for finding in off_grid(source)]
 
 
 # ── Cards and sections (set in CSS) ────────────────────────────────────────────────────────────
