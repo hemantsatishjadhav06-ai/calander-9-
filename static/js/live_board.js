@@ -11,6 +11,8 @@
  * - Hour chart: hover or focus a bar for "10:00–11:00 · 6 turns"; arrow keys move
  *   between hours and each hour is read out through a polite live region beside the chart
  *   ([data-chart-live]); Escape hides the tooltip. Text is set with textContent only.
+ *   The tooltip's colours are the theme's tokens, read through window.bbToken (base.html) when
+ *   it draws; a theme change (bb:themechange on window) draws a visible tooltip again.
  * - "checked 12 s ago" keeps counting between refreshes.
  */
 (function () {
@@ -152,6 +154,11 @@
 
   /* ---- Hour chart ------------------------------------------------------- */
 
+  // A design token's value in the current theme; empty when the reader is missing.
+  function token(name) {
+    return typeof window.bbToken === "function" ? window.bbToken(name) : "";
+  }
+
   function hits(chart) {
     return chart ? chart.querySelectorAll("[data-hit]") : [];
   }
@@ -180,7 +187,7 @@
     svg.setAttribute("width", "12");
     svg.setAttribute("height", "12");
     svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "#FEA69C"); /* danger-300: the stopped icon on the dark tooltip (8.77:1) */
+    svg.setAttribute("stroke", token("danger-300") || "currentColor"); /* danger-300 on the inverse tooltip: 8.77:1 light, 7.24:1 dark */
     svg.setAttribute("stroke-width", "2.5");
     svg.setAttribute("stroke-linecap", "round");
     svg.setAttribute("stroke-linejoin", "round");
@@ -225,7 +232,7 @@
     value.style.fontWeight = "600";
     value.textContent = total + (total === 1 ? " turn" : " turns");
     var range = document.createElement("div");
-    range.style.color = "#CED2D7"; /* ink-300 on ink-900: 10.88:1 */
+    range.style.color = token("ink-300"); /* ink-300 on the inverse tooltip: 10.88:1 light, 4.58:1 dark */
     range.textContent = hit.getAttribute("data-range") || "";
     tip.appendChild(value);
     tip.appendChild(range);
@@ -254,6 +261,14 @@
     tip.style.top = Math.max(0, svgTop + barTop - tip.offsetHeight - 8) + "px";
     if (announce) announceBar(chart, hit);
   }
+
+  // Only a visible tooltip carries colours already drawn; a hidden one reads the new theme when it shows.
+  window.addEventListener("bb:themechange", function () {
+    document.querySelectorAll("[data-hour-chart]").forEach(function (chart) {
+      var index = activeIndexOf(chart);
+      if (index !== null) showBar(chart, index);
+    });
+  });
 
   function initChart(chart) {
     if (chart.__liveReady) return;

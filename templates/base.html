@@ -1154,8 +1154,10 @@
     <script nonce="{{ request.csp_nonce }}">
         /* Analytics hero chart: read data attrs off the canvas, (re)create Chart.js.
            Lives in base.html so its CSP nonce matches the parent page — the chart
-           partial re-renders on HTMX swaps via the htmx:afterSwap hook below. */
-        function bbInitHeroChart(retries) {
+           partial re-renders on HTMX swaps via the htmx:afterSwap hook below. Its colours
+           are the theme's tokens, read when it draws (bbToken below); a theme change draws
+           it again (`quiet`: no entrance animation). */
+        function bbInitHeroChart(retries, quiet) {
             var canvas = document.getElementById('analytics-area-chart');
             if (!canvas) return;
             if (typeof Chart === 'undefined') {
@@ -1170,7 +1172,11 @@
                 data = JSON.parse(canvas.dataset.series || '[]');
                 labels = JSON.parse(canvas.dataset.labels || '[]');
             } catch (e) { return; }
-            var color = '#1C1F24';
+            /* The line ink-900, the axis text ink-500, the grid ink-100: in light, the values
+               the chart drew before dark mode. */
+            var color = bbToken('ink-900');
+            var axisText = bbToken('ink-500');
+            var gridLine = bbToken('ink-100');
             /* The labels are ISO dates (YYYY-MM-DD); people read dates in words: "24 Sep",
                "Thu 24 Sep" in the tooltip. Anything else is shown as it came. */
             var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1185,14 +1191,19 @@
             if (window._bbHeroChart) { window._bbHeroChart.destroy(); }
             var ctx = canvas.getContext('2d');
             var gradient = ctx.createLinearGradient(0, 0, 0, 260);
+            /* The token as rgba with alpha `a`; a value that is not six-digit hex (a stylesheet
+               that has not loaded) leaves the fill transparent rather than throwing. */
             function hexToRgba(c, a) {
-                var v = c.replace('#', '');
-                var r = parseInt(v.slice(0, 2), 16), g = parseInt(v.slice(2, 4), 16), b = parseInt(v.slice(4, 6), 16);
-                return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+                var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c);
+                if (!m) return 'transparent';
+                return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + a + ')';
             }
             gradient.addColorStop(0, hexToRgba(color, 0.08));
             gradient.addColorStop(1, hexToRgba(color, 0.0));
-            window._bbHeroChart = new Chart(ctx, {
+            /* Chart.js draws its axis and tooltip text on the canvas at 12 px unless told;
+               the type floor is 13 px. */
+            if (Chart.defaults && Chart.defaults.font) { Chart.defaults.font.size = 13; }
+            var config = {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -1226,14 +1237,24 @@
                                 maxTicksLimit: 6,
                                 maxRotation: 0,
                                 autoSkipPadding: 12,
-                                color: '#656B73',
+                                color: axisText,
                                 callback: function (value) { return dayInWords(this.getLabelForValue(value)); },
                             },
                         },
-                        y: { beginAtZero: true, grid: { color: '#EDEFF2' }, ticks: { color: '#656B73' } },
+                        y: { beginAtZero: true, grid: { color: gridLine }, ticks: { color: axisText } },
                     },
                 },
-            });
+            };
+            if (quiet) { config.options.animation = false; }
+            window._bbHeroChart = new Chart(ctx, config);
+        }
+        /* A design token as the page shows it now: bbToken('ink-900') reads --ink-900 from <html>,
+           where the theme is set, so it follows the theme. Empty when it cannot be read.
+           static/js/live_board.js reads its tooltip colours through it too. */
+        function bbToken(name) {
+            try {
+                return getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim();
+            } catch (e) { return ''; }
         }
         // Wrap in a no-arg callback so the DOMContentLoaded event object
         // doesn't get passed as ``retries`` — that would make
@@ -1245,6 +1266,11 @@
             if (target && target.id === 'analytics-hero-chart') {
                 bbInitHeroChart();
             }
+        });
+        /* The Appearance choice fires bb:themechange on window: a drawn chart is drawn again
+           in the new theme's colours. */
+        window.addEventListener('bb:themechange', function () {
+            if (window._bbHeroChart) { bbInitHeroChart(0, true); }
         });
 
         /* flatpickr hides the real input and shows a generated altInput, which
