@@ -286,6 +286,29 @@ def test_each_rewrite(before, after):
     assert dark(after) == after  # idempotent
 
 
+SCOPE = '<div data-theme-scope="light"><i class="bg-white border border-ink-300"></i></div>'
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        # bg-white → bg-surface lengthens the text: the scrim and the edge just before the scope still move.
+        (
+            '<p class="bg-white"></p>' * 20 + '<div class="fixed inset-0 bg-ink-950/50 border-ink-300"></div>' + SCOPE,
+            '<p class="bg-surface"></p>' * 20
+            + '<div class="fixed inset-0 bg-scrim/50 border-line-strong"></div>'
+            + SCOPE,
+        ),
+        # The scrims shorten it: the edge inside the scope still stays.
+        ('<i class="bg-ink-950/50"></i>' * 30 + SCOPE, '<i class="bg-scrim/50"></i>' * 30 + SCOPE),
+    ],
+)
+def test_the_light_scope_is_read_afresh_after_each_pass(before, after):
+    """Each rewrite pass changes the text's length, so the next reads the scope where it now is."""
+    assert dark(before) == after
+    assert dark(after) == after
+
+
 BARE_CSS = (
     "{% comment %}The filters' styles.{% endcomment %}/* Filters */\n"
     "    .f,\n    .g {\n        color: var(--ink-800);\n        border: 1px solid var(--ink-300);\n    }\n"
@@ -466,30 +489,33 @@ def test_a_page_without_the_stylesheet_may_use_white(tree, capsys):
 
 
 @pytest.mark.parametrize(
-    ("markup", "colour"),
+    ("markup", "where", "colour"),
     [
-        ("<style>.a { color: #123456; }</style>", "#123456"),
-        ('<p style="color: rgb(1 2 3)">x</p>', "rgb("),
-        ("<p :style=\"'background: #fff'\">x</p>", "#fff"),
-        ('<svg><path fill="#123456"/></svg>', "#123456"),
-        ('<p class="bg-[#123456]">x</p>', "#123456"),
-        ('<img class="shadow-[0_1px_2px_rgb(1_2_3/.24)]">', "rgb("),
+        ("<style>.a { color: #123456; }</style>", "part.html:2", "#123456"),
+        ('<p style="color: rgb(1 2 3)">x</p>', "part.html:2", "rgb("),
+        ("<p :style=\"'background: #fff'\">x</p>", "part.html:2", "#fff"),
+        ('<svg><path fill="#123456"/></svg>', "part.html:2", "#123456"),
+        ('<p class="bg-[#123456]">x</p>', "part.html:2", "#123456"),
+        ('<img class="shadow-[0_1px_2px_rgb(1_2_3/.24)]">', "part.html:2", "rgb("),
+        # A partial a <style> block includes is CSS from its first line (as calendar's filter styles).
+        ('<style>{% include "studio/_styles.html" %}</style>', "_styles.html:2", "#123456"),
     ],
 )
-def test_a_raw_colour_in_a_dark_ready_page_s_tree_fails(tree, capsys, monkeypatch, markup, colour):
+def test_a_raw_colour_in_a_dark_ready_page_s_tree_fails(tree, capsys, monkeypatch, markup, where, colour):
     tree("base.html", '<html><link href="css/dist/styles.css">{% block content %}{% endblock %}</html>')
     tree(
         "studio/index.html",
         '{% extends "base.html" %}{% block content %}{% include "studio/part.html" %}{% endblock %}',
     )
     tree("studio/part.html", "<div>\n" + markup + "\n</div>")
+    tree("studio/_styles.html", "{# The part's styles. #}\n.a { color: #123456; }\n")
     tree("studio/elsewhere.html", '{% extends "base.html" %}\n' + markup)
     assert run_check(capsys)[0] == 0  # nobody is declared yet
     monkeypatch.setattr(screens, "DARK_READY", frozenset({("studio", "index")}))
     monkeypatch.setattr(screens, "PAGE_TEMPLATES", {("studio", "index"): ("studio/index.html",)})
     code, out = run_check(capsys)
     assert code == 1
-    assert f"templates/studio/part.html:2: raw colour {colour}" in out
+    assert f"templates/studio/{where}: raw colour {colour}" in out
     assert "elsewhere.html" not in out  # not in a declared page's tree
 
 

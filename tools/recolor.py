@@ -56,7 +56,7 @@ import argparse
 import difflib
 import re
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -989,35 +989,60 @@ def css_spans(text: str, *, css: bool = False) -> list[tuple[int, int]]:
     return spans + [(m.start(2), m.end(2)) for m in STYLE_ANY_ATTR_RE.finditer(text)]
 
 
+def css_declarations(text: str, *, css: bool = False) -> list[tuple[str, int, str]]:
+    """(property, where its value starts, the value) of each declaration in a template's CSS
+    (``css_spans``), read with comments and template tags blanked: a colon in a tag or a comment does
+    not start one. The value is the blanked one, as long as the text it stands for."""
+    masked = _mask(text)
+    found = []
+    for start, end in css_spans(text, css=css):
+        for declaration in CSS_DECLARATION_RE.finditer(_mask_css_comments(masked[start:end])):
+            found.append((declaration.group(1).lower(), start + declaration.start(2), declaration.group(2)))
+    return found
+
+
 def ink300_css_edges(
     text: str, ranges: list[tuple[int, int]] | None = None, *, css: bool = False
 ) -> list[tuple[int, int, str]]:
     """(start, end, property) of each ``var(--ink-300)`` a template's CSS draws as an edge (border,
     outline, box-shadow, column rule), outside the light scope's *ranges* and ``recolor: keep`` lines."""
     ranges = ranges or []
-    masked = _mask(text)
     found = []
-    for start, end in css_spans(text, css=css):
-        for declaration in CSS_DECLARATION_RE.finditer(_mask_css_comments(masked[start:end])):
-            prop = declaration.group(1).lower()
-            if not CSS_EDGE_PROPERTY_RE.match(prop):
-                continue
-            offset = start + declaration.start(2)
-            for m in INK300_VAR_RE.finditer(declaration.group(2)):
-                if not (_in(ranges, offset + m.start()) or _kept(text, offset + m.start())):
-                    found.append((offset + m.start(), offset + m.end(), prop))
+    for prop, offset, value in css_declarations(text, css=css):
+        if not CSS_EDGE_PROPERTY_RE.match(prop):
+            continue
+        for m in INK300_VAR_RE.finditer(value):
+            if not (_in(ranges, offset + m.start()) or _kept(text, offset + m.start())):
+                found.append((offset + m.start(), offset + m.end(), prop))
     return sorted(found)
 
 
-def dark_class_strings(text: str, ranges: list[tuple[int, int]] | None = None) -> str:
-    """The rules that need no element: bg-white, scrims, ink-300 edges (named and arbitrary-value
-    utilities), literal arbitrary shadows."""
-    ranges = ranges or []
-    text = _rewrite_outside(text, SOLID_WHITE_RE, r"\1bg-surface", ranges)
-    text = _rewrite_outside(text, SCRIM_SRC_RE, _scrim, ranges)
-    text = _rewrite_outside(text, INK300_EDGE_RE, r"\1\2-line-strong", ranges)
-    text = _rewrite_outside(text, INK300_ARBITRARY_RE, lambda m: INK300_VAR_RE.sub(EDGE_TOKEN, m.group(0)), ranges)
-    return _rewrite_outside(text, ARBITRARY_SHADOW_RE, _arbitrary_shadow, ranges)
+#: The rewrites that need no element, in order: bg-white, scrims, ink-300 edges (named and
+#: arbitrary-value utilities), literal arbitrary shadows.
+DARK_CLASS_REWRITES: tuple[tuple[re.Pattern, str | Callable[[re.Match], str]], ...] = (
+    (SOLID_WHITE_RE, r"\1bg-surface"),
+    (SCRIM_SRC_RE, _scrim),
+    (INK300_EDGE_RE, r"\1\2-line-strong"),
+    (INK300_ARBITRARY_RE, lambda m: INK300_VAR_RE.sub(EDGE_TOKEN, m.group(0))),
+    (ARBITRARY_SHADOW_RE, _arbitrary_shadow),
+)
+
+
+def dark_class_strings(text: str, *, scoped: bool = False) -> str:
+    """The rewrites that need no element (``DARK_CLASS_REWRITES``). *scoped*: the text is a template,
+    whose light scope keeps its classes; a pass that changes the text moves the scope, so the next pass
+    reads it again."""
+
+    def scope(text: str) -> list[tuple[int, int]]:
+        return _scope_ranges(elements(text)) if scoped and SCOPE_ATTR in text else []
+
+    ranges = scope(text)
+    for pattern, repl in DARK_CLASS_REWRITES:
+        after = _rewrite_outside(text, pattern, repl, ranges)
+        if after != text:
+            ranges = scope(after)
+        text = after
+    return text
 
 
 def _token_text(token: Token, colour: str, mod: str | None = None) -> str:
@@ -1042,7 +1067,7 @@ def _edge_colour(own: set[str], around: set[str]) -> str | None:
 def recolor_dark(text: str, *, name: str = "", css: bool = False) -> str:
     """The dark pass over a template that loads the stylesheet (*name* as the loader knows it; *css*
     when it is bare CSS, included inside a parent's ``<style>`` block)."""
-    text = dark_class_strings(text, _scope_ranges(elements(text)))
+    text = dark_class_strings(text, scoped=True)
     for start, end, _ in reversed(ink300_css_edges(text, _scope_ranges(elements(text)), css=css)):
         text = text[:start] + EDGE_TOKEN + text[end:]
     return _dark_in_context(text, name)
@@ -1297,18 +1322,15 @@ STYLE_ANY_ATTR_RE = re.compile(r"""\s(?:x-bind)?:?style=(["'])(.*?)\1""", re.S)
 ARBITRARY_RE = re.compile(r"(?<![\w-])[a-z][\w-]*-\[[^\]\s]+\]")
 
 
-def raw_colour_problems(text: str) -> list[tuple[int, str]]:
-    """(line, problem) for a colour value written in a template: in a ``<style>`` block's declarations,
-    a ``style=`` or ``:style=`` attribute, an SVG colour attribute or an arbitrary class. A platform's
-    own colour, the light scope's subtrees and ``presets|type="color"|recolor: keep`` lines are exempt."""
+def raw_colour_problems(text: str, *, css: bool = False) -> list[tuple[int, str]]:
+    """(line, problem) for a colour value written in a template: in a declaration of its CSS (a
+    ``<style>`` block, a ``style=`` or ``:style=`` attribute, or the whole template when *css* says it
+    is bare CSS, included inside a parent's ``<style>`` block), an SVG colour attribute or an arbitrary
+    class. A platform's own colour, the light scope's subtrees and ``presets|type="color"|recolor: keep``
+    lines are exempt."""
     ranges = _scope_ranges(elements(text))
-    spans: list[tuple[int, int, bool]] = []  # start, end, platform colours allowed
-    for block in STYLE_BLOCK_RE.finditer(text):
-        body_start = block.start(2)
-        for declaration in re.finditer(r"([-\w]+)\s*:([^;{}]*)", _mask_css_comments(block.group(2))):
-            spans.append((body_start + declaration.start(2), body_start + declaration.end(2), False))
-    for attr in STYLE_ANY_ATTR_RE.finditer(text):
-        spans.append((attr.start(2), attr.end(2), False))
+    # start, end, platform colours allowed; a value is read as written (a literal in a tag counts too)
+    spans = [(start, start + len(value), False) for _, start, value in css_declarations(text, css=css)]
     for attr in SVG_COLOUR_ATTR_RE.finditer(text):
         spans.append((attr.start(2), attr.end(2), True))
     for arbitrary in ARBITRARY_RE.finditer(text):
@@ -1418,7 +1440,7 @@ def dark_findings(paths: Iterable[Path], kinds: dict[Path, bool], partials: Iter
             name = template_name(path)
             found = dark_problems(text, css=name in partials)
             if name in ready and Path(name).name != "_platform_icon.html":
-                found += raw_colour_problems(text)
+                found += raw_colour_problems(text, css=name in partials)
         else:
             found = class_string_problems(text)
         lines += [f"dark: {rel}:{line}: {problem}" for line, problem in sorted(found)]

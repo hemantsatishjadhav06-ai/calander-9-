@@ -583,7 +583,15 @@ their limits, `pairs:diff`'s result, the protected-test guard green, the working
 the estimate, the F4 note (T8), the two light movements T3 made by design on no `pairs:diff` page
 (the composer's tooltip from ink-800 to the inverse surface, ink-900; the analytics drawer's
 media-kind badge in `analytics/_post_detail.html` from `bg-ink-900/80` to `bg-scrim/80`, ink-950 at
-80 %), and that `frontend-design` was unavailable and `impeccable`'s shape step stood in. **Stop: screen 1 starts after the owner signs off the shell pair.**
+80 %), the three places T3 departed from its text, each for a reason: (a) `bg-black/NN` stays and is
+not rewritten to `bg-scrim/NN`, because black is the palette lock and does not flip and the rewrite
+would move light from `#000` to ink-950 `#0E1114` (`composer/partials/media_list.html:11`,
+`media_list_pending.html:11`); (b) the select chevrons are a per-theme `--select-chevron` data URI,
+each drawn in its theme's `--text-tertiary`, not a CSS mask over `var(--text-tertiary)`; (c)
+`.hour-bar.is-now` and `.timeline-now` keep ink-900, which flips (14.6:1 on a dark card), instead of
+the inverse surface, which would sit at 1.32:1 on a dark card (DESIGN_SYSTEM.md §21 explains all
+three), the open decision on the selected filter chip that T22 needs (below), and that
+`frontend-design` was unavailable and `impeccable`'s shape step stood in. **Stop: screen 1 starts after the owner signs off the shell pair.**
 
 ## Part B — Screen 1 · New post sheet (size L)
 
@@ -765,7 +773,13 @@ trees — today `calendar/partials/_publish_filter_styles.html` (15), `base.html
 moved), `calendar/partials/event_form.html` (9), `calendar/calendar.html` (4),
 `approvals/partials/_toasts.html` (4), `calendar/partials/publish_queue.html` (1),
 `approvals/partials/_approval_row.html` (1): the list tabs and the event form render inside Calendar,
-so they are in its tree; then every dark axe finding. Red: C6 fails once the pages are declared; new
+so they are in its tree; then every dark axe finding. Before declaring, the owner decides the selected
+filter chip (`.ui-filter-chip[aria-pressed="true"]` in styles.css, and the composer's override chip):
+T3 made it the inverse surface as listed, which in dark sits 1.32:1 on a card and 1.41:1 on the
+canvas, so its selected state rests on a fill change under 3:1 and the weight (the reason the hour
+bar kept ink-900). Keep it, or move it to ink-900 with `text-on-fill` (14.6:1 on a dark card, 15.6:1 on
+the canvas; light does not move, since both are `#1C1F24` and white there); either way the checker
+gains the chip's fill against the card and the canvas. Red: C6 fails once the pages are declared; new
 `tests/e2e/screens/dark-shell.spec.ts` (dark, three projects: Home with waiting items, a brief card and
 a receipt (the `team_workspace`/`home_request` fixtures), Calendar month, week, day, its four list tabs,
 the event form, and posts selected in each selection bar (`calendar-bulk-bar` in the calendar view and
