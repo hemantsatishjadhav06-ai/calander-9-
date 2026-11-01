@@ -125,6 +125,9 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "apps.common.middleware.PermissionsPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # HTML only, after WhiteNoise (static files are compressed already) and before everything that
+    # writes the page, so it compresses last (apps/common/middleware.py, issue #25).
+    "apps.common.middleware.HtmlGZipMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",

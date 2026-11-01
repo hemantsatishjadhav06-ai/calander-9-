@@ -380,6 +380,15 @@ success individually after restart, and obtain fresh approvals for affected
 queued content/destinations. The October rollout runbooks and audits are kept
 in [the archive](archive/2026-10/TELEGRAM_RAILWAY_ROLLOUT.md).
 
+### What the app compresses
+
+HTML pages and HTMX fragments are gzipped by the app for browsers that ask
+(`apps.common.middleware.HtmlGZipMiddleware`, with Django's BREACH padding).
+Static files are served precompressed by WhiteNoise. File downloads (media,
+attachments, exports), streamed responses and JSON (the Agent API, MCP,
+webhooks) are sent as they are. A proxy in front that compresses again sees
+`Content-Encoding: gzip` and leaves the page alone.
+
 ## Rollback
 
 The release step takes a database backup **before** migrating
