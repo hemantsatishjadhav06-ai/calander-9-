@@ -278,6 +278,35 @@ def test_the_shell_spaces_on_the_8px_grid() -> None:
     )
 
 
+def _inline_padding(body: str) -> tuple[str, str] | None:
+    """``(left, right)`` of a rule's ``padding`` shorthand, or None when the rule sets no padding."""
+    for declaration in body.split(";"):
+        name, _, value = declaration.partition(":")
+        if name.strip() == "padding":
+            parts = value.split()
+            right = parts[1] if len(parts) > 1 else parts[0]
+            return (parts[3] if len(parts) == 4 else right), right
+    return None
+
+
+def test_a_sidebar_section_label_starts_on_the_nav_items_column() -> None:
+    """A section label's words start where every nav item's icon does: the 8 px gutter plus 12 px.
+
+    The settings layouts (``layouts/settings.html``, ``layouts/workspace_settings.html``) fill the shell's
+    ``sidebar_nav`` with section labels between nav items; with its own inset the label's words sat 2 px
+    left of the icons (T13 review). Every ``.sidebar-nav-item`` rule (the 32 px item and the 44 px touch
+    item) pads as the label does, so the sidebar keeps one column.
+    """
+    from apps.common.tests.test_components import _css_rules  # here: test_components imports this module
+
+    rules: dict[str, list[tuple[str, str]]] = {".sidebar-nav-item": [], ".sidebar-section-label": []}
+    for _, prelude, body in _css_rules():
+        if prelude in rules and (inline := _inline_padding(body)) is not None:
+            rules[prelude].append(inline)
+    assert rules[".sidebar-section-label"] == [("12px", "12px")], rules
+    assert len(rules[".sidebar-nav-item"]) == 2 and set(rules[".sidebar-nav-item"]) == {("12px", "12px")}, rules
+
+
 def test_the_guard_reads_every_template_of_a_gated_screen_and_nothing_else(tmp_path: Path) -> None:
     def write(name: str, body: str) -> None:
         path = tmp_path / name

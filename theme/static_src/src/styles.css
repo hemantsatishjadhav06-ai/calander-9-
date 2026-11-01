@@ -635,7 +635,7 @@
   font-size: 0.8125rem; line-height: 1rem; font-weight: 600;
   text-transform: none; letter-spacing: 0;
   color: var(--ink-500);
-  padding: 14px 10px 4px;
+  padding: 14px 12px 4px;         /* inset as .sidebar-nav-item: the words start on the icons' 20px column */
 }
 .sidebar-badge {
   margin-left: auto; min-width: 20px; height: 18px; padding: 0 6px;
