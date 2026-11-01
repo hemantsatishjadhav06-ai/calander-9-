@@ -3,6 +3,96 @@
 One entry per phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md): the date, what changed, and what the
 phase gate (section 6) said. Newest first.
 
+## 1 Nov 2026 — Phase 2: cut and merge, gate passed
+
+Spec [`02-cut-and-merge.md`](02-cut-and-merge.md), plan [`phase-2.md`](phase-2.md), code map
+[`phase-2-code-map.md`](phase-2-code-map.md). PR #23.
+
+**What changed.** The sidebar is six places and the Settings gear (Home, Approvals, Calendar,
+Inbox, Analytics, Activity; Blog with its switch); *More* is gone. Phones get a bottom bar (Home,
+Approvals with its count, Calendar, Inbox, More), the notifications bell and a Go to palette
+(Ctrl/Cmd-K or its button) that offers only the places and Settings tabs a person may open.
+Approvals has its own screen at `/workspace/<id>/approvals/` (`approvals:index`), Activity is at
+`/studio/activity/` with the routines, and Settings is one screen at `/workspace/<id>/settings/`
+with seven tabs. Old pages answer 301 to their new home after their own checks; the URL contract
+routes, POST targets and HTMX fragments keep rendering. The per-workspace switches hide Blog,
+Queues, Templates, the extra providers and the advanced settings from navigation and creation only.
+Intelligence and API keys left the navigation (their URLs work). The public site links Home, How
+it works and a new Request invite form (CSRF, honeypot, per-network and site-wide rate limits, one
+notification per platform operator in the daily digest); `/pricing/` answers 301 to it. Nothing was
+restyled or deleted; the approval gate, isolation, budgets and Telegram are untouched.
+
+**Fixed on the way to green** (each with a failing test first):
+
+- Go to on WebKit (iPhone 13): the field did not keep the focus after opening, so typed letters
+  were lost and Enter opened Home instead of the match. The palette now keeps the focus in its
+  field for as long as it is open, and Enter and the arrows choose by the typed words, not by
+  layout (`16337e5`). An independent review of that fix found that opening Go to over another
+  dialog (the notifications drawer, New idea, the phone menu) made the palette's guard and that
+  dialog's focus trap recurse until the stack overflowed; the focus now goes back on the next
+  turn, at most 20 times per opening (`17db9eb`), with a browser case that opens Go to over the
+  drawer.
+- The e2e harness runs a fixture again when Postgres ends it as one side of a deadlock with the
+  harness's worker, and logs each retry with the fixture's name and what Postgres said
+  (`760c376`, `f54d6ea`). The application-level risk behind it (a person approving while the
+  worker holds a `FOR UPDATE` lock on the workspace row) is [issue #24](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/24).
+- `REQUEST_INVITE_HOURLY_LIMIT` pinned in the e2e settings; the browser job's limit raised to 35
+  minutes for the larger suite (about 225 cases).
+
+**Gate evidence on `ff90678923b74281d9f4ad9239480948088a155f`:**
+
+- [CI run 41275707640](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41275707640):
+  all nine jobs passed. Full pytest **6,081 passed, 1 Redis-only skip**, 227 subtests; coverage
+  **42,084/48,162 statements (87.3801%)**, above Phase 1's 86.8357%. Browsers (WebKit for iPhone
+  13, zero retries): **225 passed, 3 skipped**, the three golden path 12 (TOTP) cases, pending
+  until Phase 4. Lighthouse mobile medians, budgets unchanged and all met: Home 98 / LCP 1,433 ms /
+  CLS 0.078 / lab INP 80 ms; Approvals (now `/approvals/`) 99 / 1,587 ms / 0.012 / 80 ms; Calendar
+  97 / 1,928 ms / 0.007 / 80 ms; gzip JavaScript 62–80 KB.
+- A complete local browser run on the same commit (`npx playwright test`, Chromium for all three
+  projects; WebKit cannot be downloaded here): **225 passed, 3 skipped (TOTP), 0 failed** (22.9 min).
+
+**Gate, exactly as written in `BETA_PLAN.md` section 6:**
+
+> full pytest suite green (the invariants' tests untouched); 12 e2e tests updated to the new
+> routes and green; no 404 for any URL listed in `PRODUCT_MAP.md`.
+
+- *Full pytest green, invariants' tests untouched.* Green in the run above. The tests `CLAUDE.md`
+  names for the invariants keep their checks unchanged (readiness copy in `test_setup.py`,
+  `test_chat_provider_readiness.py`, the accessibility and isolation sweeps). Tests of the old
+  navigation in the same files were rewritten for the new one (the sidebar, *More*, the Routines
+  page). One isolation check, `test_routines.py::TestIsolation::test_another_workspaces_routine_is_not_found_from_here`,
+  is unedited but now reads the Routines page's 301 (empty body), so its page half passes without
+  testing anything; its POST half still does. `test_activity.py::test_activity_never_shows_another_workspaces_routine`
+  makes the same check where the routines are now shown.
+- *12 e2e tests updated to the new routes and green.* By the spec's decision D10 the golden specs
+  stay unedited (no file under `tests/e2e/golden/` changed) and pass because every route they use
+  still answers; the new routes are covered by `tests/e2e/screens/` (navigation, Approvals,
+  Settings, Activity, switches, the public site) on all three devices, and Lighthouse measures
+  Approvals at `/approvals/`. Eleven golden paths pass on all three devices; path 12 stays pending.
+- *No 404 for any URL in `PRODUCT_MAP.md`.* `tests/test_product_map_urls.py` checks every URL in the
+  frozen pre-Phase 2 list and in today's map, as the owner, with every switch off and on: 200,
+  301/302 to a working page, or 403/405 by design. Green.
+
+**Performance: HTML is now compressed.** CI's Lighthouse numbers on this branch read lower than
+main's (Home 98 → 94, Calendar 99 → 95, blocking time and lab INP up). A same-machine comparison of
+main `1b6172f` and `16337e5` (two alternating rounds, three runs each) put blocking time and lab
+INP equal within noise, so most of that gap was CI runner speed. What was real: every page's HTML
+grew by about 11 KB (the new navigation), and pages other than Calendar and Approvals were sent
+**uncompressed** (those two gzip their own: the Calendar since Phase 1, Approvals since its new
+screen in this phase). On `f54d6ea` CI measured Home's LCP at 2,580 ms
+against the 2,500 ms budget and the Lighthouse job failed. Home's largest element is
+server-rendered text, so under slow-4G simulation it waits on the bytes before it, and the page
+itself was 135 KB of them. `HtmlGZipMiddleware` (`ff90678`) gzips HTML pages and HTMX fragments
+for browsers that ask, with Django's BREACH padding, and leaves file downloads, streams and JSON
+as they were ([issue #25](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/25)).
+Same machine, two alternating rounds: Home's document went from 136,860 to 29,732 bytes on the
+wire and its LCP from about 2.75 s to 2.09 s (medians); Approvals and Calendar unchanged. In CI
+on `ff90678` Home's LCP median is 1,433 ms and its score 98, back to main's level.
+
+**Result: passed.** The owner authorized merge and release. Production has been offline since
+31 Oct, so the release waits for it; "make CI required on `main`" is still a setting only the
+owner can change.
+
 ## 31 Oct 2026 — Phase 1: quarantines removed, gate passed
 
 Resumed PR #17 at `d197897` (all nine CI jobs green, four harness races and the
