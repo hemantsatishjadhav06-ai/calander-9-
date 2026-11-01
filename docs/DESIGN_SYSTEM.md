@@ -330,7 +330,7 @@ Sizes: sm `h-8 px-3 text-[13px]`, md `h-9 px-3.5 text-sm`, lg `h-11 px-[18px] te
 
 ### 10.4 Cards and rows
 
-- Card: `rounded-2xl border border-ink-200 bg-white p-5 max-sm:p-4 shadow-xs` (nested and list cards `rounded-xl p-4`). Header: `flex items-baseline justify-between gap-3`; title `text-h2 text-ink-950`; subtitle `mt-0.5 text-[13px]/[18px] text-ink-600`; standalone link right-aligned. Clickable: add `transition-[border-color,box-shadow] duration-150 hover:border-ink-300 hover:shadow-sm` (no transform).
+- Card: `.ui-card` (`rounded-2xl`, a hairline, `shadow-xs`), padded 20px below 1024px and 24px from 1024px; nested and list cards `.ui-card-nested` (`rounded-xl`, 16px). The padding is set in CSS, not by a utility; a `p-0` or `sm:p-6` override still wins outside a rebuilt screen. A screen's sections sit in `.ui-sections`, 32px apart. Header: `flex items-baseline justify-between gap-3`; title `text-h2 text-ink-950`; subtitle `mt-0.5 text-[13px]/[18px] text-ink-600`; standalone link right-aligned. Clickable: add `transition-[border-color,box-shadow] duration-150 hover:border-ink-300 hover:shadow-sm` (no transform).
 - List row: list `divide-y divide-ink-200`; row `flex items-center gap-3 min-h-14 px-4 py-3 hover:bg-ink-25 aria-selected:bg-brand-50`; leading 20–32px status glyph or 44×55 creative thumb (`rounded-[7px] shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]`); title `text-sm font-semibold text-ink-900`; meta `text-xs text-ink-500 tabular-nums`; trailing actions or `size-4 text-ink-400` chevron.
 
 ### 10.5 Status pill, badges, chips
@@ -407,7 +407,7 @@ Overlay `fixed inset-0 bg-ink-950/35`. Dialog `w-full max-w-[560px] rounded-2xl 
 | Page header | `text-h1 text-ink-950` → status line `mt-1.5 text-sm text-ink-600` with `·` separators in ink-400 and underlined links → segmented tabs `mt-5` → content `mt-6`. |
 | Phone top bar | 52px `.translucent-bar sticky top-0`: menu icon, workspace 16/600, spacer, Go to and the bell (`.ui-btn-icon`). The Approvals count is in the phone bar (11.1). Drawer 280px over `bg-ink-950/35`. |
 | Widths | Home, Publish, Approvals, Activity, Settings 1180px (a Settings panel 672–960px); Routines (the form's error page) 960px; Set up 880px; thread column ≤ 720px; Home grid `grid-cols-[minmax(0,1fr)_372px] gap-6` at ≥ 1280px, one column below with Today first only when something waits. |
-| Rhythm | 4px base: 4, 8, 12, 16, 20, 24, 32, 40, 64. Card padding 20 (16 phone); gap between cards 24; section gap 40; group label top margin 18; page padding 32/40 desktop, 24 tablet, 16 phone. |
+| Rhythm | 4px base: 4, 8, 12, 16, 20, 24, 32, 40, 64. Card padding 20 below 1024px, 24 from 1024px (nested 16); gap between cards 24; section gap 40 (32 in a rebuilt screen, `.ui-sections`); group label top margin 18; page padding 32/40 desktop, 24 tablet, 16 phone. **Rebuilt screens space on 8px steps** (Tailwind 2, 4, 6, 8, 10, 12, 16, 20 …): 4px and 12px (1 and 3) only inside a control (`ui-btn`, `ui-input`, `ui-select`, `ui-chip`, `ui-tab`, `ui-pill` or `data-control`) or as the gap of an icon and its label; no `.5` steps, no `px` spacing, no arbitrary value off the 8px grid. `apps/common/tests/test_spacing_grid.py` checks every gated screen's templates (spec D4). |
 | Breakpoints | phone < 640, tablet 640–1023 (sidebar becomes a drawer, 44px targets), desktop ≥ 1024, wide ≥ 1280. |
 
 ### 11.1 Navigation

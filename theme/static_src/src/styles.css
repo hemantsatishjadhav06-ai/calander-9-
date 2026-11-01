@@ -1042,10 +1042,12 @@ span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--te
   .ui-error { margin-top: 6px; display: flex; gap: 6px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--danger-500); }
   .ui-checkbox { width: 16px; height: 16px; border-radius: 4px; accent-color: var(--brand-700); }
 
-  /* Cards: hero cards ui-card (16px radius, 20px padding), list cards ui-card-nested (12px, 16px) */
+  /* Cards: hero cards ui-card (16px radius; 20px padding below 1024px, 24px from 1024px), list cards
+     ui-card-nested (12px, 16px). A screen's sections sit in ui-sections, 32px apart (spec D4). */
   .ui-card { background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-2xl); padding: 20px; box-shadow: var(--shadow-xs); }
   .ui-card-nested { background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 16px; }
-  @media (max-width: 639px) { .ui-card { padding: 16px; } }
+  @media (min-width: 1024px) { .ui-card { padding: 24px; } }
+  .ui-sections { display: flex; flex-direction: column; gap: 32px; }
   .ui-card-link { transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
   .ui-card-link:hover { border-color: var(--border-hover); box-shadow: var(--shadow-sm); }
   .ui-card-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
