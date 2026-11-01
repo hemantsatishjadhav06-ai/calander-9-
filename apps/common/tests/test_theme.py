@@ -218,6 +218,17 @@ def test_an_undeclared_page_says_it_stays_light(client, team, monkeypatch):
 
 
 @pytest.mark.django_db
+def test_the_stays_light_note_is_read_with_the_group(client, team, monkeypatch):
+    # A screen reader moving through the radios hears the note: the group points at it.
+    monkeypatch.setattr(screens, "DARK_READY", frozenset())
+    html = _account_page(client, team).content.decode()
+    group = re.search(r'<fieldset[^>]*\baria-describedby="([^"]+)"[^>]*>\s*<legend[^>]*>Appearance</legend>', html)
+    assert group, "the Appearance group names no description"
+    note = re.search(rf'<p[^>]*\bid="{re.escape(group.group(1))}"[^>]*>([^<]*)</p>', html)
+    assert note and note.group(1).strip() == NOTE
+
+
+@pytest.mark.django_db
 def test_a_declared_page_does_not_say_it_stays_light(client, team, monkeypatch):
     monkeypatch.setattr(screens, "DARK_READY", frozenset({ACCOUNT}))
     response = _account_page(client, team)

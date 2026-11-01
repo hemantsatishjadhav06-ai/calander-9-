@@ -9,9 +9,11 @@ tests/e2e/
   support/     test.ts (test, expect and the fixtures below), harness.ts, axe.ts, network.ts,
                poll.ts (until: read a probe until the worker is done), settled.ts (wait for a swap or a
                fade to finish), nav.ts (move through the navigation the way each device shows it),
-               global-setup.ts (the end-of-run network check)
+               type.ts (expectReadSize: the computed size of named running text, which each rebuilt
+               screen's spec checks), global-setup.ts (the end-of-run network check)
   self/        the harness's own checks (axe helper, network guard, session fixture, phone bar overlap)
-               and theme.spec.ts (Phase 3's Appearance and the head script)
+               and Phase 3's foundations: theme.spec.ts (Appearance and the head script) and
+               foundations.spec.ts (the type floor and the body size on each device)
   golden/      the golden paths, one file each (NN-name.spec.ts)
   screens/     the screens Phase 2 added or moved, one file each (navigation, approvals, settings,
                activity, switches, marketing); docs/specs/02-cut-and-merge.md D10

@@ -831,14 +831,14 @@
 
                     <!-- Appearance: System, Light or Dark, kept on this device by the head script (components/theme_script.html). The menu reads the choice each time it opens, so a choice made in another tab shows here. -->
                     <div class="border-t border-ink-200 mt-1 px-1.5 pt-2 pb-1.5" x-data="{ appearance: 'system' }" x-effect="if (orgMenuOpen) appearance = bbTheme.preference()">
-                        <fieldset>
+                        <fieldset{% if not theme_ready %} aria-describedby="appearance-note"{% endif %}>
                             <legend class="px-1 text-[13px] leading-[18px] font-medium text-ink-600">Appearance</legend>
                             <div class="ui-segmented mt-1.5 flex w-full">
                                 <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="system" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-system">System</label>
                                 <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="light" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-light">Light</label>
                                 <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="dark" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-dark">Dark</label>
                             </div>
-                            {% if not theme_ready %}<p class="mt-1.5 px-1 text-[13px] leading-[18px] text-ink-600">This page stays light for now.</p>{% endif %}
+                            {% if not theme_ready %}<p id="appearance-note" class="mt-1.5 px-1 text-[13px] leading-[18px] text-ink-600">This page stays light for now.</p>{% endif %}
                         </fieldset>
                     </div>
 
@@ -1208,6 +1208,9 @@
             /* The token as rgba with alpha `a`; a value that is not six-digit hex (a stylesheet
                that has not loaded) leaves the fill transparent rather than throwing. */
             function hexToRgba(c, a) {
+                /* The minified stylesheet writes some colours with three hex digits: read both forms. */
+                var short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c);
+                if (short) c = '#' + short[1] + short[1] + short[2] + short[2] + short[3] + short[3];
                 var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c);
                 if (!m) return 'transparent';
                 return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + a + ')';

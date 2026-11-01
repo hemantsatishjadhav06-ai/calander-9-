@@ -126,6 +126,12 @@ test('in dark, the chart draws the dark theme\'s values for the same tokens', ()
   assert.deepEqual(dark.fill, [[0, `rgba(${r},${g},${b},0.08)`], [1, `rgba(${r},${g},${b},0)`]]);
 });
 
+test('a three-digit token, as the minified stylesheet writes one, fills like its six-digit form', () => {
+  // tailwindcss --minify shortens #ffffff to #fff; the chart reads the built stylesheet's value.
+  const { stops } = drawn({ ...LIGHT, '--ink-900': '#fff' });
+  assert.deepEqual(stops, [[0, 'rgba(255,255,255,0.08)'], [1, 'rgba(255,255,255,0)']]);
+});
+
 test('a token that cannot be read leaves the fill transparent instead of breaking the chart', () => {
   const { config, stops } = drawn({});
   assert.equal(config.type, 'line');
