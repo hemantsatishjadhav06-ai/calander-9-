@@ -84,6 +84,7 @@ test('the phone bar’s More opens the drawer; desktop has no phone bar', async 
   const { workspace_a: workspace } = harness.ids;
   await as('owner');
   await page.goto(`/workspace/${workspace}/calendar/`);
+  await axe(page, 'Calendar (owner)');
   if (!isPhone(page)) {
     await expect(page.getByTestId('phone-bar')).toBeHidden();
     await expect(page.getByTestId('phone-bar-more')).toBeHidden();
@@ -119,18 +120,29 @@ test('the notifications bell shows the unread count and opens the drawer', async
   await expect(badge).toHaveCount(1);
   await expect(badge).toHaveText('1');
 
+  await axe(page, 'Home with the bell (editor)');
+
+  // Opening the drawer refreshes the count once: the bell on screen asks, the hidden one does not.
+  const counted: string[] = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/notifications/unread-count/') counted.push(request.url());
+  });
   const loaded = page.waitForResponse(
     (response) => response.request().method() === 'GET' && new URL(response.url()).pathname === '/notifications/drawer/',
   );
+  const refreshed = page.waitForResponse((response) => new URL(response.url()).pathname === '/notifications/unread-count/');
   // From the keyboard, so the bell holds the focus before the drawer opens in every engine (WebKit
   // does not focus a button on a tap).
   await bell.focus();
   await page.keyboard.press('Enter');
   expect((await loaded).status()).toBe(200);
+  expect((await refreshed).status()).toBe(200);
   const drawer = page.getByTestId('notifications-drawer');
   await expect(drawer).toBeVisible();
   await expect(drawer.getByTestId(`notifications-item-${notice.id}`)).toBeVisible();
   await settled(drawer, 'the notifications drawer');
+  // Both bells would ask in the same moment, before either answer arrives.
+  expect(counted, 'one unread-count request per open').toHaveLength(1);
   await axe(page, 'Notifications drawer', { include: '[data-testid="notifications-drawer"]' });
 
   await page.keyboard.press('Escape');
@@ -147,6 +159,7 @@ test('Go to opens with its button and Ctrl/Cmd-K, filters, opens a page with Ent
   const { workspace_a: workspace } = harness.ids;
   await as('owner');
   await page.goto(`/workspace/${workspace}/studio/`);
+  await axe(page, 'Home (owner)');
 
   const button = page.getByTestId('palette-open').filter({ visible: true });
   await expect(button).toHaveCount(1);
@@ -189,6 +202,7 @@ test('Go to opens with its button and Ctrl/Cmd-K, filters, opens a page with Ent
   await expect(page.getByTestId('palette-item-inbox')).toBeFocused();
   await Promise.all([page.waitForURL(`**/workspace/${workspace}/inbox/`), page.keyboard.press('Enter')]);
   await expectLit(page, 'inbox');
+  await axe(page, 'Inbox, opened from Go to');
 
   // Enter in the field opens the first match.
   await page.keyboard.press('ControlOrMeta+k');

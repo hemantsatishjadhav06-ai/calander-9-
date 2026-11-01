@@ -239,6 +239,8 @@ code is (views, templates, services).
   handler; a routine that fails to save comes back on the old routines page
   with its form (400).
 - **Code:** `apps/studio/views_agency.py` (`team_roster`, `team_legacy`),
+  `apps/studio/views_live.py` (`team_page`, the Activity page with its
+  routines section; `team_board`, the board's refresh and Home's strip),
   `apps/studio/urls_agency.py`, `apps/studio/team.py` (the one list of
   agents), `apps/studio/opendots.py` (`task_record`, `control_job`),
   `apps/studio/opendots_views.py`, `apps/studio/live.py` (the live snapshot;
@@ -290,8 +292,8 @@ code is (views, templates, services).
     there), then the client admin itself (invite a client, send or revoke a
     magic link) for a workspace manager.
   - **Approvals** — `/settings/?tab=approvals`: the approval stages and whether
-    dashboard approval is required (`workspaces:approvals_settings`'s form).
-    Workspace owners and managers.
+    dashboard approval is required (`workspaces:approvals_settings`'s form,
+    which comes back to this tab after saving). Workspace owners and managers.
   - **Autopilot** — `/settings/?tab=autopilot`: the whole autopilot form
     (`studio:autopilot`'s): posts per week, accounts, content pillars, the
     weekday and hour to plan, articles per month (with the `blog` switch),
@@ -305,7 +307,8 @@ code is (views, templates, services).
     checklist, the same as `studio:setup`); the free-form routine form (staff);
     **Developers**, a link to the API keys (`api_keys:list`) for the
     organisation's owners and admins only; the danger zone (archive or delete
-    the workspace) for its owner or manager; and, only with the
+    the workspace) for its owner or manager, which comes back to Advanced
+    unless the workspace is archived or deleted; and, only with the
     `advanced_settings` switch, **Verified facts** (`#verified-facts`),
     **Creative memory** (`#creative-memory`) and a link to **Outcomes**, each
     with its page's own check.
@@ -314,8 +317,9 @@ code is (views, templates, services).
   `usable_tabs`; `index`), `apps/studio/urls_settings.py` (mounted in
   `config/urls.py` ahead of the client admin's `/settings/clients/`),
   `apps/studio/settings_links.py` (`tab_url`; `moved`, the 301 an old page
-  answers). Templates `templates/settings/index.html` and
-  `templates/settings/tabs/*.html`, which include the old pages' bodies:
+  answers; `returning_to`, the tab an old handler returns to). Templates
+  `templates/settings/index.html` and `templates/settings/tabs/*.html`,
+  which include the old pages' bodies:
   `studio/partials/brand_profile_form.html`, `autopilot_form.html`,
   `setup_checklist.html`, `verified_facts.html`, `memory_body.html`,
   `social_accounts/partials/_account_list.html`,

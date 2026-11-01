@@ -11,6 +11,10 @@ fired by the same response doesn't tear down the toast before it's seen.
 above_phone_bar: pass nav.phone from a page in the app shell; below 1024px the toasts then rise
 above the phone bar (base.html: 58px and the safe area). The composer and the client portal have
 no phone bar and pass nothing.
+While posts are ticked in the approvals list (calendar/partials/publish_approvals.html sets
+has-approval-selection on body), the toasts rise above its selection bar, so a refused bulk action
+does not cover the bar it came from: 5.5rem on desktop; below 1024px the bar sits 4.5rem and the
+safe area up and is 56px tall, wherever the list is shown.
 {% endcomment %}
 <style nonce="{{ request.csp_nonce }}">
   @keyframes bb-toastPop { from { opacity:0; transform:translateY(8px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
@@ -28,6 +32,8 @@ no phone bar and pass nothing.
   #bb-toast-host { position:fixed; z-index:200; bottom:1.5rem; right:1.5rem; display:flex; flex-direction:column; align-items:flex-end; gap:.5rem; pointer-events:none; }
   @media (max-width: 639px) { #bb-toast-host { left:1rem; right:1rem; bottom:1rem; align-items:stretch; } }
   {% if above_phone_bar %}@media (max-width: 1023px) { #bb-toast-host { bottom: calc(4.5rem + env(safe-area-inset-bottom)); } }{% endif %}
+  body.has-approval-selection #bb-toast-host { bottom: 5.5rem; }
+  @media (max-width: 1023px) { body.has-approval-selection #bb-toast-host { bottom: calc(9rem + env(safe-area-inset-bottom)); } }
   .bb-toast { display:flex; align-items:flex-start; gap:.75rem; max-width:420px; padding:.75rem .875rem; border-radius:var(--radius-xl); background:var(--ink-900); color:#fff; box-shadow:var(--shadow-lg); animation:bb-toastPop 240ms var(--ease-out); pointer-events:auto; }
   .bb-toast-title { font-size:.875rem; font-weight:500; line-height:1.25rem; }
   .bb-toast-body { font-size:.8125rem; color:var(--ink-300); line-height:1.125rem; }

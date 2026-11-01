@@ -7,16 +7,22 @@ select something on it (``?claim=``, ``?open=``) and the section's anchor. POSTs
 A move that lasts only while a switch is on says ``cacheable=False``: browsers keep a 301 for good
 otherwise, and would never see the page again once the switch is turned off.
 
+``returning_to`` is the other way: a form in a Settings tab that posts to an old page's handler
+sends the tab's address as ``next``, and the handler goes back there (only to this workspace's
+Settings screen) instead of to its old page.
+
 This module imports nothing from the views, so every old page can use it without an import cycle.
 """
 
 from __future__ import annotations
 
-from urllib.parse import urlencode
+import re
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from django.http import HttpRequest, HttpResponsePermanentRedirect
 from django.urls import reverse
 from django.utils.cache import add_never_cache_headers
+from django.utils.http import url_has_allowed_host_and_scheme
 
 #: Query values that select something on an old page; they travel with the redirect.
 CARRIED = ("claim", "open")
@@ -46,3 +52,26 @@ def moved(
     if not cacheable:
         add_never_cache_headers(response)
     return response
+
+
+def returning_to(request: HttpRequest, workspace_id) -> str | None:
+    """The Settings tab a form was sent from (its ``next``), or None to keep the handler's own page.
+
+    Only a path on this site to this workspace's Settings screen is taken; anything else (another
+    host, another workspace, another page) is ignored, so the handler answers exactly as it did
+    before. The address is rebuilt from its ``tab`` alone, never echoed back.
+    """
+    destination = request.POST.get("next", "")
+    if not destination or not url_has_allowed_host_and_scheme(
+        destination, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return None
+    parts = urlsplit(destination)
+    if parts.scheme or parts.netloc:
+        return None
+    if parts.path != reverse("settings:index", kwargs={"workspace_id": workspace_id}):
+        return None
+    tab = parse_qs(parts.query).get("tab", [""])[0]
+    if not re.fullmatch(r"[a-z_]{1,32}", tab):
+        return reverse("settings:index", kwargs={"workspace_id": workspace_id})
+    return tab_url(workspace_id, tab)

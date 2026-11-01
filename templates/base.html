@@ -734,8 +734,9 @@
             <nav class="sidebar-nav flex-1 overflow-y-auto pt-1 pb-3 px-3 flex flex-col gap-0.5" :class="sidebarCollapsed ? 'px-2' : 'px-3'" aria-label="Main" data-testid="sidebar-nav">
                 {% block sidebar_nav %}{% spaceless %}
                 {% for item in nav.items %}
-                <a href="{{ item.url }}" data-testid="nav-{{ item.key }}" class="sidebar-nav-item{% if item.active %} active{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}
-                   aria-label="Approvals{% if item.count %}, {{ item.count }} waiting{% endif %}"{% endif %}>
+                {# Every link carries its name (and count) in aria-label: the collapsed sidebar hides the label and the badge. #}
+                <a href="{{ item.url }}" data-testid="nav-{{ item.key }}" class="sidebar-nav-item{% if item.active %} active{% endif %}"{% if item.active %} aria-current="page"{% endif %}
+                   aria-label="{{ item.label }}{% if item.count %}, {{ item.count }}{% if item.key == "approvals" %} waiting{% elif item.key == "inbox" %} unread{% endif %}{% endif %}">
                     {% include "components/nav_icon.html" with key=item.key %}
                     <span class="sidebar-nav-label">{{ item.label }}</span>
                     {% if item.count %}<span class="sidebar-badge{% if item.key == "approvals" %} is-turn{% endif %}">{{ item.count }}</span>{% endif %}
@@ -743,7 +744,7 @@
                 {% endfor %}
                 {% if nav.settings %}
                 <div class="mt-auto" aria-hidden="true"></div>{# the gear sits at the bottom #}
-                <a href="{{ nav.settings.url }}" data-testid="nav-settings" class="sidebar-nav-item{% if nav.settings.active %} active{% endif %}"{% if nav.settings.active %} aria-current="page"{% endif %}>
+                <a href="{{ nav.settings.url }}" data-testid="nav-settings" class="sidebar-nav-item{% if nav.settings.active %} active{% endif %}"{% if nav.settings.active %} aria-current="page"{% endif %} aria-label="{{ nav.settings.label }}">
                     {% include "components/nav_icon.html" with key="settings" %}
                     <span class="sidebar-nav-label">{{ nav.settings.label }}</span>
                 </a>
@@ -876,7 +877,10 @@
                 {% include "components/notifications_bell.html" with bell_class="text-ink-900" %}
             </div>
             <!-- Main content -->
-            <main id="main-content" tabindex="-1" class="relative flex-1 min-w-0 bg-ink-50 px-4 pt-5 pb-12 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-16 overflow-y-auto flex flex-col focus:outline-none">
+            {% comment %}data-phone-bar-scroll (main and the scroller inside it): below 1024px each keeps the phone
+               bar's height clear at the bottom (scroll-padding-bottom, styles.css), so a control focused from the
+               keyboard never scrolls in under the bar (WCAG 2.4.11). Only where the bar shows (nav.phone).{% endcomment %}
+            <main id="main-content" data-testid="main-content" tabindex="-1" class="relative flex-1 min-w-0 bg-ink-50 px-4 pt-5 pb-12 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-16 overflow-y-auto flex flex-col focus:outline-none"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
                 {% block page_header %}{% endblock %}
                 {% if messages %}
                 <div class="mb-5 space-y-2 w-full max-w-[1180px] mx-auto">
@@ -893,7 +897,7 @@
                    window past the app shell into blank canvas.
                    -m-1 p-1: a 4px gutter inside the clip box, so the 2px focus ring at a 2px offset is never
                    cut off on a full-width button, a card or a breadcrumb that touches the edge.{% endcomment %}
-                <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-1 p-1">
+                <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-1 p-1" data-testid="page-scroller"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
                 {% block content %}{% endblock %}
                 {% comment %}
                   Below 1024px the phone bar is fixed along the bottom of the screen. This room at the end
@@ -1018,16 +1022,20 @@
            and one in the phone's top bar; the one on screen polls every 60s while
            the tab is visible, and both refresh at once when a notification is
            marked read anywhere on the page. */
+        /* The bell's unread count. The bell is in the page twice (the sidebar's header and the phone's
+           top bar) and one is always hidden: only the one on screen asks, every minute and when the
+           drawer opens or marks something read, so each refresh costs one request. */
         function notificationBadge(initial) {
             return {
                 count: initial || 0,
                 _timer: null,
                 start() {
                     this._timer = setInterval(() => {
-                        if (!document.hidden && this.$el.getClientRects().length) this.refresh();
+                        if (!document.hidden) this.refresh();
                     }, 60000);
                 },
                 async refresh() {
+                    if (!this.$el.getClientRects().length) return;
                     try {
                         const resp = await fetch('{% url "notifications:unread_count" %}', { credentials: 'same-origin' });
                         if (resp.ok) this.count = (await resp.json()).count;

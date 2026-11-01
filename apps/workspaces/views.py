@@ -4,6 +4,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.accounts.uploads import validate_profile_image
@@ -52,6 +53,15 @@ def workspace_create(request):
     return redirect("calendar:calendar", workspace_id=workspace.id)
 
 
+def _back(request, workspace, page: str):
+    """Where a save or a refusal lands: the Settings tab the form was sent from (Advanced for the
+    danger zone, Approvals for the approvals form) when it names one of this workspace's, else *page*,
+    the handler's own page, as before."""
+    return redirect(
+        settings_links.returning_to(request, workspace.id) or reverse(page, kwargs={"workspace_id": workspace.id})
+    )
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def workspace_settings(request, workspace_id):
@@ -89,7 +99,7 @@ def workspace_settings(request, workspace_id):
             )
             if active_count <= 1:
                 messages.error(request, "Cannot archive the last workspace in the organization.")
-                return redirect("workspaces:settings", workspace_id=workspace.id)
+                return _back(request, workspace, "workspaces:settings")
             workspace.is_archived = True
             workspace.save(update_fields=["is_archived"])
         messages.success(request, f'Workspace "{workspace.name}" has been archived.')
@@ -99,7 +109,7 @@ def workspace_settings(request, workspace_id):
         workspace.is_archived = False
         workspace.save(update_fields=["is_archived"])
         messages.success(request, f'Workspace "{workspace.name}" has been restored.')
-        return redirect("workspaces:settings", workspace_id=workspace.id)
+        return _back(request, workspace, "workspaces:settings")
 
     if action == "delete_workspace" and is_owner_or_manager:
         with transaction.atomic():
@@ -110,7 +120,7 @@ def workspace_settings(request, workspace_id):
             )
             if active_count <= 1 and not workspace.is_archived:
                 messages.error(request, "Cannot delete the last workspace in the organization.")
-                return redirect("workspaces:settings", workspace_id=workspace.id)
+                return _back(request, workspace, "workspaces:settings")
             workspace_name = workspace.name
             workspace.delete()
         messages.success(request, f'Workspace "{workspace_name}" has been permanently deleted.')
@@ -139,19 +149,19 @@ def workspace_settings(request, workspace_id):
         allowed_types = ("image/jpeg", "image/png", "image/webp", "image/gif")
         if icon.content_type not in allowed_types:
             messages.error(request, "Logo must be a JPEG, PNG, WebP, or GIF image.")
-            return redirect("workspaces:settings", workspace_id=workspace.id)
+            return _back(request, workspace, "workspaces:settings")
 
         # Validate file size (2 MB max)
         max_size = 2 * 1024 * 1024
         if icon.size > max_size:
             messages.error(request, "Logo must be under 2 MB.")
-            return redirect("workspaces:settings", workspace_id=workspace.id)
+            return _back(request, workspace, "workspaces:settings")
 
         try:
             icon = validate_profile_image(icon)
         except ValidationError as exc:
             messages.error(request, " ".join(exc.messages))
-            return redirect("workspaces:settings", workspace_id=workspace.id)
+            return _back(request, workspace, "workspaces:settings")
 
         # Delete old icon before saving new one
         if workspace.icon:
@@ -160,7 +170,7 @@ def workspace_settings(request, workspace_id):
 
     workspace.save()
     messages.success(request, "Workspace settings updated.")
-    return redirect("workspaces:settings", workspace_id=workspace.id)
+    return _back(request, workspace, "workspaces:settings")
 
 
 def workspace_settings_context(workspace, membership) -> dict:
@@ -199,14 +209,14 @@ def approvals_settings(request, workspace_id):
         valid_modes = Workspace.ApprovalWorkflowMode.values
         if mode not in valid_modes:
             messages.error(request, "Invalid approval workflow mode.")
-            return redirect("workspaces:approvals_settings", workspace_id=workspace.id)
+            return _back(request, workspace, "workspaces:approvals_settings")
 
         require = request.POST.get("require_dashboard_approval") == "on"
         if require != workspace.require_dashboard_approval and (
             membership.workspace_role != WorkspaceMembership.WorkspaceRole.OWNER
         ):
             messages.error(request, "Only a workspace owner can change whether dashboard approval is required.")
-            return redirect("workspaces:approvals_settings", workspace_id=workspace.id)
+            return _back(request, workspace, "workspaces:approvals_settings")
         if require and mode in (Workspace.ApprovalWorkflowMode.NONE, Workspace.ApprovalWorkflowMode.OPTIONAL):
             # Enforced approval needs a review step to approve in.
             mode = Workspace.ApprovalWorkflowMode.REQUIRED_INTERNAL
@@ -215,7 +225,7 @@ def approvals_settings(request, workspace_id):
         workspace.require_dashboard_approval = require
         workspace.save(update_fields=["approval_workflow_mode", "require_dashboard_approval", "updated_at"])
         messages.success(request, "Approval workflow updated.")
-        return redirect("workspaces:approvals_settings", workspace_id=workspace.id)
+        return _back(request, workspace, "workspaces:approvals_settings")
 
     return render(
         request,

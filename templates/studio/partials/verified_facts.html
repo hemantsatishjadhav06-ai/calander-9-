@@ -4,7 +4,7 @@ studio/trust.html, which includes it, for Settings → Advanced to include as we
 studio:trust (an explicit action, so it never posts to the page that includes it), and each claim's
 "Review or renew" link is claim.edit_url, which the including page sets to reopen itself on that claim.
 Context: workspace, form (BrandClaimForm), claims (each with current and edit_url), photos, can_verify,
-selected_claim.
+selected_claim; heading_level (optional, 2 by default): the level of its headings (Settings → Advanced passes 4).
 {% endcomment %}
 <div class="space-y-8">
 {% if can_verify %}
@@ -12,7 +12,7 @@ selected_claim.
   {% csrf_token %}
   {% if selected_claim %}<input type="hidden" name="claim_id" value="{{ selected_claim.pk }}">{% endif %}
   <div>
-    <h2 id="verify-heading" class="ui-card-title">{% if selected_claim %}Review or renew a claim{% else %}Verify a claim{% endif %}</h2>
+    <h{{ heading_level|default:2 }} id="verify-heading" class="ui-card-title">{% if selected_claim %}Review or renew a claim{% else %}Verify a claim{% endif %}</h{{ heading_level|default:2 }}>
     <p class="ui-card-subtitle">Only claims checked by a person, with a source, are used in posts.</p>
   </div>
   {% if form.non_field_errors %}<div role="alert" class="ui-callout ui-callout-danger text-sm"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><div>{{ form.non_field_errors }}</div></div>{% endif %}
@@ -41,7 +41,7 @@ selected_claim.
 {% endif %}
 
 <section aria-labelledby="claims-heading">
-  <h2 id="claims-heading" class="mb-3 text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Claim records</h2>
+  <h{{ heading_level|default:2 }} id="claims-heading" class="mb-3 text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Claim records</h{{ heading_level|default:2 }}>
   {% if claims %}
   <ul class="ui-card p-0 overflow-hidden divide-y divide-ink-200" aria-label="Claim records">
     {% for claim in claims %}
@@ -71,7 +71,7 @@ selected_claim.
 </section>
 
 <section aria-labelledby="photos-heading">
-  <h2 id="photos-heading" class="mb-3 text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Project photo provenance</h2>
+  <h{{ heading_level|default:2 }} id="photos-heading" class="mb-3 text-[17px]/[22px] font-semibold tracking-[-0.01em] text-ink-950">Project photo provenance</h{{ heading_level|default:2 }}>
   {% if photos %}
   <ul class="grid sm:grid-cols-2 gap-4" aria-label="Photo provenance">
     {% for row in photos %}

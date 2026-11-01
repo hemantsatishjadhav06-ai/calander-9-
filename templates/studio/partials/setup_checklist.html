@@ -2,7 +2,8 @@
 The Set up checklist: one row per step with its state, its link and its one action, then when it was
 checked. Extracted unchanged from studio/setup.html, which includes it, for Settings → Advanced → Health
 to include as well. Actions post to their own handlers, which return to studio:setup.
-Context: rows (views_setup.checklist), checked_at, tzname.
+Context: rows (views_setup.checklist), checked_at, tzname; heading_level (optional, 2 by default): the level
+of each step's heading, one below the heading it sits under (Settings → Advanced → Health passes 4).
 {% endcomment %}
 {% load tz %}
 {# Only the first unfinished step's action is solid; every other step's action is secondary. #}
@@ -14,7 +15,7 @@ Context: rows (views_setup.checklist), checked_at, tzname.
             {% if row.state == 'done' %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>{% elif row.state == 'attention' %}<span class="text-xs font-bold">!</span>{% else %}<span class="text-xs font-semibold tabular-nums">{{ forloop.counter }}</span>{% endif %}
         </span>
         <div class="flex-1 min-w-0 basis-[calc(100%-2.5rem)] sm:basis-auto">
-            <h2 class="text-sm font-semibold text-ink-900">{{ row.title }}<span class="sr-only"> — {% if row.state == 'done' %}done{% elif row.state == 'attention' %}needs attention{% else %}to do{% endif %}</span></h2>
+            <h{{ heading_level|default:2 }} class="text-sm font-semibold text-ink-900">{{ row.title }}<span class="sr-only"> — {% if row.state == 'done' %}done{% elif row.state == 'attention' %}needs attention{% else %}to do{% endif %}</span></h{{ heading_level|default:2 }}>
             <p class="mt-0.5 text-sm text-ink-700 break-words">{{ row.status }}</p>
             {% if row.note %}<p class="text-[13px]/[18px] text-ink-600 mt-1 break-words">{{ row.note }}</p>{% endif %}
             {% if row.detail %}<p class="ui-owner-box mt-2 break-words"><span class="font-semibold text-ink-900">For the owner:</span> {{ row.detail }}</p>{% endif %}

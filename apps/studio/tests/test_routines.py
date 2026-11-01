@@ -8,6 +8,7 @@ provider. Every path here ends with nothing approved, scheduled or published.
 from __future__ import annotations
 
 import datetime as dt
+import re
 import sys
 import threading
 import types
@@ -835,8 +836,14 @@ class TestPage:
         assert 'id="routines"' in html and 'id="activity-routines-heading"' in html
         section = html.index('id="routines"')
         assert section < html.index(_url("studio:routines_run_now", world, routine_id=routine.pk))
-        for word in ("AI Studio", "assistant", "operator", "CTO", "API_KEY"):
-            assert word not in html
+        # The free-form form lives in Settings → Advanced: the same naming rules hold there.
+        advanced = client.get(reverse("settings:index", kwargs={"workspace_id": world.workspace.id}) + "?tab=advanced")
+        form = re.search(r'data-testid="settings-advanced-routine".*?</section>', advanced.content.decode(), re.S)
+        assert advanced.status_code == 200 and form, "the routine form is on Settings → Advanced"
+        assert f'action="{_url("studio:routines_create", world)}"' in form.group(0)
+        for page in (html, form.group(0), advanced.content.decode()):
+            for word in ("AI Studio", "assistant", "operator", "CTO", "API_KEY"):
+                assert word not in page
 
     def test_someone_else_sees_run_now_but_not_pause_or_delete(self, client, world):
         other = make_routine(world, user=world.manager, title="Manager's routine")
@@ -926,6 +933,25 @@ class TestPage:
         )
         assert response.status_code == 302
         assert response["Location"] == _url("studio:team", world) + "#routines"
+
+    def test_controls_on_activity_return_to_its_routines_section(self, client, world):
+        """Run now, Pause and Delete pressed on Activity come back to its Routines section, not the board."""
+        routine = make_routine(world, user=world.editor, title="Mornings")
+        client.force_login(world.editor)
+        activity = _url("studio:team", world) + "#routines"
+
+        html = client.get(_url("studio:team", world)).content.decode()
+
+        for name in ("studio:routines_run_now", "studio:routines_toggle", "studio:routines_delete"):
+            action = _url(name, world, routine_id=routine.pk)
+            form = re.search(r'<form[^>]*action="' + re.escape(action) + r'".*?</form>', html, re.S)
+            assert form, name
+            assert f'name="next" value="{activity}"' in form.group(0), name
+        response = client.post(_url("studio:routines_toggle", world, routine_id=routine.pk), {"next": activity})
+        assert response.status_code == 302 and response["Location"] == activity
+        # Home's rows still come back to Home.
+        home = client.get(_url("studio:index", world)).content.decode()
+        assert f'name="next" value="{_url("studio:index", world)}"' in home
 
     def test_run_now_is_rate_limited(self, client, world, settings, manager_agent, jobs):
         settings.RATELIMIT_ENABLE = True

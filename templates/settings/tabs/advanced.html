@@ -4,7 +4,9 @@ Health is the Set up checklist (studio:setup keeps rendering and its wording); t
 posts to studio:routines_create (create_posts); Verified facts, Creative memory and Outcomes show only
 with the advanced_settings switch on (facts for the agency team, memory with create_posts, outcomes for
 people who record them or read analytics); Developers links to the API keys page for the organisation's
-owners and admins; the danger zone posts to workspaces:settings for a workspace owner or manager.
+owners and admins; the danger zone posts to workspaces:settings for a workspace owner or manager, with this
+tab as next, so what it refuses comes back here. Headings: Advanced is h2 under the page's h1, each section
+h3, and what a section includes one level below it (heading_level), as on its own page.
 Context: views_settings._advanced.
 {% endcomment %}
 <div class="max-w-[960px] min-w-0">
@@ -23,13 +25,13 @@ Context: views_settings._advanced.
         </div>
         {% include "studio/partials/setup_progress.html" %}
         <div class="mt-4">
-            {% include "studio/partials/setup_checklist.html" %}
+            {% include "studio/partials/setup_checklist.html" with heading_level=4 %}
         </div>
     </section>
 
     {% if show_routine_form %}
     <div id="write-a-routine" class="mb-8" data-testid="settings-advanced-routine">
-        {% include "studio/partials/routine_form.html" with form=routine_form %}
+        {% include "studio/partials/routine_form.html" with form=routine_form heading_level=3 %}
     </div>
     {% endif %}
 
@@ -39,7 +41,7 @@ Context: views_settings._advanced.
             <h3 id="settings-facts-title" class="text-h3 text-ink-950">Verified facts and project photos</h3>
             <p class="mt-1 text-sm text-ink-600">Record who checked each claim, its source and review expiry. These are human attestations; collecting a website does not independently verify a commercial claim. Saved brand background notes remain unverified.</p>
         </header>
-        {% include "studio/partials/verified_facts.html" with form=claim_form %}
+        {% include "studio/partials/verified_facts.html" with form=claim_form heading_level=4 %}
     </section>
     {% endif %}
 
@@ -52,7 +54,7 @@ Context: views_settings._advanced.
             </header>
             {% include "studio/partials/memory_actions.html" %}
         </div>
-        {% include "studio/partials/memory_body.html" %}
+        {% include "studio/partials/memory_body.html" with heading_level=4 %}
     </section>
     {% endif %}
 
@@ -82,7 +84,7 @@ Context: views_settings._advanced.
 
     {% if show_danger_zone %}
     <div id="danger-zone" data-testid="settings-advanced-danger">
-        {% include "workspaces/partials/danger_zone.html" %}
+        {% include "workspaces/partials/danger_zone.html" with heading_level=3 return_to=settings_return_url %}
     </div>
     {% endif %}
 </div>

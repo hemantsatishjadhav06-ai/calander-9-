@@ -14,7 +14,10 @@ context and the partial it shows. Adding a tab is adding an entry.
   builders, so a tab costs nothing until it is opened.
 - **Saving stays where it was:** every panel includes its page's own body, and
   every form in it posts to that page's handler with an explicit ``action=``,
-  so a save behaves exactly as before. Nothing is posted to this screen.
+  so a save behaves exactly as before. Nothing is posted to this screen. The
+  approvals form and the danger zone also send the tab as ``next``, so their
+  handlers come back to it (``settings_links.returning_to``) rather than to
+  their old pages.
 - **The old pages moved here:** the Settings hub, the workspace page, the accounts
   list and the client admin answer a 301 to their tab on GET, after their own
   checks (``settings_links.moved``); so do Verified facts and Creative memory
@@ -288,6 +291,9 @@ def index(request, workspace_id):
             "settings_tab": active.key,
             "settings_tab_label": active.label,
             "settings_panel": active.template,
+            # A form that posts to an old page's handler sends this as ``next`` to come back here
+            # (settings_links.returning_to): the approvals form and the danger zone do.
+            "settings_return_url": tab_url(workspace.id, active.key),
         },
     )
     if active.no_store:

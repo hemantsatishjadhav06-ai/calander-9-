@@ -285,21 +285,54 @@ def test_the_approvals_tab_is_the_approvals_settings_form_posting_to_the_old_han
     html = client.get(_settings(world, "approvals")).content.decode()
 
     assert 'data-testid="settings-panel-approvals"' in html
-    assert _form(html, action) == _form(old, action)
+    # The same form, plus where to come back to: the tab (the old page sends no return address).
+    back = f'<input type="hidden" name="next" value="{_settings(world, "approvals")}">'
+    assert back in _form(html, action) and 'name="next"' not in _form(old, action)
+    assert _form(html, action).replace(back, "") == _form(old, action)
     assert f'href="{reverse("members:list")}"' in html
 
 
-def test_saving_approvals_from_the_tab_goes_through_the_old_handler(client, world):
+def test_saving_approvals_from_the_tab_goes_through_the_old_handler_and_returns_to_the_tab(client, world):
     client.force_login(world.owner)
     action = _url("workspaces:approvals_settings", world)
-    assert f'action="{action}"' in client.get(_settings(world, "approvals")).content.decode()
+    tab = _settings(world, "approvals")
+    assert f'action="{action}"' in client.get(tab).content.decode()
 
-    response = client.post(action, {"approval_workflow_mode": "required_internal"})
+    response = client.post(action, {"approval_workflow_mode": "required_internal", "next": tab})
 
     assert response.status_code == 302
-    assert response["Location"] == action
+    assert response["Location"] == tab
     world.workspace.refresh_from_db()
     assert world.workspace.approval_workflow_mode == "required_internal"
+    assert "Approval workflow updated." in client.get(tab).content.decode()
+
+
+def test_saving_approvals_from_the_old_page_still_returns_to_the_old_page(client, world):
+    """No return address (the old page's form), or one outside this workspace's Settings: as before."""
+    client.force_login(world.owner)
+    action = _url("workspaces:approvals_settings", world)
+    other = Workspace.objects.create(organization=world.org, name="Second")
+    WorkspaceMembership.objects.create(user=world.owner, workspace=other, workspace_role="owner")
+    for foreign in (
+        None,
+        "https://evil.example/settings/?tab=approvals",
+        "//evil.example/",
+        reverse("settings:index", kwargs={"workspace_id": other.pk}) + "?tab=approvals",
+        _url("studio:index", world),
+    ):
+        data = {"approval_workflow_mode": "optional", **({"next": foreign} if foreign else {})}
+        response = client.post(action, data)
+        assert response.status_code == 302 and response["Location"] == action, foreign
+
+    # A refusal (a manager may not switch dashboard approval) also comes back to where it was asked.
+    world.workspace.require_dashboard_approval = True
+    world.workspace.save(update_fields=["require_dashboard_approval"])
+    client.force_login(world.manager)
+    tab = _settings(world, "approvals")
+    response = client.post(action, {"approval_workflow_mode": "none", "next": tab})
+    assert response.status_code == 302 and response["Location"] == tab
+    world.workspace.refresh_from_db()
+    assert world.workspace.require_dashboard_approval
 
 
 # --- only the active tab is built --------------------------------------------------

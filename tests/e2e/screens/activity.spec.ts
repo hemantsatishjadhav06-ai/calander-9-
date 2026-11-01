@@ -63,9 +63,10 @@ test('the old Team and Routines pages land on Activity', async ({ page, as, axe,
     expect((await first!.response())?.status(), `${from} moved for good`).toBe(301);
     expect(new URL(page.url()).pathname).toBe(activity);
     await expect(page.getByTestId('activity-board')).toBeVisible();
+    await settled(page.getByTestId('activity-board'), 'the live board');
+    await axe(page, `Activity, from ${from} (editor)`);
   }
   // Routines lands on its section.
   expect(new URL(page.url()).hash).toBe('#routines');
   await expect(page.getByTestId('activity-routines')).toBeInViewport();
-  await axe(page, 'Activity, from the old Routines page (editor)');
 });

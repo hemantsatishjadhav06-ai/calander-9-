@@ -112,11 +112,47 @@ test('Approvals: the selection bar and a toast sit above the phone bar', async (
   const gap = await clearOfTheBar(page, bulk, 'the selection bar');
   if (!isPhone(page)) expect(gap, 'desktop keeps the selection bar 24px from the bottom').toBeCloseTo(DESKTOP_GAP, 0);
 
+  // A toast while posts are selected rises above the selection bar too.
+  const lifted = await approvalToast(page);
+  await clearOfTheBar(page, lifted, 'the approval toast');
+  await above(bulk, lifted, 'the approval toast ends above the selection bar');
+  await axe(page, 'Approvals with a selection and a toast');
+  await page.getByTestId('toast-host').evaluate((host) => host.replaceChildren());
+
   await row.getByTestId('approvals-row-select').uncheck();
   await expect(bulk).toBeHidden();
   const toastGap = await clearOfTheBar(page, await approvalToast(page), 'the approval toast');
   if (!isPhone(page)) expect(toastGap, 'desktop keeps the toast 24px from the bottom').toBeCloseTo(DESKTOP_GAP, 0);
   await axe(page, 'Approvals with a toast');
+});
+
+test('the page keeps the phone bar’s height clear when it scrolls a control into view (WCAG 2.4.11)', async ({
+  page,
+  harness,
+  as,
+  axe,
+}) => {
+  await as('owner');
+  await page.goto(`/workspace/${harness.ids.workspace_a}/settings/?tab=advanced`);
+  await expect(page.getByTestId('settings-panel-advanced')).toBeVisible();
+  await axe(page, 'Settings: Advanced (owner)');
+  // Both scrollers: main (when a page runs over, as the calendar does) and the content inside it.
+  // scroll-padding-bottom is what keeps a control focused from the keyboard out from under the bar.
+  const padding: number[] = [];
+  for (const testid of ['main-content', 'page-scroller']) {
+    const scroller = page.getByTestId(testid);
+    await expect(scroller, `${testid} is on the page`).toHaveCount(1);
+    padding.push(await scroller.evaluate((element) => parseFloat(getComputedStyle(element).scrollPaddingBottom) || 0));
+  }
+  if (!isPhone(page)) {
+    await expect(page.getByTestId('phone-bar'), 'no phone bar on desktop').toBeHidden();
+    expect(padding, 'desktop scrolls as before').toEqual([0, 0]);
+    return;
+  }
+  const bar = await box(page.getByTestId('phone-bar'), 'the phone bar');
+  for (const value of padding) {
+    expect(value, `the scroller keeps the phone bar’s ${bar.height}px clear`).toBeGreaterThanOrEqual(bar.height - 0.5);
+  }
 });
 
 test('Media: the Folders button sits above the phone bar', async ({ page, harness, as, axe }) => {

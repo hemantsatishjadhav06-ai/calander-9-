@@ -2,10 +2,11 @@
 Write a routine in your own words: the free-form form, posted to studio:routines_create. Extracted unchanged
 from studio/routines.html, which still includes it when a routine fails to save (400, with the sentence and
 what was typed), and for Settings → Advanced to include as well.
-Context: workspace, form (title, instruction, cadence, weekday, time as posted), cadences, weekdays, tzname.
+Context: workspace, form (title, instruction, cadence, weekday, time as posted), cadences, weekdays, tzname;
+heading_level (optional, 2 by default): its heading's level (Settings → Advanced passes 3).
 {% endcomment %}
 <section aria-labelledby="new-routine-heading" class="ui-card">
-    <h2 id="new-routine-heading" class="ui-card-title">Write a routine</h2>
+    <h{{ heading_level|default:2 }} id="new-routine-heading" class="ui-card-title">Write a routine</h{{ heading_level|default:2 }}>
     <p class="ui-card-subtitle mb-5">Say what the team should do, as you would in the thread. It runs in your name, at the time you choose ({{ tzname }}).</p>
     <form method="post" action="{% url 'studio:routines_create' workspace_id=workspace.id %}" class="space-y-4" x-data="{ cadence: '{{ form.cadence }}' }">
         {% csrf_token %}

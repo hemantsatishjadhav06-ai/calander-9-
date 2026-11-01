@@ -4,7 +4,7 @@
 {% block content %}
 <div class="w-full max-w-[1180px] mx-auto">
     <div class="flex items-start gap-2 mb-6">
-        <a aria-label="Back to approvals" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&tab=approvals" class="ui-btn ui-btn-icon -ml-2 mt-0.5">
+        <a aria-label="Back to approvals" href="{{ approvals_url }}" class="ui-btn ui-btn-icon -ml-2 mt-0.5">
             <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
         </a>
         <div class="min-w-0">

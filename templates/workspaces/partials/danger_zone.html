@@ -1,17 +1,21 @@
 {% comment %}
 Archive or delete the workspace: the danger zone, posted to workspaces:settings (explicit actions). Extracted
 from workspaces/settings.html, which includes it for a workspace owner or manager, for Settings → Advanced
-to include for the same people. Context: workspace, can_archive, can_delete.
+to include for the same people. Context: workspace, can_archive, can_delete; return_to (optional): the
+Settings tab to come back to when the workspace stays (sent as next); heading_level (optional, 2 by
+default): the level of its title, its two parts one below (Settings → Advanced passes 3). The
+confirmation dialogs keep their own h2: each is a dialog of its own.
 {% endcomment %}
+{% with level=heading_level|default:2 %}{% with part=level|add:1 %}
 <section class="ui-card mt-6" aria-labelledby="workspace-lifecycle-title">
-    <h2 id="workspace-lifecycle-title" class="ui-card-title">Archive or delete</h2>
+    <h{{ level }} id="workspace-lifecycle-title" class="ui-card-title">Archive or delete</h{{ level }}>
 
     <!-- Archive / restore -->
     <div x-data="{ showArchiveModal: false }" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div class="min-w-0">
-            <h3 class="text-h3 text-ink-950">
+            <h{{ part }} class="text-h3 text-ink-950">
                 {% if workspace.is_archived %}Restore this workspace{% else %}Archive this workspace{% endif %}
-            </h3>
+            </h{{ part }}>
             <p class="mt-1 max-w-[52ch] text-sm text-ink-600">
                 {% if workspace.is_archived %}
                 This workspace is archived. Restoring it puts it back in the sidebar for every member.
@@ -27,6 +31,7 @@ to include for the same people. Context: workspace, can_archive, can_delete.
         <form method="POST" action="{% url 'workspaces:settings' workspace_id=workspace.id %}" class="shrink-0">
             {% csrf_token %}
             <input type="hidden" name="action" value="unarchive_workspace">
+            {% if return_to %}<input type="hidden" name="next" value="{{ return_to }}">{% endif %}
             <button type="submit" class="ui-btn ui-btn-secondary">Restore workspace</button>
         </form>
         {% elif can_archive %}
@@ -59,6 +64,7 @@ to include for the same people. Context: workspace, can_archive, can_delete.
                         <form method="POST" action="{% url 'workspaces:settings' workspace_id=workspace.id %}">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="archive_workspace">
+                            {% if return_to %}<input type="hidden" name="next" value="{{ return_to }}">{% endif %}
                             <button type="submit" class="ui-btn ui-btn-primary">Archive workspace</button>
                         </form>
                     </div>
@@ -71,7 +77,7 @@ to include for the same people. Context: workspace, can_archive, can_delete.
     <!-- Delete -->
     <div x-data="{ showDeleteModal: false }" class="mt-5 flex flex-col gap-3 border-t border-ink-200 pt-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div class="min-w-0">
-            <h3 class="text-h3 text-ink-950">Delete this workspace</h3>
+            <h{{ part }} class="text-h3 text-ink-950">Delete this workspace</h{{ part }}>
             <p class="mt-1 max-w-[52ch] text-sm text-ink-600">
                 {% if can_delete %}
                 Removes the workspace and everything in it: posts, connected accounts, media and memberships. This can't be undone.
@@ -118,6 +124,7 @@ to include for the same people. Context: workspace, can_archive, can_delete.
                         <form method="POST" action="{% url 'workspaces:settings' workspace_id=workspace.id %}">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="delete_workspace">
+                            {% if return_to %}<input type="hidden" name="next" value="{{ return_to }}">{% endif %}
                             <button type="submit" class="ui-btn ui-btn-danger">Delete workspace</button>
                         </form>
                     </div>
@@ -127,3 +134,4 @@ to include for the same people. Context: workspace, can_archive, can_delete.
         {% endif %}
     </div>
 </section>
+{% endwith %}{% endwith %}

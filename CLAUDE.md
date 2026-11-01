@@ -226,7 +226,7 @@ uncertain send or delivery is held for a person, never replayed.
 ### `apps/studio` — the agency
 
 - `models.py` — `BrandProfile`; `StudioBrief` (a post in the making) and `StudioConcept`; `AgentRun` (one agent turn: tokens, cost); `AgencyJob` (every other kind of work); `AgencySettings` (autopilot, approvers, budget, creation mode, feature switches); `BrandClaim`; `CampaignOutcome`; `AutopilotWeek`; `CreativeInsight`; `Conversation` and `Message`; `Routine` and `RoutineRun`.
-- `views.py` — Home, create, the post page and its actions, the brand profile. `views_setup.py` — Set up (and the old Settings hub's 301). `views_settings.py` and `urls_settings.py` — the Settings screen at `/workspace/<id>/settings/` (`settings:index`, tabs by `?tab=`; `TABS` is the tab registry, `usable_tabs` the tabs a person may use). `settings_links.py` — `tab_url`, and `moved`, the 301 an old settings page answers after its own checks. `views_routines.py` — routine actions (a GET of the old page answers 301 to Activity). `views_agency.py` — Activity (`studio:team` at `/studio/activity/`, with the routines section; `/studio/team/` answers 301) and job pages. `views_autopilot.py`. `views_chat.py` — threads and inbox drafts. `views_memory.py`, `views_outcomes.py`, `views_trust.py`. `views_customer_workflow.py` — the older endpoints (redirect to Home). `opendots_views.py` — task controls.
+- `views.py` — Home, create, the post page and its actions, the brand profile. `views_setup.py` — Set up (and the old Settings hub's 301). `views_settings.py` and `urls_settings.py` — the Settings screen at `/workspace/<id>/settings/` (`settings:index`, tabs by `?tab=`; `TABS` is the tab registry, `usable_tabs` the tabs a person may use). `settings_links.py` — `tab_url`; `moved`, the 301 an old settings page answers after its own checks; `returning_to`, the tab an old handler goes back to when a Settings tab's form sends it as `next` (only this workspace's Settings). `views_routines.py` — routine actions (a GET of the old page answers 301 to Activity). `views_agency.py` — Activity (`studio:team` at `/studio/activity/`, with the routines section; `/studio/team/` answers 301) and job pages. `views_live.py` — `team_page` (the Activity page: the live board and the routines section) and `team_board` (the board's refresh and Home's "Right now" strip). `views_autopilot.py`. `views_chat.py` — threads and inbox drafts. `views_memory.py`, `views_outcomes.py`, `views_trust.py`. `views_customer_workflow.py` — the older endpoints (redirect to Home). `opendots_views.py` — task controls.
 - `dashboard.py` — Today, the tabs, waiting / at work / week / stats; queries only.
 - `readiness.py` — the one readiness line; its copy never names a setting or a worker.
 - `chat.py` — threads: who may write where, who answers, caps, posting, receipts, `REQUEST_KINDS`.
@@ -265,7 +265,9 @@ uncertain send or delivery is held for a person, never replayed.
   **Settings** is the workspace's one settings screen: Brand, Accounts, Team &
   clients, Approvals, Autopilot, Notifications, Advanced. A person's own
   settings are **Account**. **Set up** keeps its name; Settings → Advanced →
-  **Health** is the same checklist under the same rules.
+  **Health** includes the Set up checklist and follows the same owner-only rule:
+  the exact names to set (environment variables, providers) show to owners only,
+  and everyone else reads "Ask your owner."
 - One sentence per screen on what to do. Status in words: "Waiting for you",
   "The team is working", "Paused: autopilot is off", "Needs your review".
 - No environment-variable names, worker names, token counts, contrast ratios,

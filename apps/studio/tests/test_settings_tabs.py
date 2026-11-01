@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 
 import pytest
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
@@ -273,6 +274,130 @@ def test_the_danger_zone_is_the_workspace_pages_and_posts_there(client, world):
     assert response.status_code == 302 and response["Location"] == reverse("organizations:workspaces")
     world.workspace.refresh_from_db()
     assert world.workspace.is_archived
+
+
+def test_the_danger_zone_returns_to_advanced_when_pressed_there(client, world):
+    """Archive, restore and delete pressed in Advanced come back to Advanced (not Brand) when they stay."""
+    advanced = _settings(world, "advanced")
+    action = _url("workspaces:settings", world)
+    Workspace.objects.create(organization=world.org, name="Second")
+    danger = _section(_get(client, world.owner, world, "advanced").content.decode(), "settings-advanced-danger")
+    forms = re.findall(r'<form[^>]*action="' + re.escape(action) + r'".*?</form>', danger, re.S)
+    assert len(forms) == 2  # archive and delete (each behind its confirmation)
+    for form in forms:
+        assert f'name="next" value="{advanced.replace("&", "&amp;")}"' in form
+
+    # Archiving the last active workspace is refused: the sentence shows on Advanced.
+    Workspace.objects.exclude(pk=world.workspace.pk).delete()
+    response = client.post(action, {"action": "archive_workspace", "next": advanced})
+    assert response.status_code == 302 and response["Location"] == advanced
+    assert "Cannot archive the last workspace" in client.get(advanced).content.decode()
+    response = client.post(action, {"action": "delete_workspace", "next": advanced})
+    assert response.status_code == 302 and response["Location"] == advanced
+    assert Workspace.objects.filter(pk=world.workspace.pk).exists()
+
+    # Restoring an archived workspace stays in Advanced too, where the form now offers archiving.
+    Workspace.objects.filter(pk=world.workspace.pk).update(is_archived=True)
+    restore = _section(_get(client, world.owner, world, "advanced").content.decode(), "settings-advanced-danger")
+    assert (
+        'value="unarchive_workspace"' in restore and f'name="next" value="{advanced.replace("&", "&amp;")}"' in restore
+    )
+    response = client.post(action, {"action": "unarchive_workspace", "next": advanced})
+    assert response.status_code == 302 and response["Location"] == advanced
+    world.workspace.refresh_from_db()
+    assert not world.workspace.is_archived
+
+
+def test_the_danger_zone_ignores_a_return_address_outside_this_workspaces_settings(client, world):
+    """Without a return address, or with one that is not this workspace's Settings, the old page's behaviour."""
+    action = _url("workspaces:settings", world)
+    other = Workspace.objects.create(organization=world.org, name="Second")
+    WorkspaceMembership.objects.create(user=world.owner, workspace=other, workspace_role="owner")
+    client.force_login(world.owner)
+    Workspace.objects.filter(pk=world.workspace.pk).update(is_archived=True)
+    for foreign in (
+        None,
+        "https://evil.example/workspace/settings/",
+        "//evil.example/",
+        reverse("settings:index", kwargs={"workspace_id": other.pk}) + "?tab=advanced",
+        _url("studio:index", world),
+        _url("settings:index", world).rstrip("/") + "x/?tab=advanced",
+    ):
+        data = {"action": "unarchive_workspace", **({"next": foreign} if foreign else {})}
+        response = client.post(action, data)
+        assert response.status_code == 302 and response["Location"] == action, foreign
+        Workspace.objects.filter(pk=world.workspace.pk).update(is_archived=True)
+
+
+# --- Advanced: the heading outline and the owner-only details of Health --------------
+
+
+def _headings(html: str) -> list[tuple[int, str]]:
+    """The panel's headings in document order, as (level, text), modal titles left out."""
+    panel = html[html.index('data-testid="settings-panel-advanced"') : html.index("</main>")]
+    found = []
+    for match in re.finditer(r"<h([1-6])\b([^>]*)>(.*?)</h\1>", panel, re.S):
+        if "ui-modal-title" in match.group(2):
+            continue  # a confirmation dialog starts its own outline
+        found.append((int(match.group(1)), re.sub(r"<[^>]+>|\s+", " ", match.group(3)).strip()))
+    return found
+
+
+def test_advanced_headings_nest_under_their_sections(client, world):
+    """Advanced is h2 under the page's h1; its sections are h3; what each section includes sits below it."""
+    _advanced_on(world)
+    Workspace.objects.create(organization=world.org, name="Second")
+    html = _get(client, world.owner, world, "advanced").content.decode()
+
+    headings = _headings(html)
+    assert headings[0] == (2, "Advanced")
+    sections = {"Health", "Write a routine", "Verified facts and project photos", "Creative memory"}
+    sections |= {"Outcomes", "Developers", "Archive or delete"}
+    assert {text for level, text in headings if level == 3} == sections
+    previous = 2
+    for level, text in headings[1:]:
+        assert level >= 3, f"{text!r} (h{level}) is not below Advanced"
+        assert level <= previous + 1, f"{text!r} (h{level}) skips a level after h{previous}"
+        previous = level
+    # Each section's own headings sit one level below it.
+    after_health = headings[[text for _level, text in headings].index("Health") + 1]
+    assert after_health[0] == 4, after_health
+
+
+def test_advanced_headings_keep_their_own_pages_levels(client, world):
+    """The pages the sections come from keep their outline: their own headings stay h2 under their h1.
+    (With advanced_settings off, so Verified facts and Creative memory answer on their own pages.)"""
+    client.force_login(world.owner)
+    setup = client.get(_url("studio:setup", world)).content.decode()
+    assert re.search(r'<h2 class="text-sm font-semibold text-ink-900">[^<]+<span class="sr-only">', setup)
+    trust = client.get(_url("studio:trust", world)).content.decode()
+    assert re.search(r'<h2 id="claims-heading"[^>]*>Claim records</h2>', trust)
+    memory = client.get(_url("studio:memory", world)).content.decode()
+    assert re.search(r'<h2 id="style-heading" class="ui-card-title">Your house style</h2>', memory)
+    workspace_page = render_to_string(
+        "workspaces/partials/danger_zone.html", {"workspace": world.workspace, "can_archive": True, "can_delete": True}
+    )
+    assert '<h2 id="workspace-lifecycle-title" class="ui-card-title">Archive or delete</h2>' in workspace_page
+    assert re.search(r'<h3 class="text-h3 text-ink-950">\s*Archive this workspace\s*</h3>', workspace_page)
+
+
+def test_advanced_health_shows_the_exact_names_to_owners_only(client, world, settings):
+    """Invariant 9 on Settings → Advanced → Health, as on Set up: owners see what exactly to set; nobody
+    else sees an environment variable, a provider or a model, only that the owner can finish it."""
+    settings.ANTHROPIC_API_KEY = ""
+    settings.FAL_KEY = ""
+    owner = _section(_get(client, world.owner, world, "advanced").content.decode(), "settings-advanced-health")
+    assert "ANTHROPIC_API_KEY" in owner and "FAL_KEY" in owner and "For the owner:" in owner
+
+    banned = ("API_KEY", "FAL", "ANTHROPIC", "OPENROUTER", "STUDIO_MODEL", "STUDIO_PROVIDER", "worker")
+    for user in (world.manager, world.editor, world.viewer, _org_admin(world)):
+        html = _get(client, user, world, "advanced").content.decode()
+        health = _section(html, "settings-advanced-health")
+        assert "Ask your owner." in health, user.email
+        assert "For the owner:" not in html, user.email
+        for word in banned:
+            assert word not in health, (user.email, word)
+            assert word not in html, (user.email, word)
 
 
 # --- Advanced: the power features behind advanced_settings --------------------------

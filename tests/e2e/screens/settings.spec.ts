@@ -73,6 +73,7 @@ test('the owner saves the brand colour from the Brand tab, and the Brand page sh
     'value',
     NEW_PRIMARY.toUpperCase(),
   );
+  await axe(page, 'Settings: Brand after saving (owner)');
 
   expect(network.blocked).toEqual([]);
   expect((await harness.probe<{ hosts: string[] }>('refused_network', { since })).hosts).toEqual([]);

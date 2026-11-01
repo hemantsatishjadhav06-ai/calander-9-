@@ -8,7 +8,11 @@ tear down the toast.
 {% endcomment %}
 {% load tz approval_extras %}
 
-<div x-data="{ selectedPosts: [], diffOpen: false, rejectOpen: false, bulkReason: '' }"
+{% comment %}has-approval-selection on body while posts are ticked: the toast host (approvals/partials/_toasts.html)
+   then rises above the selection bar, as calendar.html does for its own selection; a refresh or another
+   tab removes it with the list (destroy).{% endcomment %}
+<div x-data="{ selectedPosts: [], diffOpen: false, rejectOpen: false, bulkReason: '', destroy() { document.body.classList.remove('has-approval-selection') } }"
+     x-effect="document.body.classList.toggle('has-approval-selection', selectedPosts.length > 0)"
      hx-trigger="approvalAction from:body, bulkActionComplete from:body"
      hx-get="{% url 'calendar:publish_tab_approvals' workspace_id=workspace.id %}?approval_status={{ status_filter }}{% if approval_filter_qs %}&{{ approval_filter_qs }}{% endif %}"
      hx-target="#tab-content" hx-swap="innerHTML"

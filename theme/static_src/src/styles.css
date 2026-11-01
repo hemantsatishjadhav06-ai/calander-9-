@@ -308,6 +308,11 @@
    override them (a borderless field inside the composer, for example). */
 @layer base {
   html { scroll-padding-top: 72px; }   /* WCAG 2.4.11: a focused control never hides under a sticky bar */
+  /* The same at the bottom below 1024px, where the phone bar (base.html) is fixed: the page's scrollers
+     (data-phone-bar-scroll, only where the bar shows) keep its height clear, 58px and the safe area. */
+  @media (max-width: 1023px) {
+    [data-phone-bar-scroll] { scroll-padding-bottom: calc(3.625rem + env(safe-area-inset-bottom)); }
+  }
   body {
     font-family: var(--font-body);
     background: var(--surface-page);

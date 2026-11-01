@@ -2,13 +2,14 @@
 Creative memory: the upload panel, the curator's state, the house style, the references and the
 best-performing posts. Extracted unchanged from studio/memory.html, which includes it, for Settings →
 Advanced to include as well. Every form posts to its own studio:memory_* handler. The including element
-carries x-data="{ upload: … }". Context: views_memory.memory_context.
+carries x-data="{ upload: … }". Context: views_memory.memory_context; heading_level (optional, 2 by
+default): the level of its headings (Settings → Advanced passes 4).
 {% endcomment %}
 {% load tz %}
 {# ---- Upload references ---- #}
 {% if can_upload %}
 <section id="upload-panel" x-show="upload" x-cloak aria-labelledby="upload-heading" class="ui-card mb-6">
-    <h2 id="upload-heading" class="ui-card-title">Add your best designer's work</h2>
+    <h{{ heading_level|default:2 }} id="upload-heading" class="ui-card-title">Add your best designer's work</h{{ heading_level|default:2 }}>
     <p class="ui-card-subtitle mb-4">Up to six JPEG, PNG or WebP pictures. The team copies their feel — light, palette, layout — never the exact image.</p>
     <form method="post" enctype="multipart/form-data" action="{% url 'studio:memory_upload' workspace_id=workspace.id %}" class="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-4 items-end" x-data="{ busy: false }" x-on:submit="busy = true">
         {% csrf_token %}
@@ -47,7 +48,7 @@ carries x-data="{ upload: … }". Context: views_memory.memory_context.
 <section aria-labelledby="style-heading" class="ui-card" x-data="{ editing: {% if open_style %}true{% else %}false{% endif %} }">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
-            <h2 id="style-heading" class="ui-card-title">Your house style</h2>
+            <h{{ heading_level|default:2 }} id="style-heading" class="ui-card-title">Your house style</h{{ heading_level|default:2 }}>
             <p class="ui-card-subtitle">As the prompt engineer understands it.</p>
         </div>
         {% if can_edit_style %}
@@ -83,7 +84,7 @@ carries x-data="{ upload: … }". Context: views_memory.memory_context.
 <section aria-labelledby="refs-heading" class="ui-card">
     <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
-            <h2 id="refs-heading" class="ui-card-title">Your best designer's work</h2>
+            <h{{ heading_level|default:2 }} id="refs-heading" class="ui-card-title">Your best designer's work</h{{ heading_level|default:2 }}>
             <p class="ui-card-subtitle">Picked by you. The team copies the feel, never the exact image.</p>
         </div>
         <span class="ui-badge h-6 px-2.5 text-xs">{{ reference_count }} reference{{ reference_count|pluralize }}</span>
@@ -123,7 +124,7 @@ carries x-data="{ upload: … }". Context: views_memory.memory_context.
 {# ---- Best performers ---- #}
 <section aria-labelledby="best-heading" class="ui-card">
     <div class="mb-4">
-        <h2 id="best-heading" class="ui-card-title">Best-performing posts</h2>
+        <h{{ heading_level|default:2 }} id="best-heading" class="ui-card-title">Best-performing posts</h{{ heading_level|default:2 }}>
         <p class="ui-card-subtitle">Compared with the same account's typical result; posts are at least three days old. Mark any as a designer reference.</p>
         <details class="group/rank mt-1 text-xs text-ink-600">
             <summary class="inline-flex min-h-8 max-lg:min-h-11 cursor-pointer list-none items-center gap-1 rounded-md font-medium text-ink-700 hover:text-ink-900 [&::-webkit-details-marker]:hidden">How posts are ranked<svg class="w-3.5 h-3.5 text-ink-500 transition-transform group-open/rank:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>

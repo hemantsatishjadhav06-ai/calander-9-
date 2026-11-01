@@ -46,7 +46,7 @@ nothing swaps nothing, and only meaningful changes are announced in #team-live-a
         <div class="grid xl:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
             <div class="ui-card p-0 overflow-hidden min-w-0">
                 {% if section.routines %}
-                {% include "studio/partials/routine_rows.html" with routines=section.routines workspace=workspace can_manage=section.can_manage %}
+                {% include "studio/partials/routine_rows.html" with routines=section.routines workspace=workspace can_manage=section.can_manage next_url=request.path|add:"#routines" %}
                 {% else %}
                 <div class="ui-empty">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>

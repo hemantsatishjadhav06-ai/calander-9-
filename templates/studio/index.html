@@ -82,7 +82,7 @@
                         </li>
                         {% endfor %}
                     </ul>
-                    {% if today.waiting_count > 3 %}<p class="text-xs text-ink-600 pt-1">and {{ today.waiting_count|add:"-3" }} more · <a class="link-inline font-medium" href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=approvals">Open approvals</a></p>{% endif %}
+                    {% if today.waiting_count > 3 %}<p class="text-xs text-ink-600 pt-1">and {{ today.waiting_count|add:"-3" }} more · <a class="link-inline font-medium" href="{% url 'approvals:index' workspace_id=workspace.id %}">Open approvals</a></p>{% endif %}
                     {% endif %}
 
                     {% if today.going_out %}

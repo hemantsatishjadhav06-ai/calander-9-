@@ -108,8 +108,11 @@ class ShellA11yTests(TestCase):
         }
         labels = [self._link_text(testid) for testid in moved]
         self.assertEqual(labels, list(moved.values()))
+        # The old title-case labels are nowhere on the page (not only absent from these three links);
+        # HTML comments are markup notes nobody sees (base.html marks its idea modal with one).
+        page = re.sub(r"<!--.*?-->", "", self.html, flags=re.S)
         for old in ("Create Idea", "Posting Schedule", "Import CSV"):
-            self.assertNotIn(old, labels)
+            self.assertNotIn(old, page)
         self.assertIn('<h2 class="text-h2 text-ink-950">New idea</h2>', self.html)
         kw = {"workspace_id": self.ws.id}
         pages = {

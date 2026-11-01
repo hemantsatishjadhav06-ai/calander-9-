@@ -1,8 +1,10 @@
 {% comment %}Who has to say yes before a post goes out: the form and where reviewers are managed. Included by
 the approvals settings page and by Settings → Approvals; the form posts to workspaces:approvals_settings
-either way. Context: workspace, is_owner_or_manager, is_owner, approval_modes.{% endcomment %}
+either way. Context: workspace, is_owner_or_manager, is_owner, approval_modes; return_to (optional): the
+Settings tab to come back to after saving (sent as next; the old page sends none and comes back to itself).{% endcomment %}
 <form method="POST" action="{% url 'workspaces:approvals_settings' workspace_id=workspace.id %}" x-data="{ mode: '{{ workspace.approval_workflow_mode }}' }">
     {% csrf_token %}
+    {% if return_to %}<input type="hidden" name="next" value="{{ return_to }}">{% endif %}
 
     <section class="ui-card" aria-labelledby="approval-mode-title">
         <h2 id="approval-mode-title" class="ui-card-title">Review before posting</h2>

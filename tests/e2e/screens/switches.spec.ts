@@ -26,6 +26,7 @@ test('the Blog item shows only while the blog switch is on', async ({ page, as, 
   await expect(page.getByTestId('nav-activity')).toBeAttached();
   await expect(page.getByTestId('nav-blog')).toHaveCount(0);
   await expect(page.getByTestId('palette-item-blog')).toHaveCount(0);
+  await axe(page, 'Home without Blog (owner, switch off)');
 
   expect((await switches({ blog: true })).features.blog).toBe(true);
   await page.reload();
