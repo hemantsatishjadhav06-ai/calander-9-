@@ -38,20 +38,6 @@ FIXTURE = """
 """
 
 
-def _failures(sheet: contrast.Sheet, theme: str) -> list[str]:
-    values = sheet.theme(theme)
-    failures = []
-    for pair in contrast.PAIRS:
-        try:
-            result = contrast.measure(pair, values)
-        except (LookupError, ValueError) as error:
-            failures.append(f"{pair.label}: cannot resolve ({error})")
-            continue
-        if not result.passed:
-            failures.append(f"{pair.label}: {result.fg} on {result.bg} {result.ratio:.2f}:1 < {pair.needs}:1")
-    return failures
-
-
 @pytest.fixture(scope="module")
 def sheet() -> contrast.Sheet:
     return contrast.load()
@@ -111,7 +97,7 @@ def test_the_sticky_bar_blends_as_section_23_did(sheet):
 
 def test_a_pair_under_its_bar_fails(sheet):
     broken = replace(sheet, dark={**sheet.dark, "--ink-500": "#FFFFFF", "--ink-0": "#FFFFFF"})
-    assert any("tertiary ink-500 on card ink-0" in line for line in _failures(broken, "dark"))
+    assert any("tertiary ink-500 on card ink-0" in line for line in contrast.problems(broken, "dark"))
 
 
 # (c) Every pair passes in both themes.
@@ -120,11 +106,50 @@ def test_a_pair_under_its_bar_fails(sheet):
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_every_pair_passes(sheet, theme):
     assert sheet.dark, "no :root[data-theme=dark] block"
-    assert _failures(sheet, theme) == []
+    assert contrast.problems(sheet, theme) == []
 
 
 def test_the_checker_exits_cleanly(capsys):
     assert contrast.main([]) == 0, capsys.readouterr().err
+
+
+def test_status_icons_are_paired_with_every_surface_and_their_chip():
+    """3:1 for status-500 icons on every surface (plan T2), as the control border and the focus ring are."""
+    checked = {(pair.fg, pair.bg) for pair in contrast.PAIRS if pair.needs == contrast.NON_TEXT}
+    missing = [
+        f"--{status}-500 on {bg}"
+        for status in contrast.STATUSES
+        for bg in (*(token for _, token in contrast.SURFACES), f"--{status}-50")
+        if (f"--{status}-500", bg) not in checked
+    ]
+    assert missing == []
+
+
+@pytest.mark.parametrize(
+    ("surface", "status", "label"),
+    [
+        ("--brand-50", "--warning-500", "warning-500 icon on selected row brand-50"),
+        ("--ink-100", "--danger-500", "danger-500 icon on sidebar ink-100"),
+    ],
+)
+def test_a_status_icon_under_its_bar_on_any_surface_fails(sheet, surface, status, label):
+    broken = replace(sheet, dark={**sheet.dark, surface: sheet.dark[status]})
+    assert any(label in line for line in contrast.problems(broken, "dark"))
+
+
+def test_the_one_light_exception_is_named_pinned_and_held_in_dark(sheet):
+    """success-500 on ink-100 was 2.93:1 in light before F1 and light must not move; dark holds it."""
+    excepted = [pair for pair in contrast.PAIRS if pair.light_exception]
+    assert list(contrast.LIGHT_EXCEPTIONS) == [("--success-500", "--ink-100")]
+    assert [(pair.fg, pair.bg) for pair in excepted] == list(contrast.LIGHT_EXCEPTIONS)  # each used once
+    pair = excepted[0]
+    light = contrast.measure(pair, sheet.theme("light"))
+    assert not light.passed
+    assert f"{light.ratio:.2f}:1" in pair.light_exception  # the reason quotes today's light ratio
+    assert contrast.measure(pair, sheet.theme("dark")).passed
+    assert not any(pair.label in line for line in contrast.problems(sheet, "light"))
+    broken = replace(sheet, dark={**sheet.dark, "--ink-100": sheet.dark["--success-500"]})
+    assert any(pair.label in line for line in contrast.problems(broken, "dark"))
 
 
 # (d) The media block and the attribute block declare the same properties with the same values.

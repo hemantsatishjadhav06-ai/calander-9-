@@ -149,13 +149,11 @@ class Sheet:
         return {**self.layer1, **self.layer2}
 
     def theme(self, name: str) -> dict[str, str]:
-        """The declarations ``<html>`` holds in ``light``, ``dark`` or ``dark-media``."""
+        """The declarations ``<html>`` holds in ``light`` or ``dark`` (the media block must equal it)."""
         if name == "light":
             return self.light
         if name == "dark":
             return {**self.light, **self.dark}
-        if name == "dark-media":
-            return {**self.light, **self.dark_media}
         raise KeyError(name)
 
     def layer1_names(self) -> list[str]:
@@ -385,6 +383,12 @@ class Pair:
     fg: str
     bg: str
     needs: float
+    #: Why light is not held to *needs* (``LIGHT_EXCEPTIONS``); empty for every other pair.
+    light_exception: str = ""
+
+    def held_in(self, theme: str) -> bool:
+        """Whether *theme* is held to the bar: always in dark, in light unless excepted."""
+        return not (theme == "light" and self.light_exception)
 
 
 TEXT, LARGE = 4.5, 3.0
@@ -414,6 +418,14 @@ TEXT_ROLES: tuple[tuple[str, str], ...] = (
 #: Tertiary text is not allowed on the translucent bar (§23 shows why).
 STICKY_ROLES = tuple(role for role in TEXT_ROLES if role[1] != "--ink-500")
 STATUSES = ("success", "warning", "danger", "info")
+#: Pairs held in dark only, each with its reason. Light was under the bar before F1 and light must
+#: not move (spec D2); the reason quotes the light ratio, and the contrast test holds it to the
+#: measurement, so light cannot drift unseen.
+LIGHT_EXCEPTIONS: dict[tuple[str, str], str] = {
+    ("--success-500", "--ink-100"): (
+        "light pre-existing, 2.93:1; a success icon never sits on the sidebar ink-100 or a neutral chip"
+    ),
+}
 
 
 def _pairs() -> tuple[Pair, ...]:
@@ -478,8 +490,10 @@ def _pairs() -> tuple[Pair, ...]:
             )
         )
     for status in STATUSES:
-        for surface, bg in (*SURFACES[:3], (f"{status}-50 chip", f"--{status}-50")):
-            add(Pair(group, f"{status}-500 icon on {surface}", f"--{status}-500", bg, NON_TEXT))
+        fg = f"--{status}-500"
+        for surface, bg in (*SURFACES, (f"{status}-50 chip", f"--{status}-50")):
+            exception = LIGHT_EXCEPTIONS.get((fg, bg), "")
+            add(Pair(group, f"{status}-500 icon on {surface}", fg, bg, NON_TEXT, exception))
     return tuple(pairs)
 
 
@@ -527,6 +541,23 @@ def measure(pair: Pair, values: Mapping[str, str]) -> Result:
 def check(sheet: Sheet, theme: str, pairs: Sequence[Pair] = PAIRS) -> list[Result]:
     values = sheet.theme(theme)
     return [measure(pair, values) for pair in pairs]
+
+
+def problems(sheet: Sheet, theme: str, pairs: Sequence[Pair] = PAIRS) -> list[str]:
+    """Each pair *theme* holds that cannot be resolved or is under its bar, one line per pair."""
+    values = sheet.theme(theme)
+    lines = []
+    for pair in pairs:
+        if not pair.held_in(theme):
+            continue
+        try:
+            result = measure(pair, values)
+        except (LookupError, ValueError) as error:
+            lines.append(f"{pair.label}: cannot resolve {error}")
+            continue
+        if not result.passed:
+            lines.append(f"{pair.label}: {result.fg} on {result.bg} {_ratio(result.ratio)} < {_ratio(pair.needs)}")
+    return lines
 
 
 # ── Structure (the light scope, the two dark blocks, a dark value for every token) ──────────────
@@ -622,15 +653,27 @@ def markdown(sheet: Sheet) -> str:
                 "| Pair | Needs | Light | Ratio | Dark | Ratio | Result |",
                 "|---|---:|---|---:|---|---:|---|",
             ]
-        passed = light_result.passed and dark_result.passed
+        held = [result for theme, result in (("light", light_result), ("dark", dark_result)) if pair.held_in(theme)]
+        verdict = "PASS" if all(result.passed for result in held) else "FAIL"
+        if pair.light_exception:
+            verdict += f" in dark; light excepted: {pair.light_exception}"
         lines.append(
             f"| {pair.label} | {_ratio(pair.needs)} "
             f"| `{light_result.fg}` on `{light_result.bg}` | {_ratio(light_result.ratio)} "
             f"| `{dark_result.fg}` on `{dark_result.bg}` | {_ratio(dark_result.ratio)} "
-            f"| {'PASS' if passed else 'FAIL'} |"
+            f"| {verdict} |"
         )
-    failures = sum(not result.passed for result in (*light_results, *dark_results))
-    lines += ["", f"Pairs checked: {len(PAIRS)} in each theme; failures: {failures}."]
+    failures = sum(
+        not result.passed
+        for theme, results in (("light", light_results), ("dark", dark_results))
+        for result in results
+        if result.pair.held_in(theme)
+    )
+    excepted = sum(bool(pair.light_exception) for pair in PAIRS)
+    lines += [
+        "",
+        f"Pairs checked: {len(PAIRS)} in each theme; failures: {failures}; excepted in light only: {excepted}.",
+    ]
     return "\n".join(lines)
 
 
@@ -642,28 +685,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     sheet = load(args.css.read_text(encoding="utf-8"))
     if args.markdown:
         print(markdown(sheet))
-    problems: list[str] = []
-    for theme in ("light", "dark"):
-        values = sheet.theme(theme)
-        for pair in PAIRS:
-            try:
-                result = measure(pair, values)
-            except (LookupError, ValueError) as error:
-                problems.append(f"{theme}: {pair.label}: cannot resolve {error}")
-                continue
-            if not result.passed:
-                problems.append(
-                    f"{theme}: {pair.label}: {result.fg} on {result.bg} {_ratio(result.ratio)} < {_ratio(pair.needs)}"
-                )
-    problems += [f"dark: no dark value for {name}" for name in missing_dark_values(sheet)]
+    found = [f"{theme}: {line}" for theme in ("light", "dark") for line in problems(sheet, theme)]
+    found += [f"dark: no dark value for {name}" for name in missing_dark_values(sheet)]
     if sheet.dark_media != sheet.dark:
-        problems.append("the media block and the attribute block differ")
-    problems += [f"light scope: {line}" for line in scope_differences(sheet)]
-    for problem in problems:
+        found.append("the media block and the attribute block differ")
+    found += [f"light scope: {line}" for line in scope_differences(sheet)]
+    for problem in found:
         print(problem, file=sys.stderr)
     if not args.markdown:
-        print(f"{len(PAIRS)} pairs in each theme; {len(problems)} problems.")
-    return 1 if problems else 0
+        print(f"{len(PAIRS)} pairs in each theme; {len(found)} problems.")
+    return 1 if found else 0
 
 
 if __name__ == "__main__":

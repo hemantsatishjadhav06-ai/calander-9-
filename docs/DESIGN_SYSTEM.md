@@ -570,7 +570,7 @@ Light is what everyone sees until a page is declared ready: a page turns dark on
 - Success leans a little toward leaf-yellow in dark (hue 142, 500 and 600 lighter), so Pine and an "Approved" chip's text stay 14.0 apart (OKLab ΔE ×100; 14.2 in light, §3.5).
 - The 300 steps keep their light values. Their role is text and icons on the inverse surface (toast detail ink-300, toast action brand-300, the status icons on a toast, *Delete* and *Reject all* in danger-300 on the selection bars), and that surface stays dark in both themes.
 - `--surface-inverse` in dark is ink-200 `#2A2E34`, a raised dark grey, so a toast or tooltip still stands off the canvas (1.41:1) and the cards (1.32:1). Because ink-300 must read on it (4.58:1), ink-300 is a text-grade grey in dark: a secondary button's edge, a hover edge and a table header rule read stronger than in light (6.03:1 on a card, against 1.52:1). ink-400 and ink-500 sit just above it, so the order 300 < 400 < 500 holds.
-- Status icons are checked on the card, row hover, canvas and their own chip, as §23 checked them. In light, success-500 on ink-100 is 2.93:1, so a status icon never sits on the sidebar or a neutral chip.
+- Status icons are checked on every surface and on their own chip, as the control edge and the focus ring are. One pair is held in dark only and named in the checker's `LIGHT_EXCEPTIONS`: success-500 on the sidebar ink-100 is 2.93:1 in light, as it was before dark mode, and light must not move (7.37:1 in dark). So a success icon never sits on the sidebar or a neutral chip; the other three statuses read on ink-100 in both themes.
 - Not yet measured in dark: §23's colour-vision tables. For normal vision, the closest pair of status icons is info-500 against ink-500 at 8.9 (OKLab ΔE ×100); the simulation was not re-run.
 
 **New tokens.** Their light values are exactly what they replace, so light cannot move (the contrast test checks it).
@@ -771,21 +771,29 @@ Light is what everyone sees until a page is declared ready: a page turns dark on
 | success-500 icon on card ink-0 | 3.00:1 | `#429E4A` on `#FFFFFF` | 3.38:1 | `#6AC361` on `#14171C` | 8.20:1 | PASS |
 | success-500 icon on sheet ink-25 | 3.00:1 | `#429E4A` on `#FBFCFD` | 3.29:1 | `#6AC361` on `#191C20` | 7.81:1 | PASS |
 | success-500 icon on canvas ink-50 | 3.00:1 | `#429E4A` on `#F6F7F8` | 3.15:1 | `#6AC361` on `#0C0F13` | 8.77:1 | PASS |
+| success-500 icon on sidebar ink-100 | 3.00:1 | `#429E4A` on `#EDEFF2` | 2.93:1 | `#6AC361` on `#1E2127` | 7.37:1 | PASS in dark; light excepted: light pre-existing, 2.93:1; a success icon never sits on the sidebar ink-100 or a neutral chip |
+| success-500 icon on selected row brand-50 | 3.00:1 | `#429E4A` on `#EFFAF5` | 3.16:1 | `#6AC361` on `#12261F` | 7.25:1 | PASS |
 | success-500 icon on success-50 chip | 3.00:1 | `#429E4A` on `#EDFCED` | 3.17:1 | `#6AC361` on `#162614` | 7.26:1 | PASS |
 | warning-500 icon on card ink-0 | 3.00:1 | `#9B5A00` on `#FFFFFF` | 5.45:1 | `#E19A3D` on `#14171C` | 7.61:1 | PASS |
 | warning-500 icon on sheet ink-25 | 3.00:1 | `#9B5A00` on `#FBFCFD` | 5.30:1 | `#E19A3D` on `#191C20` | 7.24:1 | PASS |
 | warning-500 icon on canvas ink-50 | 3.00:1 | `#9B5A00` on `#F6F7F8` | 5.08:1 | `#E19A3D` on `#0C0F13` | 8.13:1 | PASS |
+| warning-500 icon on sidebar ink-100 | 3.00:1 | `#9B5A00` on `#EDEFF2` | 4.73:1 | `#E19A3D` on `#1E2127` | 6.83:1 | PASS |
+| warning-500 icon on selected row brand-50 | 3.00:1 | `#9B5A00` on `#EFFAF5` | 5.10:1 | `#E19A3D` on `#12261F` | 6.72:1 | PASS |
 | warning-500 icon on warning-50 chip | 3.00:1 | `#9B5A00` on `#FFF7EB` | 5.12:1 | `#E19A3D` on `#2E200F` | 6.69:1 | PASS |
 | danger-500 icon on card ink-0 | 3.00:1 | `#991618` on `#FFFFFF` | 8.46:1 | `#ED756A` on `#14171C` | 6.29:1 | PASS |
 | danger-500 icon on sheet ink-25 | 3.00:1 | `#991618` on `#FBFCFD` | 8.24:1 | `#ED756A` on `#191C20` | 5.99:1 | PASS |
 | danger-500 icon on canvas ink-50 | 3.00:1 | `#991618` on `#F6F7F8` | 7.89:1 | `#ED756A` on `#0C0F13` | 6.73:1 | PASS |
+| danger-500 icon on sidebar ink-100 | 3.00:1 | `#991618` on `#EDEFF2` | 7.34:1 | `#ED756A` on `#1E2127` | 5.65:1 | PASS |
+| danger-500 icon on selected row brand-50 | 3.00:1 | `#991618` on `#EFFAF5` | 7.92:1 | `#ED756A` on `#12261F` | 5.56:1 | PASS |
 | danger-500 icon on danger-50 chip | 3.00:1 | `#991618` on `#FFF3F1` | 7.79:1 | `#ED756A` on `#341916` | 5.67:1 | PASS |
 | info-500 icon on card ink-0 | 3.00:1 | `#035A7B` on `#FFFFFF` | 7.63:1 | `#57A9D2` on `#14171C` | 6.85:1 | PASS |
 | info-500 icon on sheet ink-25 | 3.00:1 | `#035A7B` on `#FBFCFD` | 7.43:1 | `#57A9D2` on `#191C20` | 6.52:1 | PASS |
 | info-500 icon on canvas ink-50 | 3.00:1 | `#035A7B` on `#F6F7F8` | 7.11:1 | `#57A9D2` on `#0C0F13` | 7.33:1 | PASS |
+| info-500 icon on sidebar ink-100 | 3.00:1 | `#035A7B` on `#EDEFF2` | 6.62:1 | `#57A9D2` on `#1E2127` | 6.15:1 | PASS |
+| info-500 icon on selected row brand-50 | 3.00:1 | `#035A7B` on `#EFFAF5` | 7.14:1 | `#57A9D2` on `#12261F` | 6.06:1 | PASS |
 | info-500 icon on info-50 chip | 3.00:1 | `#035A7B` on `#EFF8FD` | 7.09:1 | `#57A9D2` on `#12242E` | 6.08:1 | PASS |
 
-Pairs checked: 126 in each theme; failures: 0.
+Pairs checked: 134 in each theme; failures: 0; excepted in light only: 1.
 
 ## 22. White-label guard
 
