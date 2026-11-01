@@ -1860,7 +1860,10 @@ Links already sent can never be updated, so every one of these paths must keep a
 
 ```python
 @pytest.fixture
-def seeded(db): from tests.e2e.server import seed; return seed.run()
+def seeded(db):
+    from tests.e2e.server import seed
+
+    return seed.run()
 ```
 
 Workspace A is `00000000-…-0a`, and its owner is already a member there. `g1._routes(get_resolver().url_patterns)` and `g1._methods(view)` give each pattern's view and the methods it accepts.
