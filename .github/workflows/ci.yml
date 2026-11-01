@@ -376,13 +376,43 @@ jobs:
           echo "E2E shards: $SHARDS"
           test "$SHARDS" = "success"
 
+  visual-baselines-present:
+    name: Visual (look for baselines)
+    # Whether any baseline is committed yet. GitHub does not offer hashFiles() in a job's `if`, so the
+    # Visual job below reads this job's answer instead.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      present: ${{ steps.look.outputs.present }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Look for a PNG under tests/e2e/__screenshots__/
+        id: look
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$(find tests/e2e/__screenshots__ -type f -name '*.png' -print -quit 2>/dev/null)" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Visual (Playwright) skipped::No baseline is committed under tests/e2e/__screenshots__/ yet, so there is nothing to compare. The first visual: commit (the shell, at the foundations gate) turns the comparison on."
+          fi
+
   visual:
     name: Visual (Playwright)
-    # Playwright 1.56.1 supports this image; ubuntu-latest moved to 26.04.
-    runs-on: ubuntu-24.04
     # tests/e2e/visual/ against the baselines committed under tests/e2e/__screenshots__/ (spec D9), on
     # the three projects; it compares and never writes (no E2E_UPDATE_BASELINES). Baselines come from
     # .github/workflows/visual-baselines.yml. Every gate records this job's wall time too.
+    # It runs only once a baseline is committed (a PNG under tests/e2e/__screenshots__/, found by the job
+    # above) and is skipped with a notice before the first `visual:` commit; from then on a missing or
+    # changed image fails it.
+    needs: [visual-baselines-present]
+    if: needs.visual-baselines-present.outputs.present == 'true'
+    # Playwright 1.56.1 supports this image; ubuntu-latest moved to 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       CI: "1"

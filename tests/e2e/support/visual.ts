@@ -10,7 +10,9 @@
 // VISUAL_INSTANT (the `visual_clock` fixture, tests/e2e/server/steps/visual.py) and the browser's with
 // page.clock; the visual workspace is put back to the same rows on every call; what still prints the
 // real date or a time relative to it carries `data-visual-dynamic` in the template and is masked
-// here, and so is the phone bar when a locator's box reaches under it.
+// here, and so is the phone bar when a locator's box reaches under it. Nothing moves while it is
+// photographed: visualWorld shows the page with reduced motion (spec D7 and D9), once for every visual
+// spec, and snap() refuses a page that is not.
 //
 // Comparing is switched on by E2E_VISUAL=1, which only CI's visual job and the baseline workflow set.
 // Not by CI: CLAUDE.md documents local `CI=1` runs, and a local machine's fonts are not the runner's,
@@ -77,10 +79,20 @@ export async function thawClock(harness: Harness): Promise<void> {
   await harness.fixture('visual_clock', {});
 }
 
-/** The clock frozen first, then the visual workspace put back: its rows are made while nothing else runs. */
+/**
+ * The clock frozen first, then the visual workspace put back: its rows are made while nothing else runs.
+ * The page is shown with reduced motion from here on (its colour scheme is left as the spec chose it),
+ * so the stylesheet's global rule holds every transition and animation at 0.01 ms in each photograph.
+ */
 export async function visualWorld(page: Page, harness: Harness, at: string = VISUAL_INSTANT): Promise<VisualWorld> {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await freezeClock(page, harness, at);
   return harness.fixture<VisualWorld>('visual_workspace', {});
+}
+
+/** Whether the page is shown with reduced motion (visualWorld asks for it; snap() needs it). */
+export async function prefersReducedMotion(page: Page): Promise<boolean> {
+  return page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
 /** The colour scheme the page is shown in (`test.use({ colorScheme })` or page.emulateMedia). */
@@ -98,6 +110,8 @@ async function nextFrames(page: Page): Promise<void> {
 
 /** No request in flight (htmx's own class marks one), every font loaded, nothing fading in or moving. */
 async function atRest(page: Page, target: Locator | Page): Promise<void> {
+  const reduced = await prefersReducedMotion(page);
+  expect(reduced, 'a baseline is photographed with reduced motion: call visualWorld first').toBe(true);
   await page.waitForLoadState('networkidle');
   await expect
     .poll(() => page.evaluate(() => document.querySelectorAll('.htmx-request').length), { message: 'HTMX requests finished' })

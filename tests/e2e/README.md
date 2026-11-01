@@ -129,7 +129,9 @@ spec meets a page it did not declare. The device's scheme is `page.emulateMedia(
   the baseline workflow set. Anywhere else, a local `CI=1` run included, a visual spec skips with
   "baselines are made and compared in CI (D9)": this machine's fonts (Inter here) and its iPhone 13
   (Chromium unless `CI=1`) are not the runner's. The behavioural shards skip them too; the visual
-  job runs `tests/e2e/visual` on the three projects.
+  job runs `tests/e2e/visual` on the three projects. CI's Visual job runs only once a PNG is committed
+  under `__screenshots__/` (until the first `visual:` commit it is skipped with a notice), and from
+  then on a missing or changed image fails it.
 - **Who writes them.** `.github/workflows/visual-baselines.yml`, and nothing else:
   `playwright.config.ts` sets `updateSnapshots` to `all` only when `CI`, `E2E_VISUAL=1` and
   `E2E_UPDATE_BASELINES=1` are all set, and `none` otherwise (never Playwright's default `missing`);
@@ -139,15 +141,24 @@ spec meets a page it did not declare. The device's scheme is `page.emulateMedia(
   gh workflow run visual-baselines.yml --ref claude/trusting-dijkstra-m7nul1 -f specs=tests/e2e/visual/shell.spec.ts
   ```
 
-  It uploads the artifact `visual-baselines`: `tests/e2e/__screenshots__/` and the shell pair taken on
-  WebKit at 390 px, before (main `045978b`) and after (this branch), which is D3's type pair. Look at
-  every image, then commit the baselines in a `visual:` commit with their before/after pair. The
-  workflow has its own concurrency group, so it never cancels CI. GitHub offers it for dispatch once
-  it has run: the `visual-baselines` label on the pull request runs it once and registers it (if a
-  dispatch is refused, re-label once).
+  It uploads the artifact `visual-baselines` (`tests/e2e/__screenshots__/` and the shell pair taken on
+  WebKit at 390 px, before (main `045978b`) and after (this branch), which is D3's type pair), then
+  commits the changed baselines back to the branch it ran on: one commit, `visual: baselines for
+  <specs> (run <id>)`, holding only PNG files under `tests/e2e/__screenshots__/`, and none when
+  nothing changed or when any step of the photographing job (the type pair included) failed. Only
+  its second job, which runs no project code, holds a write token, and it pushes
+  fast-forward only to a branch of this repository: never for a fork's pull request (there, download
+  the artifact) and never to the default branch; if the branch moved on meanwhile, nothing is pushed
+  and the run says so. A push made with the workflow's token starts no CI run, so the next push
+  compares the new baselines: pull the commit (`git pull --ff-only`) before pushing again. Look at
+  every image in that commit and put its before/after pair on the pull request. The workflow never
+  cancels CI, and its jobs queue rather than cancel, so another label on the pull request cannot cut
+  a baseline run short. GitHub offers it for dispatch once it has run: the `visual-baselines` label
+  on the pull request runs it once and registers it (if a dispatch is refused, re-label once).
 - **Stable by construction.** A spec freezes the clock first, then asks for the visual workspace
-  (`visualWorld(page, harness)` does both), signs in as one of its people, and clears the clock after
-  each test (`test.afterEach(() => thawClock(harness))`):
+  (`visualWorld(page, harness)` does both and turns on reduced motion, D7, so nothing moves in a
+  photograph; `snap` refuses a page without it), signs in as one of its people, and clears the clock
+  after each test (`test.afterEach(() => thawClock(harness))`):
   - `visual_clock` (`server/steps/visual.py`): `{"at": "2027-01-03T09:00:00+05:30"}` freezes the
     server's clock (`server/clock.py` puts its own `now` in `django.utils.timezone` and in every copy
     of it), so request threads and the worker read the same instant; `{}` puts the real clock back.
@@ -177,7 +188,9 @@ spec meets a page it did not declare. The device's scheme is `page.emulateMedia(
   colour scheme, for axe and visual cases only; behavioural flows run in light.
 - **The harness's own check.** `self/visual-harness.spec.ts` runs everywhere: no run but the
   baseline workflow's writes a baseline, two masked photographs of the visual Home two seconds apart
-  are byte-identical, so are they with the clock 90 days on, and the masked elements exist.
+  are byte-identical, so are they with the clock 90 days on, the masked elements exist, and the
+  visual world is shown with reduced motion in both schemes (the stylesheet's rule holds the page's
+  transitions at 0.01 ms).
 
 The first baseline is `visual/shell.spec.ts`: the shell around the visual workspace's Home, light, on
 the three projects. It is committed at the foundations gate; screen 1 (which removes the New menu) and

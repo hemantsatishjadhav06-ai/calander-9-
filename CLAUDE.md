@@ -72,11 +72,18 @@ are not the runner's. Baselines are written only by
 `.github/workflows/visual-baselines.yml` (CI, `E2E_VISUAL=1` and
 `E2E_UPDATE_BASELINES=1` together; never locally), started by hand on the
 branch with `gh workflow run visual-baselines.yml --ref <branch> -f
-specs=<files>`; its artifact is reviewed and committed in a `visual:` commit.
-Visual specs freeze the server's clock and hold its worker (`visual_clock`)
-and use the fixed `visual_workspace`; `data-visual-dynamic` marks what prints
-the real date and is the one non-test-id selector, for masking only. See
-`tests/e2e/README.md`.
+specs=<files>`; it uploads them as the artifact `visual-baselines` and commits
+the changed ones back to that branch in one `visual:` commit naming the specs
+and the run (a branch of this repository only, never a fork's). That push
+starts no CI run: pull the commit before pushing again, and look at every
+image in it.
+**Visual (Playwright)** runs only once a PNG is committed under
+`tests/e2e/__screenshots__/`, is skipped with a notice before that, and fails
+on a missing or changed image after it.
+Visual specs freeze the server's clock and hold its worker (`visual_clock`),
+use the fixed `visual_workspace` and photograph with reduced motion
+(`visualWorld`); `data-visual-dynamic` marks what prints the real date and is
+the one non-test-id selector, for masking only. See `tests/e2e/README.md`.
 
 **Performance.** In a separate terminal, start the manifest-static test server
 on its own database and port, then run the Lighthouse runner against it:
@@ -98,6 +105,14 @@ including inline code. TBT is retained as a navigation diagnostic, not used
 as an INP substitute or a second interaction gate. The real-input measurement
 does not establish field p75 INP.
 Run the budget parser's own tests with `node --test tests/lighthouse/*.test.mjs`.
+A screen's own pages are named targets in `tests/lighthouse/targets.mjs`:
+`node tests/lighthouse/run.mjs --targets=a,b` (or `LIGHTHOUSE_TARGETS=a,b`)
+measures them with the same three runs and budgets, and with none named the
+runner measures CI's three. On CI's runner,
+`gh workflow run lighthouse-targets.yml --ref <branch> -f targets=<names>`
+(`.github/workflows/lighthouse-targets.yml`; the `lighthouse-targets` label on
+the pull request runs it once and registers it for dispatch) uploads
+`.lighthouseci/` as the artifact `lighthouse-targets`.
 
 **Audits and catalogues.** These require `pip-audit` 2.10.1 and GNU gettext's
 `msgfmt` in addition to the toolchain above:
@@ -116,8 +131,13 @@ migration check and `compilemessages`), **Docker build**, **Secret scan
 (gitleaks)**, **Dependency audit**, **E2E (Playwright)** (one shard per device
 project, each with its own server and database, and one summary check of that
 name), **Visual (Playwright)** and **Lighthouse CI** on every pull request and
-on pushes to `main`. Pre-commit hooks provide an
-earlier subset;
+on pushes to `main`. Each shard keeps its report and failure traces as
+`playwright-evidence-<project>`, the Visual job as `visual-evidence`, beside
+`pytest-evidence` and `lighthouse-evidence` (seven days). Two workflows run
+only when started by hand or by their label on the pull request: **Visual
+baselines** (`visual-baselines` label), which commits the baselines back to
+the branch, and **Lighthouse targets** (`lighthouse-targets` label). Pre-commit
+hooks provide an earlier subset;
 passing them does not replace the full CI gate. At the Phase 1 gate, run the
 full pytest suite and three consecutive complete browser runs, report the
 pending TOTP cases separately, and record the tested SHA and CI run in

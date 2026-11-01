@@ -1,14 +1,24 @@
 import { updateSnapshotsFor } from '../../../playwright.config';
 import { SCHEMES, forSchemes } from '../support/schemes';
 import { expect, test } from '../support/test';
-import { DYNAMIC, VISUAL_INSTANT, capture, freezeClock, schemeOf, thawClock, visualWorld } from '../support/visual';
+import {
+  DYNAMIC,
+  VISUAL_INSTANT,
+  capture,
+  freezeClock,
+  prefersReducedMotion,
+  schemeOf,
+  thawClock,
+  visualWorld,
+} from '../support/visual';
 
 // The visual harness's own check (spec D9, plan T10). It runs everywhere, on every project, because it
 // compares nothing with a committed baseline: it proves that what the baselines rest on holds here.
 // A local run never writes a baseline; the visual workspace's Home photographs the same two seconds
 // later and with the clock 90 days on (the server's frozen clock and the browser's moved together);
-// the elements that print the real date or a time relative to it are there to be masked; and each
-// scheme of forSchemes reaches the page.
+// the elements that print the real date or a time relative to it are there to be masked; each scheme
+// of forSchemes reaches the page; and a visual world is shown with reduced motion (spec D7 and D9), in
+// either scheme, so no baseline photographs a transition.
 
 /** Ninety days after the visual instant, at the same hour of the day. */
 const NINETY_DAYS_ON = '2027-04-03T09:00:00+05:30';
@@ -72,5 +82,25 @@ forSchemes((scheme) => {
   test(`forSchemes shows the page in ${scheme}`, async ({ page }) => {
     expect(SCHEMES).toContain(scheme);
     expect(await schemeOf(page)).toBe(scheme);
+  });
+
+  test(`a visual world is shown with reduced motion, in ${scheme}`, async ({ page, harness, as }) => {
+    const world = await visualWorld(page, harness);
+    await as({ email: world.users.owner.email });
+    expect((await page.goto(`/workspace/${world.workspace_id}/studio/`))?.status()).toBe(200);
+    await expect(page.getByTestId('home-today')).toBeVisible();
+    expect(await prefersReducedMotion(page), 'visualWorld asks for reduced motion').toBe(true);
+    expect(await schemeOf(page), 'and keeps the scheme the spec chose').toBe(scheme);
+    // The stylesheet's global reduced-motion rule took it: an element given a 300 ms transition (in its
+    // own style, which the rule's !important outranks) gets the rule's 0.01 ms instead.
+    const milliseconds = await page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.style.transition = 'opacity 300ms linear';
+      document.body.append(probe);
+      const seconds = parseFloat(getComputedStyle(probe).transitionDuration);
+      probe.remove();
+      return seconds * 1000;
+    });
+    expect(milliseconds, 'a 300 ms transition runs for 0.01 ms').toBeLessThan(1);
   });
 });
