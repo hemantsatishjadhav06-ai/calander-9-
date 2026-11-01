@@ -38,6 +38,10 @@ restyled or deleted; the approval gate, isolation, budgets and Telegram are unto
   worker holds a `FOR UPDATE` lock on the workspace row) is [issue #24](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/24).
 - `REQUEST_INVITE_HOURLY_LIMIT` pinned in the e2e settings; the browser job's limit raised to 35
   minutes for the larger suite (about 225 cases).
+- A latent flaky test outside this phase: the client-safe report test looks for a planted "4.2" in
+  the report's words, and on the gate-record commit the report's own "observed" time
+  (`05:47:14.271625`) contained it (about a 1-in-100 chance). The test is unedited; the report now
+  records that time to the second (`operations_as_of`), with a test of its own.
 
 **Gate evidence on `ff90678923b74281d9f4ad9239480948088a155f`:**
 

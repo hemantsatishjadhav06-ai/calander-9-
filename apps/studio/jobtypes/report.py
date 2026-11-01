@@ -412,7 +412,7 @@ def stage_write(job: AgencyJob) -> None:
     stored.update(
         operations=facts["operations"],
         operation_scope=OPERATION_SCOPE,
-        operations_as_of=timezone.now().isoformat(),
+        operations_as_of=timezone.now().replace(microsecond=0).isoformat(),
         performance_note=facts["performance_note"],
         outcomes=facts["outcomes"],
         current_backlog=facts["current_backlog"],
