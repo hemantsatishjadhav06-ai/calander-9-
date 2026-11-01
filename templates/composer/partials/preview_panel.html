@@ -5,7 +5,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
 
 {% if previews %}
     {% for p in previews %}
-    <div class="preview-card" style="animation: slideUp 200ms {{ forloop.counter0|add:0 }}50ms cubic-bezier(0.16,1,0.3,1) both">
+    <div class="preview-card" data-theme-scope="light" style="animation: slideUp 200ms {{ forloop.counter0|add:0 }}50ms cubic-bezier(0.16,1,0.3,1) both">
 
         <!-- Platform label + char badge -->
         <div class="px-3.5 py-2 border-b border-ink-200 flex items-center gap-2">

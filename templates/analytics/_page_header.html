@@ -9,14 +9,14 @@
             {# Account switcher #}
             <div x-data="{ open: false }" class="relative">
                 <button aria-haspopup="true" :aria-expanded="open" type="button" @click="open = !open"
-                        class="flex min-h-11 items-center gap-2.5 rounded-xl bg-white py-1.5 pl-2 pr-3 text-left shadow-xs ring-1 ring-inset ring-ink-300 hover:bg-ink-25 hover:ring-ink-400">
+                        class="flex min-h-11 items-center gap-2.5 rounded-xl bg-surface py-1.5 pl-2 pr-3 text-left shadow-xs ring-1 ring-inset ring-line-strong hover:bg-ink-25 hover:ring-ink-400">
                     <span class="relative flex-shrink-0">
                         {% if active_account.avatar_url %}
                             <img src="{{ active_account.avatar_url }}" alt="" class="size-8 rounded-full object-cover">
                         {% else %}
                             <span class="grid size-8 place-items-center rounded-full bg-ink-100 text-[13px] font-semibold text-ink-700" aria-hidden="true">{{ active_account.account_name|make_list|first|upper }}</span>
                         {% endif %}
-                        <span class="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-white [&>svg]:size-3">
+                        <span class="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-surface [&>svg]:size-3">
                             {% include "partials/_platform_icon.html" with platform=active_account.platform size="sm" %}
                         </span>
                     </span>
@@ -39,7 +39,7 @@
                                 {% else %}
                                     <span class="grid size-[30px] place-items-center rounded-full bg-ink-100 text-[12px] font-semibold text-ink-700" aria-hidden="true">{{ acc.account_name|make_list|first|upper }}</span>
                                 {% endif %}
-                                <span class="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-white [&>svg]:!size-3 [&>svg]:!text-current">
+                                <span class="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-surface [&>svg]:!size-3 [&>svg]:!text-current">
                                     {% include "partials/_platform_icon.html" with platform=acc.platform size="sm" %}
                                 </span>
                             </span>

@@ -124,7 +124,7 @@
         }
         .idea-pill-btn {
             display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px;
-            border: 0; box-shadow: inset 0 0 0 1px var(--ink-300), var(--shadow-xs); border-radius: 9999px; font-size: 0.8125rem;
+            border: 0; box-shadow: inset 0 0 0 1px var(--border-hover), var(--shadow-xs); border-radius: 9999px; font-size: 0.8125rem;
             font-weight: 500; color: var(--text-primary); background: var(--surface-0);
             cursor: pointer; transition: background-color var(--dur-instant); white-space: nowrap;
         }
@@ -235,7 +235,7 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="text-ink-900 min-h-screen bg-ink-50">
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:bg-white focus:px-4 focus:py-3 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-semibold focus:text-ink-900">Skip to content</a>
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:bg-surface focus:px-4 focus:py-3 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-semibold focus:text-ink-900">Skip to content</a>
     {% csrf_token %}
     <!-- Global HTMX loading indicator: a thin top progress bar shown during
          any HTMX request (calendar/analytics/publish swaps had no feedback). -->
@@ -303,7 +303,7 @@
         <div class="ui-toast toast-enter">
             <svg class="w-[18px] h-[18px] flex-shrink-0 mt-px text-danger-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>
             <p class="flex-1 min-w-0 break-words" x-text="message"></p>
-            <button type="button" @click="show = false" class="-m-1.5 flex-shrink-0 grid place-items-center w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg cursor-pointer text-ink-300 hover:text-white hover:bg-white/10 focus-visible:outline-white" aria-label="Dismiss">
+            <button type="button" @click="show = false" class="-m-1.5 flex-shrink-0 grid place-items-center w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg cursor-pointer text-ink-300 hover:text-white hover:bg-white/10 focus-visible:outline-on-inverse" aria-label="Dismiss">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
@@ -344,7 +344,7 @@
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
              @click="mobileMenuOpen = false"
-             class="fixed inset-0 bg-ink-950/35 z-30 lg:hidden"></div>
+             class="fixed inset-0 bg-scrim/35 z-30 lg:hidden"></div>
 
         <!-- Sidebar: pale ink-100 with a hairline edge; a 280px drawer below 1024px.
              Below 1024px the closed drawer is inert (out of the tab order and the accessibility tree);
@@ -405,14 +405,14 @@
                      x-transition:leave="transition ease-in duration-75"
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0"
-                     class="absolute left-3 right-3 top-full mt-1 bg-white rounded-xl shadow-lg ring-1 ring-ink-200 p-1 z-50">
+                     class="absolute left-3 right-3 top-full mt-1 bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 p-1 z-50">
                     {% for ws in sidebar_workspaces %}
                     <a href="{% url 'calendar:calendar' workspace_id=ws.id %}"
                        class="flex items-center gap-2.5 px-2.5 py-1.5 min-h-[34px] max-lg:min-h-11 text-sm rounded-lg hover:bg-ink-50 transition-colors {% if request.workspace and ws.id == request.workspace.id %}bg-ink-50 font-semibold text-ink-950{% else %}text-ink-900{% endif %}">
                         {% if ws.icon %}
-                        <img src="{{ ws.icon.url }}" alt="" class="w-7 h-7 rounded-[7px] object-cover flex-shrink-0 shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]">
+                        <img src="{{ ws.icon.url }}" alt="" class="w-7 h-7 rounded-[7px] object-cover flex-shrink-0 shadow-[var(--shadow-creative)]">
                         {% else %}
-                        <div class="w-7 h-7 rounded-[7px] flex items-center justify-center bg-ink-900 text-white text-[13px] font-semibold flex-shrink-0">
+                        <div class="w-7 h-7 rounded-[7px] flex items-center justify-center bg-inverse text-on-inverse text-[13px] font-semibold flex-shrink-0">
                             {{ ws.name|make_list|first|upper }}
                         </div>
                         {% endif %}
@@ -474,7 +474,7 @@
                          x-transition:leave="transition ease-in duration-75"
                          x-transition:leave-start="opacity-100 scale-100"
                          x-transition:leave-end="opacity-0 scale-95"
-                         class="absolute left-0 right-0 top-full mt-1.5 min-w-[220px] bg-white rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
+                         class="absolute left-0 right-0 top-full mt-1.5 min-w-[220px] bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
                         <a href="{% url 'composer:compose' workspace_id=request.workspace.id %}"
                            class="flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-ink-50 transition-colors">
                             <div class="w-9 h-9 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0">
@@ -573,7 +573,7 @@
                                                 <div class="px-1 pt-0.5 pb-1.5 mb-1 border-b border-ink-200">
                                                     <input type="text" x-ref="sidebarCreateTagSearchInput" x-model="createTagSearch"
                                                            @keydown.enter.prevent="if (createTagSearch.trim() && !filteredCreateTags.includes(createTagSearch.trim())) { persistAndToggleCreateTag(createTagSearch.trim()); } else if (filteredCreateTags.length === 1) { toggleCreateTag(filteredCreateTags[0]); createTagSearch = ''; }"
-                                                           class="w-full text-sm px-2.5 h-8 rounded-lg border border-ink-400 bg-white placeholder:text-ink-500"
+                                                           class="w-full text-sm px-2.5 h-8 rounded-lg border border-ink-400 bg-surface placeholder:text-ink-500"
                                                            placeholder="Search or create tag..." aria-label="Search or create tag">
                                                 </div>
                                                 <template x-for="tag in filteredCreateTags" :key="tag">
@@ -672,7 +672,7 @@
                                                  class="emoji-picker-popup">
                                                 <div class="emoji-picker-search">
                                                     <input type="text" data-testid="idea-emoji-search" placeholder="Search emoji..." aria-label="Search emoji" x-model="_emojiSearch"
-                                                           class="w-full px-2.5 h-8 text-sm rounded-lg border border-ink-400 bg-white placeholder:text-ink-500"
+                                                           class="w-full px-2.5 h-8 text-sm rounded-lg border border-ink-400 bg-surface placeholder:text-ink-500"
                                                            @click.stop>
                                                 </div>
                                                 <div class="emoji-picker-grid">
@@ -704,8 +704,8 @@
                         </div>
                     </div>
                     <div x-show="showCreateTagModal" x-cloak class="fixed inset-0 z-[220] flex items-center justify-center" @keydown.escape.window="closeCreateTagModal()">
-                        <div class="fixed inset-0 bg-ink-950/35" @click="closeCreateTagModal()"></div>
-                        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" @click.stop
+                        <div class="fixed inset-0 bg-scrim/35" @click="closeCreateTagModal()"></div>
+                        <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" @click.stop
                              x-trap="showCreateTagModal" role="dialog" aria-modal="true" aria-labelledby="sidebar-create-tag-title">
                             <h3 id="sidebar-create-tag-title" class="text-h3 text-ink-950 mb-4">Create new tag</h3>
                             <input type="text" x-ref="sidebarNewTagNameInput" x-model="newTagName" aria-labelledby="sidebar-create-tag-title"
@@ -802,7 +802,7 @@
                      x-transition:leave="transition ease-in duration-75"
                      x-transition:leave-start="opacity-100 scale-100"
                      x-transition:leave-end="opacity-0 scale-95"
-                     class="absolute bottom-full left-3 right-3 mb-2 min-w-[220px] bg-white rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
+                     class="absolute bottom-full left-3 right-3 mb-2 min-w-[220px] bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
 
                     <!-- User info -->
                     <div class="px-2.5 pt-2.5 pb-2">
@@ -861,13 +861,13 @@
                     {% with current_ws=request.workspace %}
                     {% if current_ws %}
                     {% if current_ws.icon %}
-                    <img src="{{ current_ws.icon.url }}" alt="" class="w-7 h-7 rounded-[7px] object-cover flex-shrink-0 shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]">
+                    <img src="{{ current_ws.icon.url }}" alt="" class="w-7 h-7 rounded-[7px] object-cover flex-shrink-0 shadow-[var(--shadow-creative)]">
                     {% else %}
-                    <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0 bg-ink-900 text-white text-[13px] font-semibold">{{ current_ws.name|make_list|first|upper }}</div>
+                    <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0 bg-inverse text-on-inverse text-[13px] font-semibold">{{ current_ws.name|make_list|first|upper }}</div>
                     {% endif %}
                     <span class="text-base font-semibold text-ink-950 truncate">{{ current_ws.name }}</span>
                     {% else %}
-                    <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0 bg-ink-900 text-white text-[13px] font-semibold">{{ SITE_NAME|make_list|first|upper }}</div>
+                    <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0 bg-inverse text-on-inverse text-[13px] font-semibold">{{ SITE_NAME|make_list|first|upper }}</div>
                     <span class="text-base font-semibold text-ink-950 truncate">{{ SITE_NAME }}</span>
                     {% endif %}
                     {% endwith %}
@@ -957,7 +957,7 @@
         <div x-show="notificationsOpen" x-cloak class="fixed inset-0 z-[100] flex justify-end" @keydown.escape.window="notificationsOpen = false">
             <div class="ui-overlay" @click="notificationsOpen = false"></div>
             <div data-testid="notifications-drawer" role="dialog" aria-modal="true" aria-label="Notifications" x-trap.noscroll="notificationsOpen"
-                 class="relative flex flex-col w-full max-w-[100vw] sm:max-w-sm h-full bg-white shadow-xl">
+                 class="relative flex flex-col w-full max-w-[100vw] sm:max-w-sm h-full bg-surface shadow-xl">
                 <div class="flex justify-end px-3 pt-3">
                     <button type="button" class="ui-btn ui-btn-icon" @click="notificationsOpen = false" aria-label="Close notifications">
                         <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1616,8 +1616,8 @@
     <div x-data="{ createWsOpen: false }"
          @open-create-ws.window="createWsOpen = true; $nextTick(() => $refs.newWsName.focus())">
         <div x-show="createWsOpen" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center">
-            <div class="absolute inset-0 bg-ink-950/35" @click="createWsOpen = false"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6"
+            <div class="absolute inset-0 bg-scrim/35" @click="createWsOpen = false"></div>
+            <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-md mx-4 p-6"
                  role="dialog" aria-modal="true" aria-labelledby="create-ws-title"
                  x-trap.noscroll="createWsOpen"
                  x-show="createWsOpen"

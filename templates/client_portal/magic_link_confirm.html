@@ -18,7 +18,7 @@
             {% if workspace.organization.logo_url %}
             <img src="{{ workspace.organization.logo_url }}" alt="" class="mb-6 h-8 w-auto">
             {% else %}
-            <div class="mb-6 flex size-10 items-center justify-center rounded-[10px] bg-ink-900 text-base font-semibold text-white" aria-hidden="true">{{ workspace.name|make_list|first|upper }}</div>
+            <div class="mb-6 flex size-10 items-center justify-center rounded-[10px] bg-inverse text-base font-semibold text-on-inverse" aria-hidden="true">{{ workspace.name|make_list|first|upper }}</div>
             {% endif %}
 
             <h1 class="text-h1 text-ink-950">Sign in to {{ workspace.name }}</h1>

@@ -19,7 +19,7 @@ Uses Alpine.js for client-side category filtering.
                 {% for tpl in featured_templates %}
                 <button type="button"
                         @click="$dispatch('use-builtin-template', { id: {{ tpl.id }} })"
-                        class="text-left bg-ink-25 rounded-xl ring-1 ring-inset ring-ink-200 p-4 hover:ring-ink-300 hover:bg-white transition-colors group cursor-pointer">
+                        class="text-left bg-ink-25 rounded-xl ring-1 ring-inset ring-ink-200 p-4 hover:ring-line-strong hover:bg-surface transition-colors group cursor-pointer">
                     <div class="text-2xl mb-2">{{ tpl.emoji }}</div>
                     <h3 class="text-[15px] leading-[22px] font-semibold text-ink-900 mb-1 line-clamp-2">{{ tpl.title }}</h3>
                     <p class="text-[13px] leading-[18px] text-ink-600 line-clamp-3">{{ tpl.description }}</p>
@@ -36,7 +36,7 @@ Uses Alpine.js for client-side category filtering.
                 @click="activeCategory = '{{ cat.slug }}'"
                 class="ui-filter-chip"
                 :aria-pressed="(activeCategory === '{{ cat.slug }}').toString()"
-                :class="activeCategory === '{{ cat.slug }}' ? 'is-selected' : 'bg-white ring-1 ring-inset ring-ink-200'">
+                :class="activeCategory === '{{ cat.slug }}' ? 'is-selected' : 'bg-surface ring-1 ring-inset ring-ink-200'">
             {% if cat.slug == "all" %}
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             {% elif cat.slug == "tip" %}

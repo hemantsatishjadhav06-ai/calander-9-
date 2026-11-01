@@ -28,18 +28,19 @@ safe area up and is 56px tall, wherever the list is shown.
      so explicit cursor utilities still win; disabled buttons stay not-allowed. */
   button { cursor: pointer; }
   button:disabled, button[disabled] { cursor: not-allowed; }
-  /* The dark toast (design system: toast): ink-900, a status-coloured icon, white title, ink-300 detail. */
+  /* The dark toast (design system: toast): the inverse surface (dark in both themes), a status-coloured icon,
+     its text-on-inverse title, ink-300 detail. */
   #bb-toast-host { position:fixed; z-index:200; bottom:1.5rem; right:1.5rem; display:flex; flex-direction:column; align-items:flex-end; gap:.5rem; pointer-events:none; }
   @media (max-width: 639px) { #bb-toast-host { left:1rem; right:1rem; bottom:1rem; align-items:stretch; } }
   {% if above_phone_bar %}@media (max-width: 1023px) { #bb-toast-host { bottom: calc(4.5rem + env(safe-area-inset-bottom)); } }{% endif %}
   body.has-approval-selection #bb-toast-host { bottom: 5.5rem; }
   @media (max-width: 1023px) { body.has-approval-selection #bb-toast-host { bottom: calc(9rem + env(safe-area-inset-bottom)); } }
-  .bb-toast { display:flex; align-items:flex-start; gap:.75rem; max-width:420px; padding:.75rem .875rem; border-radius:var(--radius-xl); background:var(--ink-900); color:#fff; box-shadow:var(--shadow-lg); animation:bb-toastPop 240ms var(--ease-out); pointer-events:auto; }
+  .bb-toast { display:flex; align-items:flex-start; gap:.75rem; max-width:420px; padding:.75rem .875rem; border-radius:var(--radius-xl); background:var(--surface-inverse); color:var(--text-on-inverse); box-shadow:var(--shadow-lg); animation:bb-toastPop 240ms var(--ease-out); pointer-events:auto; }
   .bb-toast-title { font-size:.875rem; font-weight:500; line-height:1.25rem; }
   .bb-toast-body { font-size:.8125rem; color:var(--ink-300); line-height:1.125rem; }
   .bb-toast-close { flex:none; display:grid; place-items:center; width:32px; height:32px; margin:-6px -6px -6px auto; border:0; border-radius:var(--radius-lg); background:transparent; color:var(--ink-300); }
-  .bb-toast-close:hover { color:#fff; background:rgb(255 255 255 / .1); }
-  .bb-toast-close:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+  .bb-toast-close:hover { color:var(--text-on-inverse); background:color-mix(in srgb, var(--text-on-inverse) 10%, transparent); }
+  .bb-toast-close:focus-visible { outline:2px solid var(--text-on-inverse); outline-offset:2px; }
   @media (max-width: 1023px) { .bb-toast-close { width:44px; height:44px; margin:-12px -12px -12px auto; } }
 </style>
 <div id="bb-toast-host" data-testid="toast-host" aria-live="polite" aria-atomic="true"></div>
@@ -48,10 +49,10 @@ safe area up and is 56px tall, wherever the list is shown.
   if (window.__bbToastInit) return;
   window.__bbToastInit = true;
   var TONES = {
-    success: { accent: 'var(--success-300)', bg: 'var(--ink-900)', icon: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>' },
-    info:    { accent: 'var(--info-300)', bg: 'var(--ink-900)', icon: '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>' },
-    warn:    { accent: 'var(--warning-300)', bg: 'var(--ink-900)', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
-    error:   { accent: 'var(--danger-300)', bg: 'var(--ink-900)', icon: '<path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><path d="M15 9l-6 6M9 9l6 6"/>' },
+    success: { accent: 'var(--success-300)', bg: 'var(--surface-inverse)', icon: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>' },
+    info:    { accent: 'var(--info-300)', bg: 'var(--surface-inverse)', icon: '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>' },
+    warn:    { accent: 'var(--warning-300)', bg: 'var(--surface-inverse)', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
+    error:   { accent: 'var(--danger-300)', bg: 'var(--surface-inverse)', icon: '<path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><path d="M15 9l-6 6M9 9l6 6"/>' },
   };
   function render(detail) {
     if (!detail || !detail.title) return;

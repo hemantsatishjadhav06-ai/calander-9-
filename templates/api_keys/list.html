@@ -27,7 +27,7 @@
     {% endif %}
 
     {% if rows %}
-    <ul class="ui-list overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" role="list">
+    <ul class="ui-list overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-xs" role="list">
         {% for row in rows %}
         <li class="px-4 py-4 sm:px-5 {% if row.status != 'active' %}bg-ink-25{% endif %}">
             {% include "api_keys/_key_row.html" with row=row %}

@@ -28,7 +28,7 @@
             <legend class="mb-3 text-h3 text-ink-950">Search Console property</legend>
             <div class="space-y-2">
                 {% for prop in properties %}
-                <label class="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 ring-1 ring-inset ring-ink-200 hover:ring-ink-300 has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
+                <label class="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 ring-1 ring-inset ring-ink-200 hover:ring-line-strong has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
                     <input type="radio" name="property" value="{{ prop.url }}" {% if prop.url == suggested %}checked{% endif %} required class="size-4 flex-shrink-0 accent-brand-700">
                     <span class="min-w-0">
                         <span class="block break-all font-mono text-sm text-ink-900">{{ prop.url }}</span>

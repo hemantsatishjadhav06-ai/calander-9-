@@ -27,7 +27,7 @@
             {{ message.sender_name|make_list|first|upper }}
         </div>
         {% endif %}
-        <span class="absolute -bottom-1 -right-1 grid size-[18px] place-items-center rounded-full bg-white ring-1 ring-ink-200 [&>svg]:size-3" title="{{ message.social_account.get_platform_display }}">
+        <span class="absolute -bottom-1 -right-1 grid size-[18px] place-items-center rounded-full bg-surface ring-1 ring-ink-200 [&>svg]:size-3" title="{{ message.social_account.get_platform_display }}">
             {% include "partials/_platform_icon.html" with platform=message.social_account.platform size="sm" %}
         </span>
     </div>

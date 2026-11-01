@@ -9,7 +9,7 @@ Alpine `accId` and `hasVideoAttached` come from the enclosing x-for scope at
 the include site.
 {% endcomment %}
 <button type="button"
-        class="w-[140px] min-h-[104px] flex-shrink-0 rounded-[10px] border border-ink-300 bg-white flex flex-col items-center justify-center gap-2 p-3 hover:border-ink-400 hover:bg-ink-25 transition-colors disabled:bg-ink-50 disabled:border-ink-200 disabled:text-ink-500 disabled:cursor-not-allowed cursor-pointer"
+        class="w-[140px] min-h-[104px] flex-shrink-0 rounded-[10px] border border-line-strong bg-surface flex flex-col items-center justify-center gap-2 p-3 hover:border-ink-400 hover:bg-ink-25 transition-colors disabled:bg-ink-50 disabled:border-ink-200 disabled:text-ink-500 disabled:cursor-not-allowed cursor-pointer"
         :disabled="!hasVideoAttached"
         :title="hasVideoAttached ? 'Pick a frame from your video' : 'Attach a video first'"
         @click="openFramePicker(accId, '{{ mode }}')">

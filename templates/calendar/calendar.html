@@ -120,7 +120,7 @@
         text-decoration: none; overflow: hidden; cursor: pointer;
         transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
     }
-    .post-chip:hover { border-color: var(--ink-300); box-shadow: var(--shadow-sm); }
+    .post-chip:hover { border-color: var(--border-hover); box-shadow: var(--shadow-sm); }
     .post-chip .chip-glyph { display: inline-flex; flex-shrink: 0; }
     .post-chip .chip-glyph svg { width: 14px; height: 14px; }
     .post-chip .chip-thumb { width: 18px; height: 18px; border-radius: 4px; object-fit: cover; flex-shrink: 0; box-shadow: var(--shadow-creative); }
@@ -209,7 +209,7 @@
     .calendar-channel-slot {
         display: inline-flex; align-items: center; gap: 5px;
         max-width: 100%; min-height: 26px; padding: 2px 6px;
-        border-radius: 7px; border: 1px dashed var(--ink-300);
+        border-radius: 7px; border: 1px dashed var(--border-hover);
         background: var(--surface-0); color: var(--ink-700);
         font-size: 12px; font-weight: 500;
     }
@@ -313,16 +313,16 @@ ticked (see the `sel` Alpine store). Below 1024px it sits above the phone bar
 (base.html: 58px and the safe area) where the bar shows; from 1024px it is unchanged.{% endcomment %}
 <div x-data="bulkBar()">
     {# Floating action bar: a dark surface, so white focus rings #}
-    <div x-cloak x-show="$store.sel.count > 0"
+    <div data-theme-scope="light" x-cloak x-show="$store.sel.count > 0"
          x-effect="document.body.classList.toggle('has-selection', $store.sel.count > 0)"
          role="region" aria-label="Selected posts" data-testid="calendar-bulk-bar"
-         class="fixed {% if nav.phone %}bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6{% else %}bottom-6 max-sm:bottom-4{% endif %} left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 max-w-[calc(100vw-2rem)] bg-ink-900 text-white rounded-xl shadow-lg pl-4 pr-1.5 py-1.5">
+         class="fixed {% if nav.phone %}bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6{% else %}bottom-6 max-sm:bottom-4{% endif %} left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 max-w-[calc(100vw-2rem)] bg-inverse text-on-inverse rounded-xl shadow-lg pl-4 pr-1.5 py-1.5">
         <span class="text-sm font-medium whitespace-nowrap tabular-nums" x-text="$store.sel.count + ' selected'" aria-live="polite"></span>
         <span class="w-px h-5 bg-white/20 mx-1.5" aria-hidden="true"></span>
-        <button type="button" @click="ask('draft')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-white hover:bg-white/10 focus-visible:outline-white transition-colors disabled:opacity-50">Draft</button>
-        <button type="button" @click="ask('publish')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg bg-brand-200 text-brand-950 hover:bg-brand-300 focus-visible:outline-white transition-colors disabled:opacity-50">Publish</button>
-        <button type="button" @click="ask('delete')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-danger-300 hover:bg-white/10 hover:text-danger-200 focus-visible:outline-white transition-colors disabled:opacity-50">Delete</button>
-        <button type="button" aria-label="Clear selection" @click="$store.sel.clear()" class="w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg text-ink-300 hover:bg-white/10 hover:text-white focus-visible:outline-white flex items-center justify-center transition-colors" title="Clear selection">
+        <button type="button" @click="ask('draft')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-white hover:bg-white/10 focus-visible:outline-on-inverse transition-colors disabled:opacity-50">Draft</button>
+        <button type="button" @click="ask('publish')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg bg-brand-200 text-brand-950 hover:bg-brand-300 focus-visible:outline-on-inverse transition-colors disabled:opacity-50">Publish</button>
+        <button type="button" @click="ask('delete')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-danger-300 hover:bg-white/10 hover:text-danger-200 focus-visible:outline-on-inverse transition-colors disabled:opacity-50">Delete</button>
+        <button type="button" aria-label="Clear selection" @click="$store.sel.clear()" class="w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg text-ink-300 hover:bg-white/10 hover:text-white focus-visible:outline-on-inverse flex items-center justify-center transition-colors" title="Clear selection">
             <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>

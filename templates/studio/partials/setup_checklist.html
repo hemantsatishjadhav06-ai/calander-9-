@@ -11,7 +11,7 @@ of each step's heading, one below the heading it sits under (Settings → Advanc
     {% for row in rows %}
     <li class="flex flex-wrap sm:flex-nowrap items-start gap-x-4 gap-y-3 px-4 sm:px-5 py-4" data-setup-row="{{ row.key }}" data-setup-state="{{ row.state }}" data-testid="setup-row-{{ row.key }}">
         <span class="mt-px flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center
-            {% if row.state == 'done' %}bg-success-500 text-white{% elif row.state == 'attention' %}bg-white text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]{% else %}bg-white text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]{% endif %}" aria-hidden="true">
+            {% if row.state == 'done' %}bg-success-500 text-on-fill{% elif row.state == 'attention' %}bg-surface text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]{% else %}bg-surface text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]{% endif %}" aria-hidden="true">
             {% if row.state == 'done' %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>{% elif row.state == 'attention' %}<span class="text-xs font-bold">!</span>{% else %}<span class="text-xs font-semibold tabular-nums">{{ forloop.counter }}</span>{% endif %}
         </span>
         <div class="flex-1 min-w-0 basis-[calc(100%-2.5rem)] sm:basis-auto">

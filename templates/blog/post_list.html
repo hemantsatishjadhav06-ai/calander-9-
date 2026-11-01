@@ -45,7 +45,7 @@
     </nav>
 
     {% if posts %}
-    <ul class="ui-list overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" aria-label="{{ active_tab|capfirst }} posts">
+    <ul class="ui-list overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-xs" aria-label="{{ active_tab|capfirst }} posts">
         {% for post in posts %}
         <li>
             <a href="{% url 'blog:detail' workspace_id=workspace.id post_id=post.id %}"

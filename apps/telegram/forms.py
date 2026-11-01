@@ -57,7 +57,7 @@ class PairingForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["purpose"].widget = forms.HiddenInput()
         self.initial["purpose"] = "chat" if group else "user"
-        self.fields["audience"].widget.attrs.update({"class": "w-full rounded-lg border border-ink-400 bg-white p-3"})
+        self.fields["audience"].widget.attrs.update({"class": "w-full rounded-lg border border-ink-400 bg-surface p-3"})
         if group:
             self.fields["audience"].choices = [
                 choice for choice in TelegramChat.Audience.choices if choice[0] != TelegramChat.Audience.PRIVATE
@@ -82,7 +82,7 @@ class ManagedBotCreationForm(forms.Form):
     manager_connection = forms.ChoiceField(
         label="Your personally linked manager bot",
         choices=[],
-        widget=forms.Select(attrs={"class": "w-full rounded-lg border border-ink-400 bg-white p-3"}),
+        widget=forms.Select(attrs={"class": "w-full rounded-lg border border-ink-400 bg-surface p-3"}),
     )
 
     def __init__(self, *args, managers=(), **kwargs):

@@ -197,7 +197,7 @@
             {% for brief in briefs %}
             <li class="min-w-0">
                 <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=brief.id %}"
-                   class="group flex h-full flex-col overflow-hidden rounded-[14px] border border-ink-200 bg-white shadow-xs ui-card-link">
+                   class="group flex h-full flex-col overflow-hidden rounded-[14px] border border-ink-200 bg-surface shadow-xs ui-card-link">
                     <div class="aspect-[4/5] bg-ink-50 flex items-center justify-center overflow-hidden shadow-[inset_0_-1px_0_var(--ink-200)]">
                         {% if brief.graphic %}
                         <img src="{% if brief.graphic.thumbnail %}{{ brief.graphic.thumbnail.url }}{% else %}{{ brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">

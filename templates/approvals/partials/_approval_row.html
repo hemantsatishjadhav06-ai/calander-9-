@@ -5,7 +5,7 @@ One main action per card: the tinted button. "Approve" alone never schedules; "A
 schedules the exact proposed time, and only a person can press either.
 {% endcomment %}
 {% load tz approval_extras %}
-<div class="bg-white border border-ink-200 rounded-xl shadow-xs transition-colors hover:border-ink-300"
+<div class="bg-surface border border-ink-200 rounded-xl shadow-xs transition-colors hover:border-line-strong"
      data-testid="approvals-row-{{ post.id }}"
      x-data="{ expanded: false, panel: null, comment: '' }">
     <div class="flex flex-wrap sm:flex-nowrap items-start gap-3 p-4">
@@ -70,7 +70,7 @@ schedules the exact proposed time, and only a person can press either.
                 <div class="flex gap-2 mb-4 flex-wrap">
                     {% for pm in post.media_attachments.all %}
                     {% if pm.media_asset.thumbnail %}
-                    <img src="{{ pm.media_asset.thumbnail.url }}" alt="" class="w-14 h-14 rounded-[10px] object-cover shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)] ring-1 ring-ink-200">
+                    <img src="{{ pm.media_asset.thumbnail.url }}" alt="" class="w-14 h-14 rounded-[10px] object-cover shadow-[var(--shadow-creative)] ring-1 ring-ink-200">
                     {% elif pm.media_asset.file and pm.media_asset.media_type == 'image' %}
                     <img src="{{ pm.media_asset.file.url }}" alt="" class="w-14 h-14 rounded-[10px] object-cover ring-1 ring-ink-200">
                     {% else %}

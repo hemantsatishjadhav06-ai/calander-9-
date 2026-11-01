@@ -96,7 +96,7 @@ Usage: {% include "social_accounts/partials/_account_card.html" with account=acc
                           @htmx:after-request.camel="disconnecting = false">
                         {% csrf_token %}
                         <button type="submit" :disabled="disconnecting" class="ui-btn ui-btn-danger ui-btn-sm disabled:opacity-60 disabled:cursor-not-allowed">
-                            <span x-show="disconnecting" x-cloak class="ui-spinner !border-white/40 !border-t-white" aria-hidden="true"></span>
+                            <span x-show="disconnecting" x-cloak class="ui-spinner !border-on-fill/40 !border-t-on-fill" aria-hidden="true"></span>
                             <span x-text="disconnecting ? 'Disconnecting…' : 'Disconnect'">Disconnect</span>
                         </button>
                     </form>

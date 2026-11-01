@@ -132,11 +132,14 @@
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
 
-  --shadow-xs: 0 1px 2px rgba(14, 17, 20, .05);
-  --shadow-sm: 0 1px 2px rgba(14, 17, 20, .04), 0 1px 3px rgba(14, 17, 20, .06);
-  --shadow-md: 0 4px 12px -2px rgba(14, 17, 20, .08), 0 2px 4px -1px rgba(14, 17, 20, .04);
-  --shadow-lg: 0 12px 32px -8px rgba(14, 17, 20, .16), 0 4px 8px -2px rgba(14, 17, 20, .06);
-  --shadow-xl: 0 24px 64px -12px rgba(14, 17, 20, .24), 0 8px 16px -4px rgba(14, 17, 20, .08);
+  /* shadow-xs ... shadow-xl read the Layer 2 tokens below: Tailwind inlines an @theme shadow's value
+     into its utility, so a literal here would never follow the theme. The Layer 2 :root declaration
+     wins over this one (unlayered beats @layer theme), so the reference is never circular. */
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -144,9 +147,9 @@
   --animate-live-pulse: live-pulse 2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
   --animate-skeleton: skeleton 1.4s linear infinite;
   @keyframes live-pulse {
-    0%   { box-shadow: 0 0 0 0 rgb(3 90 123 / .35); }
-    70%  { box-shadow: 0 0 0 6px rgb(3 90 123 / 0); }
-    100% { box-shadow: 0 0 0 0 rgb(3 90 123 / 0); }
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info-500) 35%, transparent); }
+    70%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--info-500) 0%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info-500) 0%, transparent); }
   }
   @keyframes skeleton {
     from { background-position: 200% 0; }
@@ -195,8 +198,7 @@
   --primary-soft: var(--brand-50);          /* selected row */
   --primary-muted: var(--brand-100);        /* tinted button fill, text selection */
   --primary-ring: var(--brand-600);         /* SOLID outline colour (checkbox, toggle, .focus-ring) */
-  --primary-halo: rgb(30 112 87 / .18);     /* decorative halo around a focused input; the border carries 3:1 */
-  --primary-rgb: 17, 86, 65;                /* legacy rgba(var(--primary-rgb), a) users */
+  --primary-halo: color-mix(in srgb, var(--brand-600) 18%, transparent);   /* decorative halo around a focused input; the border carries 3:1 */
   --focus-ring: var(--brand-600);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
@@ -215,12 +217,12 @@
   --surface-2: var(--ink-100);              /* neutral chip, segmented track, skeleton */
   --surface-3: var(--ink-200);
   --surface-sheet: var(--ink-25);           /* table header, row hover, internal note */
-  --surface-sticky: rgb(246 247 248 / .92); /* translucent bars: ink-600 or darker text only */
-  --overlay: rgb(14 17 20 / .36);
+  --surface-sticky: color-mix(in srgb, var(--ink-50) 92%, transparent);   /* translucent bars: ink-600 or darker text only */
+  --overlay: color-mix(in srgb, var(--scrim) 36%, transparent);
 
   /* Borders */
   --border: var(--ink-200);                 /* hairlines, dividers, card edges (decorative) */
-  --border-hover: var(--ink-300);           /* clickable card hover, secondary button edge */
+  --border-hover: var(--ink-300);           /* clickable card hover, secondary button edge (border-line-strong); dark keeps it an edge */
   --border-control: var(--ink-400);         /* inputs, checkbox, radio, toggle-off: >= 3.1:1 everywhere */
 
   /* Text */
@@ -230,7 +232,7 @@
   --text-secondary: var(--ink-600);
   --text-tertiary: var(--ink-500);          /* meta, timestamps, placeholders (>= 4.67:1 on every surface) */
   --text-ghost: var(--ink-500);             /* was a separate grey; now the same AA-safe tertiary */
-  --text-inverse: #FFFFFF;
+  --text-inverse: var(--text-on-inverse);
   --text-link: var(--brand-700);
   --text-link-hover: var(--brand-800);
 
@@ -243,7 +245,7 @@
 
   /* Illustrations (retired: empty states use one line icon) */
   --color-illustration-border: var(--ink-200);
-  --color-illustration-card: #FFFFFF;
+  --color-illustration-card: var(--ink-0);
   --color-illustration-element: var(--ink-200);
   --color-illustration-secondary-element: var(--ink-100);
   --color-illustration-accent: var(--ink-400);
@@ -267,17 +269,24 @@
   --accent-indigo: var(--info-500);     --accent-indigo-soft: var(--info-50);
   --accent-emerald: var(--success-500); --accent-emerald-soft: var(--success-50);
 
-  /* Shadows (same values as the @theme ones so var() and shadow-* utilities agree) */
-  --shadow-xs: 0 1px 2px rgba(14, 17, 20, .05);
-  --shadow-sm: 0 1px 2px rgba(14, 17, 20, .04), 0 1px 3px rgba(14, 17, 20, .06);
-  --shadow-md: 0 4px 12px -2px rgba(14, 17, 20, .08), 0 2px 4px -1px rgba(14, 17, 20, .04);
-  --shadow-lg: 0 12px 32px -8px rgba(14, 17, 20, .16), 0 4px 8px -2px rgba(14, 17, 20, .06);
-  --shadow-xl: 0 24px 64px -12px rgba(14, 17, 20, .24), 0 8px 16px -4px rgba(14, 17, 20, .08);
+  /* Shadows: the shadow-* utilities read these (see @theme). A shadow is the scrim's colour, which stays
+     dark in both themes; the dark theme sets its own strengths. */
+  --shadow-xs: 0 1px 2px color-mix(in srgb, var(--scrim) 5%, transparent);
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--scrim) 4%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-md: 0 4px 12px -2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 4%, transparent);
+  --shadow-lg: 0 12px 32px -8px color-mix(in srgb, var(--scrim) 16%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-xl: 0 24px 64px -12px color-mix(in srgb, var(--scrim) 24%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 8%, transparent);
   --shadow-primary: none;                   /* the orange glow is gone; kept for its existing users */
-  --shadow-button: 0 1px 2px rgba(14, 17, 20, .12), inset 0 1px 0 rgba(255, 255, 255, .12);
-  --shadow-nav-active: 0 1px 2px rgba(14, 17, 20, .06), 0 0 0 1px rgba(14, 17, 20, .04);
-  --shadow-segment: 0 1px 2px rgba(14, 17, 20, .08), 0 0 0 .5px rgba(14, 17, 20, .06);
-  --shadow-creative: inset 0 0 0 1px rgba(14, 17, 20, .06);
+  --shadow-button: 0 1px 2px color-mix(in srgb, var(--scrim) 12%, transparent), inset 0 1px 0 color-mix(in srgb, var(--on-fill) 12%, transparent);
+  --shadow-nav-active: 0 1px 2px color-mix(in srgb, var(--scrim) 6%, transparent), 0 0 0 1px color-mix(in srgb, var(--scrim) 4%, transparent);
+  --shadow-segment: 0 1px 2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 0 0 .5px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-creative: inset 0 0 0 1px color-mix(in srgb, var(--scrim) 6%, transparent);
+
+  /* The select chevron (.bb-select, select.ui-input) in --text-tertiary. A data URI cannot read a
+     variable, so each theme declares its own; apps/common/tests/test_recolor_dark.py holds the URI's
+     colour to --text-tertiary in each theme. A <select> has no pseudo-element, and a mask on it would
+     clip its focus ring, so the chevron stays a background image. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
 
   /* Radii (identical to Tailwind's defaults; nothing shifts) */
   --radius-sm: 0.25rem;   /* 4px  checkbox */
@@ -324,7 +333,8 @@
    icon, 600 the chip text. The brand and status 300 steps keep their light values: their role is the
    inverse surface (toast action, toast icons), which stays dark in both themes. ink-300 is the
    exception: it changes with the ink scale, and as the toast detail it must read 4.5:1 on the dark
-   inverse surface (ink-200), so in dark it is a text-grade grey, not a border grey. Layer 2 sets only
+   inverse surface (ink-200), so in dark it is a text-grade grey, not a border grey; an edge drawn in
+   ink-300 uses --border-hover (border-line-strong), which dark keeps an edge. Layer 2 sets only
    what does not follow Layer 1; it writes no colour of its own. tools/contrast.py checks every pair in
    both themes, but for the one light pair named in its LIGHT_EXCEPTIONS (below its bar before dark
    mode; light must not move), and apps/common/tests/test_contrast.py runs it; it prints the §21 tables.
@@ -364,6 +374,8 @@
   --overlay: color-mix(in srgb, var(--scrim) 64%, transparent);
   --text-inverse: var(--text-on-inverse);
   --color-illustration-card: var(--ink-0);
+  --border-hover: color-mix(in srgb, var(--ink-300) 20%, var(--ink-200));
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239CA1A9' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
   --shadow-xs: 0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent);
   --shadow-sm: 0 1px 2px color-mix(in srgb, var(--scrim) 36%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 48%, transparent);
   --shadow-md: 0 4px 12px -2px color-mix(in srgb, var(--scrim) 56%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 36%, transparent);
@@ -407,6 +419,8 @@
     --overlay: color-mix(in srgb, var(--scrim) 64%, transparent);
     --text-inverse: var(--text-on-inverse);
     --color-illustration-card: var(--ink-0);
+    --border-hover: color-mix(in srgb, var(--ink-300) 20%, var(--ink-200));
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239CA1A9' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
     --shadow-xs: 0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent);
     --shadow-sm: 0 1px 2px color-mix(in srgb, var(--scrim) 36%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 48%, transparent);
     --shadow-md: 0 4px 12px -2px color-mix(in srgb, var(--scrim) 56%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 36%, transparent);
@@ -452,7 +466,7 @@
   --primary: var(--brand-700); --primary-hover: var(--brand-800); --primary-pressed: var(--brand-900);
   --primary-strong: var(--brand-700); --primary-strong-hover: var(--brand-800); --primary-bright: var(--brand-500);
   --primary-soft: var(--brand-50); --primary-muted: var(--brand-100); --primary-ring: var(--brand-600);
-  --primary-halo: rgb(30 112 87 / .18);
+  --primary-halo: color-mix(in srgb, var(--brand-600) 18%, transparent);
   --focus-ring: var(--brand-600);
   --neutral-950: var(--ink-950); --neutral-900: var(--ink-900); --neutral-800: var(--ink-800);
   --neutral-700: var(--ink-700); --neutral-600: var(--ink-600); --neutral-500: var(--ink-500);
@@ -460,17 +474,17 @@
   --neutral-100: var(--ink-100); --neutral-50: var(--ink-50);
   --surface-0: var(--ink-0); --surface-page: var(--ink-50); --surface-sidebar: var(--ink-100);
   --surface-1: var(--ink-50); --surface-2: var(--ink-100); --surface-3: var(--ink-200);
-  --surface-sheet: var(--ink-25); --surface-sticky: rgb(246 247 248 / .92);
-  --overlay: rgb(14 17 20 / .36);
+  --surface-sheet: var(--ink-25); --surface-sticky: color-mix(in srgb, var(--ink-50) 92%, transparent);
+  --overlay: color-mix(in srgb, var(--scrim) 36%, transparent);
   --border: var(--ink-200); --border-hover: var(--ink-300); --border-control: var(--ink-400);
   --text-strong: var(--ink-950); --text-primary: var(--ink-900); --text-body: var(--ink-700);
   --text-secondary: var(--ink-600); --text-tertiary: var(--ink-500); --text-ghost: var(--ink-500);
-  --text-inverse: #FFFFFF; --text-link: var(--brand-700); --text-link-hover: var(--brand-800);
+  --text-inverse: var(--text-on-inverse); --text-link: var(--brand-700); --text-link-hover: var(--brand-800);
   --on-fill: var(--ink-0);
   --surface-inverse: var(--ink-900);
   --text-on-inverse: var(--ink-0);
   --scrim: var(--ink-950);
-  --color-illustration-border: var(--ink-200); --color-illustration-card: #FFFFFF;
+  --color-illustration-border: var(--ink-200); --color-illustration-card: var(--ink-0);
   --color-illustration-element: var(--ink-200); --color-illustration-secondary-element: var(--ink-100);
   --color-illustration-accent: var(--ink-400);
   --success-soft: var(--success-50);
@@ -482,15 +496,16 @@
   --accent-amber: var(--warning-500); --accent-amber-soft: var(--warning-50); --accent-indigo: var(--info-500);
   --accent-indigo-soft: var(--info-50); --accent-emerald: var(--success-500);
   --accent-emerald-soft: var(--success-50);
-  --shadow-xs: 0 1px 2px rgba(14, 17, 20, .05);
-  --shadow-sm: 0 1px 2px rgba(14, 17, 20, .04), 0 1px 3px rgba(14, 17, 20, .06);
-  --shadow-md: 0 4px 12px -2px rgba(14, 17, 20, .08), 0 2px 4px -1px rgba(14, 17, 20, .04);
-  --shadow-lg: 0 12px 32px -8px rgba(14, 17, 20, .16), 0 4px 8px -2px rgba(14, 17, 20, .06);
-  --shadow-xl: 0 24px 64px -12px rgba(14, 17, 20, .24), 0 8px 16px -4px rgba(14, 17, 20, .08);
-  --shadow-button: 0 1px 2px rgba(14, 17, 20, .12), inset 0 1px 0 rgba(255, 255, 255, .12);
-  --shadow-nav-active: 0 1px 2px rgba(14, 17, 20, .06), 0 0 0 1px rgba(14, 17, 20, .04);
-  --shadow-segment: 0 1px 2px rgba(14, 17, 20, .08), 0 0 0 .5px rgba(14, 17, 20, .06);
-  --shadow-creative: inset 0 0 0 1px rgba(14, 17, 20, .06);
+  --shadow-xs: 0 1px 2px color-mix(in srgb, var(--scrim) 5%, transparent);
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--scrim) 4%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-md: 0 4px 12px -2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 4%, transparent);
+  --shadow-lg: 0 12px 32px -8px color-mix(in srgb, var(--scrim) 16%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-xl: 0 24px 64px -12px color-mix(in srgb, var(--scrim) 24%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 8%, transparent);
+  --shadow-button: 0 1px 2px color-mix(in srgb, var(--scrim) 12%, transparent), inset 0 1px 0 color-mix(in srgb, var(--on-fill) 12%, transparent);
+  --shadow-nav-active: 0 1px 2px color-mix(in srgb, var(--scrim) 6%, transparent), 0 0 0 1px color-mix(in srgb, var(--scrim) 4%, transparent);
+  --shadow-segment: 0 1px 2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 0 0 .5px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-creative: inset 0 0 0 1px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
 }
 
 
@@ -570,7 +585,7 @@
   transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .sidebar-nav-item svg { color: var(--ink-500); }
-.sidebar-nav-item:hover { background: rgb(14 17 20 / .05); color: var(--ink-900); }
+.sidebar-nav-item:hover { background: color-mix(in srgb, var(--ink-950) 5%, transparent); color: var(--ink-900); }
 .sidebar-nav-item.active,
 .sidebar-nav-item[aria-current="page"] {
   background: var(--surface-0);
@@ -593,10 +608,10 @@
   border-radius: var(--radius-full);
   background: var(--ink-200); color: var(--ink-700);
 }
-.sidebar-badge.is-turn { background: var(--brand-700); color: #fff; }   /* Approvals waiting: the only accent badge */
+.sidebar-badge.is-turn { background: var(--brand-700); color: var(--on-fill); }   /* Approvals waiting: the only accent badge */
 .sidebar-logo-mark {
   width: 28px; height: 28px; border-radius: 7px;
-  background: var(--ink-900); color: #fff;
+  background: var(--surface-inverse); color: var(--text-on-inverse);   /* the logo mark stays dark in both themes */
   font-size: 13px; font-weight: 600;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
@@ -650,7 +665,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 .btn-neutral-100 { transition: background-color var(--dur-fast) var(--ease-out); }
 .btn-neutral-100:hover { background: var(--ink-100) !important; }
 .btn-danger-soft { transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
-.btn-danger-soft:hover { background: var(--danger-500) !important; color: #fff !important; }
+.btn-danger-soft:hover { background: var(--danger-500) !important; color: var(--on-fill) !important; }
 .btn-danger-soft-bg { transition: background-color var(--dur-fast) var(--ease-out); }
 .btn-danger-soft-bg:hover { background: var(--danger-50) !important; }
 .btn-primary-hover { transition: background-color var(--dur-fast) var(--ease-out); }
@@ -658,7 +673,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 .btn-primary-lift { transition: background-color var(--dur-fast) var(--ease-out); }
 .btn-primary-lift:hover { background: var(--primary-hover) !important; transform: none; box-shadow: var(--shadow-button); }
 .card-hover-lift { transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
-.card-hover-lift:hover { border-color: var(--ink-300) !important; box-shadow: var(--shadow-sm) !important; transform: none; }
+.card-hover-lift:hover { border-color: var(--border-hover) !important; box-shadow: var(--shadow-sm) !important; transform: none; }
 .btn-surface-1:hover { background: var(--surface-1) !important; }
 .btn-surface-2:hover { background: var(--surface-2) !important; }
 .btn-error-darker { transition: background-color var(--dur-fast) var(--ease-out); }
@@ -667,7 +682,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 .btn-text-hover-primary { transition: color var(--dur-fast) var(--ease-out); }
 .btn-text-hover-primary:hover { color: var(--text-primary) !important; }
 .btn-icon-hover { transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
-.btn-icon-hover:hover { background: rgb(14 17 20 / .05) !important; color: var(--text-primary) !important; }
+.btn-icon-hover:hover { background: color-mix(in srgb, var(--ink-950) 5%, transparent) !important; color: var(--text-primary) !important; }
 .btn-surface-neutral-50 { transition: background-color var(--dur-fast) var(--ease-out); }
 .btn-surface-neutral-50:hover { background: var(--ink-25) !important; }
 .btn-amber { transition: background-color var(--dur-fast) var(--ease-out); }
@@ -710,7 +725,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
   box-shadow: 0 0 0 1px var(--focus-ring), 0 0 0 4px var(--primary-halo);
 }
 .form-input-styled.is-error { border-color: var(--danger-500); }
-.form-input-styled.is-error:focus { box-shadow: 0 0 0 1px var(--danger-500), 0 0 0 4px rgb(153 22 24 / .14); }
+.form-input-styled.is-error:focus { box-shadow: 0 0 0 1px var(--danger-500), 0 0 0 4px color-mix(in srgb, var(--danger-500) 14%, transparent); }
 /* Flatpickr alt-input inherits .form-datetime styling */
 .form-datetime.flatpickr-input + .form-datetime { cursor: pointer; }
 
@@ -724,12 +739,12 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
   border: 0; cursor: pointer; text-decoration: none;
   transition: background-color var(--dur-instant) var(--ease-out), box-shadow var(--dur-instant) var(--ease-out), transform var(--dur-instant) var(--ease-out);
 }
-.btn-brand { background: var(--brand-700); color: #fff; box-shadow: var(--shadow-button); width: 100%; }
+.btn-brand { background: var(--brand-700); color: var(--on-fill); box-shadow: var(--shadow-button); width: 100%; }
 .btn-brand:hover { background: var(--brand-800); transform: none; box-shadow: var(--shadow-button); }
 .btn-brand:active { background: var(--brand-900); transform: scale(.98); }
 .btn-outline, .btn-social {
   background: var(--surface-0); color: var(--ink-900);
-  box-shadow: inset 0 0 0 1px var(--ink-300), var(--shadow-xs); width: 100%;
+  box-shadow: inset 0 0 0 1px var(--border-hover), var(--shadow-xs); width: 100%;
 }
 .btn-social { font-weight: 500; gap: 0.75rem; }
 .btn-outline:hover, .btn-social:hover { background: var(--ink-25); box-shadow: inset 0 0 0 1px var(--ink-400), var(--shadow-xs); transform: none; }
@@ -827,7 +842,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 .flatpickr-day:hover { background: var(--surface-2); border-color: transparent; }
 .flatpickr-day.today:not(.selected) { border-color: var(--brand-200); background: transparent; }
 .flatpickr-day.today:not(.selected):hover { background: var(--brand-50); border-color: var(--brand-200); }
-.flatpickr-day.selected, .flatpickr-day.selected:hover { background: var(--brand-700); border-color: var(--brand-700); color: #fff; }
+.flatpickr-day.selected, .flatpickr-day.selected:hover { background: var(--brand-700); border-color: var(--brand-700); color: var(--on-fill); }
 .flatpickr-day.prevMonthDay, .flatpickr-day.nextMonthDay { color: var(--text-tertiary); }
 .flatpickr-day.flatpickr-disabled, .flatpickr-day.flatpickr-disabled:hover { color: var(--ink-400); }
 /* Time picker */
@@ -853,7 +868,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
    the right border). Pair with the usual border/padding utility classes. */
 .bb-select {
   appearance: none; -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-image: var(--select-chevron);
   background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1rem 1rem;
   padding-right: 2.5rem;
 }
@@ -890,8 +905,8 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   width: 16px;
   height: 16px;
   border-radius: 9999px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgb(14 17 20 / .24);
+  background: var(--on-fill);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--scrim) 24%, transparent);
   transition: transform var(--dur-fast) var(--ease-spring);
 }
 .bb-toggle input:checked + .bb-toggle-track { background: var(--brand-700); }
@@ -906,7 +921,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   background: var(--surface-sticky);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 1px solid rgb(14 17 20 / .06);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink-950) 6%, transparent);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .translucent-bar { background: var(--ink-50); } }
 @media (prefers-reduced-transparency: reduce) { .translucent-bar { background: var(--ink-50); backdrop-filter: none; -webkit-backdrop-filter: none; } }
@@ -937,11 +952,11 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-btn:disabled, .ui-btn[aria-disabled="true"] { cursor: not-allowed; }
   .ui-btn-sm { height: 32px; padding: 0 12px; font-size: 0.8125rem; }
   .ui-btn-lg { height: 44px; padding: 0 18px; font-size: 0.9375rem; border-radius: 10px; }
-  .ui-btn-primary { background: var(--brand-700); color: #fff; box-shadow: var(--shadow-button); }
+  .ui-btn-primary { background: var(--brand-700); color: var(--on-fill); box-shadow: var(--shadow-button); }
   .ui-btn-primary:hover { background: var(--brand-800); }
   .ui-btn-primary:active { background: var(--brand-900); transform: scale(.98); }
   .ui-btn-primary:disabled, .ui-btn-primary[aria-disabled="true"] { background: var(--ink-100); color: var(--ink-500); box-shadow: none; transform: none; }
-  .ui-btn-secondary { background: var(--surface-0); color: var(--ink-900); box-shadow: inset 0 0 0 1px var(--ink-300), var(--shadow-xs); }
+  .ui-btn-secondary { background: var(--surface-0); color: var(--ink-900); box-shadow: inset 0 0 0 1px var(--border-hover), var(--shadow-xs); }
   .ui-btn-secondary:hover { background: var(--ink-25); box-shadow: inset 0 0 0 1px var(--ink-400), var(--shadow-xs); }
   .ui-btn-secondary:active { background: var(--ink-50); }
   .ui-btn-secondary:disabled, .ui-btn-secondary[aria-disabled="true"] { background: var(--ink-50); color: var(--ink-500); box-shadow: inset 0 0 0 1px var(--ink-200); }
@@ -949,15 +964,15 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-btn-tinted:hover { background: var(--brand-200); color: var(--brand-800); }
   .ui-btn-tinted:disabled, .ui-btn-tinted[aria-disabled="true"] { background: var(--ink-100); color: var(--ink-500); }
   .ui-btn-ghost { background: transparent; color: var(--ink-700); }
-  .ui-btn-ghost:hover { background: rgb(14 17 20 / .05); color: var(--ink-900); }
-  .ui-btn-ghost:active { background: rgb(14 17 20 / .10); }
+  .ui-btn-ghost:hover { background: color-mix(in srgb, var(--ink-950) 5%, transparent); color: var(--ink-900); }
+  .ui-btn-ghost:active { background: color-mix(in srgb, var(--ink-950) 10%, transparent); }
   .ui-btn-ghost:disabled, .ui-btn-ghost[aria-disabled="true"] { color: var(--ink-500); background: transparent; }
-  .ui-btn-danger { background: var(--danger-500); color: #fff; box-shadow: var(--shadow-button); }   /* confirm in a modal only (8.46:1) */
+  .ui-btn-danger { background: var(--danger-500); color: var(--on-fill); box-shadow: var(--shadow-button); }   /* confirm in a modal only (8.46:1) */
   .ui-btn-danger:hover { background: var(--danger-600); }
   .ui-btn-danger-ghost { background: transparent; color: var(--danger-500); }                      /* Delete / Discard in rows and menus */
   .ui-btn-danger-ghost:hover { background: var(--danger-50); }
   .ui-btn-icon { width: 32px; height: 32px; padding: 0; color: var(--ink-500); background: transparent; }   /* always with aria-label */
-  .ui-btn-icon:hover { background: rgb(14 17 20 / .05); color: var(--ink-900); }
+  .ui-btn-icon:hover { background: color-mix(in srgb, var(--ink-950) 5%, transparent); color: var(--ink-900); }
   .ui-btn-icon svg { width: 18px; height: 18px; }
   @media (max-width: 1023px) {
     .ui-btn, .ui-btn-sm, .ui-btn-lg { min-height: 44px; }
@@ -980,7 +995,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   textarea.ui-input { height: auto; min-height: 88px; padding: 8px 12px; }
   select.ui-input {
     appearance: none; -webkit-appearance: none; padding-right: 2.5rem;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-image: var(--select-chevron);
     background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1rem 1rem;
   }
   .ui-input::placeholder { color: var(--ink-500); }
@@ -1002,7 +1017,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-card-nested { background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 16px; }
   @media (max-width: 639px) { .ui-card { padding: 16px; } }
   .ui-card-link { transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
-  .ui-card-link:hover { border-color: var(--ink-300); box-shadow: var(--shadow-sm); }
+  .ui-card-link:hover { border-color: var(--border-hover); box-shadow: var(--shadow-sm); }
   .ui-card-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .ui-card-title { font-size: 1.25rem; line-height: 1.625rem; letter-spacing: -0.015em; font-weight: 600; color: var(--ink-950); }
   .ui-card-subtitle { margin-top: 2px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--ink-600); }
@@ -1036,8 +1051,8 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
     border-radius: 9999px; background: var(--ink-200); color: var(--ink-700);
     font-size: 11px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums;
   }
-  .ui-badge-turn { background: var(--brand-700); color: #fff; }
-  .ui-badge-danger { background: var(--danger-500); color: #fff; }
+  .ui-badge-turn { background: var(--brand-700); color: var(--on-fill); }
+  .ui-badge-danger { background: var(--danger-500); color: var(--on-fill); }
 
   /* Tag chip with a 24px remove button */
   .ui-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 2px 0 8px; border-radius: 9999px; background: var(--ink-100); color: var(--ink-700); font-size: 0.75rem; font-weight: 600; }
@@ -1045,15 +1060,15 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-chip button { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 9999px; color: var(--ink-500); }
   .ui-chip button:hover { background: var(--ink-200); color: var(--ink-900); }
 
-  /* Filter chip: aria-pressed="true" turns it ink-900 (never the accent) */
+  /* Filter chip: aria-pressed="true" turns it the inverse surface, dark in both themes (never the accent) */
   .ui-filter-chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9999px; font-size: 0.8125rem; font-weight: 500; color: var(--ink-700); white-space: nowrap; }
   .ui-filter-chip:hover { background: var(--ink-100); }
-  .ui-filter-chip[aria-pressed="true"], .ui-filter-chip.is-selected { background: var(--ink-900); color: #fff; font-weight: 600; }
+  .ui-filter-chip[aria-pressed="true"], .ui-filter-chip.is-selected { background: var(--surface-inverse); color: var(--text-on-inverse); font-weight: 600; }
   @media (max-width: 1023px) { .ui-filter-chip { height: 44px; } }
 
   /* Segmented control (peer views: Home / Routines / Team / Settings).
      <nav class="ui-segmented"><a class="ui-segment" aria-current="page">Home</a>… */
-  .ui-segmented { display: inline-flex; max-width: 100%; overflow-x: auto; padding: 2px; border-radius: 9px; background: rgb(14 17 20 / .055); scrollbar-width: none; }
+  .ui-segmented { display: inline-flex; max-width: 100%; overflow-x: auto; padding: 2px; border-radius: 9px; background: color-mix(in srgb, var(--ink-950) 5.5%, transparent); scrollbar-width: none; }
   .ui-segmented::-webkit-scrollbar { display: none; }
   .ui-segment {
     display: inline-flex; align-items: center; justify-content: center; padding: 5px 14px; border-radius: 7px;
@@ -1091,7 +1106,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   /* Tables */
   .ui-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface-0); }
   .ui-table { width: 100%; border-collapse: collapse; }
-  .ui-table th { height: 36px; padding: 0 16px; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--ink-600); background: var(--ink-25); border-bottom: 1px solid var(--ink-300); white-space: nowrap; }
+  .ui-table th { height: 36px; padding: 0 16px; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--ink-600); background: var(--ink-25); border-bottom: 1px solid var(--border-hover); white-space: nowrap; }
   .ui-table td { padding: 14px 16px; font-size: 0.875rem; line-height: 1.375rem; color: var(--ink-900); border-bottom: 1px solid var(--border); }
   .ui-table tr:last-child td { border-bottom: 0; }
   .ui-table tbody tr:hover { background: var(--ink-25); }
@@ -1130,8 +1145,8 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-modal-body { padding: 0 24px 20px; font-size: 0.875rem; line-height: 1.25rem; color: var(--ink-700); }
   .ui-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border); }
 
-  /* Toast: dark, bottom right (bottom on phones) */
-  .ui-toast { display: flex; align-items: flex-start; gap: 12px; max-width: 420px; border-radius: var(--radius-xl); background: var(--ink-900); padding: 12px 14px; font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; color: #fff; box-shadow: var(--shadow-lg); }
+  /* Toast: the inverse surface (dark in both themes), bottom right (bottom on phones) */
+  .ui-toast { display: flex; align-items: flex-start; gap: 12px; max-width: 420px; border-radius: var(--radius-xl); background: var(--surface-inverse); padding: 12px 14px; font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; color: var(--text-on-inverse); box-shadow: var(--shadow-lg); }
   .ui-toast-detail { display: block; font-size: 0.8125rem; line-height: 1.125rem; font-weight: 400; color: var(--ink-300); }
   .ui-toast-action { font-weight: 600; color: var(--brand-300); }
   .ui-toast-action:hover { text-decoration: underline; }
@@ -1171,7 +1186,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 .stage:first-child::before { display: none; }
 .stage:not([data-state="waiting"])::before { background: var(--success-500); }
 .stage-node { position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 9999px; background: var(--surface-0);
-              display: grid; place-items: center; color: #fff; }
+              display: grid; place-items: center; color: var(--on-fill); }
 .stage-node svg { width: 10px; height: 10px; }
 .stage[data-state="done"] .stage-node { background: var(--success-500); }
 .stage[data-state="failed"] .stage-node { background: var(--danger-500); }
@@ -1188,25 +1203,27 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 .receipt-item:last-child { padding-bottom: 0; }
 .receipt-item:last-child::before { display: none; }
 .receipt-item time, .receipt-item .receipt-meta { color: var(--ink-500); font-variant-numeric: tabular-nums; }
-.receipt-node { flex: none; width: 16px; height: 16px; margin-top: 1px; border-radius: 9999px; background: var(--surface-0); display: grid; place-items: center; color: #fff; }
+.receipt-node { flex: none; width: 16px; height: 16px; margin-top: 1px; border-radius: 9999px; background: var(--surface-0); display: grid; place-items: center; color: var(--on-fill); }
 .receipt-node svg { width: 10px; height: 10px; }
 .receipt-item[data-state="done"] .receipt-node { background: var(--success-500); }
 .receipt-item[data-state="current"] .receipt-node { box-shadow: inset 0 0 0 2px var(--info-500); }
 .receipt-item[data-state="pending"] .receipt-node { box-shadow: inset 0 0 0 1.5px var(--ink-400); }   /* 3.57:1 + the word "Pending" */
 .receipt-item[data-state="failed"] .receipt-node { background: var(--danger-500); }
 
-/* Hour-bar chart: 24 bars, single series in ink, the current hour in ink-900, failures stacked in danger */
-.hour-chart { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; align-items: end; height: 96px; border-bottom: 1px solid var(--ink-300); }
+/* Hour-bar chart: 24 bars, single series in ink, the current hour in ink-900, failures stacked in danger.
+   The current hour and the timeline's now line are marks on the card, not surfaces: they keep ink-900,
+   which flips with the theme, so each stays the strongest mark (3:1 on the card in both themes). */
+.hour-chart { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; align-items: end; height: 96px; border-bottom: 1px solid var(--border-hover); }
 .hour-bar { display: flex; flex-direction: column; justify-content: flex-start; background: var(--ink-400); border-radius: 4px 4px 0 0; min-height: 0; }
 .hour-bar.is-now { background: var(--ink-900); }
 .hour-bar:hover, .hour-bar:focus-visible { background: var(--ink-600); }
 .hour-bar-fail { background: var(--danger-500); border-radius: 4px 4px 0 0; box-shadow: 0 2px 0 var(--surface-0); margin-bottom: 2px; }
 .chart-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.75rem; line-height: 1rem; font-weight: 500; color: var(--ink-500); font-variant-numeric: tabular-nums; }
-.chart-tip { background: var(--ink-900); color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; line-height: 1rem; box-shadow: var(--shadow-lg); pointer-events: none; }
+.chart-tip { background: var(--surface-inverse); color: var(--text-on-inverse); border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; line-height: 1rem; box-shadow: var(--shadow-lg); pointer-events: none; }
 
 /* Next-24-hours timeline (desktop). Below 768px it renders as a plain list. */
 .timeline { position: relative; height: 150px; }
-.timeline-axis { position: absolute; left: 0; right: 0; top: 70px; height: 1px; background: var(--ink-300); }
+.timeline-axis { position: absolute; left: 0; right: 0; top: 70px; height: 1px; background: var(--border-hover); }
 .timeline-now { position: absolute; top: 22px; bottom: 30px; width: 2px; border-radius: 1px; background: var(--ink-900); }
 .timeline-quiet { position: absolute; top: 52px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
                   font-size: 0.75rem; font-weight: 500; color: var(--ink-600);
@@ -1261,5 +1278,5 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 }
 
 /* Keyframes repeated outside @theme so plain CSS that reads var(--animate-*) always finds them */
-@keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgb(3 90 123 / .35); } 70% { box-shadow: 0 0 0 6px rgb(3 90 123 / 0); } 100% { box-shadow: 0 0 0 0 rgb(3 90 123 / 0); } }
+@keyframes live-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info-500) 35%, transparent); } 70% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--info-500) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info-500) 0%, transparent); } }
 @keyframes skeleton { from { background-position: 200% 0; } to { background-position: -200% 0; } }

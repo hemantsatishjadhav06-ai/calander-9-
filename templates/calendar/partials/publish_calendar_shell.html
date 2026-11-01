@@ -77,7 +77,7 @@ Toolbar: nav arrows + period + Today + Month/Week/Day | right: filter dropdowns.
     </div>
 
     <!-- Calendar content area (swapped by HTMX) -->
-    <div id="calendar-content" class="rounded-2xl border border-ink-200 bg-white shadow-xs overflow-hidden">
+    <div id="calendar-content" class="rounded-2xl border border-ink-200 bg-surface shadow-xs overflow-hidden">
         {% if view_type == 'month' %}
             {% include "calendar/partials/month_grid.html" %}
         {% elif view_type == 'week' %}

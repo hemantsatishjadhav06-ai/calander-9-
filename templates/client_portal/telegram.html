@@ -26,7 +26,7 @@
     <div role="status" class="space-y-3 rounded-xl bg-ink-50 p-4 ring-1 ring-inset ring-ink-200" data-portal-personal-pairing>
       {% if pairing_url %}<a href="{{ pairing_url }}" target="_blank" rel="noopener noreferrer" class="ui-btn ui-btn-primary max-sm:w-full">Open Telegram and link my account</a>{% endif %}
       <p class="text-sm text-ink-700">Or open @{{ connection.bot_username }} in a private Telegram chat and send this command yourself:</p>
-      <code class="block select-all break-all rounded-md bg-white px-3 py-2 font-mono text-[13px] text-ink-900 ring-1 ring-inset ring-ink-200">{{ pairing_command }}</code>
+      <code class="block select-all break-all rounded-md bg-surface px-3 py-2 font-mono text-[13px] text-ink-900 ring-1 ring-inset ring-ink-200">{{ pairing_command }}</code>
       <p class="text-xs text-ink-600">Expires {{ expires_at|date:"j M Y, H:i T" }}. This link and code work once and are shown only now. Keep them private.</p>
     </div>
     {% endif %}

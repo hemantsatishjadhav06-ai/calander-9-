@@ -39,7 +39,7 @@ Context: live.
             {% endif %}
             <rect x="{{ hour.slot_x }}%" y="0" width="{{ hour.slot }}%" height="{{ activity.height }}" fill="transparent" data-hit="{{ hour.index }}" data-range="{{ hour.range }}{% if hour.is_now %} (this hour){% endif %}" data-total="{{ hour.total }}" data-failed="{{ hour.failed }}" data-top="{{ hour.y }}"><title>{{ hour.range }}: {{ hour.total }} {{ hour.total|pluralize:"turn,turns" }}{% if hour.failed %}, {{ hour.failed }} stopped{% endif %}</title></rect>
             {% endfor %}
-            <line x1="0" x2="100%" y1="{{ activity.baseline }}" y2="{{ activity.baseline }}" class="stroke-ink-300" stroke-width="1"/>
+            <line x1="0" x2="100%" y1="{{ activity.baseline }}" y2="{{ activity.baseline }}" class="stroke-line-strong" stroke-width="1"/>
         </svg>
         <div class="chart-tip absolute left-0 top-0 z-10 hidden whitespace-nowrap" data-chart-tip aria-hidden="true"></div>
     </div>
@@ -60,7 +60,7 @@ Context: live.
             <table class="w-full text-[13px]">
                 <caption class="sr-only">Turns your team took each hour, last 24 hours, times in {{ live.tzname }}</caption>
                 <thead class="sticky top-0 bg-ink-25">
-                    <tr class="border-b border-ink-300">
+                    <tr class="border-b border-line-strong">
                         <th scope="col" class="h-8 px-3 text-left text-xs font-semibold text-ink-600">Hour</th>
                         <th scope="col" class="h-8 px-3 text-right text-xs font-semibold text-ink-600">Turns</th>
                         <th scope="col" class="h-8 px-3 text-right text-xs font-semibold text-ink-600">Stopped</th>

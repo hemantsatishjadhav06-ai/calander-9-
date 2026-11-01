@@ -10,7 +10,7 @@
     </div>
 
     {% if subscription and subscription.status == "active" %}
-    <div class="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-white px-4 py-1.5 shadow-xs ring-1 ring-inset ring-ink-200">
+    <div class="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-surface px-4 py-1.5 shadow-xs ring-1 ring-inset ring-ink-200">
         <dl class="flex items-center gap-4">
             <div>
                 <dt class="text-caption text-ink-600">Plan</dt>
@@ -253,7 +253,7 @@
         border-radius: 9999px;
         background: var(--ink-100);
         color: var(--ink-700);
-        box-shadow: inset 0 0 0 1px var(--ink-300);
+        box-shadow: inset 0 0 0 1px var(--border-hover);
         font-size: 0.625rem;
         font-weight: 700;
     }

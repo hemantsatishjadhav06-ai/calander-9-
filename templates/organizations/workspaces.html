@@ -8,7 +8,7 @@
     </header>
 
     {% if workspace_data %}
-    <ul class="ui-list overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xs" role="list">
+    <ul class="ui-list overflow-hidden rounded-xl border border-ink-200 bg-surface shadow-xs" role="list">
         {% for item in workspace_data %}
         <li class="px-4 py-4 sm:px-5">
             {% include "organizations/partials/workspace_card.html" with item=item %}

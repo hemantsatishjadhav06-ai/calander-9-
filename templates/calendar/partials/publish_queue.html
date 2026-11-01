@@ -34,7 +34,7 @@ Shows all scheduled platform posts grouped by date. Loaded via HTMX into #tab-co
                 </div>
 
                 <!-- Right: post card -->
-                <div x-data class="flex-1 min-w-0 bg-white rounded-xl border border-ink-200 shadow-xs ui-card-link">
+                <div x-data class="flex-1 min-w-0 bg-surface rounded-xl border border-ink-200 shadow-xs ui-card-link">
                     <div class="p-4 cursor-pointer" @click="window.location='{% url 'composer:compose_edit' workspace_id=workspace.id post_id=pp.post_id %}?account={{ pp.social_account_id }}'">
                         <!-- Channel info -->
                         <div class="flex items-center gap-2 mb-1.5 min-w-0">
@@ -56,7 +56,7 @@ Shows all scheduled platform posts grouped by date. Loaded via HTMX into #tab-co
                         {% if pp.post.media_attachments.exists %}
                         <div class="flex gap-1.5 mt-3">
                             {% for att in pp.post.media_attachments.all|slice:":4" %}
-                            <div class="w-11 h-11 rounded-[7px] overflow-hidden bg-ink-50 flex-shrink-0 relative shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]">
+                            <div class="w-11 h-11 rounded-[7px] overflow-hidden bg-ink-50 flex-shrink-0 relative shadow-[var(--shadow-creative)]">
                                 {% if att.media_asset.thumbnail %}
                                     <img src="{{ att.media_asset.thumbnail.url }}" alt="" class="w-full h-full object-cover">
                                 {% elif att.media_asset.media_type == 'image' or att.media_asset.media_type == 'gif' %}
@@ -66,7 +66,7 @@ Shows all scheduled platform posts grouped by date. Loaded via HTMX into #tab-co
                                 {% endif %}
                                 {% if att.media_asset.media_type == 'video' %}
                                 <div class="absolute inset-0 flex items-center justify-center">
-                                    <div class="w-5 h-5 rounded-full bg-ink-950/60 flex items-center justify-center">
+                                    <div class="w-5 h-5 rounded-full bg-scrim/60 flex items-center justify-center">
                                         <svg class="w-2.5 h-2.5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 9-14 9V3z"/></svg>
                                     </div>
                                 </div>

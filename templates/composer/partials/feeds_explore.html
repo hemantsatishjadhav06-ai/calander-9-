@@ -9,7 +9,7 @@
                 hx-target="#explore-feeds-content"
                 hx-swap="innerHTML"
                 aria-pressed="{% if cat.slug == active_category %}true{% else %}false{% endif %}"
-                class="ui-filter-chip {% if cat.slug == active_category %}is-selected{% else %}bg-white ring-1 ring-inset ring-ink-200{% endif %}">
+                class="ui-filter-chip {% if cat.slug == active_category %}is-selected{% else %}bg-surface ring-1 ring-inset ring-ink-200{% endif %}">
             {{ cat.label }}
         </button>
         {% endfor %}

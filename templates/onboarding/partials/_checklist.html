@@ -10,7 +10,7 @@ checklist_total_count, checklist_dismissed. Refreshes itself when an idea change
      hx-trigger="ideaChanged from:body"
      hx-swap="outerHTML"
      {% endif %}
-     class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" data-onboarding-checklist
+     class="overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-xs" data-onboarding-checklist
      x-data="{ open: window.matchMedia('(min-width: 1024px)').matches }">
     <div class="flex items-center justify-between gap-3 px-4 sm:px-5 py-3" x-bind:class="open && 'border-b border-ink-200'">
         <button type="button" class="flex min-h-11 min-w-0 items-center gap-2.5 rounded-lg text-left" x-on:click="open = !open" x-bind:aria-expanded="open" aria-controls="onboarding-checklist-items">
@@ -39,11 +39,11 @@ checklist_total_count, checklist_dismissed. Refreshes itself when an idea change
         <li>
             <a href="{{ item.url }}" class="group flex items-center gap-3 px-4 sm:px-5 py-3 no-underline transition-colors hover:bg-ink-25 focus-visible:-outline-offset-2">
                 {% if item.completed %}
-                <span class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-success-500 text-white" aria-hidden="true">
+                <span class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-success-500 text-on-fill" aria-hidden="true">
                     <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 </span>
                 {% else %}
-                <span class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)] tabular-nums" aria-hidden="true">{{ forloop.counter }}</span>
+                <span class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-surface text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)] tabular-nums" aria-hidden="true">{{ forloop.counter }}</span>
                 {% endif %}
                 <span class="min-w-0 flex-1">
                     <span class="block text-sm font-medium {% if item.completed %}text-ink-500 line-through decoration-ink-400{% else %}text-ink-900{% endif %}">{{ item.title }}<span class="sr-only">{% if item.completed %} (done){% endif %}</span></span>

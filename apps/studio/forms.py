@@ -232,7 +232,7 @@ class BrandProfileForm(forms.ModelForm):
         self.initial["logo"] = str(self.instance.logo_id or "")
         for name, field in self.fields.items():
             if name in ("primary_color", "accent_color"):
-                field.widget.attrs["class"] = "h-10 w-16 rounded-lg border border-ink-400 bg-white p-1 cursor-pointer"
+                field.widget.attrs["class"] = "h-10 w-16 rounded-lg border border-ink-400 bg-surface p-1 cursor-pointer"
             else:
                 field.widget.attrs.setdefault("class", _FIELD)
 

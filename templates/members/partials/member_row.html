@@ -93,7 +93,7 @@
             {% if wm.workspace.icon %}
             <img src="{{ wm.workspace.icon.url }}" alt="" class="size-5 rounded-full object-cover">
             {% else %}
-            <span class="grid size-5 place-items-center rounded-full bg-white text-[11px] font-semibold text-ink-700" aria-hidden="true">{{ wm.workspace.name|first|upper }}</span>
+            <span class="grid size-5 place-items-center rounded-full bg-surface text-[11px] font-semibold text-ink-700" aria-hidden="true">{{ wm.workspace.name|first|upper }}</span>
             {% endif %}
             {{ wm.workspace.name }}
         </li>

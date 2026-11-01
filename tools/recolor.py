@@ -18,10 +18,22 @@ sections 1-7; the system itself is docs/DESIGN_SYSTEM.md). It rewrites, in place
   literal hex everywhere else (emails, the marketing site, legal and error pages, which do not
   load the tokens). ``var(--x, #hex)`` loses its now-pointless fallback when ``--x`` is a token.
 
+* The dark pass (Phase 3, F1; docs/specs/phase-3.md T3). The scale utilities follow the theme
+  by themselves (``@theme inline``); what does not follow moves to a token whose light value is
+  the literal it replaces, so light cannot move: ``bg-white`` is ``bg-surface``; ``text-white``
+  on a fill that flips (its own or the nearest ancestor's) is ``text-on-fill``; a solid
+  ``bg-ink-800|900|950`` whose children use white or 200/300 steps, or that ``INVERSE_ROLES``
+  names (logo marks, a tooltip, a selected chip), stays dark in both themes as
+  ``bg-inverse``/``text-on-inverse`` (and keeps its light look through ``data-theme-scope``
+  when a child uses a step that flips); scrims are ``bg-scrim/NN``; white edges are ``-surface``,
+  ``-on-fill`` or ``-on-inverse`` by what they sit on; ink-300 edges (a text grey in dark) are
+  the edge token. The light content scope (``data-theme-scope="light"``: platform previews) and
+  pages that do not load the stylesheet are left alone.
+
 What it leaves alone: platform and brand colours (only colours in the old palettes are
 mapped, so LinkedIn ``#0A66C2`` or a client's navy never move), user-chosen label colours
 (colour pickers and their presets), component classes such as ``btn-neutral``, tests,
-migrations and vendored JS.
+migrations and vendored JS, and any line marked ``recolor: keep`` (white over a photo).
 
 It is idempotent: the output contains no old palette names and no mapped hex, so a second
 run changes nothing.
@@ -30,8 +42,10 @@ Usage::
 
     python tools/recolor.py            # rewrite every target file
     python tools/recolor.py --check    # change nothing; list files that would change, any old
-                                       # palette class left anywhere, and any marketing screenshot
-                                       # that still shows the orange interface (exit 1 if any)
+                                       # palette class left anywhere, any marketing screenshot
+                                       # that still shows the orange interface, what the dark
+                                       # rules find, and any colour styles.css writes outside
+                                       # Layer 1 (exit 1 if any)
     python tools/recolor.py path ...   # only these files
     python tools/recolor.py --diff     # print a unified diff instead of writing
 """
@@ -43,9 +57,14 @@ import difflib
 import re
 import sys
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+#: The repository this file belongs to (ROOT may be pointed elsewhere by the tests).
+REPO = ROOT
+if str(REPO) not in sys.path:  # `python tools/recolor.py` puts tools/ on the path, not the repository
+    sys.path.insert(0, str(REPO))
 
 # ─────────────────────────────── Tailwind classes ───────────────────────────────
 
@@ -546,11 +565,8 @@ class CssRecolor:
                 return f"#{new[0]:02X}{new[1]:02X}{new[2]:02X}"
             return f"rgba({new[0]}, {new[1]}, {new[2]}{alpha.rstrip()})"
 
-        css = re.sub(
-            r"rgba\(\s*var\(--primary-rgb\s*,\s*249\s*,\s*115\s*,\s*22\s*\)",
-            "rgba(var(--primary-rgb)" if self.tokens else "rgba(17, 86, 65",
-            css,
-        )
+        # --primary-rgb is retired (Phase 3, F1): the old orange fallback becomes the literal Pine.
+        css = re.sub(r"rgba\(\s*var\(--primary-rgb\s*,\s*249\s*,\s*115\s*,\s*22\s*\)", "rgba(17, 86, 65", css)
         return RGBA_RE.sub(repl, css)
 
     def _literal(self, raw: str, *, text: bool) -> str:
@@ -614,6 +630,486 @@ def recolor_html_colours(text: str, *, tokens: bool, defined: set[str]) -> str:
     return text
 
 
+# ─────────────────────────────── Dark mode (Phase 3, F1) ───────────────────────────────
+#
+# The dark theme redefines Layer 1, so every scale utility flips by itself. These rules move what does
+# not follow to tokens whose light value is the literal they replace (docs/specs/phase-3.md T3):
+# bg-white -> bg-surface, text-white on a fill that flips -> text-on-fill, the elements that stay dark
+# in both themes -> bg-inverse/text-on-inverse, scrims -> bg-scrim/NN, white edges by what they sit on,
+# ink-300 edges (a text grey in dark) -> the edge token. They read the element a class sits on and its
+# ancestors, so a child's white is judged by the fill it is drawn over.
+
+INVERSE, DARK, FLIP, LIGHT = "inverse", "dark", "flips", "light"
+
+#: Elements that stay dark in both themes by role though nothing inside them is white: per template,
+#: markers of the element's start tag. The workspace initial (the logo mark), the composer's tooltip and
+#: its selected override chip (a selected filter chip). The selection bars and toasts need no entry:
+#: their children use white or 200/300 steps, which makes a dark fill inverse by itself.
+INVERSE_ROLES: dict[str, tuple[str, ...]] = {
+    "base.html": ("rounded-[7px] flex items-center justify-center",),
+    "client_portal/portal_base.html": ("flex size-7 flex-shrink-0 items-center justify-center rounded-[7px]",),
+    "client_portal/magic_link_confirm.html": ("rounded-[10px]",),
+    "workspaces/list.html": ("grid size-9 shrink-0 place-items-center rounded-[7px]",),
+    "organizations/partials/workspace_card.html": ("grid size-9 shrink-0 place-items-center rounded-[7px]",),
+    "onboarding/connection_page.html": ("inline-flex h-14 w-14 items-center justify-center rounded-2xl",),
+    "composer/compose.html": (
+        "pointer-events-none absolute left-3 -top-6",
+        ":data-testid=\"'compose-override-toggle-' + accId\"",
+    ),
+}
+#: Component classes that paint a fill (styles.css and the toast partial).
+CLASS_FILLS: dict[str, str] = {
+    "ui-toast": INVERSE,
+    "bb-toast": INVERSE,
+    "chart-tip": INVERSE,
+    "sidebar-logo-mark": INVERSE,
+    "ui-btn-primary": FLIP,
+    "ui-btn-danger": FLIP,
+    "ui-badge-turn": FLIP,
+    "ui-badge-danger": FLIP,
+    "btn-brand": FLIP,
+}
+#: Colours that flip and are not a scale step (they follow the theme through Layer 2).
+SEMANTIC_FLIPS = {
+    "on-fill",
+    "surface",
+    "canvas",
+    "sunken",
+    "sidebar",
+    "fg",
+    "fg-strong",
+    "fg-muted",
+    "fg-subtle",
+    "line",
+    "line-strong",
+    "control",
+}
+#: A platform's own colours (glyphs and previews show the platform as it is).
+PLATFORM_HEX = {"0A66C2", "1877F2", "FF0000", "E60023", "FE2C55", "3897F0", "0085FF", "6364FF"}
+
+#: A colour utility: 1 variant chain, 2 important, 3 utility, 4 colour, 5 opacity modifier.
+UTIL_RE = re.compile(
+    r"(?<![\w-])((?:[a-z0-9-]+:|\[[^\]\s]+\]:)*)(!?)"
+    r"(bg|text|ring|outline|border(?:-[xytrbl])?|divide(?:-[xy])?|stroke|fill|from|via|to|decoration|"
+    r"placeholder|accent|caret)"
+    r"-([a-z]+(?:-[a-z]+)*(?:-\d+)?)((?:/\d{1,3})?)(?![\w/-])"
+)
+SCALE_STEP_RE = re.compile(r"^(ink|brand|success|warning|danger|info)-(\d+)$")
+SOLID_WHITE_RE = re.compile(r"(?<![\w-])((?:[a-z0-9-]+:|\[[^\]\s]+\]:)*!?)bg-white(?![\w/-])")
+SCRIM_SRC_RE = re.compile(r"(?<![\w-])((?:[a-z0-9-]+:|\[[^\]\s]+\]:)*!?)bg-ink-(950|900)/(\d{1,3})(?![\w/-])")
+INK300_EDGE_RE = re.compile(
+    r"(?<![\w-])((?:[a-z0-9-]+:|\[[^\]\s]+\]:)*!?)"
+    r"(border(?:-[xytrbl])?|ring|divide(?:-[xy])?|outline|stroke)-ink-300(?![\w/-])"
+)
+ARBITRARY_SHADOW_RE = re.compile(r"(?<![\w-])shadow-\[([^\]\s]+)\]")
+SHADOW_INK_RE = re.compile(r"rgba?\(14[,_\s]+17[,_\s]+20[,_\s/]+([\d.]+)\)")
+CSS_EDGE_PROPERTY_RE = re.compile(r"^(?:border(?:-[a-z-]+)?|outline(?:-color)?|box-shadow|column-rule(?:-color)?)$")
+CLASS_ATTR_RE = re.compile(r"""(?<![\w.-])((?:x-bind)?:?class)\s*=\s*(["'])(.*?)\2""", re.S)
+TAG_OPEN_RE = re.compile(r"<(/?)([a-zA-Z][\w:-]*)")
+VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+BREAKPOINT_RE = re.compile(r"^(?:max-|min-)?(?:sm|md|lg|xl|2xl)$")
+SCOPE_ATTR = 'data-theme-scope="light"'
+
+
+def _blank(match: re.Match) -> str:
+    return re.sub(r"[^\n]", " ", match.group(0))
+
+
+def _mask(text: str) -> str:
+    """*text* with comments and template tags blanked (same length), so markup can be read around them."""
+    text = re.sub(r"{%\s*comment\b.*?%}.*?{%\s*endcomment\s*%}", _blank, text, flags=re.S)
+    text = re.sub(r"<!--.*?-->", _blank, text, flags=re.S)
+    return re.sub(r"{#.*?#}|{{.*?}}|{%.*?%}", _blank, text, flags=re.S)
+
+
+@dataclass
+class Token:
+    """One colour utility in a class attribute, at its place in the template."""
+
+    start: int
+    end: int
+    chain: str
+    bang: str
+    util: str
+    colour: str
+    mod: str
+
+    @property
+    def text(self) -> str:
+        return f"{self.chain}{self.bang}{self.util}-{self.colour}{self.mod}"
+
+    @property
+    def state(self) -> str:
+        """The variant chain without breakpoints: ``md:hover:`` is ``hover:``; ``lg:`` is the base."""
+        return "".join(part + ":" for part in self.chain.split(":") if part and not BREAKPOINT_RE.match(part))
+
+
+@dataclass
+class Element:
+    """A start tag, where it sits in the tree, and the classes it carries (``class``, ``:class``)."""
+
+    name: str
+    start: int
+    tag_end: int
+    tag: str
+    ancestors: tuple[int, ...]
+    in_light_scope: bool
+    classes: tuple[str, ...]
+    tokens: tuple[Token, ...]
+    close: int = -1
+
+
+def _tokens(masked: str, start: int, end: int) -> tuple[list[str], list[Token]]:
+    classes: list[str] = []
+    tokens: list[Token] = []
+    for attr in CLASS_ATTR_RE.finditer(masked, start, end):
+        value_start = attr.start(3)
+        value = attr.group(3)
+        classes += [word.strip("'\"{}(),:") for word in value.split()]
+        for m in UTIL_RE.finditer(value):
+            tokens.append(Token(value_start + m.start(), value_start + m.end(), *m.groups()))
+    return [word for word in classes if word], tokens
+
+
+def elements(text: str) -> list[Element]:
+    """Every start tag of a template, in order, with its ancestors (a tolerant HTML reading).
+
+    Comments and template tags are blanked first, so a quote inside ``{{ … }}`` cannot end an attribute
+    and a tag in a comment is not markup; ``<script>`` and ``<style>`` hold no elements; a closing tag
+    closes the nearest open element of its name.
+    """
+    masked = _mask(text)
+    found: list[Element] = []
+    stack: list[int] = []
+    pos = 0
+    while True:
+        m = TAG_OPEN_RE.search(masked, pos)
+        if not m:
+            break
+        name = m.group(2).lower()
+        if m.group(1):  # a closing tag
+            for depth in range(len(stack) - 1, -1, -1):
+                if found[stack[depth]].name == name:
+                    for index in stack[depth:]:
+                        found[index].close = m.start()
+                    del stack[depth:]
+                    break
+            pos = m.end()
+            continue
+        gt = _unquoted_gt(masked[m.start() :])
+        if gt == -1:
+            break
+        end = m.start() + gt + 1
+        tag = masked[m.start() : end]
+        classes, tokens = _tokens(masked, m.start(), end)
+        parent_scoped = bool(stack) and found[stack[-1]].in_light_scope
+        element = Element(
+            name=name,
+            start=m.start(),
+            tag_end=end,
+            tag=text[m.start() : end],
+            ancestors=tuple(reversed(stack)),
+            in_light_scope=parent_scoped or SCOPE_ATTR in tag,
+            classes=tuple(classes),
+            tokens=tuple(tokens),
+            close=end,
+        )
+        found.append(element)
+        pos = end
+        if name in ("script", "style") and not tag.endswith("/>"):
+            close = masked.lower().find(f"</{name}", end)
+            element.close = len(text) if close == -1 else close
+            pos = element.close
+        elif name not in VOID_TAGS and not tag.endswith("/>"):
+            stack.append(len(found) - 1)
+    for index in stack:
+        found[index].close = len(text)
+    return found
+
+
+def _line_span(text: str, pos: int) -> str:
+    start = text.rfind("\n", 0, pos) + 1
+    end = text.find("\n", pos)
+    return text[start : end if end != -1 else len(text)]
+
+
+def _kept(text: str, pos: int) -> bool:
+    return bool(KEEP_LINE_RE.search(_line_span(text, pos)))
+
+
+def _line_of(text: str, pos: int) -> int:
+    return text.count("\n", 0, pos) + 1
+
+
+def _scope_ranges(found: list[Element]) -> list[tuple[int, int]]:
+    return [(element.start, element.close) for element in found if SCOPE_ATTR in element.tag]
+
+
+def _in(ranges: list[tuple[int, int]], pos: int) -> bool:
+    return any(start <= pos < end for start, end in ranges)
+
+
+def fill_kind(util: str, colour: str, mod: str) -> str | None:
+    """What a ``bg-*`` utility paints: inverse, dark in both themes, a fill that flips, or a light fill."""
+    if util != "bg":
+        return None
+    alpha = int(mod[1:]) if mod else 100
+    if colour == "inverse":
+        return INVERSE
+    if colour in ("scrim", "black"):
+        return DARK if alpha >= 20 else None
+    if alpha < 50:
+        return None  # a tint, not a fill
+    if colour in ("white", "surface", "canvas", "sunken", "sidebar"):
+        return LIGHT
+    step = SCALE_STEP_RE.match(colour)
+    if not step:
+        return None
+    scale, number = step.group(1), int(step.group(2))
+    dark_from = {"ink": 700, "brand": 600}.get(scale, 500)
+    return FLIP if number >= dark_from else LIGHT
+
+
+def _own_fills(element: Element) -> dict[str, set[str]]:
+    """The fills an element paints, per state (``""`` is the base)."""
+    fills: dict[str, set[str]] = {}
+    for token in element.tokens:
+        kind = fill_kind(token.util, token.colour, token.mod)
+        if kind:
+            fills.setdefault(token.state, set()).add(kind)
+    for word in element.classes:
+        kind = CLASS_FILLS.get(word) or (DARK if word.startswith("pi-") else None)
+        if kind:
+            fills.setdefault("", set()).add(kind)
+    return fills
+
+
+def _ancestor_fill(fills: list[dict[str, set[str]]], element: Element) -> set[str]:
+    """The base fill of the nearest ancestor that paints one (empty when none does)."""
+    for index in element.ancestors:
+        base = fills[index].get("")
+        if base:
+            return base
+    return set()
+
+
+def _named_inverse(name: str, element: Element) -> bool:
+    return any(marker in element.tag for marker in INVERSE_ROLES.get(name, ()))
+
+
+def _children_use_white_or_pale_steps(found: list[Element], element: Element) -> bool:
+    for child in found:
+        if child.start <= element.start:
+            continue
+        if child.start >= element.close:
+            break
+        for token in child.tokens:
+            step = SCALE_STEP_RE.match(token.colour)
+            if token.colour == "white" or (step and step.group(2) in ("200", "300")):
+                return True
+    return False
+
+
+_CONSTANT_CACHE: dict[str, frozenset[str]] = {}
+
+
+def constant_steps() -> frozenset[str]:
+    """The scale steps whose dark value equals their light value (styles.css): they read the same on
+    the inverse surface in both themes."""
+    path = ROOT / "theme" / "static_src" / "src" / "styles.css"
+    css = path.read_text(encoding="utf-8") if path.exists() else ""
+    if css not in _CONSTANT_CACHE:
+        from tools import contrast
+
+        try:
+            sheet = contrast.load(css)
+        except LookupError:
+            _CONSTANT_CACHE[css] = frozenset()
+        else:
+            _CONSTANT_CACHE[css] = frozenset(
+                name[2:] for name, value in sheet.layer1.items() if sheet.dark.get(name, "").upper() == value.upper()
+            )
+    return _CONSTANT_CACHE[css]
+
+
+def _flips_on_inverse(token: Token, constant: frozenset[str]) -> bool:
+    """A colour that would change on the inverse surface, which does not (white, on-inverse and the
+    constant steps read the same; ink-300 is the inverse surface's detail grey in both themes)."""
+    if token.util == "text" and token.colour == "ink-300":
+        return False
+    if token.colour in SEMANTIC_FLIPS:
+        return True
+    return bool(SCALE_STEP_RE.match(token.colour)) and token.colour not in constant
+
+
+def _scrim(m: re.Match) -> str:
+    chain, step, alpha = m.group(1), m.group(2), int(m.group(3))
+    if step == "950" or alpha >= 30:
+        return f"{chain}bg-scrim/{alpha}"
+    return m.group(0)
+
+
+def _arbitrary_shadow(m: re.Match) -> str:
+    value = m.group(1)
+    if value == "inset_0_0_0_1px_rgba(14,17,20,.06)":
+        return "shadow-[var(--shadow-creative)]"
+
+    def mix(colour: re.Match) -> str:
+        percent = f"{float(colour.group(1)) * 100:g}"
+        return f"color-mix(in_srgb,var(--scrim)_{percent}%,transparent)"
+
+    return f"shadow-[{SHADOW_INK_RE.sub(mix, value)}]"
+
+
+def _rewrite_outside(text: str, pattern: re.Pattern, repl, ranges: list[tuple[int, int]]) -> str:
+    def guarded(m: re.Match) -> str:
+        if _in(ranges, m.start()) or _kept(text, m.start()):
+            return m.group(0)
+        return repl(m) if callable(repl) else m.expand(repl)
+
+    return pattern.sub(guarded, text)
+
+
+def _css_edges(css: str) -> str:
+    """``var(--ink-300)`` drawn as an edge (border, outline, box-shadow) in template CSS -> the edge token."""
+
+    def declaration(m: re.Match) -> str:
+        if not CSS_EDGE_PROPERTY_RE.match(m.group(1).lower()):
+            return m.group(0)
+        return m.group(0).replace("var(--ink-300)", "var(--border-hover)")
+
+    return re.sub(r"([-\w]+)(\s*:[^;{}]*)", declaration, css)
+
+
+def dark_class_strings(text: str, ranges: list[tuple[int, int]] | None = None) -> str:
+    """The rules that need no element: bg-white, scrims, ink-300 edges, literal arbitrary shadows."""
+    ranges = ranges or []
+    text = _rewrite_outside(text, SOLID_WHITE_RE, r"\1bg-surface", ranges)
+    text = _rewrite_outside(text, SCRIM_SRC_RE, _scrim, ranges)
+    text = _rewrite_outside(text, INK300_EDGE_RE, r"\1\2-line-strong", ranges)
+    return _rewrite_outside(text, ARBITRARY_SHADOW_RE, _arbitrary_shadow, ranges)
+
+
+def _token_text(token: Token, colour: str, mod: str | None = None) -> str:
+    return f"{token.chain}{token.bang}{token.util}-{colour}{token.mod if mod is None else mod}"
+
+
+def _edge_colour(own: set[str], around: set[str]) -> str | None:
+    """What a white edge becomes: None keeps white (over a photo or a scrim)."""
+    if DARK in own:
+        return None
+    if INVERSE in own:
+        return "on-inverse"
+    if FLIP in own:
+        return "surface"  # a ring around a disc sits on the card
+    if INVERSE in around:
+        return "on-inverse"
+    if DARK in around:
+        return None
+    return "on-fill" if FLIP in around else "surface"
+
+
+def recolor_dark(text: str, *, name: str = "") -> str:
+    """The dark pass over a template that loads the stylesheet (*name* as the loader knows it)."""
+    ranges = _scope_ranges(elements(text))
+    text = dark_class_strings(text, ranges)
+    text = STYLE_BLOCK_RE.sub(lambda m: m.group(1) + _keep_lines(_css_edges, m.group(2)) + m.group(3), text)
+    text = STYLE_ATTR_RE.sub(
+        lambda m: (
+            m.group(0) if _kept(text, m.start()) else m.group(1) + m.group(2) + _css_edges(m.group(3)) + m.group(2)
+        ),
+        text,
+    )
+    return _dark_in_context(text, name)
+
+
+def _keep_lines(fn, chunk: str) -> str:
+    return "\n".join(line if KEEP_LINE_RE.search(line) else fn(line) for line in chunk.split("\n"))
+
+
+def _decide(text: str, name: str) -> tuple[list[Element], list[dict[str, set[str]]], set[int]]:
+    """The elements, their fills per state, and which solid ink fills are inverse."""
+    found = elements(text)
+    fills = [_own_fills(element) for element in found]
+    inverse: set[int] = set()
+    for index, element in enumerate(found):
+        if element.in_light_scope:
+            continue
+        solid = [
+            token
+            for token in element.tokens
+            if token.util == "bg" and not token.mod and token.colour in ("ink-800", "ink-900", "ink-950")
+        ]
+        if solid and (_named_inverse(name, element) or _children_use_white_or_pale_steps(found, element)):
+            inverse.add(index)
+            fills[index] = {state: (kinds - {FLIP}) | {INVERSE} for state, kinds in fills[index].items()}
+            fills[index].setdefault("", set()).add(INVERSE)
+    return found, fills, inverse
+
+
+def _dark_in_context(text: str, name: str) -> str:
+    found, fills, inverse = _decide(text, name)
+    constant = constant_steps()
+    edits: list[tuple[int, int, str]] = []
+    for index, element in enumerate(found):
+        if element.in_light_scope:
+            continue
+        own = fills[index]
+        around = _ancestor_fill(fills, element)
+        base_white: Token | None = None
+        for token in element.tokens:
+            if _kept(text, token.start):
+                continue
+            state_fill = own.get(token.state) or own.get("", set())
+            if (
+                index in inverse
+                and token.util == "bg"
+                and token.colour in ("ink-800", "ink-900", "ink-950")
+                and not token.mod
+            ):
+                edits.append((token.start, token.end, _token_text(token, "inverse")))
+            elif token.util == "text" and token.colour == "white":
+                if FLIP in state_fill:
+                    edits.append((token.start, token.end, _token_text(token, "on-fill")))
+                elif INVERSE in state_fill and index in inverse:
+                    edits.append((token.start, token.end, _token_text(token, "on-inverse")))
+                elif not state_fill and FLIP in around and not ({INVERSE, DARK} & around):
+                    edits.append((token.start, token.end, _token_text(token, "on-fill")))
+                elif not token.state:
+                    base_white = token
+            elif token.util == "bg" and token.colour == "white" and token.mod:
+                if {INVERSE, DARK} & around:
+                    continue
+                own_fill = {kind for kinds in own.values() for kind in kinds}
+                colour = "on-fill" if FLIP in own_fill or FLIP in around else "surface"
+                edits.append((token.start, token.end, _token_text(token, colour)))
+            elif token.colour == "white" and token.util.startswith(("ring", "outline", "border", "divide")):
+                edge = _edge_colour(own.get("", set()) - {LIGHT}, around)
+                if edge:
+                    edits.append((token.start, token.end, _token_text(token, edge)))
+        if base_white is not None:
+            written = {token.state for token in element.tokens if token.util == "text"}
+            extra = [
+                f" {state}text-on-fill"
+                for state, kinds in own.items()
+                if state and FLIP in kinds and state not in written
+            ]
+            if extra:
+                edits.append((base_white.end, base_white.end, "".join(extra)))
+        # An inverse surface whose children use a step that flips keeps its light look in both themes.
+        if (index in inverse or any(t.util == "bg" and t.colour == "inverse" for t in element.tokens)) and any(
+            _flips_on_inverse(token, constant)
+            for child in found
+            if element.start < child.start < element.close and not child.in_light_scope
+            for token in child.tokens
+        ):
+            at = element.start + 1 + len(element.name)
+            edits.append((at, at, f" {SCOPE_ATTR}"))
+    for start, end, replacement in sorted(edits, key=lambda edit: (edit[0], edit[1]), reverse=True):
+        text = text[:start] + replacement + text[end:]
+    return text
+
+
 # ─────────────────────────────── Files ───────────────────────────────
 
 TOKEN_ROOTS = {
@@ -673,13 +1169,26 @@ def target_files() -> tuple[list[Path], list[Path], list[Path]]:
     return html, js, py
 
 
+def _loader_name(path: Path) -> str:
+    """The template's name as the loader knows it (the part after ``templates/``), or the file name."""
+    parts = path.parts
+    if "templates" not in parts:
+        return path.name
+    index = len(parts) - 1 - parts[::-1].index("templates")
+    return "/".join(parts[index + 1 :])
+
+
 def transform(path: Path, text: str, *, tokens: bool, defined: set[str]) -> str:
     if path.suffix == ".py":
         form_file = path.name.startswith(("forms", "widgets"))
-        return recolor_classes(text, python_form_file=form_file)
+        return dark_class_strings(recolor_classes(text, python_form_file=form_file))
     out = recolor_scrims(recolor_classes(text))
     if path.suffix == ".html":
         out = recolor_html_colours(out, tokens=tokens, defined=defined)
+        if tokens:  # pages that do not load the stylesheet (emails, legal, error) keep their literals
+            out = recolor_dark(out, name=_loader_name(path))
+    else:
+        out = dark_class_strings(out)
     return out
 
 
@@ -690,6 +1199,197 @@ def leftovers(paths: Iterable[Path]) -> list[str]:
             if LEFTOVER_RE.search(line):
                 found.append(f"{p.relative_to(ROOT)}:{n}: {line.strip()[:160]}")
     return found
+
+
+# ─────────────────────────────── Dark checks ───────────────────────────────
+
+
+def class_string_problems(text: str, ranges: list[tuple[int, int]] | None = None) -> list[tuple[int, str]]:
+    """(line, problem) for the rules that need no element: bg-white and ink-300 edges."""
+    ranges = ranges or []
+    found = []
+    for pattern, message in (
+        (SOLID_WHITE_RE, "{token} outside the light scope"),
+        (INK300_EDGE_RE, "{token} is a text grey in dark"),
+    ):
+        for m in pattern.finditer(text):
+            if not (_in(ranges, m.start()) or _kept(text, m.start())):
+                found.append((_line_of(text, m.start()), message.format(token=m.group(0))))
+    return found
+
+
+def dark_problems(text: str) -> list[tuple[int, str]]:
+    """(line, problem) for a template that loads the stylesheet: what would read wrong in dark.
+
+    bg-white outside the light scope; text-white, bg-white/NN or hover:bg-white/NN on an element whose
+    own fill or nearest ancestor's fill flips; a colour that flips on an inverse surface (without the
+    light scope that keeps its light look); an ink-300 edge. ``recolor: keep`` lines are accepted.
+    """
+    found_elements = elements(text)
+    ranges = _scope_ranges(found_elements)
+    problems = class_string_problems(text, ranges)
+    fills = [_own_fills(element) for element in found_elements]
+    constant = constant_steps()
+    for element, own in zip(found_elements, fills, strict=True):
+        if element.in_light_scope:
+            continue
+        around = _ancestor_fill(fills, element)
+        on_inverse = INVERSE in around
+        written = {token.state for token in element.tokens if token.util == "text"}
+        for token in element.tokens:
+            if _kept(text, token.start):
+                continue
+            line = _line_of(text, token.start)
+            state_fill = own.get(token.state) or own.get("", set())
+            if token.util == "text" and token.colour == "white":
+                flips = FLIP in state_fill or (not state_fill and FLIP in around and not ({INVERSE, DARK} & around))
+                if not flips and not token.state:
+                    flips = any(state and FLIP in kinds and state not in written for state, kinds in own.items())
+                if flips:
+                    problems.append((line, f"{token.text} on a fill that flips"))
+            elif token.util == "bg" and token.colour == "white" and token.mod:
+                own_fill = {kind for kinds in own.values() for kind in kinds}
+                if not ({INVERSE, DARK} & around) and (FLIP in own_fill or FLIP in around):
+                    problems.append((line, f"{token.text} on a fill that flips"))
+            if on_inverse and _flips_on_inverse(token, constant):
+                problems.append((line, f"{token.text} flips on an inverse surface"))
+    return sorted(problems)
+
+
+RAW_COLOUR_RE = re.compile(
+    r"(?<![&\w{])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])|(?<![a-zA-Z-])(?:rgba?|hsla?)\("
+)
+SVG_COLOUR_ATTR_RE = re.compile(r"""\s(?:fill|stroke|stop-color|flood-color|lighting-color|color)=(["'])(.*?)\1""")
+STYLE_ANY_ATTR_RE = re.compile(r"""\s(?:x-bind)?:?style=(["'])(.*?)\1""", re.S)
+ARBITRARY_RE = re.compile(r"(?<![\w-])[a-z][\w-]*-\[[^\]\s]+\]")
+
+
+def raw_colour_problems(text: str) -> list[tuple[int, str]]:
+    """(line, problem) for a colour value written in a template: in a ``<style>`` block's declarations,
+    a ``style=`` or ``:style=`` attribute, an SVG colour attribute or an arbitrary class. A platform's
+    own colour, the light scope's subtrees and ``presets|type="color"|recolor: keep`` lines are exempt."""
+    ranges = _scope_ranges(elements(text))
+    spans: list[tuple[int, int, bool]] = []  # start, end, platform colours allowed
+    for block in STYLE_BLOCK_RE.finditer(text):
+        body_start = block.start(2)
+        for declaration in re.finditer(r"([-\w]+)\s*:([^;{}]*)", _mask_css_comments(block.group(2))):
+            spans.append((body_start + declaration.start(2), body_start + declaration.end(2), False))
+    for attr in STYLE_ANY_ATTR_RE.finditer(text):
+        spans.append((attr.start(2), attr.end(2), False))
+    for attr in SVG_COLOUR_ATTR_RE.finditer(text):
+        spans.append((attr.start(2), attr.end(2), True))
+    for arbitrary in ARBITRARY_RE.finditer(text):
+        spans.append((arbitrary.start(), arbitrary.end(), True))
+    found = set()
+    for start, end, platform in spans:
+        for m in RAW_COLOUR_RE.finditer(text, start, end):
+            literal = m.group(0)
+            if platform and literal.lstrip("#").upper() in PLATFORM_HEX:
+                continue
+            if _in(ranges, m.start()) or _kept(text, m.start()):
+                continue
+            found.add((_line_of(text, m.start()), f"raw colour {literal}"))
+    return sorted(found)
+
+
+def _mask_css_comments(css: str) -> str:
+    """*css* with its comments blanked (same length); a ``/*`` inside a string is not a comment."""
+    out = list(css)
+    quote = ""
+    index = 0
+    while index < len(css):
+        char = css[index]
+        if quote:
+            quote = "" if char == quote else quote
+        elif char in "\"'":
+            quote = char
+        elif css.startswith("/*", index):
+            end = css.find("*/", index + 2)
+            end = len(css) if end < 0 else end + 2
+            for blank in range(index, end):
+                if out[blank] != "\n":
+                    out[blank] = " "
+            index = end
+            continue
+        index += 1
+    return "".join(out)
+
+
+def dark_ready_templates() -> set[str]:
+    """The templates of every page declared dark-ready, and every rebuilt screen's fragments."""
+    from apps.common import screens
+
+    dirs = (ROOT / "templates", *sorted(ROOT.glob("apps/*/templates")))
+    names: set[str] = set()
+    for page in screens.DARK_READY:
+        names.update(screens.template_tree(screens.PAGE_TEMPLATES.get(page, ()), dirs))
+    for screen in screens.SCREENS.values():
+        names.update(screens.template_tree(screen.fragments, dirs))
+    return names
+
+
+STYLES_REL = "theme/static_src/src/styles.css"
+STYLES_LITERAL_RE = re.compile(r"#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(", re.I)
+LAYER1_NAME_RE = re.compile(r"^--(ink|brand|success|warning|danger|info)-\d+$")
+PALETTE_LOCK = {("--color-white", "#fff"), ("--color-black", "#000")}
+
+
+def styles_problems(css: str) -> list[str]:
+    """Each colour styles.css writes in a declaration's value outside a Layer 1 block (a block that
+    declares only raw scale steps: the light, dark, media and light-scope Layer 1), but for the
+    palette lock's ``--color-white: #fff`` and ``--color-black: #000`` inside ``@theme``."""
+    masked = _mask_css_comments(css)
+    found: list[tuple[int, str]] = []
+    stack: list[tuple[str, list[tuple[str, str, int]]]] = []
+    start = 0
+    quote = ""
+    for index, char in enumerate(masked):
+        if quote:
+            quote = "" if char == quote else quote
+            continue
+        if char in "\"'":
+            quote = char
+        elif char == "{":
+            stack.append((" ".join(masked[start:index].split()), []))
+            start = index + 1
+        elif char in ";}":
+            text = masked[start:index]
+            name, colon, value = text.partition(":")
+            if stack and colon and name.strip() and not name.strip().startswith("@"):
+                stack[-1][1].append((name.strip(), value, start + len(name) + 1))
+            if char == "}" and stack:
+                prelude, declarations = stack.pop()
+                layer1 = bool(declarations) and all(LAYER1_NAME_RE.match(n) for n, _, _ in declarations)
+                for decl_name, decl_value, offset in declarations:
+                    if layer1 or (prelude == "@theme" and (decl_name, decl_value.strip()) in PALETTE_LOCK):
+                        continue
+                    for m in STYLES_LITERAL_RE.finditer(decl_value):
+                        line = _line_of(masked, offset + m.start())
+                        found.append((line, f"{m.group(0)} in {decl_name} (outside Layer 1)"))
+            start = index + 1
+    return [f"{STYLES_REL}:{line}: {problem}" for line, problem in sorted(found)]
+
+
+def dark_findings(paths: Iterable[Path], kinds: dict[Path, bool]) -> list[str]:
+    """What the dark rules find in *paths*, one line each."""
+    ready = dark_ready_templates()
+    lines: list[str] = []
+    for path in paths:
+        if path.suffix not in (".html", ".js", ".py"):
+            continue
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(ROOT)
+        if path.suffix == ".html":
+            if not kinds.get(path, True):
+                continue  # emails and standalone pages keep their literal colours
+            found = dark_problems(text)
+            name = _loader_name(path)
+            if name in ready and Path(name).name != "_platform_icon.html":
+                found += raw_colour_problems(text)
+        else:
+            found = class_string_problems(text)
+        lines += [f"dark: {rel}:{line}: {problem}" for line, problem in sorted(found)]
+    return lines
 
 
 # Product screenshots on the public site (static/img/marketing). The retired interface was orange
@@ -746,9 +1446,12 @@ def main(argv: list[str] | None = None) -> int:
     kinds = classify_templates(html)
     defined = defined_tokens()
     targets = [p.resolve() for p in args.paths] if args.paths else html + js + py
+    styles = (ROOT / STYLES_REL).resolve()
 
     changed = []
     for path in targets:
+        if path.suffix == ".css":
+            continue  # styles.css is checked, never rewritten (its tokens are written by hand)
         before = path.read_text(encoding="utf-8")
         after = transform(path, before, tokens=kinds.get(path, True), defined=defined)
         if after == before:
@@ -770,17 +1473,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.check:
         tests = sorted(p for p in (ROOT / "apps").rglob("*.py") if "tests" in p.parts or p.name.startswith("test_"))
         left = leftovers(html + js + py + tests) if not args.paths else leftovers(targets)
-        images = orange_screenshots() if not args.paths else []
+        images = orange_screenshots(MARKETING_IMAGES) if not args.paths else []
+        dark = dark_findings(targets, kinds)
+        if not args.paths or styles in targets:
+            dark += styles_problems(styles.read_text(encoding="utf-8")) if styles.exists() else []
         for name in rel:
             print(f"would recolour: {name}")
         for line in left:
             print(f"old palette class: {line}")
         for line in images:
             print(f"old screenshot: {line}")
-        if rel or left or images:
+        for line in dark:
+            print(line)
+        if rel or left or images or dark:
             print(
                 f"{len(rel)} file(s) to recolour, {len(left)} old palette class line(s) left, "
-                f"{len(images)} marketing screenshot(s) to re-capture",
+                f"{len(images)} marketing screenshot(s) to re-capture, {len(dark)} dark finding(s)",
                 file=sys.stderr,
             )
             return 1

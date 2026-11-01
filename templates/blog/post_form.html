@@ -75,12 +75,12 @@
             </p>
             {% with selected=form.featured_image.value|default_if_none:''|stringformat:"s" %}
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <label class="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl p-2 text-sm text-ink-700 ring-1 ring-inset ring-ink-200 hover:ring-ink-300 has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
+                <label class="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl p-2 text-sm text-ink-700 ring-1 ring-inset ring-ink-200 hover:ring-line-strong has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
                     <input type="radio" name="{{ form.featured_image.html_name }}" value="" {% if not selected %}checked{% endif %} class="size-4 accent-brand-700">
                     No image
                 </label>
                 {% for asset in form.image_choices %}
-                <label class="flex cursor-pointer flex-col gap-1.5 rounded-xl p-2 ring-1 ring-inset ring-ink-200 hover:ring-ink-300 has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
+                <label class="flex cursor-pointer flex-col gap-1.5 rounded-xl p-2 ring-1 ring-inset ring-ink-200 hover:ring-line-strong has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
                     <img src="{% if asset.thumbnail %}{{ asset.thumbnail.url }}{% else %}{{ asset.file.url }}{% endif %}" alt="" loading="lazy" class="aspect-video w-full rounded-[7px] bg-ink-50 object-cover shadow-[var(--shadow-creative)]">
                     <span class="flex min-w-0 items-center gap-1.5">
                         <input type="radio" name="{{ form.featured_image.html_name }}" value="{{ asset.id }}" {% if selected == asset.id|stringformat:"s" %}checked{% endif %} class="size-4 flex-shrink-0 accent-brand-700">
@@ -138,11 +138,11 @@
             </p>
             {% with selected=form.cover_style.value|default:"designed" %}
             <div class="grid gap-3 sm:grid-cols-2">
-                <label class="flex cursor-pointer gap-3 rounded-xl p-3 ring-1 ring-inset ring-ink-200 hover:ring-ink-300 has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
+                <label class="flex cursor-pointer gap-3 rounded-xl p-3 ring-1 ring-inset ring-ink-200 hover:ring-line-strong has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
                     <input type="radio" name="{{ form.cover_style.html_name }}" value="designed" {% if selected == "designed" %}checked{% endif %} class="mt-0.5 size-4 flex-shrink-0 accent-brand-700">
                     <span class="text-sm text-ink-700"><span class="block font-semibold text-ink-900">Designed cover</span>The title set over the picture in the brand's colours, with the category tag and wordmark. Without a picture, the brand background is used.</span>
                 </label>
-                <label class="flex cursor-pointer gap-3 rounded-xl p-3 ring-1 ring-inset ring-ink-200 hover:ring-ink-300 has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
+                <label class="flex cursor-pointer gap-3 rounded-xl p-3 ring-1 ring-inset ring-ink-200 hover:ring-line-strong has-checked:bg-brand-50 has-checked:ring-2 has-checked:ring-brand-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600">
                     <input type="radio" name="{{ form.cover_style.html_name }}" value="plain" {% if selected == "plain" %}checked{% endif %} class="mt-0.5 size-4 flex-shrink-0 accent-brand-700">
                     <span class="text-sm text-ink-700"><span class="block font-semibold text-ink-900">Plain</span>The featured image exactly as uploaded (resized to 1600px). No picture, no hero.</span>
                 </label>

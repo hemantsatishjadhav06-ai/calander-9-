@@ -64,7 +64,7 @@
         cursor: grab;
         transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
     }
-    .idea-card:hover { border-color: var(--ink-300); box-shadow: var(--shadow-sm); }
+    .idea-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-sm); }
     .idea-card.dragging { opacity: 0.5; }
 
     /* Column dragging */
@@ -205,7 +205,7 @@
         padding: 0 12px;
         border: 0;
         border-radius: var(--radius-lg);
-        box-shadow: inset 0 0 0 1px var(--ink-300), var(--shadow-xs);
+        box-shadow: inset 0 0 0 1px var(--border-hover), var(--shadow-xs);
         font-size: 0.8125rem;
         font-weight: 600;
         color: var(--ink-900);
@@ -484,8 +484,8 @@
 
                 <!-- Create Tag Modal -->
                 <div x-show="showCreateTagModal" x-cloak class="fixed inset-0 z-[200] flex items-center justify-center" @keydown.escape.window="showCreateTagModal = false">
-                    <div class="fixed inset-0 bg-ink-950/35" @click="showCreateTagModal = false"></div>
-                    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6" @click.stop
+                    <div class="fixed inset-0 bg-scrim/35" @click="showCreateTagModal = false"></div>
+                    <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6" @click.stop
                          x-trap.noscroll="showCreateTagModal" role="dialog" aria-modal="true" aria-labelledby="landing-create-tag-title">
                         <h3 id="landing-create-tag-title" class="ui-modal-title mb-4">Create a tag</h3>
                         <input type="text" x-ref="newTagNameInput" x-model="newTagName" aria-labelledby="landing-create-tag-title"
@@ -547,8 +547,8 @@
     <div x-show="showExploreModal" x-cloak
          class="fixed inset-0 z-[200] flex items-center justify-center"
          @keydown.escape.window="showExploreModal = false">
-        <div class="fixed inset-0 bg-ink-950/35" @click="showExploreModal = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[720px] mx-4 max-h-[85vh] overflow-hidden" @click.stop
+        <div class="fixed inset-0 bg-scrim/35" @click="showExploreModal = false"></div>
+        <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-[720px] mx-4 max-h-[85vh] overflow-hidden" @click.stop
              x-trap.noscroll="showExploreModal" role="dialog" aria-modal="true" aria-label="Explore feeds">
             <!-- Close button -->
             <button @click="showExploreModal = false" aria-label="Close"
@@ -943,7 +943,7 @@
              style="display: none;"
              @keydown.escape.window="if (showDeleteIdeaConfirm) { showDeleteIdeaConfirm = false; }">
             <!-- Backdrop -->
-            <div class="fixed inset-0 bg-ink-950/35"
+            <div class="fixed inset-0 bg-scrim/35"
                  x-show="showDeleteIdeaConfirm"
                  x-transition:enter="transition ease-out duration-200"
                  x-transition:enter-start="opacity-0"
@@ -953,7 +953,7 @@
                  x-transition:leave-end="opacity-0"
                  @click="showDeleteIdeaConfirm = false"></div>
             <!-- Dialog -->
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6"
+            <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6"
                  x-show="showDeleteIdeaConfirm"
                  x-transition:enter="transition ease-out duration-200"
                  x-transition:enter-start="opacity-0 scale-95"
@@ -995,8 +995,8 @@
 
     <template x-teleport="body">
         <div x-show="showIdeaCreateTagModal" x-cloak class="fixed inset-0 z-[220] flex items-center justify-center" @keydown.escape.window="closeIdeaCreateTagModal()">
-            <div class="fixed inset-0 bg-ink-950/35" @click="closeIdeaCreateTagModal()"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6" @click.stop
+            <div class="fixed inset-0 bg-scrim/35" @click="closeIdeaCreateTagModal()"></div>
+            <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6" @click.stop
                  x-trap="showIdeaCreateTagModal" role="dialog" aria-modal="true" aria-labelledby="landing-idea-create-tag-title">
                 <h3 id="landing-idea-create-tag-title" class="ui-modal-title mb-4">Create a tag</h3>
                 <input type="text" x-ref="ideaNewTagNameInput" x-model="newIdeaTagName" aria-labelledby="landing-idea-create-tag-title"

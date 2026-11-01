@@ -569,7 +569,10 @@ Light is what everyone sees until a page is declared ready: a page turns dark on
 - The primary is a lighter Pine, brand-700 `#4CAD8C`, with dark text through `--on-fill` (7.01:1). One step is both the fill and the link (5.79:1 or more on every surface); the earlier sketch here split them (links at brand-300, the fill at brand-500), which would have given one role two steps.
 - Success leans a little toward leaf-yellow in dark (hue 142, 500 and 600 lighter), so Pine and an "Approved" chip's text stay 14.0 apart (OKLab ΔE ×100; 14.2 in light, §3.5).
 - The brand and status 300 steps keep their light values. Their role is text and icons on the inverse surface (toast action brand-300, the status icons on a toast, *Delete* and *Reject all* in danger-300 on the selection bars), and that surface stays dark in both themes. ink-300 is the exception: it changes with the rest of the ink scale (`#CED2D7` in light, `#91969D` in dark), and because it is the toast's detail text and icons it must read 4.5:1 on the dark inverse surface (next bullet).
-- `--surface-inverse` in dark is ink-200 `#2A2E34`, a raised dark grey, so a toast or tooltip still stands off the canvas (1.41:1) and the cards (1.32:1). Because ink-300 must read on it (4.58:1), ink-300 is a text-grade grey in dark: a secondary button's edge, a hover edge and a table header rule read stronger than in light (6.03:1 on a card, against 1.52:1). ink-400 and ink-500 sit just above it, so the order 300 < 400 < 500 holds.
+- `--surface-inverse` in dark is ink-200 `#2A2E34`, a raised dark grey, so a toast or tooltip still stands off the canvas (1.41:1) and the cards (1.32:1). Because ink-300 must read on it (4.58:1), ink-300 is a text-grade grey in dark (6.03:1 on a card, against 1.52:1 in light). So an edge is never drawn in ink-300: a secondary button's edge, a hover edge, a table header rule and a chart's axis use `--border-hover` (`border-line-strong`, `ring-line-strong`), which is ink-300 in light and, in dark, ink-300 mixed 20 % into ink-200 (`#3F4349`, 1.80:1 on a card). The checker holds every edge between 1.20:1 and 2.50:1 in both themes. ink-400 and ink-500 sit just above ink-300, so the order 300 < 400 < 500 holds.
+- The two selection bars stay dark in both themes and carry the light content scope: their children use 200 steps (*Publish* on brand-200, the hover of *Delete* in danger-200) that flip in dark, where danger-200 on the dark inverse surface would read 1.21:1. Inside the scope they read exactly as in light; the checker measures them there. A toast needs no scope: its children use white, ink-300 and the constant 300 steps.
+- The current hour on the Activity chart and the timeline's now line are marks on a card, not surfaces: they keep ink-900, which flips, so each stays the strongest mark (14.6:1 on a dark card). The spec listed them with the inverse elements, but the inverse surface would sit at 1.32:1 on a dark card and the mark would vanish.
+- Shadows are the scrim's colour, which stays dark: `--shadow-*` mix `--scrim` in light and the dark theme sets its own strengths. The `shadow-*` utilities read those tokens (`@theme` points at them), because Tailwind writes an `@theme` shadow's value into its utility. The select chevron is a data URI, which cannot read a variable, so `--select-chevron` carries one per theme, each drawn in that theme's `--text-tertiary` (a test holds them equal).
 - Status icons are checked on every surface and on their own chip, as the control edge and the focus ring are. One pair is held in dark only and named in the checker's `LIGHT_EXCEPTIONS`: success-500 on the sidebar ink-100 is 2.93:1 in light, as it was before dark mode, and light must not move (7.37:1 in dark). So a success icon never sits on the sidebar or a neutral chip; the other three statuses read on ink-100 in both themes.
 - Not yet measured in dark: §23's colour-vision tables. For normal vision, the closest pair of status icons is info-500 against ink-500 at 8.9 (OKLab ΔE ×100); the simulation was not re-run.
 
@@ -584,7 +587,7 @@ Light is what everyone sees until a page is declared ready: a page turns dark on
 
 **The light content scope.** `data-theme-scope="light"` on the root of a platform preview or a creative re-declares the light Layer 1 and Layer 2 and `color-scheme: light`, so everything inside it reads light values in both themes and looks the way the platform shows it (the composer's previews, `components/post_preview.html`; each screen that shows a preview asserts in dark that its computed background is still white). The contrast test holds the scope equal to the light `:root`, property by property, and resolves it the way a browser inherits. It resets tokens, not inherited properties: an element inside the scope that inherits `color` from outside keeps the outer colour, so a preview sets its own text colour.
 
-**In a page declared ready,** write no `bg-white` outside the light scope (use `bg-surface`), no `text-white` on a fill that flips (use `text-on-fill`), and no raw colour in a template, style block or `style=`; F1 extends `python tools/recolor.py --check` to enforce these (spec D2).
+**In a page declared ready,** write no `bg-white` outside the light scope (use `bg-surface`), no `text-white` on a fill that flips (use `text-on-fill`), and no raw colour in a template, style block or `style=`. `python tools/recolor.py --check` enforces these on every template that loads the stylesheet (the raw-colour rule on the trees of the pages in `DARK_READY` and the rebuilt screens' fragments), flags a colour that flips on an inverse surface and an edge drawn in ink-300, and finds any colour `styles.css` writes outside Layer 1 but the palette lock. `python tools/recolor.py` rewrites what it can: `bg-white` to `bg-surface`, `text-white` to `text-on-fill` on a fill that flips (its own or the nearest ancestor's), a dark fill whose children use white or 200/300 steps (or that `INVERSE_ROLES` names: logo marks, a tooltip, a selected chip) to `bg-inverse`/`text-on-inverse`, scrims to `bg-scrim/NN`, white edges by what they sit on, ink-300 edges to the edge token. White over a photo or a scrim stays (`recolor: keep` where the rule cannot tell).
 
 **The tables.** `python tools/contrast.py --markdown`, pasted verbatim. `python tools/contrast.py` exits 1 if any pair fails in either theme, if a token has no dark value, if the two dark blocks differ or if the light scope differs from the light `:root`; `apps/common/tests/test_contrast.py` runs the same checks.
 
@@ -614,20 +617,22 @@ Light is what everyone sees until a page is declared ready: a page turns dark on
 | `--surface-inverse` | `var(--ink-900)` | `var(--ink-200)` |
 | `--text-on-inverse` | `var(--ink-0)` | `var(--ink-950)` |
 | `--scrim` | `var(--ink-950)` | `var(--ink-50)` |
-| `--primary-halo` | `rgb(30 112 87 / .18)` | `color-mix(in srgb, var(--brand-600) 32%, transparent)` |
-| `--surface-sticky` | `rgb(246 247 248 / .92)` | `color-mix(in srgb, var(--ink-50) 92%, transparent)` |
-| `--overlay` | `rgb(14 17 20 / .36)` | `color-mix(in srgb, var(--scrim) 64%, transparent)` |
-| `--text-inverse` | `#FFFFFF` | `var(--text-on-inverse)` |
-| `--color-illustration-card` | `#FFFFFF` | `var(--ink-0)` |
-| `--shadow-xs` | `0 1px 2px rgba(14, 17, 20, .05)` | `0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent)` |
-| `--shadow-sm` | `0 1px 2px rgba(14, 17, 20, .04), 0 1px 3px rgba(14, 17, 20, .06)` | `0 1px 2px color-mix(in srgb, var(--scrim) 36%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 48%, transparent)` |
-| `--shadow-md` | `0 4px 12px -2px rgba(14, 17, 20, .08), 0 2px 4px -1px rgba(14, 17, 20, .04)` | `0 4px 12px -2px color-mix(in srgb, var(--scrim) 56%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 36%, transparent)` |
-| `--shadow-lg` | `0 12px 32px -8px rgba(14, 17, 20, .16), 0 4px 8px -2px rgba(14, 17, 20, .06)` | `0 12px 32px -8px color-mix(in srgb, var(--scrim) 72%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 40%, transparent)` |
-| `--shadow-xl` | `0 24px 64px -12px rgba(14, 17, 20, .24), 0 8px 16px -4px rgba(14, 17, 20, .08)` | `0 24px 64px -12px color-mix(in srgb, var(--scrim) 80%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 48%, transparent)` |
-| `--shadow-button` | `0 1px 2px rgba(14, 17, 20, .12), inset 0 1px 0 rgba(255, 255, 255, .12)` | `0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink-950) 16%, transparent)` |
-| `--shadow-nav-active` | `0 1px 2px rgba(14, 17, 20, .06), 0 0 0 1px rgba(14, 17, 20, .04)` | `0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent), 0 0 0 1px color-mix(in srgb, var(--ink-950) 6%, transparent)` |
-| `--shadow-segment` | `0 1px 2px rgba(14, 17, 20, .08), 0 0 0 .5px rgba(14, 17, 20, .06)` | `0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), 0 0 0 .5px color-mix(in srgb, var(--ink-950) 8%, transparent)` |
-| `--shadow-creative` | `inset 0 0 0 1px rgba(14, 17, 20, .06)` | `inset 0 0 0 1px color-mix(in srgb, var(--ink-950) 8%, transparent)` |
+| `--primary-halo` | `color-mix(in srgb, var(--brand-600) 18%, transparent)` | `color-mix(in srgb, var(--brand-600) 32%, transparent)` |
+| `--surface-sticky` | `color-mix(in srgb, var(--ink-50) 92%, transparent)` | `color-mix(in srgb, var(--ink-50) 92%, transparent)` |
+| `--overlay` | `color-mix(in srgb, var(--scrim) 36%, transparent)` | `color-mix(in srgb, var(--scrim) 64%, transparent)` |
+| `--text-inverse` | `var(--text-on-inverse)` | `var(--text-on-inverse)` |
+| `--color-illustration-card` | `var(--ink-0)` | `var(--ink-0)` |
+| `--border-hover` | `var(--ink-300)` | `color-mix(in srgb, var(--ink-300) 20%, var(--ink-200))` |
+| `--select-chevron` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E")` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239CA1A9' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E")` |
+| `--shadow-xs` | `0 1px 2px color-mix(in srgb, var(--scrim) 5%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent)` |
+| `--shadow-sm` | `0 1px 2px color-mix(in srgb, var(--scrim) 4%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 6%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 36%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 48%, transparent)` |
+| `--shadow-md` | `0 4px 12px -2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 4%, transparent)` | `0 4px 12px -2px color-mix(in srgb, var(--scrim) 56%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 36%, transparent)` |
+| `--shadow-lg` | `0 12px 32px -8px color-mix(in srgb, var(--scrim) 16%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 6%, transparent)` | `0 12px 32px -8px color-mix(in srgb, var(--scrim) 72%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 40%, transparent)` |
+| `--shadow-xl` | `0 24px 64px -12px color-mix(in srgb, var(--scrim) 24%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 8%, transparent)` | `0 24px 64px -12px color-mix(in srgb, var(--scrim) 80%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 48%, transparent)` |
+| `--shadow-button` | `0 1px 2px color-mix(in srgb, var(--scrim) 12%, transparent), inset 0 1px 0 color-mix(in srgb, var(--on-fill) 12%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink-950) 16%, transparent)` |
+| `--shadow-nav-active` | `0 1px 2px color-mix(in srgb, var(--scrim) 6%, transparent), 0 0 0 1px color-mix(in srgb, var(--scrim) 4%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent), 0 0 0 1px color-mix(in srgb, var(--ink-950) 6%, transparent)` |
+| `--shadow-segment` | `0 1px 2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 0 0 .5px color-mix(in srgb, var(--scrim) 6%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), 0 0 0 .5px color-mix(in srgb, var(--ink-950) 8%, transparent)` |
+| `--shadow-creative` | `inset 0 0 0 1px color-mix(in srgb, var(--scrim) 6%, transparent)` | `inset 0 0 0 1px color-mix(in srgb, var(--ink-950) 8%, transparent)` |
 
 #### Text on surfaces
 
@@ -750,6 +755,28 @@ Light is what everyone sees until a page is declared ready: a page turns dark on
 | danger-300 on surface-inverse | 4.50:1 | `#FEA69C` on `#1C1F24` | 8.77:1 | `#FEA69C` on `#2A2E34` | 7.24:1 | PASS |
 | info-300 on surface-inverse | 3.00:1 | `#95CDEB` on `#1C1F24` | 9.61:1 | `#95CDEB` on `#2A2E34` | 7.93:1 | PASS |
 
+#### Selection bars (inside the light scope, dark in both themes)
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| label white on surface-inverse (light scope) | 4.50:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | PASS |
+| clear icon ink-300 on surface-inverse (light scope) | 3.00:1 | `#CED2D7` on `#1C1F24` | 10.88:1 | `#CED2D7` on `#1C1F24` | 10.88:1 | PASS |
+| Delete and Reject all danger-300 on surface-inverse (light scope) | 4.50:1 | `#FEA69C` on `#1C1F24` | 8.77:1 | `#FEA69C` on `#1C1F24` | 8.77:1 | PASS |
+| their hover danger-200 on surface-inverse (light scope) | 4.50:1 | `#FFCDC6` on `#1C1F24` | 11.65:1 | `#FFCDC6` on `#1C1F24` | 11.65:1 | PASS |
+| Publish brand-950 on brand-200 (light scope) | 4.50:1 | `#062118` on `#BFE7D6` | 12.61:1 | `#062118` on `#BFE7D6` | 12.61:1 | PASS |
+| Publish hover brand-950 on brand-300 (light scope) | 4.50:1 | `#062118` on `#94D2BA` | 9.84:1 | `#062118` on `#94D2BA` | 9.84:1 | PASS |
+| Approve all brand-700 on brand-100 (light scope) | 4.50:1 | `#115641` on `#DDF3EA` | 7.44:1 | `#115641` on `#DDF3EA` | 7.44:1 | PASS |
+| focus outline on-inverse on surface-inverse (light scope) | 3.00:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | PASS |
+
+#### Edges stay edges (between 1.20:1 and 2.50:1)
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| hover edge border-hover on card ink-0 | 1.20:1 to 2.50:1 | `#CED2D7` on `#FFFFFF` | 1.52:1 | `#3F4349` on `#14171C` | 1.80:1 | PASS |
+| hover edge border-hover on sheet ink-25 | 1.20:1 to 2.50:1 | `#CED2D7` on `#FBFCFD` | 1.48:1 | `#3F4349` on `#191C20` | 1.71:1 | PASS |
+| hover edge border-hover on canvas ink-50 | 1.20:1 to 2.50:1 | `#CED2D7` on `#F6F7F8` | 1.42:1 | `#3F4349` on `#0C0F13` | 1.92:1 | PASS |
+| hover edge border-hover on sidebar ink-100 | 1.20:1 to 2.50:1 | `#CED2D7` on `#EDEFF2` | 1.32:1 | `#3F4349` on `#1E2127` | 1.62:1 | PASS |
+
 #### Non-text: control edges, focus, status icons (3:1)
 
 | Pair | Needs | Light | Ratio | Dark | Ratio | Result |
@@ -759,6 +786,9 @@ Light is what everyone sees until a page is declared ready: a page turns dark on
 | control border on canvas ink-50 | 3.00:1 | `#83888F` on `#F6F7F8` | 3.33:1 | `#959AA1` on `#0C0F13` | 6.78:1 | PASS |
 | control border on sidebar ink-100 | 3.00:1 | `#83888F` on `#EDEFF2` | 3.10:1 | `#959AA1` on `#1E2127` | 5.69:1 | PASS |
 | control border on selected row brand-50 | 3.00:1 | `#83888F` on `#EFFAF5` | 3.34:1 | `#959AA1` on `#12261F` | 5.61:1 | PASS |
+| current hour and now line ink-900 on card ink-0 | 3.00:1 | `#1C1F24` on `#FFFFFF` | 16.52:1 | `#E5E8EC` on `#14171C` | 14.61:1 | PASS |
+| toggle knob on-fill on the off track ink-400 | 3.00:1 | `#FFFFFF` on `#83888F` | 3.57:1 | `#0C0F13` on `#959AA1` | 6.78:1 | PASS |
+| toggle knob on-fill on the on track brand-700 | 3.00:1 | `#FFFFFF` on `#115641` | 8.64:1 | `#0C0F13` on `#4CAD8C` | 7.01:1 | PASS |
 | focus ring on card ink-0 | 3.00:1 | `#1E7057` on `#FFFFFF` | 5.98:1 | `#3EA080` on `#14171C` | 5.60:1 | PASS |
 | focus ring on sheet ink-25 | 3.00:1 | `#1E7057` on `#FBFCFD` | 5.82:1 | `#3EA080` on `#191C20` | 5.33:1 | PASS |
 | focus ring on canvas ink-50 | 3.00:1 | `#1E7057` on `#F6F7F8` | 5.58:1 | `#3EA080` on `#0C0F13` | 5.99:1 | PASS |
@@ -793,7 +823,7 @@ Light is what everyone sees until a page is declared ready: a page turns dark on
 | info-500 icon on selected row brand-50 | 3.00:1 | `#035A7B` on `#EFFAF5` | 7.14:1 | `#57A9D2` on `#12261F` | 6.06:1 | PASS |
 | info-500 icon on info-50 chip | 3.00:1 | `#035A7B` on `#EFF8FD` | 7.09:1 | `#57A9D2` on `#12242E` | 6.08:1 | PASS |
 
-Pairs checked: 134 in each theme; failures: 0; excepted in light only: 1.
+Pairs checked: 149 in each theme; failures: 0; excepted in light only: 1.
 
 ## 22. White-label guard
 

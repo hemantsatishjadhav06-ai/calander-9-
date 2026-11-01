@@ -29,20 +29,20 @@ Context: assets, workspace, post (optional).
         </div>
         {% endif %}
         <!-- Overlay on hover -->
-        <div class="absolute inset-0 bg-ink-950/0 group-hover:bg-ink-950/20 transition-colors duration-150 flex items-center justify-center">
-            <div class="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 shadow-sm">
+        <div class="absolute inset-0 bg-scrim/0 group-hover:bg-scrim/20 transition-colors duration-150 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-full bg-surface/90 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 shadow-sm">
                 <svg class="w-4 h-4 text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             </div>
         </div>
         {% if asset.is_video %}
-        <div class="absolute bottom-1.5 left-1.5 px-1.5 rounded-md text-xs leading-[18px] font-semibold tabular-nums text-white bg-ink-950/65">
+        <div class="absolute bottom-1.5 left-1.5 px-1.5 rounded-md text-xs leading-[18px] font-semibold tabular-nums text-white bg-scrim/65">
             {{ asset.duration|floatformat:0 }}s
         </div>
         {% endif %}
         {% if asset.is_shared %}
-        <span class="absolute top-1.5 right-1.5 px-1.5 rounded-full text-xs leading-5 font-semibold bg-white/95 text-ink-900 shadow-xs">Shared</span>
+        <span class="absolute top-1.5 right-1.5 px-1.5 rounded-full text-xs leading-5 font-semibold bg-surface/95 text-ink-900 shadow-xs">Shared</span>
         {% endif %}
-        <div class="absolute bottom-0 left-0 right-0 px-2 py-1 bg-ink-950/65 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150">
+        <div class="absolute bottom-0 left-0 right-0 px-2 py-1 bg-scrim/65 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150">
             <span class="text-xs text-white font-medium truncate block">{{ asset.filename }}</span>
         </div>
     </div>

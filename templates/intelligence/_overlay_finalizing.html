@@ -1,6 +1,6 @@
 {% comment %}Polling overlay during sync-fallback. Lifts when /status/ returns active.{% endcomment %}
 <div id="intelligence-finalizing-overlay"
-     class="absolute inset-0 z-10 flex items-start justify-center rounded-2xl bg-white/85 px-4 pt-16 backdrop-blur-sm"
+     class="absolute inset-0 z-10 flex items-start justify-center rounded-2xl bg-surface/85 px-4 pt-16 backdrop-blur-sm"
      hx-get="{% url 'intelligence:status' org_id=organization.id %}"
      hx-trigger="load, every 1s"
      hx-swap="outerHTML">

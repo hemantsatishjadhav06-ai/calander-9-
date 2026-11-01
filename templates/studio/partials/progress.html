@@ -13,12 +13,12 @@ with a spinner, stopped a red disc with an x, a warning an amber ring, waiting a
         <li class="relative flex gap-3">
             {% if not forloop.last %}<span class="absolute left-3 top-7 -bottom-3 w-px {% if row.state == 'done' %}bg-success-500{% else %}bg-ink-200{% endif %}" aria-hidden="true"></span>{% endif %}
             <span class="relative z-10 mt-0.5 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center
-                {% if row.state == 'done' %}bg-success-500 text-white
-                {% elif row.state == 'working' %}bg-white text-info-500 shadow-[inset_0_0_0_2px_var(--info-500)]
-                {% elif row.state == 'failed' %}bg-danger-500 text-white
-                {% elif row.state == 'warning' %}bg-white text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]
+                {% if row.state == 'done' %}bg-success-500 text-on-fill
+                {% elif row.state == 'working' %}bg-surface text-info-500 shadow-[inset_0_0_0_2px_var(--info-500)]
+                {% elif row.state == 'failed' %}bg-danger-500 text-on-fill
+                {% elif row.state == 'warning' %}bg-surface text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]
                 {% elif row.state == 'skipped' %}bg-ink-100 text-ink-500
-                {% else %}bg-white text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]{% endif %}" aria-hidden="true">
+                {% else %}bg-surface text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]{% endif %}" aria-hidden="true">
                 {% if row.state == 'done' %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                 {% elif row.state == 'working' %}<svg class="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".3"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
                 {% elif row.state == 'failed' %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>

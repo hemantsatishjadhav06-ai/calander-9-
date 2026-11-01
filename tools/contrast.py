@@ -385,6 +385,11 @@ class Pair:
     needs: float
     #: Why light is not held to *needs* (``LIGHT_EXCEPTIONS``); empty for every other pair.
     light_exception: str = ""
+    #: An upper bound, for an edge that must stay an edge (0: none).
+    at_most: float = 0.0
+    #: ``"light"``: measured inside the light content scope (what a subtree carrying
+    #: ``data-theme-scope="light"`` sees in each theme); empty: on the page.
+    scope: str = ""
 
     def held_in(self, theme: str) -> bool:
         """Whether *theme* is held to the bar: always in dark, in light unless excepted."""
@@ -393,6 +398,13 @@ class Pair:
 
 TEXT, LARGE = 4.5, 3.0
 NON_TEXT = 3.0
+#: An edge (a hover edge, a secondary button's ring, a table header's rule) is drawn, not read: it must
+#: show, and must not weigh what a control boundary (3:1) or text (4.5:1) weighs. ink-300 is a text grey
+#: in dark (the toast detail), so an edge drawn in it would read 6:1 on a dark card; --border-hover keeps
+#: the edge's weight in both themes.
+EDGE_MIN, EDGE_MAX = 1.2, 2.5
+EDGES = "Edges stay edges (between 1.20:1 and 2.50:1)"
+SELECTION_BARS = "Selection bars (inside the light scope, dark in both themes)"
 
 #: The opaque surfaces text sits on (§23): card, row hover, canvas, sidebar, selected row.
 SURFACES: tuple[tuple[str, str], ...] = (
@@ -474,9 +486,32 @@ def _pairs() -> tuple[Pair, ...]:
         needs = TEXT if status == "danger" else NON_TEXT  # danger-300 labels Delete and Reject all
         add(Pair(group, f"{status}-300 on surface-inverse", f"--{status}-300", "--surface-inverse", needs))
 
+    # The two selection bars carry data-theme-scope="light": their children use 200 steps that flip
+    # (hover:text-danger-200 would read 1.21:1 on the dark inverse surface), so the bar keeps its light look.
+    group = SELECTION_BARS
+    for label, fg, bg, needs in (
+        ("label white on surface-inverse", "#FFFFFF", "--surface-inverse", TEXT),
+        ("clear icon ink-300 on surface-inverse", "--ink-300", "--surface-inverse", NON_TEXT),
+        ("Delete and Reject all danger-300 on surface-inverse", "--danger-300", "--surface-inverse", TEXT),
+        ("their hover danger-200 on surface-inverse", "--danger-200", "--surface-inverse", TEXT),
+        ("Publish brand-950 on brand-200", "--brand-950", "--brand-200", TEXT),
+        ("Publish hover brand-950 on brand-300", "--brand-950", "--brand-300", TEXT),
+        ("Approve all brand-700 on brand-100", "--brand-700", "--brand-100", TEXT),
+        ("focus outline on-inverse on surface-inverse", "--text-on-inverse", "--surface-inverse", NON_TEXT),
+    ):
+        add(Pair(group, f"{label} (light scope)", fg, bg, needs, scope="light"))
+
+    group = EDGES
+    for surface, bg in SURFACES[:4]:
+        add(Pair(group, f"hover edge border-hover on {surface}", "--border-hover", bg, EDGE_MIN, at_most=EDGE_MAX))
+
     group = "Non-text: control edges, focus, status icons (3:1)"
     for surface, bg in SURFACES:
         add(Pair(group, f"control border on {surface}", "--border-control", bg, NON_TEXT))
+    # Marks on a card: the current hour bar and the timeline's now line keep ink-900, which flips.
+    add(Pair(group, "current hour and now line ink-900 on card ink-0", "--ink-900", "--ink-0", NON_TEXT))
+    add(Pair(group, "toggle knob on-fill on the off track ink-400", "--on-fill", "--ink-400", NON_TEXT))
+    add(Pair(group, "toggle knob on-fill on the on track brand-700", "--on-fill", "--brand-700", NON_TEXT))
     for surface, bg in (*SURFACES, ("tinted button brand-100", "--brand-100")):
         add(Pair(group, f"focus ring on {surface}", "--focus-ring", bg, NON_TEXT))
     for creative, hexa in CREATIVES:
@@ -529,7 +564,7 @@ class Result:
 
     @property
     def passed(self) -> bool:
-        return self.ratio >= self.pair.needs
+        return self.ratio >= self.pair.needs and not (self.pair.at_most and self.ratio > self.pair.at_most)
 
 
 def measure(pair: Pair, values: Mapping[str, str]) -> Result:
@@ -538,25 +573,32 @@ def measure(pair: Pair, values: Mapping[str, str]) -> Result:
     return Result(pair, hex_of(fg_colour), hex_of(bg_colour), ratio(fg_colour, bg_colour))
 
 
+def _values_for(sheet: Sheet, theme: str) -> dict[str, Mapping[str, str]]:
+    """The values a pair is measured with in *theme*: on the page, and inside the light scope."""
+    return {"": sheet.theme(theme), "light": in_light_scope(sheet, theme) if sheet.light_scope else {}}
+
+
 def check(sheet: Sheet, theme: str, pairs: Sequence[Pair] = PAIRS) -> list[Result]:
-    values = sheet.theme(theme)
-    return [measure(pair, values) for pair in pairs]
+    values = _values_for(sheet, theme)
+    return [measure(pair, values[pair.scope]) for pair in pairs]
 
 
 def problems(sheet: Sheet, theme: str, pairs: Sequence[Pair] = PAIRS) -> list[str]:
-    """Each pair *theme* holds that cannot be resolved or is under its bar, one line per pair."""
-    values = sheet.theme(theme)
+    """Each pair *theme* holds that cannot be resolved or is outside its bounds, one line per pair."""
+    values = _values_for(sheet, theme)
     lines = []
     for pair in pairs:
         if not pair.held_in(theme):
             continue
         try:
-            result = measure(pair, values)
+            result = measure(pair, values[pair.scope])
         except (LookupError, ValueError) as error:
             lines.append(f"{pair.label}: cannot resolve {error}")
             continue
-        if not result.passed:
+        if result.ratio < pair.needs:
             lines.append(f"{pair.label}: {result.fg} on {result.bg} {_ratio(result.ratio)} < {_ratio(pair.needs)}")
+        elif not result.passed:
+            lines.append(f"{pair.label}: {result.fg} on {result.bg} {_ratio(result.ratio)} > {_ratio(pair.at_most)}")
     return lines
 
 
@@ -657,8 +699,9 @@ def markdown(sheet: Sheet) -> str:
         verdict = "PASS" if all(result.passed for result in held) else "FAIL"
         if pair.light_exception:
             verdict += f" in dark; light excepted: {pair.light_exception}"
+        needs = f"{_ratio(pair.needs)} to {_ratio(pair.at_most)}" if pair.at_most else _ratio(pair.needs)
         lines.append(
-            f"| {pair.label} | {_ratio(pair.needs)} "
+            f"| {pair.label} | {needs} "
             f"| `{light_result.fg}` on `{light_result.bg}` | {_ratio(light_result.ratio)} "
             f"| `{dark_result.fg}` on `{dark_result.bg}` | {_ratio(dark_result.ratio)} "
             f"| {verdict} |"

@@ -26,7 +26,7 @@
         {% else %}
         <div class="h-[260px] w-full rounded-[14px] bg-ink-50 ring-1 ring-inset ring-ink-200" aria-hidden="true"></div>
         {% endif %}
-        <span class="absolute left-3 top-3 inline-flex h-[22px] items-center rounded-full bg-ink-900/80 px-2.5 text-caption font-semibold capitalize text-white">{{ media_kind }}</span>
+        <span class="absolute left-3 top-3 inline-flex h-[22px] items-center rounded-full bg-scrim/80 px-2.5 text-caption font-semibold capitalize text-white">{{ media_kind }}</span>
     </div>
 
     <h3 class="text-caption font-semibold text-ink-500">Post copy</h3>
@@ -38,7 +38,7 @@
     <h3 class="mt-4 text-caption font-semibold text-ink-500">Performance</h3>
     <dl class="mt-2.5 grid grid-cols-2 gap-2.5">
         {% for tile in metric_tiles %}
-        <div class="rounded-xl px-3.5 py-3 ring-1 ring-inset {% if tile.is_primary %}bg-ink-50 ring-ink-300{% else %}bg-white ring-ink-200{% endif %}">
+        <div class="rounded-xl px-3.5 py-3 ring-1 ring-inset {% if tile.is_primary %}bg-ink-50 ring-line-strong{% else %}bg-surface ring-ink-200{% endif %}">
             <dt class="text-caption font-medium {% if tile.is_primary %}text-ink-900{% else %}text-ink-600{% endif %}">{{ tile.label }}</dt>
             <dd class="mt-1 text-[22px] font-bold tracking-[-0.01em] tabular-nums text-ink-950">{{ tile.value|fmt_metric:tile.kind }}</dd>
             {% if tile.sparkline %}

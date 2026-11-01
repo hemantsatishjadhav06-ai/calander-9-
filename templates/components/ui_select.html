@@ -26,7 +26,7 @@ JS body can't see the parent scope.
     <template x-if="open">
     <div data-testid="ui-select-panel"
          :style="`top:${top}px; left:${left}px;`"
-         class="fixed z-50 w-56 max-h-72 overflow-y-auto bg-white rounded-xl shadow-lg ring-1 ring-ink-200 p-1">
+         class="fixed z-50 w-56 max-h-72 overflow-y-auto bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 p-1">
         <button type="button" data-testid="ui-select-clear"
                 @click="{% if multiple %}{{ model }} = []{% else %}{{ model }} = ''; open = false{% endif %}; {{ onchange }}"
                 class="w-full text-left px-2.5 min-h-[34px] max-lg:min-h-11 text-[13px] font-semibold rounded-lg hover:bg-ink-50 mb-1"

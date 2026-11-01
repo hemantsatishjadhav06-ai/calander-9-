@@ -7,7 +7,7 @@ through the team thread: the client's change request is recorded first, then the
 A post waiting for the client opens expanded, so its actions are visible at once; decided posts start closed.
 {% endcomment %}
 {% load tz approval_extras %}
-<article class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" data-testid="portal-card"
+<article class="overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-xs" data-testid="portal-card"
      x-data="{ open: {% if post.client_pending %}true{% else %}false{% endif %}, panel: null, comment: '' }">
     <div class="cursor-pointer p-5 max-sm:p-4" @click="open = !open">
         <div class="mb-3 flex flex-wrap items-center gap-2">
@@ -35,7 +35,7 @@ A post waiting for the client opens expanded, so its actions are visible at once
         <div class="mt-4 flex flex-wrap gap-2">
             {% for pm in post.media_attachments.all %}
             {% if pm.media_asset.thumbnail %}
-            <img src="{{ pm.media_asset.thumbnail.url }}" alt="" class="size-24 rounded-[10px] object-cover shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)] ring-1 ring-ink-200">
+            <img src="{{ pm.media_asset.thumbnail.url }}" alt="" class="size-24 rounded-[10px] object-cover shadow-[var(--shadow-creative)] ring-1 ring-ink-200">
             {% elif pm.media_asset.file and pm.media_asset.media_type == 'image' %}
             <img src="{{ pm.media_asset.file.url }}" alt="" class="size-24 rounded-[10px] object-cover ring-1 ring-ink-200">
             {% else %}

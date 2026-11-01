@@ -47,7 +47,7 @@
         text-decoration: none;
         max-width: 100%; overflow: hidden;
     }
-    .cross-post-chip:hover { box-shadow: inset 0 0 0 1px var(--ink-300); }
+    .cross-post-chip:hover { box-shadow: inset 0 0 0 1px var(--border-hover); }
     .cross-post-chip .ws-dot { width: 6px; height: 6px; border-radius: 9999px; flex-shrink: 0; }
 
     /* Status tones (the same words and tones as the status pills) */
@@ -112,7 +112,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="cross-calendar-main w-full overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" x-data="{ viewOpen: false, wsOpen: false }">
+<div class="cross-calendar-main w-full overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-xs" x-data="{ viewOpen: false, wsOpen: false }">
     <!-- Toolbar -->
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-ink-200 px-4 py-3 sm:px-5">
         <!-- Period navigation -->

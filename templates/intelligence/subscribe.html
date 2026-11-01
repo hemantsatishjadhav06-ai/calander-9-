@@ -84,7 +84,7 @@
                   deployment ever ships more or fewer plans this still
                   highlights one consistent option.
                 {% endcomment %}
-                <label class="plan-card relative block cursor-pointer rounded-2xl bg-white p-5 shadow-xs"
+                <label class="plan-card relative block cursor-pointer rounded-2xl bg-surface p-5 shadow-xs"
                        data-popular="{% if forloop.counter == 2 %}1{% endif %}">
                     {% comment %}
                       Middle plan is checked by default (forloop.counter == 2
@@ -96,7 +96,7 @@
                     <input type="radio" name="plan" value="{{ plan.slug }}"
                            class="sr-only" required{% if forloop.counter == 2 %} checked{% endif %}>
                     {% if forloop.counter == 2 %}
-                    <span class="absolute -top-2.5 right-4 inline-flex h-5 items-center rounded-full bg-ink-900 px-2 text-caption font-semibold text-white">
+                    <span class="absolute -top-2.5 right-4 inline-flex h-5 items-center rounded-full bg-ink-900 px-2 text-caption font-semibold text-on-fill">
                         Most popular
                     </span>
                     {% endif %}
@@ -104,7 +104,7 @@
                     <div class="flex items-start justify-between gap-2">
                         <div class="text-h3 text-ink-950">{{ plan.name }}</div>
                         <span class="plan-card-check grid size-5 flex-shrink-0 place-items-center rounded-full" aria-hidden="true">
-                            <svg class="plan-card-check-icon hidden size-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            <svg class="plan-card-check-icon hidden size-3 text-on-fill" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         </span>
                     </div>
 
