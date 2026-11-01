@@ -948,26 +948,37 @@ def _children_use_white_or_pale_steps(found: list[Element], element: Element) ->
     return False
 
 
-_CONSTANT_CACHE: dict[str, frozenset[str]] = {}
+_SHEETS: dict[tuple[Path, int, int], Sheet | None] = {}
+
+
+def _styles_sheet() -> Sheet | None:
+    """styles.css's themed blocks (``tools.contrast.load``), read once per version of the file; None
+    when there is no file or no Layer 1 block."""
+    path = ROOT / STYLES_REL
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return None
+    key = (path, stat.st_mtime_ns, stat.st_size)
+    if key not in _SHEETS:
+        from tools import contrast
+
+        try:
+            _SHEETS[key] = contrast.load(path.read_text(encoding="utf-8"))
+        except LookupError:
+            _SHEETS[key] = None
+    return _SHEETS[key]
 
 
 def constant_steps() -> frozenset[str]:
     """The scale steps whose dark value equals their light value (styles.css): they read the same on
     the inverse surface in both themes."""
-    path = ROOT / "theme" / "static_src" / "src" / "styles.css"
-    css = path.read_text(encoding="utf-8") if path.exists() else ""
-    if css not in _CONSTANT_CACHE:
-        from tools import contrast
-
-        try:
-            sheet = contrast.load(css)
-        except LookupError:
-            _CONSTANT_CACHE[css] = frozenset()
-        else:
-            _CONSTANT_CACHE[css] = frozenset(
-                name[2:] for name, value in sheet.layer1.items() if sheet.dark.get(name, "").upper() == value.upper()
-            )
-    return _CONSTANT_CACHE[css]
+    sheet = _styles_sheet()
+    if sheet is None:
+        return frozenset()
+    return frozenset(
+        name[2:] for name, value in sheet.layer1.items() if sheet.dark.get(name, "").upper() == value.upper()
+    )
 
 
 def _flips_on_inverse(token: Token, constant: frozenset[str]) -> bool:
@@ -1130,28 +1141,6 @@ def css_declarations(text: str, *, css: bool = False) -> list[tuple[str, int, st
 
 CSS_VAR_RE = re.compile(r"^\s*var\(\s*--([a-z]+(?:-[a-z]+)*(?:-\d+)?)\s*\)\s*(?:!\s*important\s*)?$", re.I)
 CSS_WHITE_RE = re.compile(r"^\s*(#fff(?:f|fff|fffff)?|white)\s*(?:!\s*important\s*)?$", re.I)
-
-
-_SHEETS: dict[tuple[Path, int, int], Sheet | None] = {}
-
-
-def _styles_sheet() -> Sheet | None:
-    """styles.css's themed blocks (``tools.contrast.load``), read once per version of the file; None
-    when there is no file or no Layer 1 block."""
-    path = ROOT / STYLES_REL
-    try:
-        stat = path.stat()
-    except FileNotFoundError:
-        return None
-    key = (path, stat.st_mtime_ns, stat.st_size)
-    if key not in _SHEETS:
-        from tools import contrast
-
-        try:
-            _SHEETS[key] = contrast.load(path.read_text(encoding="utf-8"))
-        except LookupError:
-            _SHEETS[key] = None
-    return _SHEETS[key]
 
 
 def css_fill(value: str) -> str | None:
