@@ -110,10 +110,13 @@ test('a staff member sees only the tabs their permissions allow', async ({ page,
   await expect(page.getByTestId('brand-primary-color')).toBeDisabled();
   await expect(page.getByTestId('brand-save')).toHaveCount(0);
   await axe(page, 'Settings (viewer)');
-  for (const tab of ['approvals', 'autopilot']) {
+  for (const [tab, name] of [
+    ['approvals', 'Approvals'],
+    ['autopilot', 'Autopilot'],
+  ]) {
     expect((await page.goto(`${settings}?tab=${tab}`))?.status(), `${tab} by address`).toBe(403);
+    await axe(page, `Settings: ${name} refused (viewer)`);
   }
-  await axe(page, 'Settings: Autopilot refused (viewer)');
 });
 
 test('the old settings pages land on their tab', async ({ page, as, axe, harness }) => {

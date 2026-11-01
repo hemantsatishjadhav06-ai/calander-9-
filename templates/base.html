@@ -1018,13 +1018,10 @@
     <!-- Vendored JS -->
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script nonce="{{ request.csp_nonce }}">
-        /* Unread badge on the notifications bell. There is one bell in the sidebar
-           and one in the phone's top bar; the one on screen polls every 60s while
-           the tab is visible, and both refresh at once when a notification is
-           marked read anywhere on the page. */
         /* The bell's unread count. The bell is in the page twice (the sidebar's header and the phone's
            top bar) and one is always hidden: only the one on screen asks, every minute and when the
-           drawer opens or marks something read, so each refresh costs one request. */
+           drawer opens or marks something read, so each refresh costs one request, and it hands the
+           answer to the other (notifications-count), which is right at once if the screen turns. */
         function notificationBadge(initial) {
             return {
                 count: initial || 0,
@@ -1038,7 +1035,10 @@
                     if (!this.$el.getClientRects().length) return;
                     try {
                         const resp = await fetch('{% url "notifications:unread_count" %}', { credentials: 'same-origin' });
-                        if (resp.ok) this.count = (await resp.json()).count;
+                        if (resp.ok) {
+                            this.count = (await resp.json()).count;
+                            window.dispatchEvent(new CustomEvent('notifications-count', { detail: this.count }));
+                        }
                     } catch (e) { /* offline: keep the last known count */ }
                 },
                 destroy() { if (this._timer) clearInterval(this._timer); },

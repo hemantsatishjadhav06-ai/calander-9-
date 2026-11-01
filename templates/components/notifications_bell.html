@@ -1,8 +1,9 @@
 {% comment %}
 The notifications bell (spec D8): in the sidebar's header and in the phone's top bar. It opens the
 notifications drawer (base.html) and carries the unread badge, seeded from the server count and kept
-fresh by notificationBadge(). bell_class: extra classes (where it shows).
-{% endcomment %}<button type="button" data-testid="notifications-bell" x-data="notificationBadge({{ unread_notification_count|default:0 }})" x-init="start()" @notifications-read.window="refresh()"
+fresh by notificationBadge(): the bell on screen asks and tells the other (notifications-count).
+bell_class: extra classes (where it shows).
+{% endcomment %}<button type="button" data-testid="notifications-bell" x-data="notificationBadge({{ unread_notification_count|default:0 }})" x-init="start()" @notifications-read.window="refresh()" @notifications-count.window="count = $event.detail"
         @click="$dispatch('open-notifications')" aria-haspopup="dialog"
         aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}"
         :aria-label="count ? 'Notifications, ' + count + ' unread' : 'Notifications'"

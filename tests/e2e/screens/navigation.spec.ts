@@ -12,7 +12,8 @@
 // The bell and Go to appear twice in the page (the sidebar header on desktop, the phone's top bar
 // below 1024px); a test takes the one this device shows. The bell's badge counts a fresh person's
 // one unread notification, and the bell opens the drawer that lists it; Escape closes it and the
-// focus goes back to the bell. Go to opens with its button and with Ctrl/Cmd-K, filters the
+// focus goes back to the bell. Only the bell on screen asks for the count, and it hands the answer
+// to the other, so after Mark all read the bell a turned screen would show has no stale count. Go to opens with its button and with Ctrl/Cmd-K, filters the
 // places as you type, opens one with Enter (from the field, or on a link reached with the arrow
 // keys), and Escape hands the focus back.
 import { settled } from '../support/settled';
@@ -148,6 +149,36 @@ test('the notifications bell shows the unread count and opens the drawer', async
   await page.keyboard.press('Escape');
   await expect(drawer).toBeHidden();
   await expect(bell, 'the focus goes back to the bell').toBeFocused();
+});
+
+test('Mark all read clears the count on the bell off screen too', async ({ page, as, harness }) => {
+  const member = await harness.fixture<{ email: string }>('workspace_member', { role: 'editor' });
+  await harness.fixture('unread_notification', { email: member.email, title: 'E2E: one to mark read' });
+  await as({ email: member.email });
+  await page.goto(`/workspace/${harness.ids.workspace_a}/studio/`);
+
+  const bells = page.getByTestId('notifications-bell');
+  await expect(bells).toHaveCount(2);
+  const shown = bells.filter({ visible: true });
+  const offScreen = bells.filter({ visible: false });
+  await expect(shown).toHaveAttribute('aria-label', 'Notifications, 1 unread');
+  await expect(offScreen).toHaveAttribute('aria-label', 'Notifications, 1 unread');
+
+  const isCount = (response: { url(): string }) => new URL(response.url()).pathname === '/notifications/unread-count/';
+  const opened = page.waitForResponse(isCount);
+  await shown.click();
+  expect((await opened).status()).toBe(200);
+  const drawer = page.getByTestId('notifications-drawer');
+  await expect(drawer).toBeVisible();
+
+  const marked = page.waitForResponse((response) => new URL(response.url()).pathname === '/notifications/mark-all-read/');
+  const recounted = page.waitForResponse(isCount);
+  await drawer.getByTestId('notifications-mark-all-read').click();
+  expect((await marked).status()).toBe(200);
+  expect((await recounted).status()).toBe(200);
+  await expect(shown).toHaveAttribute('aria-label', 'Notifications');
+  // The bell the other side of 1024px would show this count at once, not a minute later.
+  await expect(offScreen, 'the bell off screen has the new count').toHaveAttribute('aria-label', 'Notifications');
 });
 
 test('Go to opens with its button and Ctrl/Cmd-K, filters, opens a page with Enter, and Escape hands focus back', async ({

@@ -6,6 +6,7 @@
     {% if notifications %}
     <button
         type="button"
+        data-testid="notifications-mark-all-read"
         hx-post="{% url 'notifications:mark_all_read' %}"
         hx-target="#notification-drawer-content"
         hx-swap="innerHTML"
