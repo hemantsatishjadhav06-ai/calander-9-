@@ -164,7 +164,10 @@ def test_the_selection_bars_keep_their_light_look_in_both_themes():
 #: Every rule a template's own CSS writes with a fill that flips under white text on main, with its
 #: decision by role, as the class inventory above: the toasts, the third selection bar, a tooltip and
 #: the selected filter chips are inverse; today's day number and the intelligence pages' primary
-#: button flip (text on the fill). (template, selector of the rule that paints the fill)
+#: button flip (text on the fill). The white may be the rule's own or, for a state's fill, the one the
+#: same element writes without that state (``.cal-select-box`` for ``.cal-select-box.is-checked``,
+#: ``.media-thumb .remove-btn`` for its ``:hover``): the checked box and the remove buttons' danger
+#: hover flip too. (template, selector of the rule that paints the fill)
 CSS_DARK_FILLS: tuple[tuple[str, str, str], ...] = (
     ("approvals/partials/_toasts.html", ".bb-toast", INVERSE),
     ("inbox/feed.html", ".bulk-bar", INVERSE),
@@ -181,6 +184,9 @@ CSS_DARK_FILLS: tuple[tuple[str, str, str], ...] = (
     ("calendar/calendar.html", ".cal-day.today .day-num", FLIPS),
     ("organizations/cross_calendar.html", ".cross-cal-day.today .day-num", FLIPS),
     ("intelligence/_cta_styles.html", ".intel-cta-primary", FLIPS),
+    ("calendar/calendar.html", ".cal-select-box.is-checked", FLIPS),
+    ("composer/compose.html", ".media-thumb .remove-btn:hover", FLIPS),
+    ("composer/create_landing.html", ".idea-media-existing-card .remove-btn:hover", FLIPS),
 )
 
 
@@ -214,23 +220,101 @@ def test_each_dark_fill_in_template_css_carries_its_decision(template, selector,
 
 
 def test_every_dark_fill_with_text_in_template_css_is_in_the_inventory():
-    """A rule that paints a dark fill (one that flips, or the inverse surface) and sets its text needs a
-    decision here, unless its text is already the text on a fill."""
+    """A rule that paints a dark fill (one that flips, or the inverse surface) under a text colour needs
+    a decision here, unless its text is already the text on a fill. The text colour is the rule's own
+    or, when it sets none, the one the same element writes in another rule: for the same selector, or
+    without the state the rule adds (``.box`` for ``.box.is-checked``, ``.b`` for ``.b:hover``)."""
     listed = {(template, selector) for template, selector, _ in CSS_DARK_FILLS}
     unlisted = []
     for path in sorted(TEMPLATES.rglob("*.html")):
         name = recolor.template_name(path)
-        for rule in _css_rules(name):
+        rules = _css_rules(name)
+        for rule in rules:
             values = {prop: value.strip() for prop, _, value in rule.declarations}
             background = values.get("background", values.get("background-color", ""))
             dark = recolor.css_fill(background) in (recolor.FLIP, recolor.INVERSE)
-            if (
-                dark
-                and values.get("color", "var(--on-fill)") != "var(--on-fill)"
-                and (name, rule.selector) not in listed
-            ):
+            colours = [value.strip() for value, _, _ in recolor.css_text_colours(rules, rule)]
+            if dark and any(colour != "var(--on-fill)" for colour in colours) and (name, rule.selector) not in listed:
                 unlisted.append(f"{name}: {rule.selector}")
     assert unlisted == []
+
+
+def test_a_state_s_fill_reads_the_white_its_element_writes_without_the_state():
+    """The checked box and the remove buttons' hover, as main wrote them: the white text sits in the
+    element's base rule and the fill that flips in its state's rule; each is one finding, on the fill."""
+    for css, line in (
+        (
+            ".cal-select-box { background: #fff; color: #fff; }\n.cal-select-box.is-checked { background: var(--brand-700); }",
+            2,
+        ),
+        (
+            ".media-thumb .remove-btn { color: white; }\n.media-thumb .remove-btn:hover { background: var(--danger-500); }",
+            2,
+        ),
+        (
+            ".idea-media-existing-card .remove-btn {\n  color: #fff;\n}\n"
+            "@media (max-width: 1023px) { .idea-media-existing-card .remove-btn { width: 44px; } }\n"
+            ".idea-media-existing-card .remove-btn:hover { background: var(--danger-500); }",
+            5,
+        ),
+    ):
+        found = [p for p in recolor.dark_problems(f"<style>{css}</style>") if "fill that flips" in p[1]]
+        assert [n for n, _ in found] == [line], (css, found)
+
+
+def test_the_calendar_checkbox_is_drawn_on_the_card_surface():
+    """``background: #fff`` is the CSS form of bg-white: a white square on a dark card."""
+    (box,) = [rule for rule in _css_rules("calendar/calendar.html") if rule.selector == ".cal-select-box"]
+    values = {prop: value.strip() for prop, _, value in box.declarations}
+    assert values["background"] == "var(--surface-0)"
+
+
+@pytest.mark.parametrize(
+    ("selector", "bases"),
+    [
+        (".cal-select-box.is-checked", [".cal-select-box"]),
+        (".media-thumb .remove-btn:hover", [".media-thumb .remove-btn"]),
+        (".chip.on:not(.off)", [".chip.on", ".chip"]),
+        ('.chip[aria-pressed="true"]', [".chip"]),
+        ("a:hover", ["a"]),
+        # A descendant, a sibling or a pseudo-element is another box, not the same element's state.
+        (".a .b", []),
+        (".a>.b", []),
+        ('label > input[type="checkbox"]:checked + .pill', []),
+        (".a:hover::before", []),
+        (".a", []),
+    ],
+)
+def test_a_selector_s_bases_drop_its_state(selector, bases):
+    assert recolor.css_base_selectors(selector) == bases
+
+
+def test_a_selector_list_splits_outside_parentheses():
+    assert recolor.css_selector_list(".a,\n  .b:is(.c, .d), .e") == [".a", ".b:is(.c, .d)", ".e"]
+
+
+def test_a_nested_rule_s_selector_is_not_a_declaration_of_its_at_rule():
+    """Inside an at-rule (or CSS nesting) a nested block's selector is its own, not a declaration of
+    the block around it: ``a:hover`` is not ``a: hover``, and a value in an attribute selector is not
+    a colour."""
+    text = "<style>@media (x) { .x a:hover { color: red } }</style>"
+    assert [(prop, value.strip()) for prop, _, value in recolor.css_declarations(text)] == [("color", "red")]
+    nested = "<style>.a { color: var(--ink-900); &:hover { color: var(--ink-700) } }</style>"
+    assert [prop for prop, _, _ in recolor.css_declarations(nested)] == ["color", "color"]
+    attribute = "<style>@media (min-width: 1px) { .chip:not([data-tone=white]) { color: var(--ink-900) } }</style>"
+    assert recolor.raw_colour_problems(attribute) == []
+
+
+def test_a_layer_2_fill_is_judged_by_the_step_it_names():
+    """``var(--primary)`` is brand-700 and flips; the card surface is light; the inverse surface stays
+    the inverse surface although it names an ink step; a mix is not judged."""
+    assert recolor.css_fill("var(--primary)") == recolor.FLIP
+    assert recolor.css_fill("var(--primary-hover)") == recolor.FLIP
+    assert recolor.css_fill("var(--surface-0)") == recolor.LIGHT
+    assert recolor.css_fill("var(--primary-soft)") == recolor.LIGHT
+    assert recolor.css_fill("var(--surface-inverse)") == recolor.INVERSE
+    assert recolor.css_fill("var(--overlay)") is None
+    assert recolor.css_fill("var(--no-such-token)") is None
 
 
 def test_the_previews_sit_in_the_light_scope_and_keep_the_platforms_white():
@@ -457,8 +541,8 @@ CLEAN_CSS = """@theme {
   --color-white: #fff;
   --color-black: #000;
 }
-:root { --ink-0: #FFFFFF; --ink-900: #1C1F24; --danger-200: #FFCDC6; --danger-300: #FEA69C; }
-:root { --surface-0: var(--ink-0); }
+:root { --ink-0: #FFFFFF; --ink-900: #1C1F24; --danger-200: #FFCDC6; --danger-300: #FEA69C; --brand-700: #115641; }
+:root { --surface-0: var(--ink-0); --primary: var(--brand-700); }
 :root[data-theme="dark"] { --ink-0: #14171C; --ink-900: #E5E8EC; --danger-200: #642722; --danger-300: #FEA69C; }
 """
 
@@ -523,6 +607,37 @@ def test_the_fixture_tree_is_clean(tree, capsys):
             "<style>.cta { background: var(--brand-700); color: #fff !important; }</style>",
             "color: #fff on a fill that flips",
         ),
+        # A Layer 2 fill is the step it names (--primary is brand-700).
+        ("<style>.cta { background: var(--primary); color: #fff; }</style>", "color: #fff on a fill that flips"),
+        # A state's fill under the white its element writes without the state, or in another rule.
+        (
+            "<style>.box { background: var(--surface-0); color: #fff; } .box.is-checked { background: var(--brand-700); }"
+            "</style>",
+            "color: #fff of .box on a fill that flips",
+        ),
+        (
+            "<style>.t .b { color: white; } .t .b:hover { background: var(--danger-500) }</style>",
+            "color: white of .t .b on a fill that flips",
+        ),
+        (
+            "<style>.a, .b { color: #fff } @media (hover: hover) { .b:hover:not(.off) { background-color: var(--ink-800) } }"
+            "</style>",
+            "color: #fff of .b on a fill that flips",
+        ),
+        (
+            '<style>.chip { color: white } .chip[aria-pressed="true"] { background: var(--primary) }</style>',
+            "color: white of .chip on a fill that flips",
+        ),
+        (
+            "<style>.a { color: #fff } .a { background: var(--ink-900) }</style>",
+            "color: #fff of .a on a fill that flips",
+        ),
+        # The CSS form of bg-white.
+        (
+            "<style>.box { background: #fff; color: var(--text-primary); }</style>",
+            "background: #fff outside the light scope",
+        ),
+        ('<p style="background-color: white">x</p>', "background-color: white outside the light scope"),
         ('<div class="border border-ink-300"></div>', "border-ink-300 is a text grey in dark"),
         ("<style>.a{border:1px solid var(--ink-300)}</style>", "border: var(--ink-300) is a text grey in dark"),
         ('<p style="outline-color: var(--ink-300)">x</p>', "outline-color: var(--ink-300) is a text grey in dark"),
@@ -600,6 +715,16 @@ def test_white_on_a_dark_fill_in_template_css_names_the_line_of_the_white(tree, 
         "<style>.x { background: rgb(14 17 20 / .6); color: #fff; } .y { color: white; }</style>",
         "<style>.d { background: var(--ink-900); color: #fff; } /* recolor: keep */</style>",
         '<div data-theme-scope="light"><p style="background: var(--ink-900); color: #fff">x</p></div>',
+        # A state's fill that sets the text on a fill, here or in another rule for the same selector; a
+        # kept fill; a descendant's fill (another element); the card surface; white inside the light scope.
+        "<style>.box { background: var(--surface-0); color: #fff; }\n"
+        ".box.is-checked { background: var(--brand-700); color: var(--on-fill); }</style>",
+        "<style>.b { color: #fff } .b.on { color: var(--on-fill) } .b.on { background: var(--primary) }</style>",
+        "<style>.t .b { color: white; }\n.t .b:hover { background: var(--danger-500) } /* recolor: keep */</style>",
+        "<style>.x { color: #fff } .x .dot { background: var(--ink-900); width: 4px }</style>",
+        "<style>.x { color: #fff } .x::after { background: var(--ink-900) }</style>",
+        '<div data-theme-scope="light"><p style="background: #fff">x</p></div>',
+        "<style>.k { background: #fff } /* recolor: keep */</style>",
     ],
 )
 def test_what_the_checks_accept(tree, capsys, markup):

@@ -268,14 +268,14 @@
        Hover-reveal on chips; always shown once checked or when a selection is active. */
     .cal-select-box {
         width: 16px; height: 16px; flex-shrink: 0; border: 1.5px solid var(--ink-400);
-        border-radius: 4px; background: #fff; cursor: pointer; color: #fff;
+        border-radius: 4px; background: var(--surface-0); cursor: pointer; color: #fff;
         display: inline-flex; align-items: center; justify-content: center;
         opacity: 0; transition: opacity var(--dur-fast) ease, background-color var(--dur-fast) ease;
     }
     .post-chip:hover .cal-select-box,
     .cal-select-box.is-checked,
     body.has-selection .cal-select-box { opacity: 1; }
-    .cal-select-box.is-checked { background: var(--brand-700); border-color: var(--brand-700); }
+    .cal-select-box.is-checked { background: var(--brand-700); border-color: var(--brand-700); color: var(--on-fill); }
     .cal-select-box:hover { border-color: var(--brand-700); }
     /* Keyboard access: reveal the checkbox when its chip is focused. */
     .post-chip:focus-within .cal-select-box { opacity: 1; }

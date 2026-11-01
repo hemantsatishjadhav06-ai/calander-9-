@@ -59,6 +59,10 @@ import sys
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tools.contrast import Sheet
 
 ROOT = Path(__file__).resolve().parent.parent
 #: The repository this file belongs to (ROOT may be pointed elsewhere by the tests).
@@ -1088,14 +1092,16 @@ def _declarations(css: str, offset: int) -> list[tuple[str, int, str]]:
 
 def _rules_in(css: str, offset: int) -> list[CssRule]:
     """The rules of a style sheet (comments and template tags already blanked) that starts at *offset*
-    in its template; a nested block's declarations are its own, not its parent's."""
+    in its template; a nested block, its selector and its declarations are its own, not its parent's
+    (inside ``@media``, ``a:hover`` is not a declaration of the at-rule)."""
     blocks = _blocks(css)
     rules = []
     for open_, close in blocks:
         body = list(css[open_ + 1 : close])
         for inner_open, inner_close in blocks:
             if open_ < inner_open and inner_close < close:
-                for index in range(inner_open - open_ - 1, inner_close - open_):
+                inner_prelude = max(css.rfind(char, open_, inner_open) for char in "{};") + 1
+                for index in range(inner_prelude - open_ - 1, inner_close - open_):
                     body[index] = " " if body[index] != "\n" else "\n"
         prelude_start = max(css.rfind(char, 0, open_) for char in "{};") + 1
         selector = " ".join(css[prelude_start:open_].split())
@@ -1126,35 +1132,153 @@ CSS_VAR_RE = re.compile(r"^\s*var\(\s*--([a-z]+(?:-[a-z]+)*(?:-\d+)?)\s*\)\s*(?:
 CSS_WHITE_RE = re.compile(r"^\s*(#fff(?:f|fff|fffff)?|white)\s*(?:!\s*important\s*)?$", re.I)
 
 
+_SHEETS: dict[tuple[Path, int, int], Sheet | None] = {}
+
+
+def _styles_sheet() -> Sheet | None:
+    """styles.css's themed blocks (``tools.contrast.load``), read once per version of the file; None
+    when there is no file or no Layer 1 block."""
+    path = ROOT / STYLES_REL
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return None
+    key = (path, stat.st_mtime_ns, stat.st_size)
+    if key not in _SHEETS:
+        from tools import contrast
+
+        try:
+            _SHEETS[key] = contrast.load(path.read_text(encoding="utf-8"))
+        except LookupError:
+            _SHEETS[key] = None
+    return _SHEETS[key]
+
+
 def css_fill(value: str) -> str | None:
     """What a CSS ``background`` value paints, as ``fill_kind`` reads a ``bg-*`` utility: the inverse
     surface, a fill that flips (``var(--ink-900)``; the ``--neutral-*`` aliases are the ink steps) or a
-    light fill. Anything but one token (a gradient, an image, a literal) is not judged here."""
+    light fill. A Layer 2 token is the step its light value names (``--primary`` is ``--brand-700``
+    and flips; ``--surface-0`` is ``--ink-0``, light), but the inverse surface stays inverse. Anything
+    but one token (a gradient, an image, a literal, a mix) is not judged here."""
     m = CSS_VAR_RE.match(value)
-    if not m:
-        return None
-    name = m.group(1).lower()
-    if name == "surface-inverse":
-        return INVERSE
-    return fill_kind("bg", re.sub(r"^neutral-", "ink-", name), "")
+    sheet = _styles_sheet() if m else None
+    aliases = sheet.layer2 if sheet else {}
+    seen: set[str] = set()
+    while m and m.group(1).lower() not in seen:
+        name = m.group(1).lower()
+        seen.add(name)
+        if name == "surface-inverse":
+            return INVERSE
+        kind = fill_kind("bg", re.sub(r"^neutral-", "ink-", name), "")
+        if kind:
+            return kind
+        m = CSS_VAR_RE.match(aliases.get(f"--{name}", ""))
+    return None
+
+
+#: A state on a selector's last compound: a pseudo-class (``:hover``, ``:not(.off)``), a class
+#: (``.is-checked``) or an attribute (``[aria-pressed="true"]``); not a pseudo-element (``::before``).
+CSS_STATE_TAIL_RE = re.compile(r"(?:(?<!:):[\w-]+(?:\([^()]*\))?|\.[\w-]+|\[[^\]]*\])$")
+
+
+def css_selector_list(selector: str) -> list[str]:
+    """The selectors of a rule's selector list, spaces collapsed; a comma inside ``:is()`` or an
+    attribute does not split it."""
+    parts: list[str] = []
+    current: list[str] = []
+    depth = 0
+    for char in selector:
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+        if char == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    parts.append("".join(current))
+    return [" ".join(part.split()) for part in parts if part.strip()]
+
+
+def css_base_selectors(selector: str) -> list[str]:
+    """The same element without the states its last compound adds, nearest first: ``.box`` for
+    ``.box.is-checked``, ``.t .b`` for ``.t .b:hover``. A descendant, a sibling or a pseudo-element is
+    another box, not a state, so it has none."""
+    bases = []
+    while (m := CSS_STATE_TAIL_RE.search(selector)) and m.start() > 0 and selector[m.start() - 1] not in " >+~":
+        selector = selector[: m.start()]
+        bases.append(selector)
+    return bases
+
+
+def css_text_colours(rules: list[CssRule], rule: CssRule) -> list[tuple[str, int, str]]:
+    """The text colour a rule's element is drawn in, as the template's CSS says, (value, where it
+    starts, the selector that writes it): the rule's own last ``color``; when it sets none, for each
+    selector of its list, the last ``color`` another rule writes for the same selector or else for the
+    nearest base (``css_base_selectors``). Empty when no rule says (an inline ``style=`` has no
+    selector to match)."""
+    own = [(value, start, rule.selector) for prop, start, value in rule.declarations if prop == "color"]
+    if own or not rule.selector:
+        return own[-1:]
+    lists = [(other, css_selector_list(other.selector)) for other in rules if other is not rule]
+    found = []
+    for part in css_selector_list(rule.selector):
+        for candidate in (part, *css_base_selectors(part)):
+            written = [
+                (value, start, candidate)
+                for other, selectors in lists
+                if candidate in selectors
+                for prop, start, value in other.declarations
+                if prop == "color"
+            ]
+            if written:
+                found.append(max(written, key=lambda colour: colour[1]))
+                break
+    return found
 
 
 def css_white_on_flip(text: str, ranges: list[tuple[int, int]], *, css: bool = False) -> list[tuple[int, str]]:
-    """(line, problem) for each rule of a template's CSS that writes white text (``#fff``, ``white``)
-    on its own background that flips: white does not flip, so in dark it sits on a light fill. Outside
-    the light scope's *ranges* and ``recolor: keep`` lines."""
+    """(line, problem) for each rule of a template's CSS that paints a background that flips under
+    white text (``#fff``, ``white``): white does not flip, so in dark it sits on a light fill. The white
+    is the rule's own (named on its line) or, when the rule sets no text colour, the one its element
+    writes in another rule, for the same selector or without the state (``.box`` for
+    ``.box.is-checked``; named on the fill's line, where ``var(--on-fill)`` goes). Outside the light
+    scope's *ranges* and ``recolor: keep`` lines."""
     found = []
-    for rule in css_rules(text, css=css):
-        background = ""
-        for prop, _, value in rule.declarations:
+    rules = css_rules(text, css=css)
+    for rule in rules:
+        background, at = "", 0
+        for prop, start, value in rule.declarations:
             if prop in ("background", "background-color"):
-                background = value  # the last one wins
+                background, at = value, start + len(value) - len(value.lstrip())  # the last one wins
         if css_fill(background) != FLIP:
             continue
-        for prop, start, value in rule.declarations:
-            white = CSS_WHITE_RE.match(value) if prop == "color" else None
-            if white and not (_in(ranges, start) or _kept(text, start + white.start(1))):
-                found.append((_line_of(text, start + white.start(1)), f"color: {white.group(1)} on a fill that flips"))
+        if any(prop == "color" for prop, _, _ in rule.declarations):
+            for prop, start, value in rule.declarations:
+                white = CSS_WHITE_RE.match(value) if prop == "color" else None
+                if white and not (_in(ranges, start) or _kept(text, start + white.start(1))):
+                    line = _line_of(text, start + white.start(1))
+                    found.append((line, f"color: {white.group(1)} on a fill that flips"))
+            continue
+        if _in(ranges, at) or _kept(text, at):
+            continue
+        for value, _, source in css_text_colours(rules, rule):
+            white = CSS_WHITE_RE.match(value)
+            if white:
+                found.append((_line_of(text, at), f"color: {white.group(1)} of {source} on a fill that flips"))
+    return found
+
+
+def css_white_fills(text: str, ranges: list[tuple[int, int]], *, css: bool = False) -> list[tuple[int, str]]:
+    """(line, problem) for a white background in a template's CSS, the CSS form of ``bg-white``: in
+    dark it is a white square on a dark card. Outside the light scope's *ranges* and ``recolor: keep``
+    lines."""
+    found = []
+    for prop, start, value in css_declarations(text, css=css):
+        white = CSS_WHITE_RE.match(value) if prop in ("background", "background-color") else None
+        if white and not (_in(ranges, start) or _kept(text, start + white.start(1))):
+            found.append((_line_of(text, start + white.start(1)), f"{prop}: {white.group(1)} outside the light scope"))
     return found
 
 
@@ -1420,11 +1544,12 @@ def class_string_problems(text: str, ranges: list[tuple[int, int]] | None = None
 def dark_problems(text: str, *, css: bool = False) -> list[tuple[int, str]]:
     """(line, problem) for a template that loads the stylesheet: what would read wrong in dark.
 
-    bg-white outside the light scope; text-white, bg-white/NN or hover:bg-white/NN on an element whose
-    own fill or nearest ancestor's fill flips, and white text on a background that flips in a rule of
-    the template's CSS; a colour that flips on an inverse surface, an ancestor's or the element's own
-    (without the light scope that keeps its light look); an ink-300 edge, in a utility or in the
-    template's CSS. The template's CSS is its ``<style>`` blocks and ``style=`` values, or the whole
+    bg-white outside the light scope, and a white background in the template's CSS; text-white,
+    bg-white/NN or hover:bg-white/NN on an element whose own fill or nearest ancestor's fill flips, and
+    white text on a background that flips in the template's CSS (the rule's own white, or the one its
+    element writes without the rule's state); a colour that flips on an inverse surface, an ancestor's
+    or the element's own (without the light scope that keeps its light look); an ink-300 edge, in a
+    utility or in the template's CSS. The template's CSS is its ``<style>`` blocks and ``style=`` values, or the whole
     template when *css* says it is bare CSS, included inside a parent's ``<style>`` block.
     ``recolor: keep`` lines are accepted.
     """
@@ -1436,6 +1561,7 @@ def dark_problems(text: str, *, css: bool = False) -> list[tuple[int, str]]:
         for start, _, prop in ink300_css_edges(text, ranges, css=css)
     ]
     problems += css_white_on_flip(text, ranges, css=css)
+    problems += css_white_fills(text, ranges, css=css)
     fills = [_own_fills(element) for element in found_elements]
     constant = constant_steps()
     for element, own in zip(found_elements, fills, strict=True):
