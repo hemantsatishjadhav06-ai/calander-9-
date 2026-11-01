@@ -13,9 +13,10 @@
 // below 1024px); a test takes the one this device shows. The bell's badge counts a fresh person's
 // one unread notification, and the bell opens the drawer that lists it; Escape closes it and the
 // focus goes back to the bell. Only the bell on screen asks for the count, and it hands the answer
-// to the other, so after Mark all read the bell a turned screen would show has no stale count. Go to opens with its button and with Ctrl/Cmd-K, filters the
-// places as you type, opens one with Enter (from the field, or on a link reached with the arrow
-// keys), and Escape hands the focus back.
+// to the other, so after Mark all read the bell a turned screen would show has no stale count; axe
+// runs on the drawer once everything in it reads as read. Go to opens with its button and with
+// Ctrl/Cmd-K, filters the places as you type, opens one with Enter (from the field, or on a link
+// reached with the arrow keys), and Escape hands the focus back.
 import { settled } from '../support/settled';
 import { expectLit, go, isPhone, openMore, phonePlaces } from '../support/nav';
 import { expect, test } from '../support/test';
@@ -151,7 +152,7 @@ test('the notifications bell shows the unread count and opens the drawer', async
   await expect(bell, 'the focus goes back to the bell').toBeFocused();
 });
 
-test('Mark all read clears the count on the bell off screen too', async ({ page, as, harness }) => {
+test('Mark all read clears the count on the bell off screen too', async ({ page, as, axe, harness }) => {
   const member = await harness.fixture<{ email: string }>('workspace_member', { role: 'editor' });
   await harness.fixture('unread_notification', { email: member.email, title: 'E2E: one to mark read' });
   await as({ email: member.email });
@@ -179,6 +180,8 @@ test('Mark all read clears the count on the bell off screen too', async ({ page,
   await expect(shown).toHaveAttribute('aria-label', 'Notifications');
   // The bell the other side of 1024px would show this count at once, not a minute later.
   await expect(offScreen, 'the bell off screen has the new count').toHaveAttribute('aria-label', 'Notifications');
+  await settled(drawer, 'the notifications drawer after Mark all read');
+  await axe(page, 'Notifications drawer after Mark all read', { include: '[data-testid="notifications-drawer"]' });
 });
 
 test('Go to opens with its button and Ctrl/Cmd-K, filters, opens a page with Enter, and Escape hands focus back', async ({
