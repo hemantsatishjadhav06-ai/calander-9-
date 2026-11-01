@@ -64,6 +64,20 @@ pair. Use `data-testid` selectors in e2e, leave invariant tests unchanged, and
 observe a failing test before changing behaviour. A flaky test needs an
 issue and quarantine; CI has zero retries.
 
+**Visual baselines.** `tests/e2e/visual/` compares screenshots only where
+`E2E_VISUAL=1`, which only CI's **Visual (Playwright)** job and the baseline
+workflow set; a local run, `CI=1` included, skips those specs with the reason
+"baselines are made and compared in CI (D9)", because this machine's fonts
+are not the runner's. Baselines are written only by
+`.github/workflows/visual-baselines.yml` (CI, `E2E_VISUAL=1` and
+`E2E_UPDATE_BASELINES=1` together; never locally), started by hand on the
+branch with `gh workflow run visual-baselines.yml --ref <branch> -f
+specs=<files>`; its artifact is reviewed and committed in a `visual:` commit.
+Visual specs freeze the server's clock and hold its worker (`visual_clock`)
+and use the fixed `visual_workspace`; `data-visual-dynamic` marks what prints
+the real date and is the one non-test-id selector, for masking only. See
+`tests/e2e/README.md`.
+
 **Performance.** In a separate terminal, start the manifest-static test server
 on its own database and port, then run the Lighthouse runner against it:
 
@@ -99,8 +113,10 @@ gitleaks detect --source . --redact --no-banner
 CI (`.github/workflows/ci.yml`) runs **Agency UI state tests**, **Lint (ruff)**,
 **Type check (mypy)**, **Test (pytest)** (full Postgres suite with coverage,
 migration check and `compilemessages`), **Docker build**, **Secret scan
-(gitleaks)**, **Dependency audit**, **E2E (Playwright)** and **Lighthouse CI**
-on every pull request and on pushes to `main`. Pre-commit hooks provide an
+(gitleaks)**, **Dependency audit**, **E2E (Playwright)** (one shard per device
+project, each with its own server and database, and one summary check of that
+name), **Visual (Playwright)** and **Lighthouse CI** on every pull request and
+on pushes to `main`. Pre-commit hooks provide an
 earlier subset;
 passing them does not replace the full CI gate. At the Phase 1 gate, run the
 full pytest suite and three consecutive complete browser runs, report the
@@ -398,6 +414,9 @@ Inbound — a new command or button:
   network and axe checks, harness self-checks, the twelve golden paths and the
   Phase 2 screens (navigation, Approvals, Settings, Activity, switches, the
   public site) on three devices.
+- `tests/e2e/visual/` and `tests/e2e/__screenshots__/` — the Phase 3 visual
+  specs and their baselines (`support/visual.ts` `snap`, `support/schemes.ts`
+  `forSchemes`), compared in CI only.
 - `tests/test_product_map_urls.py` — no URL `docs/PRODUCT_MAP.md` lists, now or
   before Phase 2 (`tests/fixtures/product_map_urls.txt`), answers 404 or 500;
   a URL the map gains needs its line in the fixture.

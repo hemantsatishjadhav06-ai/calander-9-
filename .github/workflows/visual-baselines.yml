@@ -1,0 +1,158 @@
+name: Visual baselines
+
+# Writes the visual baselines (tests/e2e/visual/ on the three projects, CI's own browsers and fonts) and
+# takes the WebKit type pair, then uploads both as the artifact `visual-baselines` (spec D9, plan T10).
+# Nothing is committed here: a person downloads the artifact, looks at every image and commits the
+# baselines in a `visual:` commit with their before/after pair (CLAUDE.md, tests/e2e/README.md).
+#
+#   gh workflow run visual-baselines.yml --ref claude/trusting-dijkstra-m7nul1 -f specs=tests/e2e/visual/shell.spec.ts
+#
+# Its own file and concurrency group, so starting it never cancels a CI run (ci.yml cancels an
+# in-progress run of the same ref). GitHub offers a workflow for dispatch once it has run or is on the
+# default branch: the `visual-baselines` label on the pull request runs it once (all of
+# tests/e2e/visual/) and registers it; if a dispatch is refused, re-label once.
+
+on:
+  workflow_dispatch:
+    inputs:
+      specs:
+        description: "Visual specs to photograph: files or folders under tests/e2e/visual/, separated by spaces"
+        required: false
+        default: tests/e2e/visual
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-baselines-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baselines:
+    name: Visual baselines (write)
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'visual-baselines'
+    # Playwright 1.56.1 supports this image; ubuntu-latest moved to 26.04.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: "1"
+      DB_HOST: "127.0.0.1"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: smbean_baselines_e2e
+      E2E_PORT: "8155"
+      # Passed through the environment, never written into a script.
+      SPECS: ${{ inputs.specs }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # The branch as pushed (not the pull request's merge commit), with the history the type
+          # pair's before side needs (a worktree of main at 045978b).
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install locked Python dependencies
+        run: pip install --require-hashes -r requirements.lock
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            theme/static_src/package-lock.json
+      - name: Install locked browser dependencies and build CSS
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix theme/static_src
+          npm run build --prefix theme/static_src
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Check the specs input
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -f  # no glob expansion: each word is checked as given
+          checked=""
+          for spec in ${SPECS:-tests/e2e/visual}; do
+            if [[ ! "$spec" =~ ^tests/e2e/visual(/[A-Za-z0-9._-]+)*/?$ || "$spec" == *..* ]]; then
+              echo "::error::Only tests/e2e/visual/ is photographed here; '$spec' is not under it."
+              exit 1
+            fi
+            checked="$checked $spec"
+          done
+          # Only the checked paths, on one line, go on to the next step.
+          echo "SPECS=${checked# }" >> "$GITHUB_ENV"
+
+      - name: Write the baselines (CI, E2E_VISUAL and E2E_UPDATE_BASELINES together)
+        shell: bash
+        env:
+          E2E_VISUAL: "1"
+          E2E_UPDATE_BASELINES: "1"
+        run: |
+          set -euo pipefail
+          # Unquoted on purpose: one argument per spec; the step above allowed only paths.
+          npx playwright test $SPECS
+
+      - name: Take the shell pair on WebKit at 390 px, before (main 045978b) and after (this branch)
+        # The D3 type pair: a heading, body and caption on Home (home-pair-390.png), and Approvals and
+        # the Calendar month beside it, from CI's WebKit (playwright.pairs.config.ts with CI set).
+        shell: bash
+        env:
+          MAIN_SHA: 045978b
+          MAIN_DB: smbean_pair_main_e2e
+          MAIN_PORT: "8231"
+          AFTER_DB: smbean_pair_after_e2e
+          AFTER_PORT: "8232"
+        run: |
+          set -euo pipefail
+          git worktree add ../smbean-main "$MAIN_SHA"
+          npm ci --prefix ../smbean-main/theme/static_src
+          npm run build --prefix ../smbean-main/theme/static_src
+          (cd ../smbean-main && DB_NAME="$MAIN_DB" E2E_PORT="$MAIN_PORT" python -m tests.e2e.server --reset --port "$MAIN_PORT") > /tmp/pair-main.log 2>&1 &
+          main_pid=$!
+          trap 'kill "$main_pid" 2>/dev/null || true; wait "$main_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 180); do
+            if curl --fail --silent "http://127.0.0.1:$MAIN_PORT/health/" >/dev/null; then break; fi
+            if ! kill -0 "$main_pid" 2>/dev/null; then cat /tmp/pair-main.log; exit 1; fi
+            sleep 1
+          done
+          curl --fail --silent "http://127.0.0.1:$MAIN_PORT/health/" >/dev/null
+          PAIR_SIDE=before E2E_PORT="$MAIN_PORT" npm run pairs -- tests/e2e/pairs/00-shell.pair.ts --project=pair-390
+          DB_NAME="$AFTER_DB" E2E_PORT="$AFTER_PORT" npm run pairs -- tests/e2e/pairs/00-shell.pair.ts --project=pair-390
+
+      - name: Upload the baselines and the type pair
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: visual-baselines
+          path: |
+            tests/e2e/__screenshots__/
+            test-results/pairs/00-shell/
+          retention-days: 14
+
+      - name: Retain the run's report and traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: visual-baselines-evidence
+          path: |
+            playwright-report/
+            test-results/
+            !test-results/pairs/
+          retention-days: 7

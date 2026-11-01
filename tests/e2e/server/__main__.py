@@ -2,7 +2,8 @@
 
 In order: the settings and database guards (``config.settings.e2e`` only, a database named ``*_e2e``
 on this machine only, by ``DB_HOST`` and by every libpq variable that could move it, refused before a
-single statement runs); the fakes, the provider mock and the socket guard;
+single statement runs); the fakes, the clock (real until a visual spec freezes it), the provider mock
+and the socket guard;
 with ``--reset``, the database dropped and re-created, migrated and seeded; with ``--static
 manifest``, ``collectstatic`` into ``e2e_media/static`` for the compressed manifest storage; the
 worker thread (unless ``--no-worker``); then ``runserver`` on 127.0.0.1 without the reloader (the
@@ -109,10 +110,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     from django.core.management import call_command
 
-    from . import fakes, mocks, netguard, seed, worker
+    from . import clock, fakes, mocks, netguard, seed, worker
 
     database = settings.DATABASES["default"]
     fakes.install()
+    clock.install()  # real until a visual spec freezes it (steps/visual.py)
     mocks.install()
     stripped = netguard.strip_proxy_environment()
     netguard.install(

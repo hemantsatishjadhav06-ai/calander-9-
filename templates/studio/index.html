@@ -7,7 +7,7 @@
 <div class="max-w-[1180px] min-w-0">
     {# ---- Greeting and one status line ---- #}
     <header class="mb-5">
-        <h1 class="ui-page-title">{{ greeting }}</h1>
+        <h1 class="ui-page-title" data-visual-dynamic>{{ greeting }}</h1>
         {# Each part may wrap (a bot name can be long); only a part's link stays on one line. #}
         <p class="ui-page-status break-words" data-home-status>
             {% for part in status_parts %}{% if not forloop.first %}<span class="mx-1.5 text-ink-400" aria-hidden="true">·</span>{% endif %}<span>{{ part.text }}{% if part.url %} · <a href="{{ part.url }}" class="whitespace-nowrap font-medium link-inline">{{ part.link }}</a>{% endif %}</span>{% endfor %}
@@ -27,7 +27,7 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex items-baseline justify-between gap-3">
                             <h2 id="today-heading" class="ui-card-title">Today</h2>
-                            <p class="text-[13px] text-ink-500 tabular-nums whitespace-nowrap">{% timezone tzname %}{% now "D j M" %}{% endtimezone %}</p>
+                            <p class="text-[13px] text-ink-500 tabular-nums whitespace-nowrap" data-visual-dynamic>{% timezone tzname %}{% now "D j M" %}{% endtimezone %}</p>
                         </div>
                         {% if not today.quiet %}
                         <p class="mt-0.5 text-[13px]/[18px] text-ink-600 tabular-nums">
@@ -212,7 +212,7 @@
                     <div class="flex-1 p-3 sm:px-3.5">
                         <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1.5">
                             {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
-                            <span class="text-xs text-ink-500 whitespace-nowrap">{{ brief.created_at|timesince }} ago</span>
+                            <span class="text-xs text-ink-500 whitespace-nowrap" data-visual-dynamic>{{ brief.created_at|timesince }} ago</span>
                         </div>
                         <p class="text-sm font-semibold text-ink-900 line-clamp-2 group-hover:underline underline-offset-2">{{ brief.title }}</p>
                     </div>

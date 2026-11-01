@@ -45,7 +45,7 @@
                     {% if n.body %}
                     <p class="mt-0.5 text-xs text-ink-600 line-clamp-2">{{ n.body }}</p>
                     {% endif %}
-                    <p class="mt-1 text-xs text-ink-500 tabular-nums">{{ n.created_at|timesince }} ago</p>
+                    <p class="mt-1 text-xs text-ink-500 tabular-nums" data-visual-dynamic>{{ n.created_at|timesince }} ago</p>
                 </div>
 
                 {% if not n.is_read %}

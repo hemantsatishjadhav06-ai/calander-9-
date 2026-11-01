@@ -10,15 +10,20 @@ tests/e2e/
                poll.ts (until: read a probe until the worker is done), settled.ts (wait for a swap or a
                fade to finish), nav.ts (move through the navigation the way each device shows it),
                type.ts (expectReadSize: the computed size of named running text, which each rebuilt
-               screen's spec checks), global-setup.ts (the end-of-run network check)
+               screen's spec checks), visual.ts (snap: a screen against its baseline; the frozen
+               clock and the visual workspace), schemes.ts (forSchemes: a case in light and in dark),
+               global-setup.ts (the end-of-run network check)
   self/        the harness's own checks (axe helper, network guard, session fixture, phone bar overlap)
-               and Phase 3's foundations: theme.spec.ts (Appearance and the head script) and
-               foundations.spec.ts (the type floor and the body size on each device)
+               and Phase 3's foundations: theme.spec.ts (Appearance and the head script),
+               foundations.spec.ts (the type floor and the body size on each device) and
+               visual-harness.spec.ts (what the baselines rest on: no local writes, a still picture)
   golden/      the golden paths, one file each (NN-name.spec.ts)
   screens/     the screens Phase 2 added or moved, one file each (navigation, approvals, settings,
                activity, switches, marketing); docs/specs/02-cut-and-merge.md D10
   pairs/       Phase 3's before/after pairs and the light diff (playwright.pairs.config.ts; not in the suite)
-  __screenshots__/   toHaveScreenshot baselines (none yet; Phase 3 takes them per screen)
+  visual/      Phase 3's visual specs, compared with their baselines in CI only (Visual baselines, below)
+  __screenshots__/   the baselines, <spec path>/<name>-<scheme>-<project>.png, written only by the
+               baseline workflow and committed in `visual:` commits
 ```
 
 ## Running
@@ -114,6 +119,70 @@ adds pages for the next request in this process, `{"clear": true}` puts back the
 both answer `{"ready": […]}`. Clear it in `test.afterEach`, as `self/theme.spec.ts` does, so no other
 spec meets a page it did not declare. The device's scheme is `page.emulateMedia({ colorScheme })`.
 
+## Visual baselines
+
+`visual/` photographs screens and compares each photograph with its baseline under
+`__screenshots__/` (`toHaveScreenshot`, at most 0.1 % of the pixels may differ:
+`maxDiffPixelRatio` in `playwright.config.ts`). Spec: `docs/specs/03-rebuild-screens.md` D9, plan T10.
+
+- **Where they compare.** Only where `E2E_VISUAL=1`, which only CI's **Visual (Playwright)** job and
+  the baseline workflow set. Anywhere else, a local `CI=1` run included, a visual spec skips with
+  "baselines are made and compared in CI (D9)": this machine's fonts (Inter here) and its iPhone 13
+  (Chromium unless `CI=1`) are not the runner's. The behavioural shards skip them too; the visual
+  job runs `tests/e2e/visual` on the three projects.
+- **Who writes them.** `.github/workflows/visual-baselines.yml`, and nothing else:
+  `playwright.config.ts` sets `updateSnapshots` to `all` only when `CI`, `E2E_VISUAL=1` and
+  `E2E_UPDATE_BASELINES=1` are all set, and `none` otherwise (never Playwright's default `missing`);
+  `snap` refuses a run given `--update-snapshots` by hand. Start it on the branch:
+
+  ```bash
+  gh workflow run visual-baselines.yml --ref claude/trusting-dijkstra-m7nul1 -f specs=tests/e2e/visual/shell.spec.ts
+  ```
+
+  It uploads the artifact `visual-baselines`: `tests/e2e/__screenshots__/` and the shell pair taken on
+  WebKit at 390 px, before (main `045978b`) and after (this branch), which is D3's type pair. Look at
+  every image, then commit the baselines in a `visual:` commit with their before/after pair. The
+  workflow has its own concurrency group, so it never cancels CI. GitHub offers it for dispatch once
+  it has run: the `visual-baselines` label on the pull request runs it once and registers it (if a
+  dispatch is refused, re-label once).
+- **Stable by construction.** A spec freezes the clock first, then asks for the visual workspace
+  (`visualWorld(page, harness)` does both), signs in as one of its people, and clears the clock after
+  each test (`test.afterEach(() => thawClock(harness))`):
+  - `visual_clock` (`server/steps/visual.py`): `{"at": "2027-01-03T09:00:00+05:30"}` freezes the
+    server's clock (`server/clock.py` puts its own `now` in `django.utils.timezone` and in every copy
+    of it), so request threads and the worker read the same instant; `{}` puts the real clock back.
+    While it is frozen the worker is held between tasks (`worker.hold`): a clock months from the real
+    one would make every other spec's rows fall due at once. The three check-ins Home's health reads
+    are stamped at the instant (the team reads as online on any real date) and put back on clear.
+    `freezeClock` also fixes the browser's clock (`page.clock.setFixedTime`). A session expires 14
+    days after it is made, so sign in after setting the clock, and again after moving it.
+  - `visual_workspace` (`{}`): workspace `00000000-0000-4000-8000-0000000000c1`, "Riverside Homes", in
+    its own organisation "Visual Agency" (Asia/Kolkata); `visual-owner@e2e.test` (Vera, the lead) and
+    `visual-editor@e2e.test`; Instagram, LinkedIn company and Facebook; the brand profile; four posts
+    proposed in the week of Mon 4 Jan 2027 (`?date=2027-01-04`), two waiting for review and two
+    drafts; three briefs (ready, approved, stopped) and the team thread. Every id and time is fixed
+    and all before the instant; each call puts the same rows back; A and B are never touched. What
+    Home shows of it does not depend on the instant (no proposed time on a brief, nothing finished
+    within a day of it, no post within the next 24 hours), so the self spec can move the clock.
+  - `data-visual-dynamic` marks, in the templates, what prints today's date or a time relative to now
+    (`{% now %}` and `timesince` read the real clock, not the frozen one): Home's greeting and date,
+    Recent work's "… ago", the thread's message times and the notifications drawer's "… ago"; each
+    screen marks its own. It is the one selector a spec may use that is not a test id, and only to
+    mask; `tests/test_e2e_steps_visual.py` pins which elements carry it.
+- **snap.** `snap(target, name)` (`support/visual.ts`): a locator (the screen's own region, the
+  phone bar masked where it floats over it) or the page (a whole state, the shell included); waits
+  until no HTMX request is in flight, the fonts are loaded and the region has settled; masks
+  `[data-visual-dynamic]`; disables animations and hides the caret; and names the file
+  `<name>-<scheme>-<project>.png`. `forSchemes` (`support/schemes.ts`) declares a case once per
+  colour scheme, for axe and visual cases only; behavioural flows run in light.
+- **The harness's own check.** `self/visual-harness.spec.ts` runs everywhere: no run but the
+  baseline workflow's writes a baseline, two masked photographs of the visual Home two seconds apart
+  are byte-identical, so are they with the clock 90 days on, and the masked elements exist.
+
+The first baseline is `visual/shell.spec.ts`: the shell around the visual workspace's Home, light, on
+the three projects. It is committed at the foundations gate; screen 1 (which removes the New menu) and
+screen 2 (which rebuilds Home) refresh it in their own `visual:` commits.
+
 ## Pairs and the light diff
 
 Phase 3's before/after pairs for the owner and the check that light rendering did not move
@@ -180,6 +249,8 @@ use them only for this.
 
 One process, because the fakes are module attributes shared by the request threads and the worker:
 
+- **Clock** (`clock.py`): real, until a visual spec freezes it with `visual_clock` (Visual baselines,
+  above); `django.utils.timezone.now` and every copy of it read the frozen instant then.
 - **Fakes** (`fakes.py`): the creative team is the suite's `FakeTeam`; the account manager reads the
   request and answers `ChatAnswer` (new post with the channels and the key message named, routine,
   change, plain answer); every other agent turn gets a schema-valid answer; the model clients, web
@@ -190,7 +261,8 @@ One process, because the fakes are module attributes shared by the request threa
 - **Socket guard** (`netguard.py`): loopback to the database and the server only; every other
   connection and name lookup is refused and recorded.
 - **Worker** (`worker.py`): `run_worker`'s loop in a thread, without the platform polls (inbox sync,
-  analytics sync, health checks), which could only reach the mock's refusal.
+  analytics sync, health checks), which could only reach the mock's refusal. `hold()` stops it between
+  tasks while the clock is frozen; `resume()` lets it go on.
 - **Seed** (`seed.py`): workspace A `00000000-0000-4000-8000-00000000000a` ("Neopolis", Asia/Kolkata,
   internal approval in the dashboard) with `owner@`, `manager@`, `editor@` and `client@e2e.test`,
   connected LinkedIn company, Instagram and Facebook accounts, brand profile, verified facts, agency
@@ -238,7 +310,8 @@ test('…', async ({ page, harness, as, axe, network }) => {
 ## Rules for specs
 
 - **Selectors:** all new tests use `data-testid` only. Never a CSS class, copy text or
-  an Alpine attribute. Existing invariant golden paths retain their original role selectors under
+  an Alpine attribute. The one exception is `[data-visual-dynamic]`, and only to mask a photograph
+  (Visual baselines). Existing invariant golden paths retain their original role selectors under
   the instruction not to edit those tests. A missing hook is added to the template next to the existing attributes:
   `data-testid="<area>-<thing>"`, kebab-case (`approvals-row-approve-schedule`, `home-thread-send`).
   A hook that stands for a record ends in that record's key exactly as it is stored, underscores
