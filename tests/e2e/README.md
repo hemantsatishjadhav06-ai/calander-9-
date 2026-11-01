@@ -14,6 +14,7 @@ tests/e2e/
   golden/      the golden paths, one file each (NN-name.spec.ts)
   screens/     the screens Phase 2 added or moved, one file each (navigation, approvals, settings,
                activity, switches, marketing); docs/specs/02-cut-and-merge.md D10
+  pairs/       Phase 3's before/after pairs and the light diff (playwright.pairs.config.ts; not in the suite)
   __screenshots__/   toHaveScreenshot baselines (none yet; Phase 3 takes them per screen)
 ```
 
@@ -100,6 +101,63 @@ Keyboard scrolling uses `support/scroll.ts`: install a bounded native `scrollend
 send one key, then await completion before scrolling on the other axis. The movement assertions
 remain separate; starting to move is not evidence that the previous native animation has finished.
 The helper neither sleeps nor repeats input, and it removes listeners and timers on completion or failure.
+
+## Pairs and the light diff
+
+Phase 3's before/after pairs for the owner and the check that light rendering did not move
+(`docs/specs/03-rebuild-screens.md` D9, `docs/specs/phase-3.md` T12). They are not tests of the
+product: `playwright.pairs.config.ts` runs only `tests/e2e/pairs/` (the main config never picks those
+files up), compares nothing against a baseline and writes only under the gitignored
+`test-results/pairs/`. The images go to the owner with the pull request, never into the repository.
+Run the main suite after copying them out: its own output folder is `test-results/`, which Playwright
+empties on every run.
+
+```
+tests/e2e/pairs/
+  NN-name.pair.ts   one pair: a `before` block (main's hooks only) and an `after` block (this branch's)
+  support.ts        pairSide, ensurePairData (the same two posts on every server, once), capture, shootState
+  diff.ts           npm run pairs:diff
+  compare.cjs       PNG reading and the pixel count (tests/js/pairs_compare.test.cjs)
+```
+
+The *before* side comes from a worktree of main with its own stylesheet, server, database and port:
+
+```bash
+git worktree add ../smbean-main 045978b
+cd ../smbean-main && (cd theme/static_src && npm ci && npm run build)    # dist/ is gitignored
+DB_NAME=smbean_main_e2e ../calander-9-/.venv/bin/python -m tests.e2e.server --reset --port 8231
+# back in this branch:
+PAIR_SIDE=before E2E_PORT=8231 npm run pairs -- tests/e2e/pairs/00-shell.pair.ts
+E2E_PORT=8221 DB_NAME=smbean_p3_e2e npm run pairs -- tests/e2e/pairs/00-shell.pair.ts
+```
+
+`npm run pairs` writes `test-results/pairs/<pair>/<side>/<state>-<project>.png`: the screen at
+390 × 844 (`pair-390`, iPhone 13) and 1440 × 900 (`pair-1440`, Desktop Chrome), light, as the device
+shows it. The before side starts no server (one must be listening on `E2E_PORT`); the after side
+starts this branch's with `--reset` when none is. Each state names a `hook`, a test id the page must
+show: a state whose hook is missing fails and writes nothing, so an *after* never shows a screen that
+has not been built yet. Local pairs use Chromium and the local `system-ui` (Inter here), so they are
+not a typeface sign-off; the type pair comes from WebKit in CI (T10).
+
+`npm run pairs:diff` renders the a11y sweep's eleven pages and the three Lighthouse pages (Home is in
+both, so thirteen) at both widths on two servers, each whole page in one image (the viewport grows
+until the shell's scroller hides nothing), with the elements that print a time masked by the
+config's `pairMasks` (`time`, Home's greeting and date, `timesince`; main has no
+`data-visual-dynamic`). It fails when a pair differs in more than 0.1 % of its pixels and lists the
+page and the ratio; `test-results/pairs/diff/<project>/` holds both images, a `-diff.png` marking the
+pixels of a page over the limit, and `summary.json`. Both servers run with `--no-worker` (the diff
+refuses a server whose worker runs: it would change rows between the two renders of a page):
+
+```bash
+# in ../smbean-main
+DB_NAME=smbean_main_e2e ../calander-9-/.venv/bin/python -m tests.e2e.server --reset --no-worker --port 8231
+# in this branch (starts this branch's server with --reset --no-worker when none is on E2E_PORT)
+PAIR_BEFORE_PORT=8231 E2E_PORT=8221 DB_NAME=smbean_p3_e2e npm run pairs:diff
+```
+
+Two servers of the same commit report 0 differences. Both sides get the same two posts through
+`ensurePairData` the first time a pair or the diff meets a server, so start both with `--reset` and
+use them only for this.
 
 ## What the server does
 
