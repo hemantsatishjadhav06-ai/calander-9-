@@ -16,7 +16,7 @@ from apps.common.models import TaskHeartbeat
 from apps.composer.models import PlatformPost, Post
 from apps.members.models import WorkspaceMembership
 from apps.studio import autopilot, dashboard, engine, live, team
-from apps.studio.models import AgencyJob, AgencySettings, AgentRun, Conversation, Routine, StudioBrief
+from apps.studio.models import AgencyJob, AgencySettings, AgentRun, AutopilotWeek, Conversation, Routine, StudioBrief
 from apps.workspaces.models import Workspace
 
 TASKS = (
@@ -332,6 +332,39 @@ def test_the_chart_summary_and_scale(world):
 # ---------------------------------------------------------------------------
 
 
+def _plan_in_five_hours(world, local):
+    """Autopilot on, its weekly plan five hours after *local* (workspace time).
+
+    The plan is set by weekday and hour, counted from this week's Monday. On a Sunday evening five
+    hours later is next Monday, and a plan time that has passed this week with no plan made counts as
+    due now, so the board leaves it out. By then this week's plan has run, as it would have on its
+    Monday: record it, and the next plan is the coming Monday, five hours away.
+    """
+    plan_at = local + timedelta(hours=5)
+    row = AgencySettings.objects.create(
+        workspace=world.workspace, autopilot_enabled=True, plan_weekday=plan_at.weekday(), plan_hour=plan_at.hour
+    )
+    this_monday = local.date() - timedelta(days=local.weekday())
+    if plan_at.date() - timedelta(days=plan_at.weekday()) > this_monday:
+        AutopilotWeek.objects.create(workspace=world.workspace, week_start=this_monday + timedelta(days=7))
+    return row
+
+
+def test_the_plan_five_hours_ahead_is_on_the_board_on_a_sunday_evening(world, monkeypatch):
+    # 19:07 on a Sunday in the workspace's zone: five hours later is Monday, next week.
+    zone = live._zone(world.workspace)
+    local = datetime(2026, 11, 1, 19, 7, tzinfo=zone)
+    now = local.astimezone(UTC)
+    _plan_in_five_hours(world, local)
+    monkeypatch.setattr(autopilot, "local_now", lambda workspace, now=None: local)
+
+    events = live.snapshot(world.workspace, now=now)["upcoming"]["events"]
+
+    plans = [event for event in events if event["title"] == "Plan next week"]
+    assert len(plans) == 1
+    assert plans[0]["at"] == datetime(2026, 11, 2, 0, 0, tzinfo=zone)
+
+
 def test_upcoming_routines_autopilot_posts_approvals_and_queued_work(world, monkeypatch):
     now = timezone.now()
     Routine.objects.create(
@@ -340,10 +373,7 @@ def test_upcoming_routines_autopilot_posts_approvals_and_queued_work(world, monk
     Routine.objects.create(workspace=world.workspace, title="Off", next_run_at=now + timedelta(hours=3), enabled=False)
     Routine.objects.create(workspace=world.workspace, title="Later", next_run_at=now + timedelta(hours=30))
     local = now.astimezone(live._zone(world.workspace))
-    plan_at = local + timedelta(hours=5)
-    AgencySettings.objects.create(
-        workspace=world.workspace, autopilot_enabled=True, plan_weekday=plan_at.weekday(), plan_hour=plan_at.hour
-    )
+    _plan_in_five_hours(world, local)
     monkeypatch.setattr(autopilot, "local_now", lambda workspace, now=None: local)
     post = Post.objects.create(workspace=world.workspace, title="Clubhouse reel")
     PlatformPost.objects.create(
@@ -567,10 +597,7 @@ def _plans(world, monkeypatch, now):
     """A routine, the autopilot plan and a scheduled post, all in the next 24 hours."""
     Routine.objects.create(workspace=world.workspace, instruction=SECRET_ROUTINE, next_run_at=now + timedelta(hours=2))
     local = now.astimezone(live._zone(world.workspace))
-    plan_at = local + timedelta(hours=5)
-    AgencySettings.objects.create(
-        workspace=world.workspace, autopilot_enabled=True, plan_weekday=plan_at.weekday(), plan_hour=plan_at.hour
-    )
+    _plan_in_five_hours(world, local)
     monkeypatch.setattr(autopilot, "local_now", lambda workspace, now=None: local)
     post = Post.objects.create(workspace=world.workspace, title="Clubhouse reel")
     PlatformPost.objects.create(
