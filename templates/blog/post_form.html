@@ -113,13 +113,13 @@
                     <p>Pictures aren't switched on for this server yet.</p>
                     <details class="mt-1 text-ink-700">
                         <summary class="cursor-pointer font-medium text-ink-900 underline underline-offset-2 max-lg:py-[13px]">Details for the owner</summary>
-                        <p class="mt-1">Add <code class="font-mono text-[12px]">FAL_KEY</code> (the picture service's key) to the SM Bean services to switch this on.</p>
+                        <p class="mt-1">Add <code class="font-mono text-xs">FAL_KEY</code> (the picture service's key) to the SM Bean services to switch this on.</p>
                     </details>
                 </div>
                 {% elif ai_model %}
                 <details class="mt-2 text-small text-ink-600">
                     <summary class="cursor-pointer font-medium text-ink-700 underline underline-offset-2">Details</summary>
-                    <p class="mt-1">Picture model: <code class="font-mono text-[12px]">{{ ai_model }}</code></p>
+                    <p class="mt-1">Picture model: <code class="font-mono text-xs">{{ ai_model }}</code></p>
                 </details>
                 {% endif %}
                 {% else %}

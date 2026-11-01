@@ -21,7 +21,7 @@
                       aria-describedby="body-help{% if form.body.errors %} body-error{% endif %}"
                       class="ui-input" {% if form.body.errors %}aria-invalid="true"{% endif %}>{{ form.body.value|default_if_none:'' }}</textarea>
             {% if form.body.errors %}<p id="body-error" class="ui-error">{{ form.body.errors|join:" " }}</p>{% endif %}
-            <p id="body-help" class="ui-help">You can use <code class="font-mono text-[12px]">{sender_name}</code>, <code class="font-mono text-[12px]">{account_name}</code> and <code class="font-mono text-[12px]">{post_url}</code>.</p>
+            <p id="body-help" class="ui-help">You can use <code class="font-mono text-xs">{sender_name}</code>, <code class="font-mono text-xs">{account_name}</code> and <code class="font-mono text-xs">{post_url}</code>.</p>
         </div>
     </div>
     <div class="mt-5 flex items-center justify-end gap-2">

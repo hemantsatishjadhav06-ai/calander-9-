@@ -30,7 +30,7 @@ without a pointer must be able to reach it to scroll it.
     {% endif %}
     {% elif m.author_kind == 'agent' %}
     <div class="flex items-start gap-2.5 {% if m.is_internal %}rounded-xl border border-dashed border-ink-400 bg-ink-25 px-3.5 py-2.5{% endif %}">
-        <span class="mt-px inline-flex w-7 h-7 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-semibold {% if m.agent == 'account_manager' or not m.agent %}bg-ink-900 text-on-fill{% else %}bg-ink-100 text-ink-700{% endif %}" aria-hidden="true">{% for word in m.sender_name.split|slice:":2" %}{{ word|first|upper }}{% endfor %}</span>
+        <span class="mt-px inline-flex w-7 h-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold {% if m.agent == 'account_manager' or not m.agent %}bg-ink-900 text-on-fill{% else %}bg-ink-100 text-ink-700{% endif %}" aria-hidden="true">{% for word in m.sender_name.split|slice:":2" %}{{ word|first|upper }}{% endfor %}</span>
         <div class="min-w-0 flex-1">
             <p class="text-[13px]/[18px] font-semibold text-ink-900">
                 {% if m.is_internal %}<span class="inline-flex items-center gap-1 text-ink-700"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Internal note · </span>{% endif %}{{ m.sender_name }}

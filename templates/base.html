@@ -209,7 +209,7 @@
         /* Neutral tag chip with a 24px remove target */
         .idea-selected-tags .idea-tag-chip {
             display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 2px 0 8px; border-radius: 9999px;
-            font-size: 0.75rem; font-weight: 600;
+            font-size: 0.8125rem; font-weight: 600;
             background: var(--ink-100); color: var(--ink-700);
         }
         .idea-selected-tags .idea-tag-chip button {
@@ -567,7 +567,7 @@
                                             <button aria-haspopup="true" :aria-expanded="createTagDropdownOpen" type="button" class="idea-pill-btn" @click="createTagDropdownOpen = !createTagDropdownOpen; createGroupDropdownOpen = false; if(createTagDropdownOpen) $nextTick(() => $refs.sidebarCreateTagSearchInput.focus())">
                                                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                                                 <span>Tags</span>
-                                                <span x-show="createSelectedTags.length" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold tabular-nums bg-ink-200 text-ink-700" x-text="createSelectedTags.length"></span>
+                                                <span x-show="createSelectedTags.length" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-xs font-semibold tabular-nums bg-ink-200 text-ink-700" x-text="createSelectedTags.length"></span>
                                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
                                             </button>
                                             <div x-show="createTagDropdownOpen" x-cloak x-transition class="idea-pill-dropdown">
@@ -939,7 +939,7 @@
                     {% for item in nav.phone %}
                     <li>
                         {% if item.url %}
-                        <a href="{{ item.url }}" data-testid="phone-bar-{{ item.key }}" class="relative flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-[11px] leading-4 font-medium rounded-lg {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}
+                        <a href="{{ item.url }}" data-testid="phone-bar-{{ item.key }}" class="relative flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-xs leading-4 font-medium rounded-lg {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}
                            aria-label="Approvals{% if item.count %}, {{ item.count }} waiting{% endif %}"{% endif %}>
                             {% if item.active %}{% include "components/nav_icon.html" with key=item.key icon_class="text-brand-700" %}{% else %}{% include "components/nav_icon.html" with key=item.key icon_class="text-ink-500" %}{% endif %}
                             <span>{{ item.label }}</span>
@@ -947,7 +947,7 @@
                         </a>
                         {% else %}
                         <button type="button" data-testid="phone-bar-{{ item.key }}" aria-controls="app-sidebar" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = true"
-                                class="w-full flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-[11px] leading-4 font-medium rounded-lg cursor-pointer {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}">
+                                class="w-full flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-xs leading-4 font-medium rounded-lg cursor-pointer {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}">
                             {% if item.active %}{% include "components/nav_icon.html" with key=item.key icon_class="text-brand-700" %}{% else %}{% include "components/nav_icon.html" with key=item.key icon_class="text-ink-500" %}{% endif %}
                             <span>{{ item.label }}</span>
                         </button>

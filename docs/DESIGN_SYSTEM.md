@@ -33,7 +33,7 @@ The palette, the contrast tables in section 23 and the reference mock-ups were p
 5. **Status is never colour alone.** Every status has a shape (icon or dot form) and a word, rendered by one partial. Status hues are lightness-staggered so they separate for colour-blind people too.
 6. **Depth is functional.** Hairline plus a 1px shadow for cards; real shadows only for what floats (menus, toasts, modals). No hover lifts, no coloured glows, no gradients in the app.
 7. **Motion explains a change, then gets out of the way.** 100–320ms, ease-out, no overshoot except the toggle knob; every animation has a reduced-motion equivalent that keeps the meaning.
-8. **Accessible by construction.** WCAG 2.2 AA everywhere (144 pairs checked, section 23), real 2px focus outlines that survive forced-colours mode, 24px minimum targets (44px on touch), sentence case, 12px minimum for words.
+8. **Accessible by construction.** WCAG 2.2 AA everywhere (144 pairs checked, section 23), real 2px focus outlines that survive forced-colours mode, 24px minimum targets (44px on touch), sentence case, 13px minimum for words.
 
 ---
 
@@ -160,8 +160,8 @@ These are the `:root` variables in Layer 2 of `theme/static_src/src/styles.css`.
 | Manager / specialist message | – | no bubble; ink-900 text on white, 28px ink-900 avatar |
 | Client bubble | – | white + 1px ink-200 + neutral "Client" tag |
 | Teammate bubble | – | ink-50 + 1px ink-200 |
-| Internal note | – | ink-25, 1px **dashed** ink-400, lock icon, "Note for the team" 12/600 ink-700 |
-| System line | – | centred 12/16 ink-500 between ink-200 hairlines |
+| Internal note | – | ink-25, 1px **dashed** ink-400, lock icon, "Note for the team" 13/600 ink-700 |
+| System line | – | centred 13/18 ink-500 between ink-200 hairlines |
 | Toast / tooltip | – | ink-900 fill, white text, ink-300 detail, brand-300 action |
 | Legacy status names | `--success-50/500/700`, `--warning-50/500/700`, `--info-50/500/700`, `--error-50/200/500/600/700`, `--error-soft`, `--warning-soft`, `--success-soft` | re-pointed to the new scales (`--error-*` → danger) |
 | On a fill / inverse surface / its text / scrim | `--on-fill` (`text-on-fill`), `--surface-inverse` (`bg-inverse`), `--text-on-inverse` (`text-on-inverse`), `--scrim` (`bg-scrim/NN`) | `#FFFFFF` / ink-900 / `#FFFFFF` / ink-950; dark values in §21 |
@@ -176,29 +176,36 @@ These are the `:root` variables in Layer 2 of `theme/static_src/src/styles.css`.
 ```
 --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+--font-display: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 ```
+
+**Display stack: the system font's display cut, 0 KB.** `--font-display` (through `--brand-font-display`, the white-label hook) is set on `h1`, `h2`, `h3`, `.ui-page-title`, `.ui-card-title`, `.text-display`, `.text-h1`, `.text-h2` and `.text-h3`. `system-ui` switches to Apple's display optical size from 20px; Windows gets Segoe UI Variable Display ahead of Segoe UI. Titles and headings are 700; nothing is heavier (Segoe UI Variable and the committed Inter both stop at 700, and a synthesised 800 is worse than none). CSP `font-src 'self'` is unchanged.
+
+**Body token: running text is 16/24 below 1024px and 15/22 from 1024px.** `--read-size` and `--read-leading` in `styles.css`, set on `<body>` and offered as `text-read`. A rebuilt screen sets its running text (thread messages, captions, row titles, the Inbox message, the portal caption) with `text-read`, and its browser spec asserts the computed size with `expectReadSize` (`tests/e2e/support/type.ts`), because running text sets its own size and `<body>` alone proves nothing. `text-sm` (14px) stays for dense desktop tables and meta, never for running text in a rebuilt screen.
 
 Georgia (app) and Instrument Serif + Inter (marketing, 5 files, 95,428 bytes) are retired. If uniform cross-platform rendering is ever preferred, the OFL Inter variable woff2 already committed at `static/fonts/inter-latin-normal.woff2` (48,432 bytes, 0 new bytes) is the fallback option; it is not used now because native SF Pro is the most "Apple" choice there is.
 
 | Role | Tailwind | px / line-height | Weight | Tracking | Use |
 |---|---|---|---|---|---|
 | Marketing hero | `text-[64px]/[68px] font-bold tracking-[-0.035em]` | 64/68 (phone 40/44) | 700 | -0.035em | public site only |
-| Display | `text-display` | 40/44 | 700 | -0.025em | marketing section titles, login wordmark |
-| H1 | `text-h1` | 28/34 (phone 26/32) | 700 | -0.020em | page titles ("Good afternoon, Ana", "Your team", "Set up") |
-| H2 | `text-h2` | 20/26 | 600 | -0.015em | card titles (Today, Your team, Working now) |
-| H3 | `text-h3` | 16/22 (section heads 17/22) | 600 | -0.010em | row titles, modal sections, "Recent work" |
+| Display | `text-display` | 40/44 | 700 | -0.030em | marketing section titles, login wordmark |
+| H1 | `text-h1`, `.ui-page-title` | 28/34 (phone 26/32) | 700 | -0.020em | page titles ("Good afternoon, Ana", "Your team", "Set up") |
+| H2 | `text-h2`, `.ui-card-title` | 20/26 | 700 | -0.015em | card titles (Today, Your team, Working now) |
+| H3 | `text-h3` | 16/22 (section heads 17/22) | 700 | -0.010em | row titles, modal sections, "Recent work" |
+| Running text | `text-read` (the body token) | 16/24 below 1024px, 15/22 from 1024px | 400 | 0 | running text in a rebuilt screen: messages, captions, row titles |
 | Body large | `text-body-lg` | 15/24 | 400 | -0.005em | chat messages, composer, descriptions under H1 |
 | Body | `text-body` / `text-sm` | 14/20 | 400 (labels 500, emphasis 600) | 0 | default UI, buttons, rows, forms |
 | Table | `text-table` | 14/22 | 400 | 0 | dense tables |
 | Small | `text-small` | 13/18 | 400–500 | 0 | meta, helper text, card subtitles, live states |
-| Caption | `text-caption` | 12/16 | 500 (pills and group labels 600) | +0.005em | timestamps, pills, group labels, axis labels |
-| Micro | `text-micro` | 11/14 | 600 | +0.02em | **numerals only** (count badges) |
-| Mono | `font-mono text-[13px]/5` | 13/20 (owner boxes 12/18) | 400 | 0 | setting names the owner must type |
+| Caption | `text-caption` | 13/18 | 500 (pills and group labels 600) | +0.005em | timestamps, pills, group labels, axis labels |
+| Extra small | `text-xs` (Tailwind's, redefined) | 13/18 | 400–600 | 0 | the same as caption where a weight utility sets the weight |
+| Micro | `text-micro` | 13/18 | 600 | +0.02em | **numerals only** (count badges) |
+| Mono | `font-mono text-[13px]/5` | 13/20 (owner boxes 13/18) | 400 | 0 | setting names the owner must type |
 
 Rules:
 - Hierarchy by size and weight only. Negative tracking only at 20px and above.
-- **No uppercase, no wide tracking.** Group labels are 12/600 ink-500 in sentence case ("Waiting for you", "Done since yesterday", "Brief").
-- Words are never smaller than 12px. Inputs are 16px below 1024px (stops iOS zoom).
+- **No uppercase, no wide tracking.** Group labels are 13/600 ink-500 in sentence case ("Waiting for you", "Done since yesterday", "Brief").
+- Words are never smaller than 13px, wherever the stylesheet loads and on the standalone pages that do not load it (accept invite, the magic-link pages, legal, error, unsubscribe), and in the Analytics chart's canvas text. `apps/common/tests/test_type_floor.py` fails on any `text-[Npx]` under 13, any `font-size` under 13px and any `--text-*` token under 0.8125rem in templates, `static/js` and the stylesheets. Its two named allowlists: emails (the one exception: they do not load the stylesheet and keep literal values) and the public site's `marketing.css` with `templates/marketing/` (until screen 11). Inputs are 16px below 1024px (stops iOS zoom).
 - `tabular-nums` on counts, badges, times, dates in lists, budgets, "5 of 11 done", tables, chart axes and the calendar grid; proportional figures in prose.
 - Reading measure ≤ 72ch; thread column ≤ 720px.
 
@@ -357,7 +364,7 @@ base `inline-flex items-center gap-1.5 h-[22px] pl-[7px] pr-2 rounded-full text-
 | `on_hold`, `paused` | On hold / Paused | neutral | pause |
 | connection ok / expired / disconnected | Connected / Expires soon / Disconnected | success / warning / danger | check / clock / x-octagon |
 
-- Count badge: `inline-flex items-center justify-center min-w-5 h-[18px] px-1.5 rounded-full bg-ink-200 text-ink-700 text-[11px] font-semibold tabular-nums`. Your-turn badge (Approvals waiting only): `bg-brand-700 text-white`. Failed-runs count: `bg-danger-500 text-white`.
+- Count badge: `inline-flex items-center justify-center min-w-5 h-[18px] px-1.5 rounded-full bg-ink-200 text-ink-700 text-xs font-semibold tabular-nums`. Your-turn badge (Approvals waiting only): `bg-brand-700 text-white`. Failed-runs count: `bg-danger-500 text-white`.
 - Filter chip: `h-8 max-lg:h-11 px-3 rounded-full text-[13px] font-medium text-ink-700 hover:bg-ink-100 aria-pressed:bg-ink-900 aria-pressed:text-white aria-pressed:font-semibold` (count `text-ink-500`, selected `text-ink-300`).
 - Tag chip: `inline-flex items-center gap-1 h-6 pl-2 pr-0.5 rounded-full bg-ink-100 text-xs font-semibold text-ink-700`; remove button `size-6 grid place-items-center rounded-full hover:bg-ink-200` (24px target).
 
@@ -489,7 +496,7 @@ Markup: `<span class="live-state"><i class="live-dot live-dot--working" aria-hid
 | waiting | 16px ring 1.5px ink-400 + label ink-600 | 3.57:1 |
 | failed | 16px danger-500 disc + white x | 8.46:1 |
 
-Connectors are 2px: success-500 between reached nodes, ink-200 ahead (decorative; nodes carry the state). Labels 12/16 500 ink-600, never wrap (≤ 6 stages; on phones 11px allowed only if the label still fits, otherwise show the current stage name only). Standard stages for a post: Brief → Angles → Copy → Design → Check → For you. Routines show their own (Read results → Your answer → Four briefs).
+Connectors are 2px: success-500 between reached nodes, ink-200 ahead (decorative; nodes carry the state). Labels 13/16 500 ink-600, never wrap (≤ 6 stages; on phones, if the labels do not fit, show the current stage name only). Standard stages for a post: Brief → Angles → Copy → Design → Check → For you. Routines show their own (Read results → Your answer → Four briefs).
 
 ### 14.3 Delivery receipt (post status, grafted from Harbour)
 
@@ -507,7 +514,7 @@ Form: one magnitude series over time → bars, one hue (dataviz rule: colour com
 
 ### 14.5 Next 24 hours timeline
 
-Desktop (`.timeline`, 150px tall): a 1px ink-300 axis from Now to +24h; a 2px ink-900 "Now" line; ticks every 6 hours at the bottom (12px ink-500 tabular); quiet hours as a hatched band (`ink-100 / ink-50` at 135°) with its label inside ("Quiet hours 22:00–07:00", ink-600).
+Desktop (`.timeline`, 150px tall): a 1px ink-300 axis from Now to +24h; a 2px ink-900 "Now" line; ticks every 6 hours at the bottom (13px ink-500 tabular); quiet hours as a hatched band (`ink-100 / ink-50` at 135°) with its label inside ("Quiet hours 22:00–07:00", ink-600).
 
 | Event | Marker | Caption |
 |---|---|---|

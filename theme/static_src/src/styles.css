@@ -164,18 +164,23 @@
 
 /* Type roles: text-display, text-h1 ... text-micro (size + line-height +
    tracking + weight). `inline` because --text-body is also the semantic
-   body-text colour in Layer 2; inlining keeps the utility's font-size literal. */
+   body-text colour in Layer 2; inlining keeps the utility's font-size literal.
+   The floor is 13px wherever the stylesheet loads (apps/common/tests/test_type_floor.py):
+   caption and micro are 13/18, and Tailwind's own text-xs (12px by default) is redefined
+   to 13/18 here so every use follows without an edit. Titles and headings are 700 in the
+   display stack (--font-display, below). */
 @theme inline {
-  --text-display: 2.5rem;   --text-display--line-height: 2.75rem;  --text-display--letter-spacing: -0.025em; --text-display--font-weight: 700;
+  --text-display: 2.5rem;   --text-display--line-height: 2.75rem;  --text-display--letter-spacing: -0.03em;  --text-display--font-weight: 700;
   --text-h1: 1.75rem;       --text-h1--line-height: 2.125rem;      --text-h1--letter-spacing: -0.02em;       --text-h1--font-weight: 700;
-  --text-h2: 1.25rem;       --text-h2--line-height: 1.625rem;      --text-h2--letter-spacing: -0.015em;      --text-h2--font-weight: 600;
-  --text-h3: 1rem;          --text-h3--line-height: 1.375rem;      --text-h3--letter-spacing: -0.01em;       --text-h3--font-weight: 600;
+  --text-h2: 1.25rem;       --text-h2--line-height: 1.625rem;      --text-h2--letter-spacing: -0.015em;      --text-h2--font-weight: 700;
+  --text-h3: 1rem;          --text-h3--line-height: 1.375rem;      --text-h3--letter-spacing: -0.01em;       --text-h3--font-weight: 700;
   --text-body-lg: 0.9375rem; --text-body-lg--line-height: 1.5rem;  --text-body-lg--letter-spacing: -0.005em;
   --text-body: 0.875rem;    --text-body--line-height: 1.25rem;
   --text-table: 0.875rem;   --text-table--line-height: 1.375rem;
   --text-small: 0.8125rem;  --text-small--line-height: 1.125rem;
-  --text-caption: 0.75rem;  --text-caption--line-height: 1rem;     --text-caption--letter-spacing: 0.005em;  --text-caption--font-weight: 500;
-  --text-micro: 0.6875rem;  --text-micro--line-height: 0.875rem;   --text-micro--letter-spacing: 0.02em;     --text-micro--font-weight: 600;
+  --text-caption: 0.8125rem; --text-caption--line-height: 1.125rem; --text-caption--letter-spacing: 0.005em;  --text-caption--font-weight: 500;
+  --text-micro: 0.8125rem;  --text-micro--line-height: 1.125rem;   --text-micro--letter-spacing: 0.02em;     --text-micro--font-weight: 600;
+  --text-xs: 0.8125rem;     --text-xs--line-height: 1.125rem;
 }
 
 /* Layer 2 · Semantic tokens. Variable NAMES are unchanged from the old file
@@ -185,7 +190,9 @@
   color-scheme: light;
 
   /* Brand layer (white-label swaps happen here; re-run the contrast check on any swap) */
-  --brand-font-display: var(--font-sans);   /* Georgia retired: titles are the system sans at 600/700 */
+  /* Titles and headings: the system font's display cut (Apple's switches in from 20px; Windows gets
+     Segoe UI Variable Display), 0 KB and nothing from another host. */
+  --brand-font-display: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --brand-font-body: var(--font-sans);
   --brand-font-mono: var(--font-mono);
   --brand-green-100: var(--brand-100);      /* the old olive checkbox accent now follows the brand */
@@ -330,6 +337,18 @@
 @media (max-width: 1023px) {
   :root { --control-height: 2.75rem; }
 }
+
+:root {
+  /* Running text (spec D3): 16/24 below 1024px, 15/22 from 1024px. Set on <body> and offered as
+     text-read for a rebuilt screen's running text; text-sm (14px) stays for dense desktop tables and
+     meta. The leading is a ratio, so what inherits it from <body> keeps scaling with its own size. */
+  --read-size: 1rem;
+  --read-leading: 1.5;
+}
+@media (min-width: 1024px) {
+  :root { --read-size: 0.9375rem; --read-leading: calc(22 / 15); }
+}
+@utility text-read { font-size: var(--read-size); line-height: var(--read-leading); }
 
 /* Dark theme (spec D2, DESIGN_SYSTEM.md §21). Layer 1 is redefined, so every bg-ink-*, text-brand-*
    and ring-success-* utility (declared @theme inline above) follows without edits, and each step keeps
@@ -527,6 +546,8 @@
   }
   body {
     font-family: var(--font-body);
+    font-size: var(--read-size);
+    line-height: var(--read-leading);
     background: var(--surface-page);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
@@ -534,6 +555,10 @@
     text-rendering: optimizeLegibility;
   }
   ::selection { background: var(--brand-100); color: var(--ink-900); }
+
+  /* Titles and headings in the display stack (spec D3). Their weight and tracking come from the type
+     roles and the title classes; a utility on the element (font-mono) still wins. */
+  h1, h2, .ui-page-title, .text-display, .text-h1, .text-h2, h3, .text-h3, .ui-card-title { font-family: var(--font-display); }
 
   /* Transitional: headings that still set style="font-family: var(--font-display)" were Georgia at
      400. The display font is the system sans now, so give them heading weight and tracking until
@@ -601,14 +626,14 @@
 .sidebar-nav-item.active svg,
 .sidebar-nav-item[aria-current="page"] svg { color: var(--brand-700); }   /* 8.64:1 on the white pill */
 .sidebar-section-label {          /* sentence case, never uppercase */
-  font-size: 0.75rem; line-height: 1rem; font-weight: 600;
+  font-size: 0.8125rem; line-height: 1rem; font-weight: 600;
   text-transform: none; letter-spacing: 0;
   color: var(--ink-500);
   padding: 14px 10px 4px;
 }
 .sidebar-badge {
   margin-left: auto; min-width: 20px; height: 18px; padding: 0 6px;
-  font-size: 11px; line-height: 18px; font-weight: 600; text-align: center;
+  font-size: 13px; line-height: 18px; font-weight: 600; text-align: center;
   font-variant-numeric: tabular-nums;
   border-radius: var(--radius-full);
   background: var(--ink-200); color: var(--ink-700);
@@ -761,7 +786,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 /* Divider with text */
 .divider-text {
   display: flex; align-items: center; gap: 1rem;
-  color: var(--text-tertiary); font-size: 0.75rem; font-weight: 500;
+  color: var(--text-tertiary); font-size: 0.8125rem; font-weight: 500;
   text-transform: none; letter-spacing: 0;
 }
 .divider-text::before,
@@ -832,7 +857,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 .flatpickr-months .flatpickr-next-month:hover { background: var(--surface-2); }
 .flatpickr-months .flatpickr-prev-month svg,
 .flatpickr-months .flatpickr-next-month svg { fill: var(--text-secondary); }
-span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: none; letter-spacing: 0; }
+span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--text-tertiary); text-transform: none; letter-spacing: 0; }
 .flatpickr-day {
   font-size: 0.8125rem;
   font-weight: 500;
@@ -853,7 +878,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 /* Time picker */
 .flatpickr-time { border-top: 1px solid var(--border); }
 .flatpickr-time input { font-family: var(--font-body); font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
-.flatpickr-time .flatpickr-am-pm { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
+.flatpickr-time .flatpickr-am-pm { font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); }
 .flatpickr-time .flatpickr-am-pm:hover,
 .flatpickr-time .flatpickr-am-pm:focus { background: var(--surface-2); }
 .flatpickr-time input:hover,
@@ -1024,9 +1049,9 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-card-link { transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
   .ui-card-link:hover { border-color: var(--border-hover); box-shadow: var(--shadow-sm); }
   .ui-card-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .ui-card-title { font-size: 1.25rem; line-height: 1.625rem; letter-spacing: -0.015em; font-weight: 600; color: var(--ink-950); }
+  .ui-card-title { font-size: 1.25rem; line-height: 1.625rem; letter-spacing: -0.015em; font-weight: 700; color: var(--ink-950); }
   .ui-card-subtitle { margin-top: 2px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--ink-600); }
-  .ui-group-label { margin: 18px 0 4px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--ink-500); }
+  .ui-group-label { margin: 18px 0 4px; font-size: 0.8125rem; line-height: 1rem; font-weight: 600; color: var(--ink-500); }
 
   /* Page header: <h1 class="ui-page-title"> + <p class="ui-page-status"> */
   .ui-page-title { font-size: 1.75rem; line-height: 2.125rem; letter-spacing: -0.02em; font-weight: 700; color: var(--ink-950); }
@@ -1037,7 +1062,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
      <span class="ui-pill ui-pill-warning"><svg …/>Ready for approval</span> */
   .ui-pill {
     display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px 0 7px;
-    border-radius: 9999px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; white-space: nowrap;
+    border-radius: 9999px; font-size: 0.8125rem; line-height: 1rem; font-weight: 600; white-space: nowrap;
     background: var(--ink-100); color: var(--ink-700); box-shadow: inset 0 0 0 1px var(--ink-200);
   }
   .ui-pill svg { width: 12px; height: 12px; flex: none; color: var(--ink-500); }
@@ -1054,13 +1079,13 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-badge {
     display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; padding: 0 6px;
     border-radius: 9999px; background: var(--ink-200); color: var(--ink-700);
-    font-size: 11px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums;
+    font-size: 13px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums;
   }
   .ui-badge-turn { background: var(--brand-700); color: var(--on-fill); }
   .ui-badge-danger { background: var(--danger-500); color: var(--on-fill); }
 
   /* Tag chip with a 24px remove button */
-  .ui-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 2px 0 8px; border-radius: 9999px; background: var(--ink-100); color: var(--ink-700); font-size: 0.75rem; font-weight: 600; }
+  .ui-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 2px 0 8px; border-radius: 9999px; background: var(--ink-100); color: var(--ink-700); font-size: 0.8125rem; font-weight: 600; }
   .ui-chip:not(:has(button)) { padding-right: 8px; }
   .ui-chip button { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 9999px; color: var(--ink-500); }
   .ui-chip button:hover { background: var(--ink-200); color: var(--ink-900); }
@@ -1117,7 +1142,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   /* Tables */
   .ui-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface-0); }
   .ui-table { width: 100%; border-collapse: collapse; }
-  .ui-table th { height: 36px; padding: 0 16px; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--ink-600); background: var(--ink-25); border-bottom: 1px solid var(--border-hover); white-space: nowrap; }
+  .ui-table th { height: 36px; padding: 0 16px; text-align: left; font-size: 0.8125rem; font-weight: 600; color: var(--ink-600); background: var(--ink-25); border-bottom: 1px solid var(--border-hover); white-space: nowrap; }
   .ui-table td { padding: 14px 16px; font-size: 0.875rem; line-height: 1.375rem; color: var(--ink-900); border-bottom: 1px solid var(--border); }
   .ui-table tr:last-child td { border-bottom: 0; }
   .ui-table tbody tr:hover { background: var(--ink-25); }
@@ -1135,7 +1160,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-callout-info { background: var(--info-50); box-shadow: inset 0 0 0 1px var(--info-200); color: var(--info-700); }
   .ui-callout-info svg { color: var(--info-500); }
   /* "For the owner" box: setting names in <code> */
-  .ui-owner-box { border-radius: var(--radius-md); background: var(--ink-50); box-shadow: inset 0 0 0 1px var(--ink-200); padding: 8px 12px; font-size: 0.75rem; line-height: 1.125rem; color: var(--ink-700); }
+  .ui-owner-box { border-radius: var(--radius-md); background: var(--ink-50); box-shadow: inset 0 0 0 1px var(--ink-200); padding: 8px 12px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--ink-700); }
   .ui-owner-box code { font-family: var(--font-mono); }
 
   /* Menus and popovers */
@@ -1192,7 +1217,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 /* Stage track: <ol class="stage-track"><li class="stage" data-state="done|working|needs-you|waiting|failed"> */
 .stage-track { display: flex; list-style: none; margin: 0; padding: 0; }
 .stage { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
-         font-size: 0.75rem; line-height: 1rem; font-weight: 500; color: var(--ink-600); text-align: center; }
+         font-size: 0.8125rem; line-height: 1rem; font-weight: 500; color: var(--ink-600); text-align: center; }
 .stage::before { content: ""; position: absolute; top: 7px; left: -50%; right: 50%; height: 2px; background: var(--ink-200); }
 .stage:first-child::before { display: none; }
 .stage:not([data-state="waiting"])::before { background: var(--success-500); }
@@ -1229,20 +1254,20 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 .hour-bar.is-now { background: var(--ink-900); }
 .hour-bar:hover, .hour-bar:focus-visible { background: var(--ink-600); }
 .hour-bar-fail { background: var(--danger-500); border-radius: 4px 4px 0 0; box-shadow: 0 2px 0 var(--surface-0); margin-bottom: 2px; }
-.chart-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.75rem; line-height: 1rem; font-weight: 500; color: var(--ink-500); font-variant-numeric: tabular-nums; }
-.chart-tip { background: var(--surface-inverse); color: var(--text-on-inverse); border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; line-height: 1rem; box-shadow: var(--shadow-lg); pointer-events: none; }
+.chart-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.8125rem; line-height: 1rem; font-weight: 500; color: var(--ink-500); font-variant-numeric: tabular-nums; }
+.chart-tip { background: var(--surface-inverse); color: var(--text-on-inverse); border-radius: 8px; padding: 6px 10px; font-size: 0.8125rem; line-height: 1rem; box-shadow: var(--shadow-lg); pointer-events: none; }
 
 /* Next-24-hours timeline (desktop). Below 768px it renders as a plain list. */
 .timeline { position: relative; height: 150px; }
 .timeline-axis { position: absolute; left: 0; right: 0; top: 70px; height: 1px; background: var(--border-hover); }
 .timeline-now { position: absolute; top: 22px; bottom: 30px; width: 2px; border-radius: 1px; background: var(--ink-900); }
 .timeline-quiet { position: absolute; top: 52px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
-                  font-size: 0.75rem; font-weight: 500; color: var(--ink-600);
+                  font-size: 0.8125rem; font-weight: 500; color: var(--ink-600);
                   background: repeating-linear-gradient(135deg, var(--ink-100) 0 6px, var(--ink-50) 6px 12px); }
 .timeline-event { position: absolute; top: 62px; transform: translateX(-8px); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .timeline-event.is-up { top: auto; bottom: 72px; flex-direction: column-reverse; }
-.timeline-event b { max-width: 168px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--ink-900); }
-.timeline-ticks { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--ink-500); font-variant-numeric: tabular-nums; }
+.timeline-event b { max-width: 168px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; line-height: 1rem; font-weight: 600; color: var(--ink-900); }
+.timeline-ticks { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; font-size: 0.8125rem; color: var(--ink-500); font-variant-numeric: tabular-nums; }
 
 /* Skeleton: appears only after 300ms so fast loads never flash it */
 .skeleton {

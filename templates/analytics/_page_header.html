@@ -37,7 +37,7 @@
                                 {% if acc.avatar_url %}
                                     <img src="{{ acc.avatar_url }}" alt="" class="size-[30px] rounded-full object-cover">
                                 {% else %}
-                                    <span class="grid size-[30px] place-items-center rounded-full bg-ink-100 text-[12px] font-semibold text-ink-700" aria-hidden="true">{{ acc.account_name|make_list|first|upper }}</span>
+                                    <span class="grid size-[30px] place-items-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700" aria-hidden="true">{{ acc.account_name|make_list|first|upper }}</span>
                                 {% endif %}
                                 <span class="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-surface [&>svg]:!size-3 [&>svg]:!text-current">
                                     {% include "partials/_platform_icon.html" with platform=acc.platform size="sm" %}

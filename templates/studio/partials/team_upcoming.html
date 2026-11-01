@@ -39,7 +39,7 @@ quiet hours are a hatched band explained in the legend. Context: live.
             {% else %}
             <details id="{{ cluster.id }}" class="relative w-full">
                 <summary class="flex w-full cursor-pointer list-none flex-col gap-1.5 rounded-md{% if cluster.up %} flex-col-reverse{% endif %}{% if cluster.end %} items-end text-right{% else %} items-start{% endif %} [&::-webkit-details-marker]:hidden">
-                    <span class="inline-flex h-4 min-w-4 flex-none items-center justify-center rounded-full bg-ink-900 px-1 text-[11px] font-semibold leading-none text-on-fill tabular-nums" aria-hidden="true">{{ cluster.count }}</span>
+                    <span class="inline-flex h-4 min-w-4 flex-none items-center justify-center rounded-full bg-ink-900 px-1 text-xs font-semibold leading-none text-on-fill tabular-nums" aria-hidden="true">{{ cluster.count }}</span>
                     <span class="block w-full min-w-0">
                         <span class="block truncate text-xs font-semibold text-ink-900">{{ cluster.count }} things</span>
                         <span class="block truncate text-xs text-ink-500 tabular-nums">From {{ cluster.first.time_text }} · show</span>
