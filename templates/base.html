@@ -1074,6 +1074,7 @@
                     // and returning focus where Chromium does.
                     this.opener = document.activeElement;
                     this.query = '';
+                    this._restores = 0;
                     this.open = true;
                     this.$nextTick(() => this.placeFocus(10));
                 },
@@ -1089,12 +1090,25 @@
                 // the dialog for nowhere (lost). WebKit moved the focus out after opening, and the
                 // trap, told not to place the focus, has no node to send it back to.
                 guard(event) {
-                    if (this.open && !this.$refs.dialog.contains(event.target)) this.$refs.input.focus();
+                    if (this.open && !this.$refs.dialog.contains(event.target)) this.refocusSoon();
                 },
                 lost(event) {
-                    if (!this.open || event.relatedTarget) return;
-                    setTimeout(() => {
-                        if (this.open && !this.$refs.dialog.contains(document.activeElement)) this.$refs.input.focus();
+                    if (this.open && !event.relatedTarget) this.refocusSoon();
+                },
+                // The focus goes back on the next turn, never inside the browser's own focus change:
+                // another dialog's trap (the notifications drawer's, New idea's, the phone menu's)
+                // stays active for a moment while this one starts, and pulls the focus straight back,
+                // so handing it back at once made the two recurse until the stack overflowed. Once
+                // per turn, and at most 20 times per opening, so it can never fight forever.
+                _restores: 0,
+                _refocus: null,
+                refocusSoon() {
+                    if (this._refocus || this._restores >= 20) return;
+                    this._refocus = setTimeout(() => {
+                        this._refocus = null;
+                        if (!this.open || this.$refs.dialog.contains(document.activeElement)) return;
+                        this._restores += 1;
+                        this.$refs.input.focus();
                     }, 0);
                 },
                 close() {

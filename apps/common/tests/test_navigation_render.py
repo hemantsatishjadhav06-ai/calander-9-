@@ -674,10 +674,20 @@ def test_the_palette_is_a_labelled_trapped_dialog_opened_by_a_button_and_ctrl_k(
     root = _tag(html, 'x-data="commandPalette(')
     assert '@focusin.window.capture="guard($event)"' in root
     assert '@focusout="lost($event)"' in dialog
-    guard = component[component.index("guard(event) {") :]
-    assert "this.$refs.dialog.contains(event.target)" in guard and "this.$refs.input.focus()" in guard
-    lost = component[component.index("lost(event) {") :]
-    assert "event.relatedTarget" in lost and "this.$refs.input.focus()" in lost
+
+    def body(name):
+        start = component.index(f"{name} {{")
+        return component[start : component.index("\n                },", start)]
+
+    guard, lost, soon = body("guard(event)"), body("lost(event)"), body("refocusSoon()")
+    assert "this.$refs.dialog.contains(event.target)" in guard and "this.refocusSoon()" in guard
+    assert "event.relatedTarget" in lost and "this.refocusSoon()" in lost
+    # Never inside the browser's own focus change: another dialog's trap, still active for a moment
+    # while this one starts, would pull the focus straight back and the two would recurse until the
+    # stack overflows. Once per turn, and a bounded number of times per opening.
+    assert "this.$refs.input.focus()" not in guard and "this.$refs.input.focus()" not in lost
+    assert "setTimeout(" in soon and "this.$refs.input.focus()" in soon
+    assert "this._restores" in soon and "this._restores = 0" in component[component.index("show() {") :]
     # Enter and the arrows choose among the entries the typed words match, not among what the browser
     # has laid out: the list's links are in the entries' order.
     assert "getClientRects" not in component

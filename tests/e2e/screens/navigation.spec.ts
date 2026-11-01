@@ -275,3 +275,28 @@ test('Go to keeps the focus in its field for as long as it is open', async ({ pa
   await button.focus();
   await expect(button).toBeFocused();
 });
+
+test('Go to opened over the notifications drawer takes the focus without fighting the drawer', async ({ page, as, harness }) => {
+  const { workspace_a: workspace } = harness.ids;
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await as('owner');
+  await page.goto(`/workspace/${workspace}/inbox/`);
+  const field = page.getByTestId('palette-input');
+
+  // The drawer has its own focus trap, still active for a moment while the palette's trap starts.
+  await page.getByTestId('notifications-bell').filter({ visible: true }).click();
+  await expect(page.getByTestId('notifications-drawer')).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+k');
+  await expect(page.getByTestId('palette-dialog')).toBeVisible();
+  await expect(field).toBeFocused();
+  await page.keyboard.type('cal');
+  await expect(field).toHaveValue('cal');
+  expect(errors, 'no script error while the two traps start and stop').toEqual([]);
+
+  // Escape closes the palette only; the drawer is still open behind it.
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('palette-dialog')).toBeHidden();
+  await expect(page.getByTestId('notifications-drawer')).toBeVisible();
+  expect(errors).toEqual([]);
+});
