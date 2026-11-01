@@ -3,7 +3,7 @@
 from django.conf import settings
 from django.utils.functional import SimpleLazyObject
 
-from apps.common import navigation
+from apps.common import navigation, screens
 from apps.common.features import features_for, request_features
 
 
@@ -28,6 +28,19 @@ def branding(request):
         "SIGNUP_OPEN": getattr(settings, "SIGNUP_MODE", "invite_only") == "open",
         **_platform_availability(),
     }
+
+
+def theme_context(request):
+    """``theme_ready``: whether this page is declared dark-ready (``screens.DARK_READY``).
+
+    ``base.html`` and the portal's base put ``data-theme-ready`` on ``<html>`` only then, so a page
+    renders exactly as before until its screen's gate declares it. It reads the resolved URL alone
+    (no query: it runs on every render, HTMX fragments included) and reads the registry when called,
+    so a test or the e2e harness can patch ``screens.DARK_READY``.
+    """
+    match = getattr(request, "resolver_match", None)
+    page = (match.app_name, match.url_name) if match is not None else None
+    return {"theme_ready": page in screens.DARK_READY}
 
 
 def _platform_availability():

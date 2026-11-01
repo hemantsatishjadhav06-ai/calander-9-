@@ -160,6 +160,7 @@ TEMPLATES = [
                 "apps.notifications.context_processors.unread_notification_count",
                 "apps.common.context_processors.sidebar_context",
                 "apps.common.context_processors.branding",
+                "apps.common.context_processors.theme_context",
                 "apps.onboarding.context_processors.onboarding_checklist",
                 "apps.intelligence.context_processors.intelligence_flag",
             ],
