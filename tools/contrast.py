@@ -588,18 +588,18 @@ def missing_dark_values(sheet: Sheet, dark: Mapping[str, str] | None = None) -> 
 
 def scope_differences(sheet: Sheet) -> list[str]:
     """How the light scope differs from the light ``:root``, one line per property."""
-    problems = []
+    found: list[str] = []
     if sheet.light_scope.get("color-scheme") != "light":
-        problems.append("color-scheme: not light")
+        found.append("color-scheme: not light")
     light = sheet.light
     for name in [*sheet.layer1_names(), *sheet.layer2_names()]:
         if name == "color-scheme":
             continue
         if name not in sheet.light_scope:
-            problems.append(f"{name}: not declared")
+            found.append(f"{name}: not declared")
         elif sheet.light_scope[name] != light[name]:
-            problems.append(f"{name}: {sheet.light_scope[name]} (light :root has {light[name]})")
-    return problems
+            found.append(f"{name}: {sheet.light_scope[name]} (light :root has {light[name]})")
+    return found
 
 
 # ── Output ──────────────────────────────────────────────────────────────────────────────────────

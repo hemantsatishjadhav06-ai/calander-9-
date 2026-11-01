@@ -321,10 +321,12 @@
    and ring-success-* utility (declared @theme inline above) follows without edits, and each step keeps
    its role: ink-0 the card, ink-50 the canvas, ink-950 the strongest text, brand-700 the primary fill
    and link (a lighter Pine that carries dark text through --on-fill), status 50 the soft fill, 500 the
-   icon, 600 the chip text. The 300 steps keep their light values: their role is the inverse surface
-   (toast detail, toast action, toast icons), which stays dark in both themes. Layer 2 sets only what
-   does not follow Layer 1; it writes no colour of its own. tools/contrast.py checks every pair in both
-   themes (apps/common/tests/test_contrast.py) and prints the §21 tables.
+   icon, 600 the chip text. The brand and status 300 steps keep their light values: their role is the
+   inverse surface (toast action, toast icons), which stays dark in both themes. ink-300 is the
+   exception: it changes with the ink scale, and as the toast detail it must read 4.5:1 on the dark
+   inverse surface (ink-200), so in dark it is a text-grade grey, not a border grey. Layer 2 sets only
+   what does not follow Layer 1; it writes no colour of its own. tools/contrast.py checks every pair in
+   both themes (apps/common/tests/test_contrast.py) and prints the §21 tables.
 
    It applies where <html> says so: data-theme="dark" (the Appearance choice), or, without JavaScript, a
    dark device on a page declared ready (data-theme-ready, apps/common/screens.py). The media block
