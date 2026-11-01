@@ -886,8 +886,10 @@ gate. A page that fails stays light and is listed in `CHANGELOG.md` for the owne
 
 ## Open questions
 
-None block Phase 3; each has a default above. Questions marked *at screen N* are put to the owner
-when that screen starts.
+**Answered 1 Nov 2026: the owner chose the defaults for every question below** ("go with the
+defaults and continue"). Each default is now the decision; the per-screen gate, including the owner's
+sign-off on each before/after pair, is unchanged. Questions marked *at screen N* are still put to the
+owner when that screen starts.
 
 - *(owner)* **Dark mode choice and its place.** Default: follows the device; *Appearance* (System,
   Light, Dark) in the account menu, kept per device.
