@@ -1,5 +1,5 @@
-// What the pair specs and the light diff share (plan T12): the side, the data both servers get, and
-// one way to bring a page to rest and photograph it.
+// What the pair specs and the light diff share (plan T12): the side, the data both servers get, one
+// way to bring a page to rest and photograph it, and the tests a pair file declares.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -8,6 +8,8 @@ import { type Page, type TestInfo, expect } from '@playwright/test';
 import { PAIRS_DIR, pairMasks, pairRun } from '../../../playwright.pairs.config';
 import type { Harness } from '../support/harness';
 import { settled } from '../support/settled';
+import { test } from '../support/test';
+import { decodePng } from './compare.cjs';
 
 export type PairSide = 'before' | 'after';
 
@@ -49,6 +51,23 @@ export async function ensurePairData(page: Page, harness: Harness): Promise<void
 }
 
 const MAX_HEIGHT = 8000;
+
+/**
+ * The colour the diff paints a masked element in (Playwright's default, named so a pair can check it
+ * has none: the owner's pair shows every element, D9).
+ */
+const MASK_RGB = [255, 0, 255] as const;
+const MASK_COLOR = `rgb(${MASK_RGB.join(', ')})`;
+
+/** How many pixels of a photograph are the mask colour. */
+function maskedPixels(png: Buffer): number {
+  const { data } = decodePng(png);
+  let count = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] === MASK_RGB[0] && data[i + 1] === MASK_RGB[1] && data[i + 2] === MASK_RGB[2]) count++;
+  }
+  return count;
+}
 
 async function nextFrames(page: Page): Promise<void> {
   await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
@@ -109,14 +128,22 @@ async function growToContent(page: Page): Promise<void> {
 }
 
 /**
- * Open `url`, require its hook, bring it to rest and photograph it with the time-printing elements
- * masked: the screen as the device shows it, or (`grow`) the whole page. Fails, writing nothing, when
- * the page redirects, answers an error or lacks its hook.
+ * Open `url`, require its hook, bring it to rest and photograph it: the screen as the device shows it,
+ * or (`grow`) the whole page. `mask` paints the config's time-printing elements (`pairMasks`) over,
+ * for the diff only; the owner's pair is never masked. Fails, writing nothing, when the page
+ * redirects, answers an error or lacks its hook.
  */
 export async function capture(
   page: Page,
   url: string,
-  options: { hook: string; what: string; prepare?: (page: Page) => Promise<void>; scale: 'css' | 'device'; grow: boolean },
+  options: {
+    hook: string;
+    what: string;
+    prepare?: (page: Page) => Promise<void>;
+    scale: 'css' | 'device';
+    grow: boolean;
+    mask: boolean;
+  },
 ): Promise<Buffer> {
   const { hook, what } = options;
   const response = await page.goto(url);
@@ -142,13 +169,14 @@ export async function capture(
     animations: 'disabled',
     caret: 'hide',
     scale: options.scale,
-    mask: pairMasks.map((selector) => page.locator(selector)),
+    mask: options.mask ? pairMasks.map((selector) => page.locator(selector)) : [],
+    maskColor: MASK_COLOR,
   });
 }
 
 /**
- * Photograph one state of a pair, the screen at the device's size (390 x 844, 1440 x 900, D9), to
- * test-results/pairs/<pair>/<side>/<state>-<project>.png.
+ * Photograph one state of a pair, the screen at the device's size (390 x 844, 1440 x 900, D9) with
+ * nothing masked, to test-results/pairs/<pair>/<side>/<state>-<project>.png.
  */
 export async function shootState(
   page: Page,
@@ -162,9 +190,29 @@ export async function shootState(
     prepare: state.prepare,
     scale: 'device',
     grow: false,
+    mask: false,
   });
+  expect(maskedPixels(image), `${what}: the owner sees the whole screen, nothing masked`).toBe(0);
   const file = path.join(PAIRS_DIR, pair, side, `${state.name}-${testInfo.project.name}.png`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, image);
   return file;
+}
+
+/**
+ * The tests of one pair file: a test per state of the side this run takes (`PAIR_SIDE`), each signing
+ * in as the owner, making sure of the pair data and photographing the state. The two lists stay
+ * apart because a screen's after names hooks main does not have.
+ */
+export function pairTests(pair: string, states: Readonly<Record<PairSide, readonly PairState[]>>): void {
+  const side = pairSide();
+  test.describe(side === 'before' ? 'before: main' : 'after: this branch', () => {
+    for (const state of states[side]) {
+      test(state.name, async ({ page, as, harness }, testInfo) => {
+        await as('owner');
+        await ensurePairData(page, harness);
+        await shootState(page, testInfo, { pair, side, state, workspace: harness.ids.workspace_a });
+      });
+    }
+  });
 }

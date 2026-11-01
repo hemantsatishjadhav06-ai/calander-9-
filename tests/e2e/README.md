@@ -115,7 +115,8 @@ empties on every run.
 ```
 tests/e2e/pairs/
   NN-name.pair.ts   one pair: a `before` block (main's hooks only) and an `after` block (this branch's)
-  support.ts        pairSide, ensurePairData (the same two posts on every server, once), capture, shootState
+  support.ts        pairTests (a pair file's tests), pairSide, ensurePairData (the same two posts on
+                    every server, once), capture, shootState
   diff.ts           npm run pairs:diff
   compare.cjs       PNG reading and the pixel count (tests/js/pairs_compare.test.cjs)
 ```
@@ -133,20 +134,24 @@ E2E_PORT=8221 DB_NAME=smbean_p3_e2e npm run pairs -- tests/e2e/pairs/00-shell.pa
 
 `npm run pairs` writes `test-results/pairs/<pair>/<side>/<state>-<project>.png`: the screen at
 390 × 844 (`pair-390`, iPhone 13) and 1440 × 900 (`pair-1440`, Desktop Chrome), light, as the device
-shows it. The before side starts no server (one must be listening on `E2E_PORT`); the after side
-starts this branch's with `--reset` when none is. Each state names a `hook`, a test id the page must
-show: a state whose hook is missing fails and writes nothing, so an *after* never shows a screen that
-has not been built yet. Local pairs use Chromium and the local `system-ui` (Inter here), so they are
-not a typeface sign-off; the type pair comes from WebKit in CI (T10).
+shows it, with nothing masked: the owner signs the pair off, so Home's greeting, today's date and
+every time show as they render (a state fails if its image holds the mask colour). The before side
+starts no server (one must be listening on `E2E_PORT`); the after side starts this branch's with
+`--reset` when none is. Each state names a `hook`, a test id the page must show: a state whose hook
+is missing fails and writes nothing, so an *after* never shows a screen that has not been built yet.
+A pair file lists its `before` and `after` states and hands both to `pairTests`. Local pairs use
+Chromium and the local `system-ui` (Inter here), so they are not a typeface sign-off; the type pair
+comes from WebKit in CI (T10).
 
 `npm run pairs:diff` renders the a11y sweep's eleven pages and the three Lighthouse pages (Home is in
 both, so thirteen) at both widths on two servers, each whole page in one image (the viewport grows
 until the shell's scroller hides nothing), with the elements that print a time masked by the
 config's `pairMasks` (`time`, Home's greeting and date, `timesince`; main has no
-`data-visual-dynamic`). It fails when a pair differs in more than 0.1 % of its pixels and lists the
-page and the ratio; `test-results/pairs/diff/<project>/` holds both images, a `-diff.png` marking the
-pixels of a page over the limit, and `summary.json`. Both servers run with `--no-worker` (the diff
-refuses a server whose worker runs: it would change rows between the two renders of a page):
+`data-visual-dynamic`). Only the diff is masked; the pairs above never are. It fails when a pair
+differs in more than 0.1 % of its pixels and lists the page and the ratio;
+`test-results/pairs/diff/<project>/` holds both images, a `-diff.png` marking the pixels of a page
+over the limit, and `summary.json`. Both servers run with `--no-worker` (the diff refuses a server
+whose worker runs: it would change rows between the two renders of a page):
 
 ```bash
 # in ../smbean-main

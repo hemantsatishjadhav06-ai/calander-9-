@@ -94,53 +94,70 @@ async function openSide(
   return { name, baseURL, api, harness, context, guard, since: Date.now() / 1000 };
 }
 
-async function closeSide(side: Side): Promise<void> {
-  const refused = await side.harness.probe<{ hosts: string[] }>('refused_network', { since: side.since });
-  await side.context.close();
-  await side.api.dispose();
-  expect(refused.hosts, `the ${side.name} server tried to reach outside the machine`).toEqual([]);
-  expect(side.guard.blocked, `the ${side.name} pages asked for something off the server`).toEqual([]);
+/** The hosts the server refused while this side was open; its browser and request contexts close either way. */
+async function closeSide(side: Side): Promise<string[]> {
+  try {
+    const refused = await side.harness.probe<{ hosts: string[] }>('refused_network', { since: side.since });
+    return refused.hosts;
+  } finally {
+    await side.context.close();
+    await side.api.dispose();
+  }
 }
 
 test('light rendering: before against after', async ({ browser, playwright, baseURL }, testInfo) => {
   test.setTimeout(10 * 60_000);
   const device = pairDevices[testInfo.project.name as keyof typeof pairDevices];
   expect(device, `no device for project ${testInfo.project.name}`).toBeTruthy();
-  const before = await openSide('before', beforeURL(), browser, playwright.request, device);
-  const after = await openSide('after', String(baseURL), browser, playwright.request, device);
-  expect(before.baseURL, 'the before and after servers are two servers').not.toBe(after.baseURL);
-  expect(before.harness.ids.workspace_a, 'both servers hold the same seeded workspace').toBe(after.harness.ids.workspace_a);
-
   const out = path.join(PAIRS_DIR, 'diff', testInfo.project.name);
-  fs.rmSync(out, { recursive: true, force: true });
-  fs.mkdirSync(out, { recursive: true });
-
   const results: { page: string; path: string; ratio: number; pixels: number; size: string }[] = [];
-  const pages = { before: await before.context.newPage(), after: await after.context.newPage() };
-  await ensurePairData(pages.before, before.harness);
-  await ensurePairData(pages.after, after.harness);
-  const workspace = after.harness.ids.workspace_a;
+  const before = await openSide('before', beforeURL(), browser, playwright.request, device);
+  const sides: Side[] = [before];
+  let closed: PromiseSettledResult<string[]>[] = [];
+  try {
+    const after = await openSide('after', String(baseURL), browser, playwright.request, device);
+    sides.push(after);
+    expect(before.baseURL, 'the before and after servers are two servers').not.toBe(after.baseURL);
+    expect(before.harness.ids.workspace_a, 'both servers hold the same seeded workspace').toBe(after.harness.ids.workspace_a);
 
-  for (const page of DIFF_PAGES) {
-    const url = page.path(workspace);
-    const images = {
-      before: await capture(pages.before, url, { hook: HOOK, what: `before ${page.name}`, scale: 'css', grow: true }),
-      after: await capture(pages.after, url, { hook: HOOK, what: `after ${page.name}`, scale: 'css', grow: true }),
-    };
-    // Each side's viewport grew to its own page; the next page starts from the device's again.
-    await pages.before.setViewportSize(device.viewport);
-    await pages.after.setViewportSize(device.viewport);
-    fs.writeFileSync(path.join(out, `${page.name}-before.png`), images.before);
-    fs.writeFileSync(path.join(out, `${page.name}-after.png`), images.after);
-    const result = diffImages(decodePng(images.before), decodePng(images.after), { image: true });
-    if (result.ratio > DIFF_LIMIT && result.image) {
-      fs.writeFileSync(path.join(out, `${page.name}-diff.png`), encodePng(result.image));
+    fs.rmSync(out, { recursive: true, force: true });
+    fs.mkdirSync(out, { recursive: true });
+
+    const pages = { before: await before.context.newPage(), after: await after.context.newPage() };
+    await ensurePairData(pages.before, before.harness);
+    await ensurePairData(pages.after, after.harness);
+    const workspace = after.harness.ids.workspace_a;
+
+    // The whole page in one image, the time-printing elements masked (the diff only; never a pair).
+    const shot = { hook: HOOK, scale: 'css', grow: true, mask: true } as const;
+    for (const page of DIFF_PAGES) {
+      const url = page.path(workspace);
+      const images = {
+        before: await capture(pages.before, url, { ...shot, what: `before ${page.name}` }),
+        after: await capture(pages.after, url, { ...shot, what: `after ${page.name}` }),
+      };
+      // Each side's viewport grew to its own page; the next page starts from the device's again.
+      await pages.before.setViewportSize(device.viewport);
+      await pages.after.setViewportSize(device.viewport);
+      fs.writeFileSync(path.join(out, `${page.name}-before.png`), images.before);
+      fs.writeFileSync(path.join(out, `${page.name}-after.png`), images.after);
+      const result = diffImages(decodePng(images.before), decodePng(images.after), { image: true });
+      if (result.ratio > DIFF_LIMIT && result.image) {
+        fs.writeFileSync(path.join(out, `${page.name}-diff.png`), encodePng(result.image));
+      }
+      results.push({ page: page.name, path: url, ratio: result.ratio, pixels: result.pixels, size: `${result.width}x${result.height}` });
     }
-    results.push({ page: page.name, path: url, ratio: result.ratio, pixels: result.pixels, size: `${result.width}x${result.height}` });
+  } finally {
+    // Every side that opened closes, even when a page failed, so no browser or request context outlives
+    // the run. A failure here never hides the page's own error; the checks below read what it found.
+    closed = await Promise.allSettled(sides.map(closeSide));
   }
-
-  await closeSide(before);
-  await closeSide(after);
+  for (const [index, side] of sides.entries()) {
+    const refused = closed[index];
+    if (refused.status === 'rejected') throw refused.reason;
+    expect(refused.value, `the ${side.name} server tried to reach outside the machine`).toEqual([]);
+    expect(side.guard.blocked, `the ${side.name} pages asked for something off the server`).toEqual([]);
+  }
 
   fs.writeFileSync(path.join(out, 'summary.json'), `${JSON.stringify({ limit: DIFF_LIMIT, results }, null, 2)}\n`);
   const percent = (ratio: number) => `${(ratio * 100).toFixed(3)} %`;

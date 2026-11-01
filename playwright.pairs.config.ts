@@ -29,8 +29,8 @@ export const PAIRS_DIR = path.join(__dirname, 'test-results', 'pairs');
 /**
  * What prints a time, by selectors that already match on main (045978b has no data-visual-dynamic):
  * the `<time>` elements, Home's greeting and date, and every `timesince` the templates print ("5 minutes
- * ago", "1 hour, 2 minutes ago", "3 days from now"; copy such as "Last 24 hours" stays compared). Both
- * sides of a pair and of the diff are masked with this one list.
+ * ago", "1 hour, 2 minutes ago", "3 days from now"; copy such as "Last 24 hours" stays compared). Only
+ * `pairs:diff` masks them, on both of its servers; a pair for the owner is never masked (D9).
  */
 const UNIT = '\\d+\\s(minute|hour|day|week|month|year)s?';
 export const pairMasks: readonly string[] = [
