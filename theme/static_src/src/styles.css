@@ -326,7 +326,8 @@
    exception: it changes with the ink scale, and as the toast detail it must read 4.5:1 on the dark
    inverse surface (ink-200), so in dark it is a text-grade grey, not a border grey. Layer 2 sets only
    what does not follow Layer 1; it writes no colour of its own. tools/contrast.py checks every pair in
-   both themes (apps/common/tests/test_contrast.py) and prints the §21 tables.
+   both themes, but for the one light pair named in its LIGHT_EXCEPTIONS (below its bar before dark
+   mode; light must not move), and apps/common/tests/test_contrast.py runs it; it prints the §21 tables.
 
    It applies where <html> says so: data-theme="dark" (the Appearance choice), or, without JavaScript, a
    dark device on a page declared ready (data-theme-ready, apps/common/screens.py). The media block

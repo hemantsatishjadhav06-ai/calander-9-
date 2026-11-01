@@ -564,7 +564,7 @@ Light is what everyone sees until a page is declared ready: a page turns dark on
 
 **How it works.** Layer 1 is redefined, so every `bg-ink-*`, `text-brand-*` and `ring-success-*` utility follows without edits (they are declared `@theme inline` and read the variable where they are used). Each step keeps its role (§3): ink-0 is the card, ink-50 the canvas (the darkest step), ink-950 the strongest text; brand-700 is the primary fill and the link; status 50 is the soft fill, 500 the icon and the solid dot, 600 the chip text. So in dark the scales run from dark (0–200) to light (600–950). Layer 2 sets only what does not follow Layer 1 (the second table below) and writes no colour of its own: it points at a Layer 1 step or mixes one with `color-mix(in srgb, …)`.
 
-**What the checker decided.** Every value below came from `tools/contrast.py`; no pair was accepted under its bar.
+**What the checker decided.** Every value below came from `tools/contrast.py`; no dark pair was accepted under its bar, and the one light pair under its bar is named below (it was so before dark mode).
 
 - The primary is a lighter Pine, brand-700 `#4CAD8C`, with dark text through `--on-fill` (7.01:1). One step is both the fill and the link (5.79:1 or more on every surface); the earlier sketch here split them (links at brand-300, the fill at brand-500), which would have given one role two steps.
 - Success leans a little toward leaf-yellow in dark (hue 142, 500 and 600 lighter), so Pine and an "Approved" chip's text stay 14.0 apart (OKLab ΔE ×100; 14.2 in light, §3.5).

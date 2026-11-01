@@ -27,7 +27,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-#: Where the project's templates live, in the template loader's order (``DIRS``, then the apps').
+#: Where the project's templates live: ``DIRS`` first, then any ``apps/*/templates`` (none today), sorted by
+#: path, which is not ``INSTALLED_APPS`` order; ``find_template`` relies on the first only.
 TEMPLATE_DIRS: tuple[Path, ...] = (ROOT / "templates", *sorted(ROOT.glob("apps/*/templates")))
 
 #: A page, as ``request.resolver_match`` names it: ``(app_name, url_name)``.

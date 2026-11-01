@@ -30,19 +30,6 @@ def branding(request):
     }
 
 
-def theme_context(request):
-    """``theme_ready``: whether this page is declared dark-ready (``screens.DARK_READY``).
-
-    ``base.html`` and the portal's base put ``data-theme-ready`` on ``<html>`` only then, so a page
-    renders exactly as before until its screen's gate declares it. It reads the resolved URL alone
-    (no query: it runs on every render, HTMX fragments included) and reads the registry when called,
-    so a test or the e2e harness can patch ``screens.DARK_READY``.
-    """
-    match = getattr(request, "resolver_match", None)
-    page = (match.app_name, match.url_name) if match is not None else None
-    return {"theme_ready": page in screens.DARK_READY}
-
-
 def _platform_availability():
     """Display names of the platforms that are live, and of those coming soon.
 
@@ -63,6 +50,19 @@ def _platform_availability():
             soon.remove(name)
             live.append(name)
     return {"LIVE_PLATFORM_NAMES": live, "COMING_SOON_PLATFORM_NAMES": soon}
+
+
+def theme_context(request):
+    """``theme_ready``: whether this page is declared dark-ready (``screens.DARK_READY``).
+
+    ``base.html`` and the portal's base put ``data-theme-ready`` on ``<html>`` only then, so a page
+    renders exactly as before until its screen's gate declares it. It reads the resolved URL alone
+    (no query: it runs on every render, HTMX fragments included) and reads the registry when called,
+    so a test or the e2e harness can patch ``screens.DARK_READY``.
+    """
+    match = getattr(request, "resolver_match", None)
+    page = (match.app_name, match.url_name) if match is not None else None
+    return {"theme_ready": page in screens.DARK_READY}
 
 
 def sidebar_context(request):
