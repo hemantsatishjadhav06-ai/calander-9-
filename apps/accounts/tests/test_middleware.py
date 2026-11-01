@@ -1,4 +1,5 @@
-"""Tests for AuthRateLimitMiddleware — client-IP derivation and throttling.
+"""Tests for AuthRateLimitMiddleware — client-IP derivation and throttling —
+and for the public pages TosAcceptanceMiddleware lets through.
 
 Regression guard for the audit finding that the auth throttle trusted a
 spoofable X-Forwarded-For header, letting an attacker rotate the header to
@@ -6,11 +7,14 @@ escape the per-IP bucket (defeating brute-force / password-reset email-bomb
 protection).
 """
 
+import pytest
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.test import RequestFactory, override_settings
+from django.urls import reverse
 
 from apps.accounts.middleware import AUTH_RATE_LIMIT, AuthRateLimitMiddleware
+from apps.accounts.models import User
 
 
 def _mw():
@@ -95,3 +99,34 @@ class TestThrottle:
         for _ in range(AUTH_RATE_LIMIT + 5):
             resp = mw(rf.post("/some/other/path/", REMOTE_ADDR="198.51.100.12"))
             assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+class TestTermsExemptions:
+    """Someone signed in who has not accepted the terms yet may still read the public pages
+    the acceptance page and the marketing site link to, without being sent back to accept."""
+
+    @pytest.fixture
+    def not_yet_accepted(self, client):
+        user = User.objects.create_user(email="new@agency.example", password="x-long-password-1")
+        assert user.tos_accepted_at is None
+        client.force_login(user)
+        return client
+
+    def test_request_invite_opens_without_the_terms_redirect(self, not_yet_accepted):
+        response = not_yet_accepted.get(reverse("marketing:request_invite"))
+
+        assert response.status_code == 200
+        assert "marketing/request_invite.html" in [t.name for t in response.templates if t.name]
+
+    def test_the_old_pricing_address_still_lands_on_request_invite(self, not_yet_accepted):
+        response = not_yet_accepted.get("/pricing/", follow=True)
+
+        assert response.redirect_chain == [(reverse("marketing:request_invite"), 301)]
+        assert response.status_code == 200
+
+    def test_other_pages_still_ask_for_the_terms_first(self, not_yet_accepted):
+        response = not_yet_accepted.get(reverse("marketing:how_it_works"))
+
+        assert response.status_code == 302
+        assert response["Location"].startswith(reverse("accounts:accept_terms"))

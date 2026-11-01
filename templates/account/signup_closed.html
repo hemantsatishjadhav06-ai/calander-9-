@@ -12,9 +12,7 @@
             We're opening accounts by invitation while we work closely with our first teams.
             If a colleague already uses {{ SITE_NAME }}, ask them to invite you from the Members page.
         </p>
-        {% if SUPPORT_EMAIL %}
-        <a href="mailto:{{ SUPPORT_EMAIL }}?subject={{ SITE_NAME|urlencode }}%20early%20access" class="ui-btn ui-btn-primary ui-btn-lg mt-6 w-full">Request early access</a>
-        {% endif %}
+        <a href="{% url 'marketing:request_invite' %}" class="ui-btn ui-btn-primary ui-btn-lg mt-6 w-full">Request invite</a>
     </div>
 
     <p class="mt-6 text-center text-sm text-ink-600">

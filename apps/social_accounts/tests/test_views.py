@@ -43,6 +43,17 @@ def authenticated_client(client, user, manager_setup):
     return client
 
 
+@pytest.fixture
+def extra_providers_on(workspace):
+    """Bluesky, Mastodon, DEV.to, Threads and TikTok offered for new connections (their switch on).
+
+    The tests below that connect one of them set it; test_feature_switches.py covers the switch off.
+    """
+    from apps.studio.models import AgencySettings
+
+    AgencySettings.objects.update_or_create(workspace=workspace, defaults={"features": {"extra_providers": True}})
+
+
 class TestOAuthState:
     """Test OAuth state parameter signing and validation."""
 
@@ -73,10 +84,14 @@ class TestAccountListView:
         assert response.status_code == 302
         assert "/accounts/" in response.url
 
-    def test_returns_200_for_authenticated_user(self, authenticated_client, workspace):
+    def test_moves_to_the_settings_accounts_tab(self, authenticated_client, workspace):
+        # The list lives in Settings → Accounts (spec D1, D5): a GET answers 301 there.
         url = reverse("social_accounts:list", kwargs={"workspace_id": workspace.id})
         response = authenticated_client.get(url)
-        assert response.status_code == 200
+        assert response.status_code == 301
+        settings_url = reverse("settings:index", kwargs={"workspace_id": workspace.id})
+        assert response["Location"] == f"{settings_url}?tab=accounts"
+        assert authenticated_client.get(response["Location"]).status_code == 200
 
     def test_shows_connected_accounts(self, authenticated_client, workspace):
         SocialAccount.objects.create(
@@ -86,12 +101,12 @@ class TestAccountListView:
             account_name="My Facebook Page",
         )
         url = reverse("social_accounts:list", kwargs={"workspace_id": workspace.id})
-        response = authenticated_client.get(url)
+        response = authenticated_client.get(url, follow=True)
         assert b"My Facebook Page" in response.content
 
     def test_shows_empty_state(self, authenticated_client, workspace):
         url = reverse("social_accounts:list", kwargs={"workspace_id": workspace.id})
-        response = authenticated_client.get(url)
+        response = authenticated_client.get(url, follow=True)
         assert b"No accounts connected yet" in response.content
 
 
@@ -108,7 +123,7 @@ class TestConnectPlatformView:
         response = authenticated_client.post(url, {"platform": "twitter"})
         assert response.status_code == 302
 
-    def test_post_bluesky_redirects_to_form(self, authenticated_client, workspace):
+    def test_post_bluesky_redirects_to_form(self, authenticated_client, workspace, extra_providers_on):
         from apps.credentials.models import PlatformCredential
 
         PlatformCredential.objects.create(
@@ -122,7 +137,7 @@ class TestConnectPlatformView:
         assert response.status_code == 302
         assert "bluesky" in response.url
 
-    def test_pkce_connect_generates_and_forwards_verifier(self, authenticated_client, workspace):
+    def test_pkce_connect_generates_and_forwards_verifier(self, authenticated_client, workspace, extra_providers_on):
         """A PKCE provider (TikTok) gets a code_verifier stashed in the session
         and forwarded to get_auth_url so it can derive the code_challenge."""
         from apps.credentials.models import PlatformCredential
@@ -156,7 +171,7 @@ class TestConnectPlatformView:
             "threads": {"app_id": "", "app_secret": ""},
         }
     )
-    def test_threads_not_offered_on_meta_credentials_alone(self, authenticated_client, workspace):
+    def test_threads_not_offered_on_meta_credentials_alone(self, authenticated_client, workspace, extra_providers_on):
         """Threads authorizes against its own App ID, never the Facebook one.
 
         With only Meta credentials set, offering a Connect button would dead-end
@@ -174,7 +189,7 @@ class TestConnectPlatformView:
         assert response.url == url  # bounced back to the grid, not off to Meta
 
     @override_settings(PLATFORM_CREDENTIALS_FROM_ENV={"threads": {"app_id": "TH_ID", "app_secret": "TH_SECRET"}})
-    def test_threads_connect_uses_threads_app_id(self, authenticated_client, workspace):
+    def test_threads_connect_uses_threads_app_id(self, authenticated_client, workspace, extra_providers_on):
         url = reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id})
         response = authenticated_client.post(url, {"platform": "threads"})
         assert response.status_code == 302
@@ -182,7 +197,7 @@ class TestConnectPlatformView:
         assert "client_id=TH_ID" in response.url
 
     @override_settings(PLATFORM_CREDENTIALS_FROM_ENV={"threads": {"app_id": "TH_ID", "app_secret": ""}})
-    def test_half_configured_platform_is_not_offered(self, authenticated_client, workspace):
+    def test_half_configured_platform_is_not_offered(self, authenticated_client, workspace, extra_providers_on):
         """An app id without its secret must not render a Connect button.
 
         The credential resolver requires both keys, so offering the button would
@@ -832,7 +847,9 @@ class TestRetryWebhooksView:
         """
         self._account(workspace, connection_status=SocialAccount.ConnectionStatus.ERROR)
 
-        response = authenticated_client.get(reverse("social_accounts:list", kwargs={"workspace_id": workspace.id}))
+        response = authenticated_client.get(
+            reverse("social_accounts:list", kwargs={"workspace_id": workspace.id}), follow=True
+        )
 
         body = response.content.decode()
         assert "Real-time comments are off" not in body
@@ -956,6 +973,7 @@ class TestDisconnectView:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("extra_providers_on")
 class TestBlueskyConnectView:
     def test_get_shows_form(self, authenticated_client, workspace):
         url = reverse(
@@ -976,6 +994,7 @@ class TestBlueskyConnectView:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("extra_providers_on")
 class TestMastodonConnectView:
     def test_get_shows_form(self, authenticated_client, workspace):
         url = reverse(

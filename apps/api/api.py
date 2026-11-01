@@ -40,8 +40,8 @@ api = NinjaAPI(
     version="1.0.0",
     description=(
         "Programmatic access for external AI agents. Authentication is via "
-        "scoped bearer tokens; create one from the Organization → API Keys "
-        "page in the SM Bean settings.\n\n"
+        "scoped bearer tokens; an organisation owner or admin creates one from "
+        "Settings → Advanced → Developers in SM Bean.\n\n"
         "**Rate limits.** Per-key write rate is 120/min, read 300/min, "
         "with a 1000/min aggregate cap per workspace. Limits are enforced "
         "as HTTP 429 with a JSON body that includes `tier`, `limit`, "

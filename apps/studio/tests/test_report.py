@@ -161,6 +161,19 @@ def test_the_client_safe_report_has_only_the_reports_own_words(world, agency):
     assert [r["id"] for r in reports.recent_reports(world.workspace)] == [str(job.pk)]
 
 
+def test_the_report_records_when_its_counts_were_observed_to_the_second(world, agency):
+    # The time travels with the report's words (the client-safe copy shows "Observed ..."), so it
+    # carries no fractional seconds: they mean nothing to a reader, and their digits once read as a
+    # leaked value ("05:47:14.271625" contains "4.2").
+    _week_of_posts(world)
+    job = drive(engine.create(world.workspace, "report"))
+
+    observed = job.result["operations_as_of"]
+    assert "." not in observed
+    assert datetime.fromisoformat(observed).microsecond == 0
+    assert reports.latest_report(world.workspace)["operations_as_of"] == observed
+
+
 def test_failed_or_unfinished_reports_are_never_shown(world):
     AgencyJob.objects.create(workspace=world.workspace, kind="report", status="failed", result={"title": "Half"})
     AgencyJob.objects.create(workspace=world.workspace, kind="report", status="working", result={"title": "Busy"})

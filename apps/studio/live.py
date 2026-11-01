@@ -1176,8 +1176,9 @@ def for_viewer(data: dict[str, Any], workspace, *, can_create: bool) -> dict[str
 
 
 def _approvals_url(workspace) -> str:
-    base = _url("calendar:calendar", workspace_id=workspace.id)
-    return f"{base}?mode=list&tab=approvals" if base else ""
+    """The Approvals screen (spec D3). The board is only ever shown to the agency's staff (Activity
+    and Home refuse a plain client), and links it only for someone who may approve."""
+    return _url("approvals:index", workspace_id=workspace.id)
 
 
 def digest(data: dict[str, Any]) -> str:

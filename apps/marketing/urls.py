@@ -11,4 +11,5 @@ urlpatterns = [
     path("platforms/", views.platforms, name="platforms"),
     path("developers/", views.developers, name="developers"),
     path("get-started/", views.get_started, name="get_started"),
+    path("request-invite/", views.request_invite, name="request_invite"),
 ]

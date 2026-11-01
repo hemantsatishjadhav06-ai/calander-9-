@@ -24,7 +24,7 @@
             <div class="reveal">
                 <span class="mk-eyebrow">Authentication</span>
                 <h2 class="mk-h2" style="margin-bottom: 14px;">Workspace-scoped keys</h2>
-                <p class="mk-lead">Issue a key from <strong>Organisation → API Keys</strong>. Each key belongs to one workspace, can be allow-listed to specific social accounts, and carries a subset of the issuer's own permissions. Revocation is immediate.</p>
+                <p class="mk-lead">Issue a key from <strong>Settings → Advanced → Developers</strong>. Each key belongs to one workspace, can be allow-listed to specific social accounts, and carries a subset of the issuer's own permissions. Revocation is immediate.</p>
                 <ul class="mk-bullets" style="margin-top: 22px;">
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Permissions:</strong> <code>create_posts</code>, <code>publish_directly</code>, <code>upload_media</code>, <code>view_analytics</code>, <code>use_inbox</code>, <code>reply_from_inbox</code>. Missing one returns <code>403</code>.</span></li>
                     <li>{% include "marketing/_icon.html" with name="check" %}<span><strong>Idempotency:</strong> post creation, media uploads and inbox replies accept an <code>idempotency_key</code> (or <code>Idempotency-Key</code> header) for safe retries.</span></li>
@@ -115,14 +115,20 @@
         <div class="mk-section-head reveal">
             <span class="mk-eyebrow">Model Context Protocol</span>
             <h2 class="mk-h2">Give an agent a seat <em class="mk-accent">at the calendar.</em></h2>
-            <p class="mk-lead">The MCP server speaks JSON-RPC 2.0 over Streamable HTTP at <code>POST {{ api_base_url }}/mcp</code> and implements <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code> and <code>ping</code>. Connect with a bearer key, or let a native connector such as Claude Desktop sign in through the built-in OAuth 2.1 server with dynamic client registration and PKCE.</p>
+            <p class="mk-lead">The MCP server speaks JSON-RPC 2.0 over Streamable HTTP at <code>POST {{ api_base_url }}/mcp</code> and implements <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code> and <code>ping</code>. Connect with a bearer key, or let a desktop assistant app that supports MCP sign in through the built-in OAuth 2.1 server with dynamic client registration and PKCE.</p>
         </div>
         <div class="mk-grid mk-grid--2" style="align-items: start;">
             <div class="reveal">
-                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>Claude Code</span><button class="mk-copy" type="button" data-copy="code-mcp">Copy</button></div><pre id="code-mcp">claude mcp add --transport http sm-bean \
-  <span class="s">"{{ api_base_url }}/mcp"</span> \
-  --header <span class="s">"Authorization: Bearer bb_studio_…"</span></pre></div>
-                <div class="mk-code" tabindex="0" style="margin-top: 16px;"><div class="mk-code__head"><span>Claude Desktop or any OAuth-capable connector</span></div><pre>Add a custom connector with the URL
+                <div class="mk-code" tabindex="0"><div class="mk-code__head"><span>Your MCP client, with a bearer key</span><button class="mk-copy" type="button" data-copy="code-mcp">Copy</button></div><pre id="code-mcp">{
+  "mcpServers": {
+    "sm-bean": {
+      "type": <span class="s">"http"</span>,
+      "url": <span class="s">"{{ api_base_url }}/mcp"</span>,
+      "headers": { "Authorization": <span class="s">"Bearer bb_studio_…"</span> }
+    }
+  }
+}</pre></div>
+                <div class="mk-code" tabindex="0" style="margin-top: 16px;"><div class="mk-code__head"><span>A desktop assistant app that supports MCP, or any OAuth-capable connector</span></div><pre>Add a custom connector with the URL
 <span class="s">{{ api_base_url }}/mcp</span>
 
 The client discovers
@@ -167,9 +173,9 @@ registers itself, and asks you to sign in.</pre></div>
     <div class="mk-container">
         <div class="mk-cta reveal">
             <h2 class="mk-h2">Issue a key and make your first call.</h2>
-            <p class="mk-lead">Keys live under Organisation → API Keys once you have an account.</p>
+            <p class="mk-lead">Keys live under Settings → Advanced → Developers once you have an account.</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% if SIGNUP_OPEN %}{% url 'account_signup' %}{% else %}{% url 'marketing:request_invite' %}{% endif %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request invite{% endif %}</a>
                 <a class="mk-btn mk-btn--ghost mk-btn--lg" href="/api/v1/docs">Open the API docs</a>
             </div>
         </div>

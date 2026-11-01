@@ -86,9 +86,9 @@
 {% comment %}No negative margins to bleed into <main>'s padding: base.html wraps content in an overflow-x-hidden box, which clipped the sidebar ("OLDERS") and the Upload button.{% endcomment %}
 <div x-data="{ ...mediaLibrary(), folderSidebarOpen: false }" class="flex flex-1 min-h-0 min-w-0 lg:rounded-2xl lg:border lg:border-ink-200 lg:shadow-xs bg-white lg:overflow-hidden">
 
-  <!-- Mobile folder sidebar toggle -->
-  <button :aria-expanded="folderSidebarOpen" @click="folderSidebarOpen = !folderSidebarOpen"
-          type="button" class="lg:hidden fixed bottom-4 left-4 z-40 ui-btn ui-btn-secondary shadow-lg"
+  <!-- Mobile folder sidebar toggle: above the phone bar (base.html; 56px and the safe area) where it shows -->
+  <button :aria-expanded="folderSidebarOpen" @click="folderSidebarOpen = !folderSidebarOpen" data-testid="media-folders-toggle"
+          type="button" class="lg:hidden fixed {% if nav.phone %}bottom-[calc(4.5rem+env(safe-area-inset-bottom))]{% else %}bottom-4{% endif %} left-4 z-40 ui-btn ui-btn-secondary shadow-lg"
           x-show="!detailOpen">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6a2 2 0 012-2h2l2 2h6a2 2 0 012 2v2M4 6v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2H4z"/></svg>
     Folders

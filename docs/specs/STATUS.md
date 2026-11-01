@@ -1,17 +1,34 @@
 # Beta plan status
 
 Where each phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md) stands, and what is left. Updated
-31 Oct 2026. The detail of what changed and what each gate said is in [`CHANGELOG.md`](CHANGELOG.md).
+1 Nov 2026. The detail of what changed and what each gate said is in [`CHANGELOG.md`](CHANGELOG.md).
 
 | Phase | State |
 |---|---|
 | 0 · Agree the cut | **Done.** Spec approved, gate passed, released to production (24 Oct, main `6d9cf1d`). |
-| 1 · Test harness first | **Gate passed** on `0d9f7a9` (31 Oct): CI green on all nine jobs, three consecutive complete browser runs, TOTP pending for Phase 4. Merge and release authorized by the owner; release waits for production to be back online. |
-| 2 · Cut and merge, no restyling | **In progress**: spec `02-cut-and-merge.md`, plan `phase-2.md` and code map written; tasks T1–T2 done. |
+| 1 · Test harness first | **Gate passed** on `0d9f7a9` (31 Oct): CI green on all nine jobs, three consecutive complete browser runs, TOTP pending for Phase 4. Merged to main (`1b6172f`); release waits for production to be back online. |
+| 2 · Cut and merge, no restyling | **Gate passed** on `ff90678` (1 Nov): CI green on all nine jobs (pytest 6,081, browsers 225 with WebKit, Lighthouse Home 98), a complete local browser run, no 404 on the product map's URLs, TOTP pending for Phase 4. Merge and release authorized by the owner; release waits for production. |
 | 3 · Rebuild the nine screens | Not started. |
-| 4 · Standards | Not started (two pieces landed early: dependency audits and `compilemessages` in CI). |
+| 4 · Standards | Not started (three pieces landed early: dependency audits and `compilemessages` in CI, and HTML compression in Phase 2). |
 | 5 · Platform connections | Not started; most of it waits on the owner's developer apps. |
 | 6 · Beta release | Not started. |
+
+## Phase 2 — gate passed (1 Nov)
+
+On `ff90678` the sidebar is six places and the gear, phones have a bottom bar, and Approvals,
+Activity and Settings each have one screen; old pages answer 301 after their own checks, and the
+switches hide Blog, Queues, Templates, the extra providers and the advanced settings. CI run
+41275707640 passed all nine jobs (pytest 6,081 passed, one Redis-only skip, coverage 87.38%;
+browsers 225 passed with WebKit, 3 TOTP pending; Lighthouse Home 98, Approvals 99, Calendar 97);
+a complete local browser run passed 225. The golden specs are unedited and green, the new routes
+have their own specs on three devices, and no URL in the product map answers 404. On the way, a
+review caught a focus loop in Go to, and the Lighthouse job caught that HTML was never compressed
+(fixed: Home 136 KB → 30 KB on the wire). Details in `CHANGELOG.md`.
+
+Open follow-ups: [issue #24](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/24),
+a possible deadlock between a person approving and the worker (the e2e harness retries its
+fixture; the application is unchanged). Production is still offline, so Phases 1 and 2 wait to be
+released together. Phase 3 starts next; its screens need the owner's before/after sign-off.
 
 ## Phase 1 — gate passed (31 Oct)
 

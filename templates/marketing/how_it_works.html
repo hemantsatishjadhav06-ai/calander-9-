@@ -123,9 +123,6 @@
             <div class="mk-card mk-card--static reveal" data-delay="2"><div class="mk-card__icon mk-card__icon--orange">{% include "marketing/_icon.html" with name="image" %}</div><h3 class="mk-h3">Media pipeline</h3><p>Pillow for images, FFmpeg for video. Local disk by default, or any S3-compatible bucket with streamed uploads and downloads.</p></div>
             <div class="mk-card mk-card--static reveal" data-delay="3"><div class="mk-card__icon mk-card__icon--indigo">{% include "marketing/_icon.html" with name="cloud" %}</div><h3 class="mk-h3">Deploy anywhere</h3><p>Gunicorn behind Caddy with automatic HTTPS in Docker Compose, or the included Railway, Render and Heroku configurations.</p></div>
         </div>
-        <div class="mk-btn-row reveal" style="margin-top: 36px;">
-            <a class="mk-link" href="{% url 'marketing:get_started' %}">Deployment options {% include "marketing/_icon.html" with name="arrow" %}</a>
-        </div>
     </div>
 </section>
 
@@ -135,8 +132,7 @@
             <h2 class="mk-h2">Try the whole loop with a real account.</h2>
             <p class="mk-lead">Connect an available channel, review and schedule a post, then check its delivery receipt and the actual account.</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
-                <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:features' %}">Browse the features</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% if SIGNUP_OPEN %}{% url 'account_signup' %}{% else %}{% url 'marketing:request_invite' %}{% endif %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request invite{% endif %}</a>
             </div>
         </div>
     </div>

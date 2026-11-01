@@ -418,10 +418,12 @@
                     class="create-tab" :class="activeTab === 'ideas' && 'active'">
                 Ideas
             </button>
+            {% if features.templates %}{# The Templates tab and the Tags controls below are hidden with the templates switch (spec D6). #}
             <button type="button" @click="activeTab = 'templates'" :aria-current="activeTab === 'templates' ? 'true' : 'false'"
                     class="create-tab" :class="activeTab === 'templates' && 'active'">
                 Templates
             </button>
+            {% endif %}
             <button type="button" @click="activeTab = 'feeds'" :aria-current="activeTab === 'feeds' ? 'true' : 'false'"
                     class="create-tab" :class="activeTab === 'feeds' && 'active'">
                 Feeds
@@ -437,6 +439,7 @@
             </div>
             {% endif %}
 
+            {% if features.templates %}
             <div class="relative" x-show="activeTab === 'ideas'" x-data="{ tagFilterOpen: false, tagFilterSearch: '', showCreateTagModal: false, newTagName: '' }">
                 <button aria-haspopup="true" :aria-expanded="tagFilterOpen" @click="tagFilterOpen = !tagFilterOpen; if(tagFilterOpen) $nextTick(() => $refs.tagFilterSearchInput.focus())"
                         class="ui-btn ui-btn-secondary ui-btn-sm">
@@ -504,6 +507,7 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 
@@ -516,12 +520,14 @@
             </div>
         </div>
 
+        {% if features.templates %}
         <!-- Templates tab -->
         <div x-show="activeTab === 'templates'" x-cloak
              class="overflow-y-auto"
              style="max-height: calc(100vh - 200px);">
             {% include "composer/partials/template_gallery.html" %}
         </div>
+        {% endif %}
 
         <!-- Feeds tab -->
         <div x-show="activeTab === 'feeds'" x-cloak
@@ -606,6 +612,7 @@
                             </div>
                         </div>
 
+                        {% if features.templates %}
                         <!-- Tags dropdown -->
                         <div class="relative" @click.away="createTagDropdownOpen = false">
                             <button aria-haspopup="true" :aria-expanded="createTagDropdownOpen" type="button" class="idea-pill-btn" @click="createTagDropdownOpen = !createTagDropdownOpen; createGroupDropdownOpen = false; if(createTagDropdownOpen) $nextTick(() => $refs.createTagSearchInput.focus())">
@@ -653,6 +660,7 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -800,6 +808,7 @@
                             </div>
                         </div>
 
+                        {% if features.templates %}
                         <!-- Tags dropdown -->
                         <div class="relative" @click.away="editTagDropdownOpen = false">
                             <button aria-haspopup="true" :aria-expanded="editTagDropdownOpen" type="button" class="idea-pill-btn" @click="editTagDropdownOpen = !editTagDropdownOpen; editGroupDropdownOpen = false; if(editTagDropdownOpen) $nextTick(() => $refs.editTagSearchInput.focus())">
@@ -847,6 +856,7 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
 

@@ -205,8 +205,8 @@ uncertain send or delivery is held for a person, never replayed.
 - `credentials` — encrypted platform credentials per organisation.
 - `social_accounts` — connecting accounts, token health checks.
 - `composer` — posts, platform posts, the ideas board, templates, categories, CSV import.
-- `calendar` — the calendar, posting slots, queues, recurrence; the list view's Approvals tab.
-- `approvals` — the gate (`gate.py`, `actor.py`), services, comments, reminders.
+- `calendar` — the calendar, posting slots, queues, recurrence; the list view's Approvals tab, and the Approvals screen's view (`approvals_index`, the same rows and filters on a page of its own).
+- `approvals` — the gate (`gate.py`, `actor.py`), services, comments, reminders; `urls.py` names the Approvals screen (`approvals:index`, `/workspace/<id>/approvals/`).
 - `publisher` — the publish loop, confirmation, delivery holds and reconciliation.
 - `inbox` — social inbox sync, replies, SLA, platform webhooks.
 - `analytics` — metric sync and the Analytics pages.
@@ -219,15 +219,15 @@ uncertain send or delivery is held for a person, never replayed.
 - `telegram` — the Telegram transport (below).
 - `api`, `api_keys`, `mcp`, `oauth_server` — the Agent API, its keys, the MCP server and its OAuth.
 - `intelligence` — an optional hosted add-on; off unless all five of its variables are set.
-- `marketing` — the public pages.
-- `common` — encrypted fields, scoped managers, `features.py` (per-workspace feature switches, `feature_enabled`), `background.py` (recurring tasks, the worker lease), the mail budget, the `release`, `live_verify`, `run_worker` and backup commands.
+- `marketing` — the public pages: Home, How it works and Request invite (`request_invite`: CSRF, a honeypot, a rate limit per address; one `invite_requested` notification per platform operator). `/pricing/` answers 301 to Request invite; Features, Platforms, Developers and Get started render unlinked with `noindex`.
+- `common` — encrypted fields, scoped managers, `features.py` (per-workspace feature switches: `feature_enabled` for one, `features_for` for all of them in one query, `request_features` once per request, `features` in templates), `navigation.py` (`build_nav`: the six places, the Settings gear, the phone bar and the lit place; `build_palette`: Go to), `context_processors.sidebar_context` (the counts and the lazy `nav`, `nav_palette` and `features`), `background.py` (recurring tasks, the worker lease), `middleware.py` (Permissions-Policy; `HtmlGZipMiddleware`, which gzips HTML pages and fragments only, never files, streams or JSON), the mail budget, the `release`, `live_verify`, `run_worker` and backup commands.
 - `providers/` (top level) — one module per platform API.
 
 ### `apps/studio` — the agency
 
 - `models.py` — `BrandProfile`; `StudioBrief` (a post in the making) and `StudioConcept`; `AgentRun` (one agent turn: tokens, cost); `AgencyJob` (every other kind of work); `AgencySettings` (autopilot, approvers, budget, creation mode, feature switches); `BrandClaim`; `CampaignOutcome`; `AutopilotWeek`; `CreativeInsight`; `Conversation` and `Message`; `Routine` and `RoutineRun`.
-- `views.py` — Home, create, the post page and its actions, the brand profile. `views_setup.py` — Set up and the Settings hub. `views_routines.py`. `views_agency.py` — Team and job pages. `views_autopilot.py`. `views_chat.py` — threads and inbox drafts. `views_memory.py`, `views_outcomes.py`, `views_trust.py`. `views_customer_workflow.py` — the older endpoints (redirect to Home). `opendots_views.py` — task controls.
-- `dashboard.py` — Today, the tabs, the settings cards, waiting / at work / week / stats; queries only.
+- `views.py` — Home, create, the post page and its actions, the brand profile. `views_setup.py` — Set up (and the old Settings hub's 301). `views_settings.py` and `urls_settings.py` — the Settings screen at `/workspace/<id>/settings/` (`settings:index`, tabs by `?tab=`; `TABS` is the tab registry, `usable_tabs` the tabs a person may use). `settings_links.py` — `tab_url`; `moved`, the 301 an old settings page answers after its own checks; `returning_to`, the tab an old handler goes back to when a Settings tab's form sends it as `next` (only this workspace's Settings). `views_routines.py` — routine actions (a GET of the old page answers 301 to Activity). `views_agency.py` — Activity (`studio:team` at `/studio/activity/`, with the routines section; `/studio/team/` answers 301) and job pages. `views_live.py` — `team_page` (the Activity page: the live board and the routines section) and `team_board` (the board's refresh and Home's "Right now" strip). `views_autopilot.py`. `views_chat.py` — threads and inbox drafts. `views_memory.py`, `views_outcomes.py`, `views_trust.py`. `views_customer_workflow.py` — the older endpoints (redirect to Home). `opendots_views.py` — task controls.
+- `dashboard.py` — Today, the tabs, waiting / at work / week / stats; queries only.
 - `readiness.py` — the one readiness line; its copy never names a setting or a worker.
 - `chat.py` — threads: who may write where, who answers, caps, posting, receipts, `REQUEST_KINDS`.
 - `jobtypes/` — one module per `AgencyJob.Kind`: `chat`, `plan`, `blog`, `inbox`, `report`, `learn`, `repurpose`, `seo`; `jobs.py` collects them into `JOB_TYPES`.
@@ -258,6 +258,16 @@ uncertain send or delivery is held for a person, never replayed.
   (the account manager). Not "AI Studio", "assistant", "operator", "CTO" or
   "agent" in user-facing text; the roster names agents by their job
   (copywriter, art director, scheduler).
+- The navigation's places are **Home**, **Approvals**, **Calendar**, **Inbox**,
+  **Analytics** and **Activity** (and **Blog** with its switch); **Settings** is
+  the gear. **Activity** is the team at work and the routines (its heading
+  still says "Your team"; the agency tabs still say Team and Routines).
+  **Settings** is the workspace's one settings screen: Brand, Accounts, Team &
+  clients, Approvals, Autopilot, Notifications, Advanced. A person's own
+  settings are **Account**. **Set up** keeps its name; Settings → Advanced →
+  **Health** includes the Set up checklist and follows the same owner-only rule:
+  the exact names to set (environment variables, providers) show to owners only,
+  and everyone else reads "Ask your owner."
 - One sentence per screen on what to do. Status in words: "Waiting for you",
   "The team is working", "Paused: autopilot is off", "Needs your review".
 - No environment-variable names, worker names, token counts, contrast ratios,
@@ -337,8 +347,10 @@ component classes. The public site repeats the same values as `--mk-*` in
    (create a `RoutineRun`, do the work or queue a job, set the lease when it
    runs as a job), and extend `settle_running` if the kind runs as a job. Keep
    the rule that an interrupted run is never retried on its own.
-3. Add a preset to `SUGGESTIONS` if it deserves a one-tap card, and its wording
-   to `templates/studio/routines.html`, `partials/routine_rows.html` and the
+3. Add a preset to `SUGGESTIONS` if it deserves a one-tap card (Activity shows
+   them through `templates/studio/partials/routine_presets.html`), and its
+   wording to `partials/routine_rows.html`, `partials/routine_form.html` (the
+   form on Settings → Advanced and the old page's error answer) and the
    `/routines` lines in `apps/telegram/conversations.py`.
 4. Tests in `apps/studio/tests/test_routines.py`: due → started, blocked →
    skipped with a plain `last_error`, lease expired → interrupted and not
@@ -382,10 +394,16 @@ Inbound — a new command or button:
 - `tests/e2e/server/` — isolated settings guards, local database reset, seed,
   fake team, HTTP mocks, background worker and named fixture/probe endpoints.
   These endpoints are never mounted by the production URL configuration.
-- `tests/e2e/support/`, `self/`, `golden/` — Playwright fixtures, network and
-  axe checks, harness self-checks and the twelve golden paths on three devices.
+- `tests/e2e/support/`, `self/`, `golden/`, `screens/` — Playwright fixtures,
+  network and axe checks, harness self-checks, the twelve golden paths and the
+  Phase 2 screens (navigation, Approvals, Settings, Activity, switches, the
+  public site) on three devices.
+- `tests/test_product_map_urls.py` — no URL `docs/PRODUCT_MAP.md` lists, now or
+  before Phase 2 (`tests/fixtures/product_map_urls.txt`), answers 404 or 500;
+  a URL the map gains needs its line in the fixture.
 - `tests/lighthouse/` and `.lighthouserc.json` — authenticated mobile
-  performance measurements and budgets for Home, Approvals and Calendar.
+  performance measurements and budgets for Home, Approvals (`/approvals/`) and
+  Calendar.
 - `tests/js/` — fast Node tests of the thread's UI state and mocked browser
   navigation synchronization.
 

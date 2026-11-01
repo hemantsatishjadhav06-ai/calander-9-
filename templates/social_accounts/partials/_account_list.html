@@ -1,0 +1,29 @@
+{% comment %}The connected accounts (each card with its actions) or the empty state with the one way in.
+Included by the accounts page and by Settings → Accounts, so the markup is the same in both.
+Context: accounts, workspace_id.{% endcomment %}
+{% if accounts %}
+<!-- Connected accounts -->
+<div class="space-y-3" id="accounts-list">
+    {% for account in accounts %}
+    {% include "social_accounts/partials/_account_card.html" with account=account workspace_id=workspace_id %}
+    {% endfor %}
+</div>
+
+<!-- Summary footer -->
+<p class="mt-4 text-xs text-ink-600">
+    {{ accounts|length }} account{{ accounts|length|pluralize }} connected. We check each connection every 6 hours.
+</p>
+
+{% else %}
+<!-- Empty state: the one way in -->
+<div class="ui-card ui-empty py-12">
+    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+    <h2 class="ui-empty-title">No accounts connected yet</h2>
+    <p class="ui-empty-body">Connect a social account to publish posts, see how they do and answer comments.</p>
+    <a href="{% url 'social_accounts:connect' workspace_id=workspace_id %}"
+       class="ui-btn ui-btn-primary mt-5">
+        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Connect your first account
+    </a>
+</div>
+{% endif %}

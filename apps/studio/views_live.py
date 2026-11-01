@@ -1,12 +1,14 @@
-"""The Team tab as a live view of the team at work, and the refresh behind it.
+"""Activity (the Team tab) as a live view of the team at work, and the refresh behind it.
 
-``team_page`` renders the whole tab (``studio:team``, reached through
-``views_agency.team_roster``); ``team_board`` returns just the board for the
-HTMX refresh every few seconds, or Home's "Right now" card with
+``team_page`` renders the whole page (``studio:team`` at ``/studio/activity/``,
+reached through ``views_agency.team_roster``); ``team_board`` returns just the
+board for the HTMX refresh every few seconds, or Home's "Right now" card with
 ``?part=strip``. Both are GET only, read-only and for the agency's staff
 (``views._workspace``: clients get a 403 and use the portal). The numbers come
 from ``apps.studio.live.snapshot``, cached for a few seconds per workspace, and
-``live.for_viewer`` trims them for staff without ``create_posts``.
+``live.for_viewer`` trims them for staff without ``create_posts``. People with
+``create_posts`` also get the Routines section (``views_routines.section``),
+outside the board, so the refresh never touches it.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_GET
 
-from . import dashboard, live
+from . import dashboard, live, views_routines
 from .views import _perms, _workspace
 
 logger = logging.getLogger(__name__)
@@ -38,10 +40,13 @@ def _context(request, workspace) -> dict:
 
 
 def team_page(request, workspace_id):
-    """The Team tab (the caller has already applied login_required and require_GET)."""
+    """Activity (the caller has already applied login_required and require_GET)."""
     workspace = _workspace(request, workspace_id)
+    perms = _perms(request)
     context = _context(request, workspace)
-    context["tabs"] = dashboard.tabs(workspace, "team", perms=_perms(request))
+    context["tabs"] = dashboard.tabs(workspace, "team", perms=perms)
+    # Routine titles and controls are for people who may write one; a viewer's page carries none.
+    context["routines_section"] = views_routines.section(request, workspace, perms) if context["can_create"] else None
     return render(request, "studio/team.html", context)
 
 

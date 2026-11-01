@@ -23,6 +23,8 @@ class InviteOnlyTests(TestCase):
     def test_a_stranger_sees_the_invite_only_page_and_no_account_is_made(self):
         page = self.client.get(reverse("account_signup"))
         self.assertContains(page, "invite-only")
+        # The closed page offers the Request invite form, whether or not a support address is set.
+        self.assertContains(page, f'href="{reverse("marketing:request_invite")}"')
         _signup(self.client, "stranger@example.com")
         self.assertFalse(User.objects.filter(email="stranger@example.com").exists())
 
@@ -104,11 +106,15 @@ class InviteOnlyTests(TestCase):
 
     def test_public_ctas_ask_for_access_instead_of_signup(self):
         landing = self.client.get("/")
-        self.assertContains(landing, "Request early access")
+        self.assertContains(landing, "Request invite")
+        self.assertContains(landing, f'href="{reverse("marketing:request_invite")}"')
         self.assertNotContains(landing, "Create your account")
-        pricing = self.client.get(reverse("pricing"))
-        self.assertContains(pricing, "Request early access")
-        self.assertNotContains(pricing, "Create account")
+        self.assertNotContains(landing, f'href="{reverse("account_signup")}"')
+        # Pricing used to carry the same CTA; it now sends people to the form itself.
+        self.assertRedirects(self.client.get(reverse("pricing")), reverse("marketing:request_invite"), status_code=301)
+        form = self.client.get(reverse("marketing:request_invite"))
+        self.assertContains(form, "Request invite")
+        self.assertNotContains(form, "Create account")
 
 
 @override_settings(SIGNUP_MODE="open")
@@ -124,7 +130,11 @@ class PublicClaimsTests(TestCase):
     """Claims the CEO and CMO reviews said we cannot stand behind today."""
 
     def test_no_promise_of_things_that_do_not_exist(self):
-        pages = self.client.get("/").content.decode() + self.client.get(reverse("pricing")).content.decode()
+        # The three linked public pages (pricing now redirects to the last of them).
+        pages = "".join(
+            self.client.get(reverse(name)).content.decode()
+            for name in ("marketing:home", "marketing:how_it_works", "marketing:request_invite")
+        )
         for claim in (
             "export and move your data whenever you like",
             "Daily backups &amp; uptime monitoring",

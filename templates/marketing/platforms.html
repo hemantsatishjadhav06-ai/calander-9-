@@ -98,7 +98,7 @@
             <h2 class="mk-h2">Connect your first channel today.</h2>
             <p class="mk-lead">Self-hosting? The setup guide walks through registering each platform app.</p>
             <div class="mk-btn-row">
-                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% url 'account_signup' %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request early access{% endif %}</a>
+                <a class="mk-btn mk-btn--primary mk-btn--lg" href="{% if SIGNUP_OPEN %}{% url 'account_signup' %}{% else %}{% url 'marketing:request_invite' %}{% endif %}">{% if SIGNUP_OPEN %}Create your account{% else %}Request invite{% endif %}</a>
                 <a class="mk-btn mk-btn--ghost mk-btn--lg" href="{% url 'marketing:get_started' %}">Self-host it</a>
             </div>
         </div>

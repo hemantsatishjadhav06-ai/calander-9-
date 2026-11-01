@@ -4,6 +4,9 @@ Compact routine rows with their controls. Context:
   workspace — the workspace
   can_manage — True when the viewer manages the workspace's settings (may pause or delete any routine)
   team_url  — optional: the Team tab's address; a running row then links to it ("See it on Team")
+  next_url  — optional: where the controls come back to (views_routines._back takes it when it is
+              on this site); the page they were pressed on when left out. Activity passes its
+              Routines section (#routines), so a press lands there rather than at the board.
 Each row's own `can_change` (the viewer wrote it) also unlocks Pause and Delete.
 The rows pad themselves; put them in a card with no padding. Run now is secondary (a repeated
 row action never takes the page's one solid button); Delete is a quiet danger action.
@@ -32,18 +35,18 @@ row action never takes the page's one solid button); Delete is a quiet danger ac
         <div class="flex flex-wrap items-center gap-1.5">
             <form method="post" action="{% url 'studio:routines_run_now' workspace_id=workspace.id routine_id=row.id %}">
                 {% csrf_token %}
-                <input type="hidden" name="next" value="{{ request.path }}">
+                <input type="hidden" name="next" value="{{ next_url|default:request.path }}">
                 <button type="submit" {% if row.running %}disabled aria-disabled="true"{% endif %} class="ui-btn ui-btn-sm ui-btn-secondary" aria-label="Run “{{ row.title }}” now">Run now</button>
             </form>
             {% if can_manage or row.can_change %}
             <form method="post" action="{% url 'studio:routines_toggle' workspace_id=workspace.id routine_id=row.id %}">
                 {% csrf_token %}
-                <input type="hidden" name="next" value="{{ request.path }}">
+                <input type="hidden" name="next" value="{{ next_url|default:request.path }}">
                 <button type="submit" class="ui-btn ui-btn-sm ui-btn-ghost" aria-label="{% if row.enabled %}Pause{% else %}Resume{% endif %} “{{ row.title }}”">{% if row.enabled %}Pause{% else %}Resume{% endif %}</button>
             </form>
             <form method="post" action="{% url 'studio:routines_delete' workspace_id=workspace.id routine_id=row.id %}" x-data x-on:submit="if (!confirm('Delete this routine? Work it already started finishes as usual.')) $event.preventDefault()">
                 {% csrf_token %}
-                <input type="hidden" name="next" value="{{ request.path }}">
+                <input type="hidden" name="next" value="{{ next_url|default:request.path }}">
                 <button type="submit" class="ui-btn ui-btn-sm ui-btn-danger-ghost" aria-label="Delete “{{ row.title }}”">Delete</button>
             </form>
             {% endif %}

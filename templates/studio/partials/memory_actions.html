@@ -1,0 +1,21 @@
+{% comment %}
+Creative memory's two actions: show the upload panel (the including element's Alpine "upload" flag) and
+refresh what the team learned (posted to studio:memory_refresh). Extracted unchanged from
+studio/memory.html, which includes it, for Settings → Advanced to include as well.
+Context: workspace, can_upload, can_create, learning.
+{% endcomment %}
+<div class="flex flex-wrap items-center gap-2">
+    {% if can_upload %}
+    <button type="button" x-on:click="upload = !upload" x-bind:aria-expanded="upload.toString()" aria-controls="upload-panel"
+            class="ui-btn ui-btn-secondary">Upload references</button>
+    {% endif %}
+    {% if can_create %}
+    <form method="post" action="{% url 'studio:memory_refresh' workspace_id=workspace.id %}" x-data="{ busy: false }" x-on:submit="busy = true">
+        {% csrf_token %}
+        <button type="submit" x-bind:disabled="busy" {% if learning %}disabled aria-disabled="true"{% endif %}
+                class="ui-btn ui-btn-primary">
+            {% if learning %}Learning…{% else %}Refresh what we learned{% endif %}
+        </button>
+    </form>
+    {% endif %}
+</div>

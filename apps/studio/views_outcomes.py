@@ -20,17 +20,23 @@ from .models import CampaignOutcome
 from .views import _perms, _workspace
 
 
+def may_read_outcomes(membership) -> bool:
+    """This page's own check: the agency's staff who record outcomes or read analytics, never a client.
+    Settings → Advanced applies it to its Outcomes link."""
+    if membership is None or membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT:
+        return False
+    return outcomes.can_record(membership) or bool(membership.effective_permissions.get("view_analytics", False))
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 @ratelimit(key="user", rate="30/m", method="POST", block=True)
 def outcome_page(request, workspace_id):
     workspace = _workspace(request, workspace_id)
     membership = request.workspace_membership
-    if membership is None or membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT:
-        raise PermissionDenied("Campaign outcomes are for the agency team.")
-    writable = outcomes.can_record(membership)
-    if not writable and not membership.effective_permissions.get("view_analytics", False):
+    if not may_read_outcomes(membership):
         raise PermissionDenied("You do not have access to campaign outcomes.")
+    writable = outcomes.can_record(membership)
     form = OutcomeForm(request.POST if request.method == "POST" else None, workspace=workspace, user=request.user)
     if request.method == "POST":
         if not writable:

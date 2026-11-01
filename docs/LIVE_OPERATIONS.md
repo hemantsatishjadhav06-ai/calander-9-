@@ -275,6 +275,8 @@ comment.
 | `EMAIL_BACKEND_TYPE`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL` | both | required before inviting people | Set up → Email (owners); `/ops/email/` sends a test |
 | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | web | optional (send through a Gmail account from `/ops/email/`) | Set up → Email shows "connected" |
 | `RESEND_WEBHOOK_SECRET` | web | optional | delivery events are recorded |
+| `EMAIL_SENDING_ENABLED`, `EMAIL_DAILY_SEND_LIMIT`, `EMAIL_RECIPIENT_HOURLY_LIMIT`, `EMAIL_RECIPIENT_DAILY_LIMIT` | both | optional (defaults on, 2000 a day, 6 and 20 notification emails per person an hour and a day) | a notification past a cap is recorded as stopped by the email budget; sign-in mail skips the per-person caps |
+| `REQUEST_INVITE_HOURLY_LIMIT` | web | optional (default 30) | requests past it are thanked but not passed on, and a warning is logged |
 
 ### Sign-in and platform credentials
 
@@ -377,6 +379,15 @@ a separately tested multi-worker plan. Verify publisher, agency and confirmation
 success individually after restart, and obtain fresh approvals for affected
 queued content/destinations. The October rollout runbooks and audits are kept
 in [the archive](archive/2026-10/TELEGRAM_RAILWAY_ROLLOUT.md).
+
+### What the app compresses
+
+HTML pages and HTMX fragments are gzipped by the app for browsers that ask
+(`apps.common.middleware.HtmlGZipMiddleware`, with Django's BREACH padding).
+Static files are served precompressed by WhiteNoise. File downloads (media,
+attachments, exports), streamed responses and JSON (the Agent API, MCP,
+webhooks) are sent as they are. A proxy in front that compresses again sees
+`Content-Encoding: gzip` and leaves the page alone.
 
 ## Rollback
 

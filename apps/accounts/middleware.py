@@ -34,7 +34,10 @@ EXEMPT_PATH_PREFIXES = (
     # back to it.
     "/terms/",
     "/privacy/",
+    # /pricing/ answers 301 to /request-invite/; both stay readable, or the
+    # redirect would end on the acceptance page.
     "/pricing/",
+    "/request-invite/",
     "/support/",
     "/health/",
     "/static/",

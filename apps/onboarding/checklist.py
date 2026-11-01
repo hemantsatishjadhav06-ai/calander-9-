@@ -76,7 +76,8 @@ def get_checklist_items(workspace):
             "Review your first draft",
             "Check the finished graphic and each channel's copy, then approve and schedule.",
             reviewed,
-            calendar + "?mode=list&tab=approvals",
+            # The Approvals screen (spec D3): the checklist shows only on Home, which is for the team.
+            reverse("approvals:index", kwargs={"workspace_id": workspace_id}),
         ),
         (
             "published_post",

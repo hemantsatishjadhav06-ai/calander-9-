@@ -868,7 +868,7 @@ def test_the_home_card_adds_no_queries_once_the_snapshot_is_cached(client, world
     assert len(cold) <= len(without) + 22, "an uncached snapshot stays within its fixed budget"
 
 
-def test_the_routines_page_links_a_running_routine_to_the_team_tab(client, world):
+def test_home_links_a_running_routine_to_the_team_tab(client, world):
     Routine.objects.create(
         workspace=world.workspace,
         title="Morning plan",
@@ -886,10 +886,15 @@ def test_the_routines_page_links_a_running_routine_to_the_team_tab(client, world
     )
     client.force_login(world.owner)
 
-    html = client.get(_url("studio:routines", world)).content.decode()
+    # The Routines page moved into the Team tab (Activity) in Phase 2; Home's rows keep the link.
+    html = client.get(_url("studio:index", world)).content.decode()
 
     assert html.count("data-routine-team-link") == 1
     assert f'href="{_url("studio:team", world)}" class="ui-link' in html and "See it on Team" in html
+
+    # On the Team tab the rows sit on the page that shows the work, so none links to itself.
+    team_html = client.get(_url("studio:team", world)).content.decode()
+    assert "Morning plan" in team_html and "data-routine-team-link" not in team_html
 
 
 def test_set_up_links_autopilot_to_the_team_tab_once_it_is_on(client, world):

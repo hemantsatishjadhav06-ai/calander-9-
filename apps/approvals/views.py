@@ -6,6 +6,7 @@ import re
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.common.htmx import toast_response
@@ -404,12 +405,23 @@ def version_diff(request, workspace_id, post_id):
         "version_old": version_old,
         "version_new": version_new,
         "diff_data": diff_data,
+        "approvals_url": _approvals_url(request, workspace),
     }
 
     if request.htmx:
         return render(request, "approvals/partials/version_diff.html", context)
 
     return render(request, "approvals/version_diff.html", context)
+
+
+def _approvals_url(request, workspace) -> str:
+    """Where "Back to approvals" goes: the Approvals screen (spec D3) for the team, and the Calendar's
+    Approvals tab for a plain client, whom the screen refuses (they approve in the client portal)."""
+    from apps.studio.views import is_plain_client
+
+    if is_plain_client(request.workspace_membership):
+        return reverse("calendar:calendar", kwargs={"workspace_id": workspace.id}) + "?mode=list&tab=approvals"
+    return reverse("approvals:index", kwargs={"workspace_id": workspace.id})
 
 
 def _word_diff(old_str, new_str):

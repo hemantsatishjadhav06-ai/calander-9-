@@ -37,6 +37,23 @@ def _org_role_choices_for(membership):
 # ---------------------------------------------------------------------------
 
 
+def is_internal_to_org(request) -> bool:
+    """Whether the person may see the organisation's roster once the org-role gate has let them in.
+
+    A portal client is provisioned as an org ``member`` so the org-role gate
+    lets them through — to a page listing every teammate's email address and
+    workspace assignments. Someone whose only workspace role in this org is
+    ``client`` is external; they get no roster.
+    """
+    if request.org_membership.org_role in (OrgMembership.OrgRole.OWNER, OrgMembership.OrgRole.ADMIN):
+        return True
+    return (
+        WorkspaceMembership.objects.filter(user=request.user, workspace__organization=request.org)
+        .exclude(workspace_role=WorkspaceMembership.WorkspaceRole.CLIENT)
+        .exists()
+    )
+
+
 @login_required
 @require_org_role("member")
 @require_GET
@@ -48,18 +65,8 @@ def member_list(request):
         OrgMembership.OrgRole.ADMIN,
     )
 
-    # A portal client is provisioned as an org ``member`` so the org-role gate
-    # lets them through — to a page listing every teammate's email address and
-    # workspace assignments. Someone whose only workspace role in this org is
-    # ``client`` is external; they get no roster.
-    if not is_admin:
-        is_internal = (
-            WorkspaceMembership.objects.filter(user=request.user, workspace__organization=org)
-            .exclude(workspace_role=WorkspaceMembership.WorkspaceRole.CLIENT)
-            .exists()
-        )
-        if not is_internal:
-            raise PermissionDenied("Team management is not available to client accounts.")
+    if not is_internal_to_org(request):
+        raise PermissionDenied("Team management is not available to client accounts.")
 
     # Active members with their workspace memberships
     memberships = OrgMembership.objects.filter(organization=org).select_related("user").order_by("invited_at")

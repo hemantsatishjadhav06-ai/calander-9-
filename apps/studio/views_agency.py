@@ -1,4 +1,4 @@
-"""The agency's own pages: the Team tab (drawn live by ``views_live``) and one job's timeline.
+"""The agency's own pages: Activity (the Team tab, drawn live by ``views_live``) and one job's timeline.
 
 Under ``/workspace/<id>/studio/`` like the rest of the Studio, and for the
 agency's staff only (see ``views._workspace``). Retrying or cancelling a job
@@ -24,8 +24,21 @@ from .views_live import team_page
 @login_required
 @require_GET
 def team_roster(request, workspace_id):
-    """The Team tab: the team at work, live (``views_live``); every agent of the roster stays on it."""
+    """Activity (``studio:team``): the team at work, live (``views_live``), every agent of the roster,
+    and the routines for people who may create posts."""
     return team_page(request, workspace_id)
+
+
+@login_required
+@require_GET
+def team_legacy(request, workspace_id):
+    """``/studio/team/``, Activity's old address: the page's own checks, then a permanent move to Activity.
+
+    A plain client is refused (403) and someone signed out is sent to log in, exactly as the page
+    does, so a bookmark or a link already sent never redirects someone the page would refuse.
+    """
+    workspace = _workspace(request, workspace_id)
+    return redirect("studio:team", workspace_id=workspace.id, permanent=True)
 
 
 def _get_job(request, workspace_id, job_id):

@@ -25,6 +25,7 @@ from django.utils.html import strip_tags
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.approvals import gate as approval_gate
+from apps.common.features import request_features
 from apps.common.net import UnsafeUrlError, pinned_request
 from apps.common.validators import (
     parse_and_truncate_tag_string,
@@ -3050,6 +3051,8 @@ def create_landing(request, workspace_id):
 
     workspace = _get_workspace(request, workspace_id)
     tab = request.GET.get("tab", "ideas")
+    if tab == "templates" and not request_features(request)["templates"]:
+        tab = "ideas"  # the Templates tab is hidden with its switch; an old link opens Ideas
     tag = request.GET.get("tag")
 
     columns, all_tags = _idea_columns(workspace, tag)

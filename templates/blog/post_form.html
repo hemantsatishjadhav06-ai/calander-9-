@@ -175,7 +175,8 @@
             {% include "blog/partials/field.html" with field=form.faq_text %}
         </fieldset>
 
-        <div class="translucent-bar sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-ink-200 px-4 py-3 sm:mx-0 sm:rounded-xl sm:border">
+        {# Sticky at the bottom of the page's scroller, which ends at main's 48px bottom padding on a phone: 10px more and the safe area dock it on the 58px phone bar where the bar shows. #}
+        <div data-testid="blog-form-actions" class="translucent-bar sticky {% if nav.phone %}bottom-[calc(0.625rem+env(safe-area-inset-bottom))] lg:bottom-0{% else %}bottom-0{% endif %} z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-ink-200 px-4 py-3 sm:mx-0 sm:rounded-xl sm:border">
             <button type="submit" class="ui-btn ui-btn-primary">
                 {% if post %}Save changes{% else %}Save draft{% endif %}
             </button>

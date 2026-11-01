@@ -1,0 +1,7 @@
+{% comment %}The header's Connect account button, on the accounts page and in Settings → Accounts.
+Context: workspace_id.{% endcomment %}
+<a href="{% url 'social_accounts:connect' workspace_id=workspace_id %}"
+   class="ui-btn ui-btn-primary">
+    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Connect account
+</a>

@@ -125,6 +125,9 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "apps.common.middleware.PermissionsPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # HTML only, after WhiteNoise (static files are compressed already) and before everything that
+    # writes the page, so it compresses last (apps/common/middleware.py, issue #25).
+    "apps.common.middleware.HtmlGZipMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -779,6 +782,10 @@ YOUTUBE_WEBHOOK_SECRET = env("YOUTUBE_WEBHOOK_SECRET", default="")
 # Rate limiting
 RATELIMIT_ENABLE = not DEBUG
 RATELIMIT_USE_CACHE = "default"
+# The most Request invite submissions passed on to the platform operators in an
+# hour, from every address together (apps/marketing/views.py). Past it the form
+# still thanks the person and nobody is told.
+REQUEST_INVITE_HOURLY_LIMIT = env.int("REQUEST_INVITE_HOURLY_LIMIT", default=30)
 
 
 # ---------------------------------------------------------------------------

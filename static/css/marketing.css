@@ -662,6 +662,27 @@ main p a:not([class]):hover, main li a:not([class]):hover, main td a:not([class]
 @media (max-width: 640px) { .mk-page-hero { padding: 48px 0 28px; } }
 
 /* --------------------------------------------------------------------------
+   Form fields (Request invite): the app's field recipe (ui-label, ui-input,
+   ui-error) in the --mk-* values. ink-400 edge for the control boundary,
+   the global Pine focus ring, danger-500 for an error.
+   -------------------------------------------------------------------------- */
+.mk-form { display: grid; gap: 20px; max-width: 560px; }
+.mk-form__notice { max-width: 560px; margin-bottom: 24px; }
+.mk-field { display: grid; gap: 6px; }
+.mk-label { font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--mk-ink); }
+.mk-input {
+  display: block; width: 100%; min-height: 44px; padding: 10px 12px;
+  border: 1px solid var(--mk-ink-4); border-radius: var(--mk-r-sm);
+  background: var(--mk-surface); color: var(--mk-ink);
+  font: inherit; font-size: 1rem; line-height: 1.5rem;
+}
+textarea.mk-input { min-height: 112px; resize: vertical; }
+.mk-input:hover { border-color: var(--mk-ink-3); }
+.mk-input:focus-visible { border-color: var(--mk-brand-focus); border-radius: var(--mk-r-sm); }
+.mk-input[aria-invalid="true"] { border-color: var(--mk-danger-500); }
+.mk-error { font-size: 0.875rem; line-height: 1.25rem; color: var(--mk-danger-500); }
+
+/* --------------------------------------------------------------------------
    Closing call to action (a quiet panel, not a second dark band) & footer
    -------------------------------------------------------------------------- */
 .mk-cta { position: relative; overflow: hidden; border-radius: var(--mk-r-xl); padding: 72px 40px; text-align: center; background: var(--mk-bg-2); box-shadow: inset 0 0 0 1px var(--mk-line); color: var(--mk-ink); }

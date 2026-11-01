@@ -635,11 +635,18 @@ def brand_profile(request, workspace_id):
             return redirect("studio:brand", workspace_id=workspace.id)
     else:
         form = BrandProfileForm(instance=profile)
-    return render(
-        request,
-        "studio/brand_profile.html",
-        {"workspace": workspace, "profile": profile, "form": form, "can_edit": can_edit, "templates": design.TEMPLATES},
-    )
+    return render(request, "studio/brand_profile.html", brand_profile_context(request, workspace, profile, form))
+
+
+def brand_profile_context(request, workspace, profile, form) -> dict:
+    """What the brand profile's body shows: this page and Settings → Brand read the same values."""
+    return {
+        "workspace": workspace,
+        "profile": profile,
+        "form": form,
+        "can_edit": _can_edit_brand(request),
+        "templates": design.TEMPLATES,
+    }
 
 
 @login_required

@@ -8,10 +8,12 @@ tests/e2e/
   server/      python -m tests.e2e.server: web app + worker in one process, fakes, mocks, seed, fixtures
   support/     test.ts (test, expect and the fixtures below), harness.ts, axe.ts, network.ts,
                poll.ts (until: read a probe until the worker is done), settled.ts (wait for a swap or a
-               fade to finish), global-setup.ts (the end-of-run
-               network check)
-  self/        the harness's own checks (axe helper, network guard, session fixture)
+               fade to finish), nav.ts (move through the navigation the way each device shows it),
+               global-setup.ts (the end-of-run network check)
+  self/        the harness's own checks (axe helper, network guard, session fixture, phone bar overlap)
   golden/      the golden paths, one file each (NN-name.spec.ts)
+  screens/     the screens Phase 2 added or moved, one file each (navigation, approvals, settings,
+               activity, switches, marketing); docs/specs/02-cut-and-merge.md D10
   __screenshots__/   toHaveScreenshot baselines (none yet; Phase 3 takes them per screen)
 ```
 
@@ -52,6 +54,22 @@ non-CI configuration retains the original Chromium fallback with the iPhone view
 touch, and prints that limitation. It is useful for development where WebKit is unavailable but
 does not establish WebKit coverage. `CI=1` also refuses to reuse an existing server: use a separate
 `E2E_PORT` and `DB_NAME` if another run is active.
+
+**Screens (Phase 2).** `screens/` runs on all three projects like the golden paths. `navigation`:
+the six places and the Settings gear reach their screens (the sidebar on desktop, the phone bar and
+More's drawer on a phone), there is no *More* disclosure, the bell and Go to work from the keyboard.
+`approvals`: Approve & schedule from `/approvals/` goes through the same gate (the fingerprint and
+one dashboard action in the database); a viewer reads only; a plain client is refused. `settings`:
+the Brand tab saves the brand colour through the brand page's handler, each role sees only its tabs,
+the old settings pages answer 301 to their tab. `activity`: the live board and the three presets
+for an editor, no routines for a viewer, `/studio/team/` and `/studio/routines/` answer 301.
+`switches`: the Blog place and the five extra providers come and go with their switches, the pages
+still answer. `marketing`: Home, How it works and Request invite for someone signed out, and one
+notification per operator for a sent request. Their fixtures and probe are in
+`server/steps/screens.py` (`workspace_member`, `workspace_switches`, `unread_notification`,
+`invite_operator`; `invite_requests`), pinned by `tests/test_e2e_steps_screens.py`. A spec that turns
+a switch makes its own workspace: `workspace_switches` refuses the seeded A and B, which every spec
+shares. The existing golden specs were not edited for Phase 2; every route they use still answers.
 
 Phase 1 also checks the manager's approval and the client's request for changes in
 `golden/05-06-role-variants.spec.ts`, and foreign IDs in form bodies and query strings in
@@ -152,6 +170,14 @@ test('…', async ({ page, harness, as, axe, network }) => {
   included, so a spec builds it from the data it already has (`home-today-post-<brief id>`,
   `setup-row-creation_mode`, `connect-platform-linkedin_company`).
   Existing `data-*` hooks that pytest asserts stay exactly as they are.
+- **A hook shown twice:** a few controls are in the page twice, one copy per width, and only one
+  is visible: the bell (`notifications-bell`, `notification-badge`) and Go to (`palette-open`) in
+  the sidebar header and again in the phone's top bar, and the portal's navigation
+  (`portal-nav-*`). Take the copy this device shows with `.filter({ visible: true })` and expect
+  exactly one. The places are not duplicates: the sidebar's `nav-<key>` and the phone bar's
+  `phone-bar-<key>` are different hooks, and `support/nav.ts` (`go`, `placeLink`, `openMore`,
+  `expectLit`) picks the one a person would tap. On a phone the closed drawer is off screen but
+  counts as visible, so open it with `openMore` before using a `nav-<key>` link there.
 - **Sign-in:** only golden path 1 posts the login form (10 posts a minute per address; call
   `reset_login_limits` first). Everything else signs in with `as(...)`.
 - **Axe** on every screen a test reaches and on each dialog it opens; it fails on serious or critical

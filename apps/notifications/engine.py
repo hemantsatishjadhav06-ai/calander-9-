@@ -102,12 +102,24 @@ DAILY_DIGEST_HOUR = 8
 # ignorable.
 BATCH_HEADINGS: dict[str, tuple[str, str]] = {
     EventType.POST_FAILED: ("{n} post failed to publish", "{n} posts failed to publish"),
+    EventType.INVITE_REQUESTED: ("{n} invite request", "{n} invite requests"),
 }
 
 # Derived, never maintained by hand: an event that is batched but has no
 # heading would silently mail "12 new notifications" instead of saying what
 # happened.
 BATCHED_EMAIL_EVENTS = frozenset(BATCH_HEADINGS)
+
+# Batched events whose email waits for one message a day, sent once
+# DAILY_DIGEST_HOUR has passed in UTC, with no early send however many are
+# waiting. Invite requests: strangers decide how many arrive, and every
+# notification email to an operator counts against that operator's own
+# allowance (apps/common/mail.py: 6 an hour, 20 a day). On the rolling window a
+# steady trickle mails every few minutes and ten waiting mail at once, so a
+# stranger could spend the allowance the operator's alerts and approvals need.
+# Once a day, invite requests spend at most one of those emails. The bell has
+# each request at once.
+DAILY_BATCHED_EVENTS = frozenset({EventType.INVITE_REQUESTED})
 
 # The daily digest is not per-event-type, so it has no BATCH_HEADINGS entry.
 DAILY_DIGEST_HEADINGS = ("Your daily digest: {n} notification", "Your daily digest: {n} notifications")
@@ -144,7 +156,14 @@ DEFAULT_CHANNELS: dict[str, dict[str, bool]] = {
     EventType.AUTOPILOT_PLANNED: {Channel.IN_APP: True, Channel.EMAIL: True},
     EventType.AGENCY_ALERT: {Channel.IN_APP: True, Channel.EMAIL: True},
     EventType.DAILY_BRIEFING: {Channel.IN_APP: True, Channel.EMAIL: False},
+    EventType.INVITE_REQUESTED: {Channel.IN_APP: True, Channel.EMAIL: True},
 }
+
+# Sent only to platform operators (active staff), never chosen by a person, so
+# they stay out of the preference matrix and the history filter. Saving the
+# matrix must not write a disabled row for them either: the form has no
+# checkbox to post, and a missing checkbox reads as "off".
+OPERATOR_ONLY_EVENTS = frozenset({EventType.INVITE_REQUESTED})
 
 # Event types considered non-critical (suppressed during quiet hours).
 NON_CRITICAL_EVENTS = {
@@ -152,6 +171,7 @@ NON_CRITICAL_EVENTS = {
     EventType.REPORT_GENERATED,
     EventType.ENGAGEMENT_ALERT,
     EventType.DAILY_BRIEFING,
+    EventType.INVITE_REQUESTED,
 }
 
 
@@ -614,7 +634,13 @@ def send_batched_email_digests() -> int:
     #
     # The send/wait decision is a HAVING clause here rather than a check in
     # _send_one_digest: it belongs with the grouping it describes, and it keeps
-    # the sweep from waking a group only to decide it is not due yet.
+    # the sweep from waking a group only to decide it is not due yet. The event
+    # type is in the grouping, so the clause can tell a DAILY_BATCHED_EVENTS
+    # group (due once today's send hour has passed, never early) from the rest
+    # (due after the window, or at once for a storm).
+    daily = Q(notification__event_type__in=DAILY_BATCHED_EVENTS)
+    rolling_due = Q(oldest__lte=window_start) | Q(waiting__gte=BATCH_SIZE_TRIGGER)
+    daily_due = Q(oldest__lte=_last_daily_send_boundary(now, "UTC"))
     groups = list(
         _batchable_deliveries()
         .filter(unclaimed)
@@ -625,7 +651,7 @@ def send_batched_email_digests() -> int:
         .exclude(notification__user__quiet_hours__digest_mode=True)
         .values("notification__user_id", "notification__event_type")
         .annotate(oldest=Min("batch_queued_at"), waiting=Count("pk"))
-        .filter(Q(oldest__lte=window_start) | Q(waiting__gte=BATCH_SIZE_TRIGGER))
+        .filter((~daily & rolling_due) | (daily & daily_due))
         .order_by("oldest")[:BATCH_GROUP_LIMIT]
     )
 

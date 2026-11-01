@@ -285,7 +285,8 @@ jobs:
     name: E2E (Playwright)
     # Playwright 1.56.1 supports this image; ubuntu-latest moved to 26.04.
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # Phase 2 grew the suite to about 220 cases on three projects (14-16 minutes of tests plus setup).
+    timeout-minutes: 35
     env:
       CI: "1"
       DB_HOST: "127.0.0.1"

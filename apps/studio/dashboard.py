@@ -63,7 +63,7 @@ def tabs(workspace, active: str, perms: dict | None = None) -> list[dict[str, An
         ("overview", "Home", "studio:index"),
         ("routines", "Routines", "studio:routines"),
         ("team", "Team", "studio:team"),
-        ("settings", "Settings", "studio:settings_hub"),
+        ("settings", "Settings", "settings:index"),  # the Settings screen (the old hub answers 301 there)
     ]
     if perms is not None and not perms.get("create_posts"):
         items = [item for item in items if item[0] != "routines"]
@@ -76,27 +76,6 @@ def tabs(workspace, active: str, perms: dict | None = None) -> list[dict[str, An
         url = _maybe_url(name, workspace_id=workspace.id)
         if url:
             out.append({"key": key, "label": label, "url": url, "active": key == active})
-    return out
-
-
-def settings_cards(workspace) -> list[dict[str, Any]]:
-    """The Settings hub: one card per page the agency's settings are spread over."""
-    items = [
-        ("brand", "Brand", "Name, colours, voice and the facts the team may use.", "studio:brand"),
-        ("trust", "Verified facts", "Prices, availability and dates a person has checked.", "studio:trust"),
-        ("memory", "Creative memory", "The looks that worked, and the house style the team keeps.", "studio:memory"),
-        ("outcomes", "Outcomes", "What each campaign is for, and how it is measured.", "studio:outcomes"),
-        ("autopilot", "Autopilot", "How many posts a week, where, and who approves.", "studio:autopilot"),
-        ("telegram", "Telegram", "Your bot, your pairing and your team's groups.", "telegram:settings"),
-        ("budget", "Budget", "This month's AI spend against the soft limit.", "studio:autopilot"),
-    ]
-    out = []
-    for key, label, blurb, name in items:
-        url = _maybe_url(name, workspace_id=workspace.id)
-        if url and key == "budget":
-            url += ADVANCED_OPEN  # the budget lives in the Autopilot page's Advanced section
-        if url:
-            out.append({"key": key, "label": label, "blurb": blurb, "url": url})
     return out
 
 

@@ -42,14 +42,18 @@ def robots_txt(request):
 
 
 def sitemap_xml(request):
-    """The four public pages, so crawlers do not have to guess at them.
+    """The linked public pages, so crawlers do not have to guess at them.
+
+    Home, How it works and Request invite, then the legal pages. The pages
+    kept only for old links (Features, Platforms, Developers, Get started) are
+    ``noindex`` and left out; ``/pricing/`` redirects to Request invite.
 
     Hand-rolled rather than django.contrib.sitemaps: the public surface is a
     fixed handful of URLs with no model behind them, and the framework would
     add an app, a template loader path and a Site lookup to emit the same
     nine lines.
     """
-    paths = ["/", "/pricing/", "/terms/", "/privacy/", "/support/"]
+    paths = ["/", "/how-it-works/", "/request-invite/", "/terms/", "/privacy/", "/support/"]
     urls = "".join(f"<url><loc>{escape(request.build_absolute_uri(p))}</loc></url>" for p in paths)
     body = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
     return HttpResponse(body, content_type="application/xml")
@@ -77,8 +81,8 @@ urlpatterns = [
     path("webhooks/", include("apps.common.webhook_urls")),
     path("webhooks/telegram/", include("apps.telegram.urls_webhooks")),
     # Agent API (Phase 2) — programmatic access for external AI agents.
-    # Authenticated via scoped bearer tokens issued from the Organization
-    # → API Keys page. OpenAPI docs at /api/v1/docs. ``agent_api.urls``
+    # Authenticated via scoped bearer tokens issued from the API keys page
+    # (Settings → Advanced → Developers). OpenAPI docs at /api/v1/docs. ``agent_api.urls``
     # is Ninja's (patterns, app_namespace, instance_namespace) tuple,
     # which Django's path() handles natively.
     path("api/v1/", agent_api.urls),
@@ -107,6 +111,8 @@ urlpatterns = [
     ),
     # Approval Workflow (Stream F)
     path("workspace/<uuid:workspace_id>/", include("apps.approvals.urls")),
+    # Settings: one screen with a tab per settings page (?tab=), ahead of the client admin below it.
+    path("workspace/<uuid:workspace_id>/settings/", include("apps.studio.urls_settings")),
     # Client Portal Admin (workspace settings)
     path("workspace/<uuid:workspace_id>/settings/clients/", include("apps.client_portal.urls_admin")),
     # Media Library

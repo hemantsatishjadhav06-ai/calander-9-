@@ -105,7 +105,7 @@ class PageTests(TestCase):
             reverse("accounts:settings"),
         ]
         for url in pages:
-            response = self.client.get(url)
+            response = self.client.get(url, follow=True)  # the workspace page moved to Settings → Brand
             if response.status_code != 200:
                 continue
             html = response.content.decode()
