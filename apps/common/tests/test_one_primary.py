@@ -11,7 +11,9 @@ state that turns a button primary still counts), or a solid ``bg-brand-700`` but
 page (everything outside ``role="dialog"`` and ``role="alertdialog"`` subtrees and ``<template>``)
 and each dialog (its own subtree, nested dialogs and templates left out). A ``<template
 x-teleport="body">`` renders (Alpine moves its content to the body), so its content is a dialog of its
-own, and a dialog inside it is one more; other templates (``x-if``, ``x-for``) are not counted. A
+own, and a dialog inside it is one more, held by the body: the decision bar, header slot and breakpoint
+wrappers around the template in the source neither place it nor hide it. Other templates (``x-if``,
+``x-for``) are not counted. A
 dialog with ``data-view`` panels is one view per panel, each panel with whatever in the dialog sits
 outside every panel. The breakpoints are phones (below 1024 px) and desktop (from 1024 px), each read
 at the widths where Tailwind's breakpoints start (0, 640 and 768 px; 1024, 1280 and 1536 px): an
@@ -113,8 +115,17 @@ class Node:
         return frozenset(word.strip("'\"{}()[],:?!") for word in words)
 
     def ancestors(self) -> Iterator[Node]:
+        """Its parents, nearest first, as the browser holds them: the content of a ``<template
+        x-teleport="body">`` renders in the body (Alpine moves it there), so above the template the walk
+        goes on at the body, past the template's own ancestors in the source (in a fragment without a
+        body it ends there). Their decision bar, header slot and breakpoint wrappers do not hold it."""
         node = self.parent
         while node is not None:
+            if _is_teleported(node):
+                node = node.parent
+                while node is not None and node.tag != "body":
+                    node = node.parent
+                continue
             yield node
             node = node.parent
 
@@ -672,6 +683,39 @@ def test_a_teleported_template_is_a_dialog_of_its_own():
     # A floating button in teleported content is not the screen's: a teleported template is a dialog.
     fab = primary_findings(f'<template x-teleport="body"><div data-primary-slot="header">{FAB}</div></template>')
     assert fab and all("inside a dialog" in f.reason for f in fab), fab
+
+
+def test_teleported_content_is_held_by_the_body_not_by_the_template_s_source_ancestors():
+    """Alpine moves a teleported template's content to the body, so the decision bar and the breakpoint
+    wrappers around the template in the source neither place it nor hide it."""
+    in_the_page_s_bar = (
+        '<main><div data-decision-bar><button class="ui-btn ui-btn-primary">Approve</button>'
+        '<template x-teleport="body"><div role="dialog" aria-label="Confirm delete">'
+        '<button class="ui-btn ui-btn-primary">Delete</button></div></template></div></main>'
+    )
+    findings = primary_findings(in_the_page_s_bar)
+    assert [(f.view, f.breakpoint) for f in findings] == [
+        ("dialog 'Confirm delete'", PHONE),
+        ("dialog 'Confirm delete'", DESKTOP),
+    ], findings
+    assert all("'Delete': not in its place" in f.reason for f in findings), findings
+    # A wrapper shown on desktop only does not hide the dialog's phone-only primaries on phones.
+    in_a_desktop_wrapper = (
+        '<div class="hidden lg:flex"><template x-teleport="body"><div role="dialog" aria-label="m">'
+        '<div data-decision-bar><button class="ui-btn ui-btn-primary lg:hidden">One</button>'
+        '<button class="ui-btn ui-btn-primary lg:hidden">Two</button></div></div></template></div>'
+    )
+    assert _counts(in_a_desktop_wrapper)["dialog 'm'"] == {PHONE: 2, DESKTOP: 0}
+    assert [(f.breakpoint, f.reason.split(":")[0]) for f in primary_findings(in_a_desktop_wrapper)] == [
+        (PHONE, "2 primaries")
+    ]
+    # The body itself still holds it.
+    in_the_body = (
+        '<html><body class="max-lg:hidden"><div class="lg:hidden"><template x-teleport="body">'
+        '<div role="dialog" aria-label="m"><button class="ui-btn ui-btn-primary">One</button></div>'
+        "</template></div></body></html>"
+    )
+    assert _counts(in_the_body)["dialog 'm'"] == {PHONE: 0, DESKTOP: 1}
 
 
 def test_a_real_teleported_dialog_is_counted(rf):
