@@ -18,9 +18,14 @@ and shares with the templates' ``features``.
   ``nav.phone`` is the one flag templates test for the bar: the room at the end
   of the page and whatever else floats along the bottom follow it.
 - **One place is lit**, from ``request.resolver_match``; see ``_place``.
-- **The command palette** (``build_palette``) offers the places this person
-  may open (the same checks their pages make), Settings and the Settings tabs
-  this person may use.
+- **Only places that let the person in** (``_may_open``, the checks their pages
+  make, on the membership's ``effective_permissions``): the sidebar, the phone
+  bar and the palette never link a screen that would refuse them. A plain
+  client sees no agency screen and no gear, and their Approvals is the
+  Calendar's approvals tab (``_CLIENT_APPROVALS``), which they could open
+  before Phase 2. The gear shows while a Settings tab lets the person in.
+- **The command palette** (``build_palette``) offers the same places, Settings
+  and the Settings tabs this person may use.
 
 Activity is ``studio:team`` (its path is ``/studio/activity/``); Approvals is
 ``approvals:index`` and Settings ``settings:index``.
@@ -56,7 +61,9 @@ class NavItem:
 @dataclass(frozen=True)
 class Nav:
     """The sidebar's items, its gear and the phone bar; empty without a workspace.
-    ``phone`` is also empty wherever the page shows no phone bar (``_has_phone_bar``)."""
+    Each holds only places that let the person in; ``settings`` is None when no
+    Settings tab does. ``phone`` is also empty wherever the page shows no phone
+    bar (``_has_phone_bar``)."""
 
     items: tuple[NavItem, ...] = ()
     settings: NavItem | None = None
@@ -129,6 +136,11 @@ _REFUSED_TO_CLIENTS = frozenset({"home", "approvals", "activity", "settings"})
 # is followed too.
 _PERMISSION = {"inbox": "use_inbox", "analytics": "view_analytics"}
 
+# Where a plain client's Approvals goes: the Approvals screen refuses them (they
+# approve in the client portal), but the Calendar's approvals tab lets them in,
+# and was their Approvals before Phase 2. It lights Approvals (``_place``).
+_CLIENT_APPROVALS = "?mode=list&tab=approvals"
+
 
 def _place(app: str, name: str, tab: str | None) -> str | None:
     """The key of the place a page belongs to, or None for a page outside them."""
@@ -191,16 +203,20 @@ def build_nav(request, context: Mapping[str, Any] | None = None) -> Nav:
 
         context = sidebar_context(request)
 
+    membership = getattr(request, "workspace_membership", None)
+    client = _is_plain_client(membership)
+    permissions = membership.effective_permissions if membership is not None else {}
+
     ws = workspace.id
     kwargs = {"workspace_id": ws}
+    approvals = (
+        reverse("calendar:calendar", kwargs=kwargs) + _CLIENT_APPROVALS
+        if client
+        else reverse("approvals:index", kwargs=kwargs)
+    )
     places: list[tuple[str, str, str, int | None]] = [
         ("home", "Home", reverse("studio:index", kwargs=kwargs), None),
-        (
-            "approvals",
-            "Approvals",
-            reverse("approvals:index", kwargs=kwargs),
-            _count(context, "sidebar_pending_approvals"),
-        ),
+        ("approvals", "Approvals", approvals, _count(context, "sidebar_pending_approvals")),
         ("calendar", "Calendar", reverse("calendar:calendar", kwargs=kwargs), None),
         ("inbox", "Inbox", reverse("inbox:feed", kwargs=kwargs), _count(context, "sidebar_unread_inbox_count")),
     ]
@@ -211,10 +227,20 @@ def build_nav(request, context: Mapping[str, Any] | None = None) -> Nav:
         places.append(("blog", "Blog", reverse("blog:list", kwargs=kwargs), None))
 
     lit = _lit_place(request)
-    items = tuple(NavItem(key, label, url, count, key == lit) for key, label, url, count in places)
-    settings = NavItem("settings", "Settings", reverse("settings:index", kwargs=kwargs), None, lit == "settings")
+    # A place shows when its page lets this person in; a plain client's Approvals
+    # is the Calendar's approvals tab, which does.
+    items = tuple(
+        NavItem(key, label, url, count, key == lit)
+        for key, label, url, count in places
+        if _may_open(key, permissions, client) or (client and key == "approvals")
+    )
+    settings = (
+        NavItem("settings", "Settings", reverse("settings:index", kwargs=kwargs), None, lit == "settings")
+        if _may_use_settings(request, membership, client)
+        else None
+    )
 
-    shown = {item.key for item in items} | {"settings"}
+    shown = {item.key for item in items} | ({"settings"} if settings else set())
     more = NavItem("more", "More", None, None, lit in shown and lit not in _PHONE_KEYS)
     phone = (*(item for item in items if item.key in _PHONE_KEYS), more) if _has_phone_bar(request) else ()
     return Nav(items=items, settings=settings, phone=phone)
@@ -235,6 +261,12 @@ class PaletteEntry:
         return f"{self.label} {self.section}".strip().lower()
 
 
+def _is_plain_client(membership) -> bool:
+    from apps.studio.views import is_plain_client
+
+    return is_plain_client(membership)
+
+
 def _may_open(key: str, permissions: Mapping[str, Any], client: bool) -> bool:
     """Whether a place's page lets this person in: a plain client is refused the
     agency's screens, and the inbox and analytics need their permission."""
@@ -244,30 +276,34 @@ def _may_open(key: str, permissions: Mapping[str, Any], client: bool) -> bool:
     return needed is None or bool(permissions.get(needed, False))
 
 
-def build_palette(request, nav: Nav) -> tuple[PaletteEntry, ...]:
-    """The places *nav* shows that this person may open, then Settings and the
-    tabs the Settings screen would show them (its own checks,
-    ``views_settings.usable_tabs``).
+def _may_use_settings(request, membership, client: bool) -> bool:
+    """Whether the Settings screen has a tab for this person (its own checks,
+    ``views_settings.TABS``). A plain client is refused the screen, and without a
+    membership nothing is offered (the palette's rule). The checks run in order
+    and stop at the first tab that lets the person in, which today is Brand, open
+    to every member of the team: no query."""
+    if client or membership is None:
+        return False
+    from apps.studio.views_settings import TABS
 
-    A place is left out when its page would refuse the person: the checks are
-    ``_may_open``'s, on the membership's ``effective_permissions``. A plain
-    client is offered none of the screens that refuse them, and so no Settings
-    tab. Reading the tabs' checks costs at most one query, and only when a page
+    return any(tab.allowed(request) for tab in TABS)
+
+
+def build_palette(request, nav: Nav) -> tuple[PaletteEntry, ...]:
+    """The places *nav* shows, then Settings and the tabs the Settings screen
+    would show this person (its own checks, ``views_settings.usable_tabs``).
+
+    ``build_nav`` already left out every place whose page would refuse the
+    person (``_may_open``, on the membership's ``effective_permissions``), so the
+    palette offers exactly the sidebar's places; a plain client's Approvals is
+    the Calendar's approvals tab, and they have no gear and so no Settings tab.
+    Reading the tabs' checks costs at most one query, and only when a page
     renders the palette.
     """
     if not nav.items:
         return ()
-    from apps.studio.views import is_plain_client
-
-    membership = getattr(request, "workspace_membership", None)
-    client = is_plain_client(membership)
-    permissions = membership.effective_permissions if membership is not None else {}
-    entries = [
-        PaletteEntry(item.key, item.label, item.url or "")
-        for item in nav.items
-        if _may_open(item.key, permissions, client)
-    ]
-    if client or membership is None or nav.settings is None:
+    entries = [PaletteEntry(item.key, item.label, item.url or "") for item in nav.items]
+    if nav.settings is None:
         return tuple(entries)
 
     from apps.studio.settings_links import tab_url

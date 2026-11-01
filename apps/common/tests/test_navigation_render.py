@@ -30,6 +30,7 @@ Spec D8, R1 and R2 (docs/specs/02-cut-and-merge.md), plan T9 (docs/specs/phase-2
 
 import re
 from datetime import timedelta
+from html import unescape
 from types import SimpleNamespace
 from unittest import mock
 
@@ -76,6 +77,22 @@ REFUSED = {
     "contributor": {"inbox", "analytics"},
     "client": {"home", "approvals", "inbox", "activity", "settings"},
 }
+# Each place's own screen, the one the sidebar links for the team.
+SCREENS = {
+    "home": "studio:index",
+    "approvals": "approvals:index",
+    "calendar": "calendar:calendar",
+    "inbox": "inbox:feed",
+    "analytics": "analytics:index",
+    "activity": "studio:team",
+    "blog": "blog:list",
+    "settings": "settings:index",
+}
+# A plain client keeps an Approvals that works: the Calendar's approvals tab, which they could
+# open before Phase 2, since the Approvals screen refuses them (they approve in the client portal).
+CLIENT_APPROVALS = "?mode=list&tab=approvals"
+# The places each role is not shown at all: those whose screen refuses them, but a client's Approvals.
+LEFT_OUT = {**REFUSED, "client": REFUSED["client"] - {"approvals"}}
 
 
 def _person(email, name):
@@ -174,7 +191,8 @@ def _tag(html, marker):
 
 
 def _href(html, testid):
-    return re.search(r'href="([^"]*)"', _tag(html, f'data-testid="{testid}"')).group(1)
+    """The address a link goes to, as the browser reads it (``&amp;`` is ``&``)."""
+    return unescape(re.search(r'href="([^"]*)"', _tag(html, f'data-testid="{testid}"')).group(1))
 
 
 def _items(html):
@@ -212,11 +230,14 @@ def _pending(team, count):
 @pytest.mark.django_db
 @pytest.mark.parametrize("role", STAFF)
 def test_staff_see_six_places_then_the_gear(client, team, analytics_on, role):
+    """Six places for the owner, a manager and an editor; a viewer is not shown the Inbox, which
+    refuses them (``use_inbox``)."""
     _switches(team.ws)
     html = _calendar(client, team, role)
+    places = [key for key in PLACES if key not in REFUSED[role]]
 
-    assert _items(html) == [*PLACES, "settings"]
-    assert _labels(html) == {key: LABELS[key] for key in [*PLACES, "settings"]}
+    assert _items(html) == [*places, "settings"]
+    assert _labels(html) == {key: LABELS[key] for key in [*places, "settings"]}
     assert _href(html, "nav-settings") == _url("settings:index", team.ws)
     assert _href(html, "nav-activity") == _url("studio:team", team.ws)
     assert _href(html, "nav-approvals") == _url("approvals:index", team.ws)
@@ -718,10 +739,14 @@ def test_every_destination_the_palette_offers_opens_and_every_place_it_leaves_ou
     for key in offered:
         url = _href(html, f"palette-item-{key}")
         assert client.get(url).status_code in {200, 301, 302}, (role, key, url)
-    left_out = [key for key in _items(html) if key not in offered]
-    assert set(left_out) == REFUSED[role]
+    # The sidebar shows the palette's places, the gear standing for the Settings tabs, each to the same page.
+    assert _items(html) == [key for key in offered if not key.startswith("settings-")]
+    for key in _items(html):
+        assert _href(html, f"nav-{key}") == _href(html, f"palette-item-{key}"), key
+    left_out = [key for key in SCREENS if key not in offered]
+    assert set(left_out) == LEFT_OUT[role]
     for key in left_out:
-        url = _href(html, f"nav-{key}")
+        url = _url(SCREENS[key], team.ws)
         assert client.get(url).status_code == 403, (role, key, url)
 
 
@@ -741,9 +766,78 @@ def test_a_plain_client_is_offered_no_agency_screen(client, team):
     offered = _palette(html)
 
     assert "calendar" in offered
-    for refused in ("home", "approvals", "inbox", "activity", "settings"):
+    for refused in ("home", "inbox", "activity", "settings"):
         assert refused not in offered, refused
     assert not [key for key in offered if key.startswith("settings-")]
+    # Their Approvals is the Calendar's approvals tab, which lets them in; the Approvals screen does not.
+    assert _href(html, "palette-item-approvals") == _url("calendar:calendar", team.ws) + CLIENT_APPROVALS
+    assert client.get(_url("approvals:index", team.ws)).status_code == 403
+
+
+# --- the sidebar and the phone bar offer only places this person may open ----------------------------
+
+
+def _phone_places(html):
+    """The phone bar's links (More is a button) by key, with their addresses."""
+    bar = _phone_bar(html)
+    keys = re.findall(r'data-testid="phone-bar-([\w-]+)"', bar)
+    return {key: _href(bar, f"phone-bar-{key}") for key in keys if key != "more"}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["viewer", "contributor", "client"])
+def test_the_sidebar_and_phone_bar_link_only_places_that_let_this_person_in(client, team, analytics_on, role):
+    _switches(team.ws, blog=True)
+    html = _calendar(client, team, role)
+    linked = {f"nav-{key}": _href(html, f"nav-{key}") for key in _items(html)}
+    linked.update({f"phone-bar-{key}": url for key, url in _phone_places(html).items()})
+
+    assert "nav-calendar" in linked and "phone-bar-calendar" in linked
+    for hook, url in linked.items():
+        assert client.get(url).status_code in {200, 301, 302}, (role, hook, url)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["viewer", "contributor", "client"])
+def test_the_sidebar_and_phone_bar_leave_out_exactly_the_places_that_refuse_this_person(
+    client, team, analytics_on, role
+):
+    _switches(team.ws)
+    html = _calendar(client, team, role)
+    shown = [key for key in [*PLACES, "settings"] if key not in LEFT_OUT[role]]
+
+    assert _items(html) == shown
+    phone = [key for key in ("home", "approvals", "calendar", "inbox") if key in shown]
+    bar = _phone_bar(html)
+    assert re.findall(r'data-testid="phone-bar-([\w-]+)"', bar) == [*phone, "more"]
+    # One column for each entry, as five fill the bar for the team.
+    assert f"grid-cols-{len(phone) + 1}" in re.search(r'<ul class="([^"]*)"', bar).group(1).split()
+
+
+@pytest.mark.django_db
+def test_a_plain_clients_approvals_is_the_calendars_approvals_tab_and_has_no_gear(client, team, analytics_on):
+    _switches(team.ws)
+    _pending(team, 2)
+    html = _calendar(client, team, "client")
+    tab = _url("calendar:calendar", team.ws) + CLIENT_APPROVALS
+
+    assert _href(html, "nav-approvals") == tab
+    assert _href(_phone_bar(html), "phone-bar-approvals") == tab
+    assert 'aria-label="Approvals, 2 waiting"' in _tag(html, 'data-testid="nav-approvals"')
+    assert 'data-testid="nav-settings"' not in html
+    # The tab lights their Approvals, as it did before Phase 2.
+    lit = _page(client, team.client, tab)
+    assert re.findall(r'data-testid="nav-([\w-]+)"[^>]*aria-current="page"', _sidebar(lit)) == ["approvals"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", STAFF)
+def test_the_team_keeps_the_gear_and_the_approvals_screen(client, team, role):
+    _switches(team.ws)
+    html = _calendar(client, team, role)
+
+    assert _href(html, "nav-settings") == _url("settings:index", team.ws)
+    assert _href(html, "nav-approvals") == _url("approvals:index", team.ws)
 
 
 # --- cost: built once, from the context's own values, never for a fragment ----------------------------

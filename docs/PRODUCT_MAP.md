@@ -44,7 +44,13 @@ and the workspace's switches; `templates/base.html` draws it.
   on for at least one platform (`AnalyticsPlatformConfig`, site-wide); **Blog**
   is a seventh place only when the workspace's `blog` switch is on. **Settings**
   is the gear at the bottom. Approvals carries the count of posts waiting,
-  Inbox the unread count. There is no *More*.
+  Inbox the unread count. There is no *More*. A place shows only to someone
+  its screen lets in (the checks Go to uses: Inbox needs `use_inbox`, Analytics
+  `view_analytics`; a plain client is refused Home, Approvals, Activity and
+  Settings), so a viewer has no Inbox and a contributor no Inbox or Analytics.
+  A plain client keeps an **Approvals** that works, the Calendar's Approvals tab
+  (`calendar:calendar?mode=list&tab=approvals`), and has no gear. The gear
+  shows while a Settings tab lets the person in.
 - **One place is lit** (`aria-current="page"`): Home on Home, the post page,
   the thread page and the agency's other pages; Approvals on Approvals and on
   the Calendar's Approvals tab; Calendar on the rest of the Calendar, Queues
@@ -69,13 +75,15 @@ and the workspace's switches; `templates/base.html` draws it.
   labelled dialog. Typing filters the places this person may open (the checks
   their pages make: Inbox needs `use_inbox`, Analytics `view_analytics`),
   Settings and the Settings tabs they may use. The arrow keys or Tab move,
-  Enter opens, Escape closes and the focus goes back. A plain client is offered
-  none of the agency's screens.
+  Enter opens, Escape closes and the focus goes back. It offers the sidebar's
+  places: a plain client none of the agency's screens, with Approvals as the
+  Calendar's Approvals tab.
 - **Sidebar footer**: the account menu: Manage Team (`members:list`), Account
   (`accounts:settings`, the person's own settings), sign out.
 - **Phone** (below 1024px): the top bar holds the menu button, the workspace's
   name, Go to and the bell. The **phone bar** along the bottom holds Home,
-  Approvals (with its count), Calendar, Inbox and More; More opens the drawer,
+  Approvals (with its count), Calendar, Inbox and More, each as the sidebar
+  shows it to this person (one column each); More opens the drawer,
   which is the sidebar (Analytics, Activity, Blog, the gear). The post page and
   the composer have no phone bar (their own action bar sits there), nor do
   onboarding's connection pages or the Telegram pages for someone not on the

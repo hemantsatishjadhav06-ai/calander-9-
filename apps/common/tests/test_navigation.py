@@ -15,6 +15,11 @@ Spec R1 (docs/specs/02-cut-and-merge.md), plan T2 (docs/specs/phase-2.md).
   ``/studio/activity/`` (spec D4).
 - The counts are the ones ``sidebar_context`` already computed: building the
   navigation reads nothing but the request's switches, which it shares.
+- Only places that let the person in are shown (the palette's checks, on the
+  membership the middleware resolved): the inbox needs ``use_inbox``,
+  analytics ``view_analytics``; a plain client is shown no agency screen and
+  no gear, and their Approvals is the Calendar's approvals tab. The gear shows
+  while a Settings tab lets the person in.
 """
 
 import re
@@ -95,10 +100,14 @@ def _url(name, workspace, **kwargs):
 
 
 def _request(path, workspace, user, match=None):
-    """A GET for *path*, resolved as the URL resolver would (or as *match*)."""
+    """A GET for *path*, resolved as the URL resolver would (or as *match*), with the person's
+    membership as the membership middleware sets it (an owner's, unless the test made another)."""
     request = RequestFactory().get(path)
     request.user = user
     request.workspace = workspace
+    request.workspace_membership = WorkspaceMembership.objects.filter(
+        user=user, workspace=workspace
+    ).first() or WorkspaceMembership.objects.create(user=user, workspace=workspace, workspace_role="owner")
     request.resolver_match = match or resolve(request.path_info)
     return request
 
@@ -113,12 +122,16 @@ def _nav(request):
 
 
 def _lit(nav):
-    """Every key that is lit: the items and the gear (the phone bar repeats them)."""
-    return [item.key for item in (*nav.items, nav.settings) if item.active]
+    """Every key that is lit: the items and the gear, if shown (the phone bar repeats them)."""
+    return [item.key for item in (*nav.items, nav.settings) if item is not None and item.active]
 
 
 def _item(nav, key):
     return next(item for item in nav.items if item.key == key)
+
+
+def _keys(nav):
+    return [item.key for item in nav.items]
 
 
 # --- the items, their order, their labels and their targets ---------------------
@@ -453,8 +466,10 @@ def test_the_telegram_pages_show_the_phone_bar_to_the_team_only(workspace, user,
 
     nav = _nav(request)
 
-    assert [item.key for item in nav.phone] == (PHONE if bar else [])
-    assert [item.key for item in nav.items][:4] == ORDER[:4]  # the sidebar is the template's to hide
+    assert [item.key for item in nav.phone] == ([key for key in PHONE if key in _keys(nav)] + ["more"] if bar else [])
+    # The sidebar is the template's to hide: the places are the ones this person has on any page.
+    elsewhere = _nav(_request(_url("calendar:calendar", workspace), workspace, user))
+    assert _keys(nav) == _keys(elsewhere)
 
 
 @pytest.mark.django_db
@@ -463,6 +478,82 @@ def test_onboarding_pages_have_no_phone_bar(workspace, user):
     request = _request(reverse("onboarding:connection_page", kwargs={"token": "t"}), workspace, user)
 
     assert _nav(request).phone == ()
+
+
+# --- only places that let the person in --------------------------------------------
+
+
+def _as(role, workspace, user, path=None, custom=None):
+    WorkspaceMembership.objects.create(user=user, workspace=workspace, workspace_role=role, custom_role=custom)
+    return _nav(_request(path or _url("calendar:calendar", workspace), workspace, user))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("role", "shown", "gear"),
+    [
+        pytest.param("owner", ["home", "approvals", "calendar", "inbox", "analytics", "activity"], True, id="owner"),
+        pytest.param("viewer", ["home", "approvals", "calendar", "analytics", "activity"], True, id="viewer"),
+        pytest.param("contributor", ["home", "approvals", "calendar", "activity"], True, id="contributor"),
+        pytest.param("client", ["approvals", "calendar", "analytics"], False, id="client"),
+    ],
+)
+def test_only_the_places_that_let_the_person_in_are_shown(workspace, user, analytics_on, role, shown, gear):
+    nav = _as(role, workspace, user)
+
+    assert _keys(nav) == shown
+    assert (nav.settings is not None) is gear
+    assert [item.key for item in nav.phone] == [key for key in PHONE if key in shown] + ["more"]
+
+
+@pytest.mark.django_db
+def test_a_custom_role_is_shown_what_its_permissions_open(workspace, user, analytics_on):
+    custom = CustomRole.objects.create(
+        organization=workspace.organization, name="Inbox only", permissions={"use_inbox": True}
+    )
+    nav = _as("viewer", workspace, user, custom=custom)
+
+    assert "inbox" in _keys(nav) and "analytics" not in _keys(nav)
+    assert nav.settings is not None  # a custom role is never a plain client
+
+
+@pytest.mark.django_db
+def test_a_plain_clients_approvals_is_the_calendars_approvals_tab(workspace, user):
+    tab = _url("calendar:calendar", workspace) + "?mode=list&tab=approvals"
+    nav = _as("client", workspace, user, path=tab)
+
+    approvals = _item(nav, "approvals")
+    assert approvals.url == tab
+    assert approvals.active and nav.active_key == "approvals"
+    assert next(item for item in nav.phone if item.key == "approvals") == approvals
+
+
+@pytest.mark.django_db
+def test_the_gear_is_hidden_when_no_settings_tab_lets_the_person_in(workspace, user):
+    from apps.studio import views_settings
+
+    nobody = tuple(
+        views_settings.Tab(tab.key, tab.label, lambda request: False, tab.build, tab.template)
+        for tab in views_settings.TABS
+    )
+    with mock.patch.object(views_settings, "TABS", nobody):
+        nav = _as("owner", workspace, user)
+
+    assert nav.settings is None
+    assert nav.active_key is None or nav.active_key != "settings"
+
+
+@pytest.mark.django_db
+def test_without_a_membership_only_the_places_with_no_permission_to_check_are_shown(workspace, user, analytics_on):
+    """The middleware always sets one with a workspace; if it ever did not, nothing that needs a
+    permission is shown (the palette's rule)."""
+    request = _request(_url("calendar:calendar", workspace), workspace, user)
+    request.workspace_membership = None
+
+    nav = _nav(request)
+
+    assert "inbox" not in _keys(nav) and "analytics" not in _keys(nav)
+    assert nav.settings is None
 
 
 # --- counts: the ones the sidebar context already has -------------------------------

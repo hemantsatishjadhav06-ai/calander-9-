@@ -916,7 +916,8 @@
             {% spaceless %}
             {% if nav.phone %}
             <nav data-testid="phone-bar" data-phone-bar aria-label="Sections" class="lg:hidden fixed inset-x-0 bottom-0 z-20 translucent-bar border-t border-ink-200 pb-[env(safe-area-inset-bottom)]">
-                <ul class="grid grid-cols-5">
+                {# One column per entry: five for the team, fewer for someone a place would refuse (build_nav leaves it out). #}
+                <ul class="grid {% if nav.phone|length == 3 %}grid-cols-3{% elif nav.phone|length == 4 %}grid-cols-4{% else %}grid-cols-5{% endif %}">
                     {% for item in nav.phone %}
                     <li>
                         {% if item.url %}
