@@ -997,7 +997,7 @@ span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--te
   .ui-btn-ghost:hover { background: color-mix(in srgb, var(--ink-950) 5%, transparent); color: var(--ink-900); }
   .ui-btn-ghost:active { background: color-mix(in srgb, var(--ink-950) 10%, transparent); }
   .ui-btn-ghost:disabled, .ui-btn-ghost[aria-disabled="true"] { color: var(--ink-500); background: transparent; }
-  .ui-btn-danger { background: var(--danger-500); color: var(--on-fill); box-shadow: var(--shadow-button); }   /* confirm in a modal only (8.46:1) */
+  .ui-btn-danger { background: var(--danger-500); color: var(--on-fill); box-shadow: var(--shadow-button); }   /* the confirm of a destructive act only: inline (components/inline_confirm.html), or a modal on a screen not yet rebuilt (8.46:1) */
   .ui-btn-danger:hover { background: var(--danger-600); }
   .ui-btn-danger-ghost { background: transparent; color: var(--danger-500); }                      /* Delete / Discard in rows and menus */
   .ui-btn-danger-ghost:hover { background: var(--danger-50); }
@@ -1007,6 +1007,15 @@ span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--te
   @media (max-width: 1023px) {
     .ui-btn, .ui-btn-sm, .ui-btn-lg { min-height: 44px; }
     .ui-btn-icon { width: 44px; height: 44px; }
+  }
+
+  /* The screen's one primary, floating (components/primary_action.html, spec D5): with ui-btn
+     ui-btn-primary. Below 1024px a 56px pill with its icon and words; the component's utilities fix it
+     16px from the right above the phone bar. From 1024px it is lg:static in the page header and looks
+     like any primary button. The toasts rise above it and it hides under a selection bar (below). */
+  @media (max-width: 1023px) {
+    .ui-fab { height: 56px; padding: 0 24px 0 20px; gap: 8px; border-radius: 9999px; font-size: 1rem; line-height: 1.5rem; box-shadow: var(--shadow-lg); }
+    .ui-fab svg { width: 20px; height: 20px; }
   }
 
   /* Standalone link (card header "All threads"); inline links use .link-inline */
@@ -1139,6 +1148,14 @@ span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--te
   .ui-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px 16px; }
   a.ui-row:hover, .ui-row.is-clickable:hover { background: var(--ink-25); }
   .ui-row[aria-selected="true"] { background: var(--brand-50); }
+  /* The status border (spec D6): a list row carries data-tone from the one status mapping
+     ({{ post.status|status_tone }}, {{ brief.status|brief_tone }}) and draws a 2px left border in the
+     tone's 500 step, the pill's icon colour. An extra cue for scanning; the row keeps its pill. */
+  [data-tone="neutral"] { border-left: 2px solid var(--ink-500); }
+  [data-tone="info"] { border-left: 2px solid var(--info-500); }
+  [data-tone="success"] { border-left: 2px solid var(--success-500); }
+  [data-tone="warning"] { border-left: 2px solid var(--warning-500); }
+  [data-tone="danger"] { border-left: 2px solid var(--danger-500); }
   .ui-thumb { width: 44px; height: 55px; flex: none; border-radius: 7px; object-fit: cover; background: var(--ink-50); box-shadow: var(--shadow-creative); }
 
   /* Tables */
@@ -1189,7 +1206,8 @@ span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--te
   .ui-toast-action { font-weight: 600; color: var(--brand-300); }
   .ui-toast-action:hover { text-decoration: underline; }
 
-  /* Empty state: one line icon, a title, one sentence, at most one action */
+  /* Empty state: one line icon, a title, one sentence, at most one action (components/empty_state.html:
+     the icon, one sentence and one tinted or secondary button) */
   .ui-empty { padding: 32px 24px; text-align: center; }
   .ui-empty > svg { width: 32px; height: 32px; margin: 0 auto; color: var(--ink-400); }
   .ui-empty-title { margin-top: 12px; font-size: 0.9375rem; line-height: 1.375rem; font-weight: 600; color: var(--ink-900); }
@@ -1203,6 +1221,23 @@ span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--te
   .ui-spinner { width: 14px; height: 14px; border-radius: 9999px; border: 2px solid var(--ink-200); border-top-color: var(--info-500); animation: ui-spin 1s linear infinite; }
   @keyframes ui-spin { to { transform: rotate(360deg); } }
 }
+
+/* ── The floating primary and what it shares the bottom of a phone with (spec D5) ──
+   A page that shows components/primary_action.html sets has-fab on body. Below 1024px the button's
+   top is 8rem above the screen's bottom edge (its bottom 4.5rem up, clear of the phone bar, and 56px
+   tall), so the toasts rise 16px above it, to 9rem, as has-selection lifts them over the selection
+   bars; the page's room at the end and its scrollers' padding grow so its last line and a focused
+   control clear it (WCAG 2.4.11). It hides while a selection bar shows (visibility, so the header
+   keeps its height from 1024px). Unlayered on purpose: the toast host's rules are an unlayered <style>
+   (approvals/partials/_toasts.html) and the error toast's bottom (base.html, named by its test id) and
+   the room's height are utilities, which a layered rule would lose to. */
+@media (max-width: 1023px) {
+  body.has-fab #bb-toast-host { bottom: calc(9rem + env(safe-area-inset-bottom)); }
+  body.has-fab [data-testid="error-toast"] { bottom: calc(9rem + env(safe-area-inset-bottom)); }
+  body.has-fab [data-phone-bar-room] { height: 8.5rem; }
+  body.has-fab [data-phone-bar-scroll] { scroll-padding-bottom: calc(8.5rem + env(safe-area-inset-bottom)); }
+}
+body.has-selection .ui-fab, body.has-approval-selection .ui-fab { visibility: hidden; }
 
 
 /* ── Live-team parts (things utilities cannot express) ── */

@@ -1,0 +1,33 @@
+{% comment %}
+An inline confirm (spec D8; DESIGN_SYSTEM.md 10.9): a destructive or paid act confirms where it is,
+never in a modal, an hx-confirm or the browser's confirm(). The act's button opens a group under it,
+named by the words of what it removes or starts, with Cancel and the confirm, which repeats the act.
+Opening moves focus to Cancel, so the words are read first; Cancel and Escape close it and put focus
+back on the act (Escape stops there, so an enclosing dialog stays open).
+Context:
+  confirm_id    a unique id: the group's, and "<confirm_id>-words" for its words.
+  label         the act's words on its button ("Delete").
+  words         one sentence: what it removes or starts ("Delete the routine Morning post? It stops
+                running."). It names the group.
+  confirm_label the confirm's words (default: label); they repeat the act ("Delete routine").
+  tone          "paid" for an act that starts the team's work (secondary, then a tinted confirm);
+                anything else is destructive (danger ghost, then the danger confirm).
+  action        a URL: the confirm submits a POST form there; or
+  hx_post       a URL the confirm posts to with htmx, with hx_target and hx_swap.
+  testid        "<testid>" on the act, "-region", "-cancel" and "-confirm" on the rest.
+{% endcomment %}<div x-data="{ open: false, busy: false }" @keydown.escape="if (open) { $event.stopPropagation(); open = false; $nextTick(() => $refs.act.focus()) }">
+    <button type="button" x-ref="act" @click="open = !open; if (open) $nextTick(() => $refs.cancel.focus())"
+            aria-expanded="false" :aria-expanded="open.toString()" aria-controls="{{ confirm_id }}"{% if testid %} data-testid="{{ testid }}"{% endif %}
+            class="ui-btn {% if tone == 'paid' %}ui-btn-secondary{% else %}ui-btn-danger-ghost{% endif %}">{{ label }}</button>
+    <div id="{{ confirm_id }}" role="group" aria-labelledby="{{ confirm_id }}-words" x-show="open" x-cloak{% if testid %} data-testid="{{ testid }}-region"{% endif %}
+         class="mt-2 rounded-xl bg-ink-50 p-4 ring-1 ring-inset ring-ink-200">
+        <p id="{{ confirm_id }}-words" class="text-sm text-ink-900">{{ words }}</p>
+        <div class="mt-4 flex flex-wrap items-center justify-end gap-2">
+            <button type="button" x-ref="cancel" @click="open = false; $nextTick(() => $refs.act.focus())"{% if testid %} data-testid="{{ testid }}-cancel"{% endif %} class="ui-btn ui-btn-ghost">Cancel</button>
+            {% if action %}<form method="post" action="{{ action }}" x-on:submit="busy = true">{% csrf_token %}<button type="submit" x-bind:disabled="busy" x-bind:aria-busy="busy.toString()"{% if testid %} data-testid="{{ testid }}-confirm"{% endif %}
+                    class="ui-btn {% if tone == 'paid' %}ui-btn-tinted{% else %}ui-btn-danger{% endif %}">{{ confirm_label|default:label }}</button></form>
+            {% else %}<button type="button" hx-post="{{ hx_post }}"{% if hx_target %} hx-target="{{ hx_target }}"{% endif %}{% if hx_swap %} hx-swap="{{ hx_swap }}"{% endif %} hx-disabled-elt="this"{% if testid %} data-testid="{{ testid }}-confirm"{% endif %}
+                    class="ui-btn {% if tone == 'paid' %}ui-btn-tinted{% else %}ui-btn-danger{% endif %}">{{ confirm_label|default:label }}</button>{% endif %}
+        </div>
+    </div>
+</div>
