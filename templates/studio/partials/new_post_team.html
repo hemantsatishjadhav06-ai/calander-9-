@@ -3,9 +3,10 @@ The sheet's Ask the team panel (components/new_post_sheet.html): BriefForm, post
 The idea becomes its own thread with your manager; nothing is made until the person goes ahead.
 
 The form posts through HTMX (hx-swap none): studio:create answers 204 with HX-Redirect to the idea's
-thread, or 400 with the refusal's words alone, which base.html's htmx:responseError handler writes into
-new-post-team-error (data-inline-error). No data-no-error-toast here: that handler returns on it before
-it reads data-inline-error, and data-inline-error already keeps the toast away while its target exists.
+thread, or 400 (429 past the rate limit) with the refusal's words alone, which base.html's
+htmx:responseError handler writes into new-post-team-error (data-inline-error). No data-no-error-toast
+here: that handler returns on it before it reads data-inline-error, and data-inline-error already keeps
+the toast away while its target exists.
 Without JavaScript the form still posts (method and action) and the page answers as it always has.
 
 The body (order-1) and the decision bar (order-3, sticky at the dialog's bottom, the sheet's one primary

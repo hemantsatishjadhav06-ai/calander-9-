@@ -21,6 +21,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
+from django_ratelimit.exceptions import Ratelimited
 
 from apps.members.decorators import require_permission
 
@@ -257,16 +258,19 @@ _NOT_CONNECTED = "Your team isn't connected yet. Ask the workspace owner to fini
 _ALLOWANCE_USED = "This month's allowance for the team is used up. An owner can raise it in Settings → Autopilot."
 #: What the sheet says once a job has started for the idea (only then: see ``create``).
 _WITH_YOUR_MANAGER = "Your idea is with your manager. What we're making appears here in a moment."
+#: The sheet's answer past ``create``'s rate limit (429). No numbers: the rate is not the person's concern.
+_TOO_MANY_SENDS = "You've sent a lot in the last minute. Try again in a moment."
 
 
-def _sheet_refusal(errors) -> HttpResponse:
-    """A refusal for the New post sheet: 400 with the words alone, which the sheet's error line shows.
+def _sheet_refusal(errors, *, status: int = 400) -> HttpResponse:
+    """A refusal for the New post sheet: 400 (429 past the rate limit) with the words alone.
 
-    ``base.html``'s ``htmx:responseError`` handler writes the response's text into the element the
-    form names with ``data-inline-error``; rendered without a request, so no context processor runs.
+    ``base.html``'s ``htmx:responseError`` handler (htmx reports every 4xx and 5xx there) writes the
+    response's text into the element the form names with ``data-inline-error``, the sheet's error
+    line; rendered without a request, so no context processor runs.
     """
     body = render_to_string("studio/partials/new_post_team_error.html", {"errors": errors})
-    return HttpResponse(body, status=400)
+    return HttpResponse(body, status=status)
 
 
 def _with_channels(form, channels):
@@ -291,7 +295,9 @@ def _form_errors(form) -> list[str]:
 
 @login_required
 @require_permission("create_posts")
-@ratelimit(key="user", rate="10/m", method="POST", block=True)
+# block=False: ``create`` answers the limit itself, first of all (see its docstring). The rate, the key
+# and the group (named after this function) are what they were with block=True.
+@ratelimit(key="user", rate="10/m", method="POST", block=False)
 @require_POST
 def create(request, workspace_id):
     """An idea from the form becomes its own conversation with your manager, in the person's own words.
@@ -305,11 +311,19 @@ def create(request, workspace_id):
     idea's thread once the idea is saved, and 400 with the refusal's words alone
     otherwise; the guards and their order are the same for both. Without HTMX the
     answers are the page's: a message and a redirect, or a 400 re-render.
+
+    The rate limit comes before everything else. Past it the sheet gets 429 with
+    one sentence for its error line, and the page gets what the decorator's
+    ``block=True`` gave it: ``Ratelimited``, which Django answers with the 403 page.
     """
     import uuid
 
     from . import chat, customer_workflow
 
+    if getattr(request, "limited", False):
+        if request.htmx:
+            return _sheet_refusal([_TOO_MANY_SENDS], status=429)
+        raise Ratelimited
     workspace = _workspace(request, workspace_id)
     sheet = bool(request.htmx)
     form = BriefForm(request.POST, workspace=workspace)

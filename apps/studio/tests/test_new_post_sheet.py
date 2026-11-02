@@ -5,6 +5,8 @@ the idea is saved, whether or not a job started; every refusal answers 400 with 
 which the sheet's error line shows (``base.html``'s ``data-inline-error`` writes the response's text).
 Without HTMX the view behaves as it always has: ``test_agency_pages.py`` and
 ``test_conversation_manager.py`` pin that path, and the tests here only add the parity checks.
+Past the rate limit the sheet gets 429 with a sentence of its own (T16b; screen 1's open decision 8),
+and the page keeps the decorator's own refusal, the 403 page.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from apps.studio.models import AgencyJob, AgencySettings, Conversation, Message,
 NOT_CONNECTED = "Your team isn't connected yet. Ask the workspace owner to finish Set up."
 ALLOWANCE_USED = "This month's allowance for the team is used up. An owner can raise it in Settings → Autopilot."
 WITH_YOUR_MANAGER = "Your idea is with your manager. What we're making appears here in a moment."
+TOO_MANY_SENDS = "You've sent a lot in the last minute. Try again in a moment."
 IDEA = "Tell buyers about the new covered parking"
 #: A money amount in any form the copy could show one.
 AMOUNT = re.compile(r"[$€£]\s?\d|\d+(?:[.,]\d+)?\s?(?:USD|EUR|GBP|dollars?)\b", re.IGNORECASE)
@@ -366,7 +369,8 @@ def test_over_budget_stops_before_the_idea_is_saved(client, world, queued, monke
     assert calls == ["can_spend"]
 
 
-def test_the_rate_limit_comes_before_every_other_check(client, world, queued, monkeypatch, settings):
+@pytest.mark.parametrize(("htmx", "status"), [(False, 403), (True, 429)], ids=["page", "htmx"])
+def test_the_rate_limit_comes_before_every_other_check(client, world, queued, monkeypatch, settings, htmx, status):
     settings.RATELIMIT_ENABLE = True
     cache.clear()
     calls: list[str] = []
@@ -376,8 +380,72 @@ def test_the_rate_limit_comes_before_every_other_check(client, world, queued, mo
         assert _post(client, world).status_code == 400
     calls.clear()
 
-    response = _post(client, world)
+    response = _post(client, world, htmx=htmx)
 
-    assert response.status_code == 403
+    assert response.status_code == status
     assert calls == []
     assert_nothing_made()
+
+
+# ---------------------------------------------------------------------------
+# Past the rate limit: the sheet says so; the page answers as it always has
+# ---------------------------------------------------------------------------
+
+
+def _use_up_the_minute(client, world):
+    """Ten refused Sends (an empty idea): each counts toward the limit and none makes anything."""
+    for _ in range(10):
+        assert _post(client, world, {"idea": "", "accounts": [world.linkedin.pk]}).status_code == 400
+    assert_nothing_made()
+
+
+def test_past_the_rate_limit_the_sheet_answers_429_with_one_plain_sentence(client, world, fake_team, queued, settings):
+    settings.RATELIMIT_ENABLE = True
+    cache.clear()
+    client.force_login(world.editor)
+    _use_up_the_minute(client, world)
+
+    response = _post(client, world)  # a Send that would otherwise start the team's work
+
+    assert response.status_code == 429
+    assert "HX-Redirect" not in response
+    assert "<" not in response.content.decode()  # the sentence alone, which the sheet's error line shows
+    assert _sheet_text(response) == TOO_MANY_SENDS
+    assert not re.search(r"\d", _sheet_text(response))  # no numbers: no rate, no count, no wait
+    assert_plain_words(response.content.decode())
+    assert_nothing_made()
+    assert not queued
+    assert list(get_messages(response.wsgi_request)) == []  # the sheet shows it; no toast on the next page
+
+
+def test_past_the_rate_limit_the_page_still_answers_the_403_page(client, world, fake_team, queued, settings):
+    """Without HTMX nothing changes: the decorator's refusal, rendered by the 403 page, as before T16b."""
+    settings.RATELIMIT_ENABLE = True
+    cache.clear()
+    client.force_login(world.editor)
+    _use_up_the_minute(client, world)
+
+    response = _post(client, world, htmx=False)
+
+    assert response.status_code == 403
+    assert "403.html" in [template.name for template in response.templates]
+    page = html.unescape(response.content.decode())
+    assert "You don\u2019t have permission to view this page." in page
+    assert TOO_MANY_SENDS not in page
+    assert_nothing_made()
+    assert not queued
+
+
+def test_the_rate_and_its_key_are_unchanged(client, world, fake_team, queued, settings):
+    """Ten Sends a minute for each person: the eleventh is refused, and another person may still send."""
+    settings.RATELIMIT_ENABLE = True
+    cache.clear()
+    client.force_login(world.editor)
+    _use_up_the_minute(client, world)
+    assert _post(client, world).status_code == 429
+
+    client.force_login(world.owner)
+    response = _post(client, world)
+
+    assert response.status_code == 204
+    assert Conversation.objects.count() == 1

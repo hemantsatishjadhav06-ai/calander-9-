@@ -113,9 +113,10 @@ Top to bottom, with what each part is for:
    body is scrolled. No toast appears, nothing is made, the text stays, and Send works again. The
    sentences: "This month's allowance for the team is used up. An owner can raise it in Settings →
    Autopilot."; "Your team isn't connected yet. Ask the workspace owner to finish Set up."; the
-   form's own words for an invalid field ("Choose at least one connected account."). At the daily
-   reply cap there is no refusal: the idea is saved and the person lands on its thread with
-   `started.note`. Nothing says "is with your manager" then.
+   form's own words for an invalid field ("Choose at least one connected account."); and, past the
+   rate limit, 429 with "You've sent a lot in the last minute. Try again in a moment." (open
+   decision 8, settled). At the daily reply cap there is no refusal: the idea is saved and the
+   person lands on its thread with `started.note`. Nothing says "is with your manager" then.
 9. **Focus and keys.** Opening the sheet closes the phone drawer first, then puts focus in the first
    field of the mode: Your idea, *Open the editor*, or the idea's title. Tab stays inside the sheet
    (`x-trap.noscroll`). Escape or close returns focus to whatever opened the sheet (the button, or
@@ -206,12 +207,19 @@ confirm modals explicitly.
    (with *Send*) can sit under the keyboard while the person types; they close the keyboard, then
    tap *Send*, as in most iOS sheets. `92dvh` would follow the visible area (iOS Safari 16+ supports
    it). The spec pins `vh`, so this is the owner's call; WebKit in CI (T21) shows it.
-8. **A rate-limited Send.** `studio:create` carries `@ratelimit(..., block=True)` with no
-   `RATELIMIT_VIEW`, so the eleventh Send in a minute raises `Ratelimited`, answers the 403 page, and
-   the sheet's inline error would print that page's text ("403 … You don't have permission to view
-   this page …"). T15 (`64270d6`) kept the decorator as it was. For T16 or a follow-up: answer the
-   sheet with a sentence of its own (for example "Too many sends in a minute. Try again shortly."),
-   without changing the limit.
+8. **A rate-limited Send.** Settled in T16b. `studio:create` carried `@ratelimit(..., block=True)`
+   with no `RATELIMIT_VIEW`, so the eleventh Send in a minute raised `Ratelimited`, answered the 403
+   page, and the sheet's inline error would have printed that page's text ("403 … You don't have
+   permission to view this page …"). The decorator now has `block=False` with the same rate
+   (10/m), key (`user`), method and group (named after `create`, which it still wraps), and `create`
+   reads `request.limited` before anything else: from the sheet (`request.htmx`) it answers 429 with
+   one sentence, "You've sent a lot in the last minute. Try again in a moment." (no numbers), through
+   the same fragment as the 400 refusals, and nothing is made; without HTMX it raises `Ratelimited`
+   as the decorator did, so the page still gets the 403 page. `base.html`'s `htmx:responseError`
+   handler needed no change: htmx 2 reports every 4xx and 5xx there (`responseHandling`'s
+   `[45]..`), and the handler writes any status's text into `data-inline-error`. Pinned in
+   `apps/studio/tests/test_new_post_sheet.py` (the 429 sentence and nothing made; the page's 403;
+   the rate and key; the limit before every other check, with and without HTMX).
 9. **Two ways to ask the team on Home.** Home keeps its thread composer (goldens 02 and 03), and the
    sheet's Ask the team starts a separate thread for the idea. Screen 2 decides how Home words its
    thread so that the two do not read as the same act.
