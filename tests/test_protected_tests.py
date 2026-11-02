@@ -14,7 +14,8 @@ tests, the gate and publisher tests) are hashed whole.
 A protected test can also be turned off without one character of its own source changing: a module
 ``pytestmark`` or ``pytest_plugins``, a module fixture that overrides one it requests, a mark or an
 autouse fixture on its class, a later rebinding, ``del`` or ``setattr`` of its name, a ``conftest.py``
-that ignores, deselects or marks it at collection. Two more checks close those. The context hashes
+or an ``addopts`` that ignores, deselects, removes or marks it, or one parametrized case of it, at
+collection. Two more checks close those. The context hashes
 (``tests/fixtures/protected_context.json``, also written from ``045978b``) cover, for each per-test
 node, the module's statements that touch ``pytestmark`` or ``pytest_plugins`` or name the node or a
 class around it, its fixtures and xunit setup, and, for a node in a class, the class's header and every
@@ -23,13 +24,19 @@ statement of its body that is not a test (in a file pytest does not collect, suc
 collection of the protected files once, as the full suite would (``pyproject.toml``, every
 ``conftest.py``), and fails when a protected test is not collected, is marked skip, skipif or xfail,
 would run anything but the def its hash covers, or uses a fixture of its own module or class that the
-context does not hash (under an alias of ``pytest.fixture``, or imported).
+context does not hash (under an alias of ``pytest.fixture``, or imported). One parametrized case counts
+as much as a whole test: a deselected protected item (``-k``, ``--deselect``, a hook that reports it
+through ``pytest_deselected``) fails by its own node id, and every node id collected from the protected
+tests on ``045978b`` (``tests/fixtures/protected_collected.json``, written once from a clean checkout of
+it) must still be collected, so a case a hook removes without reporting it, renames or drops fails; ids
+added beside them pass.
 
 Outside the guard: a skip at run time from code outside the protected files, such as a
 ``conftest.py`` hook (``pytest_runtest_setup``) or fixture, or the code of a plugin or helper module a
-protected file loads (the line that loads it is context); and a protected name built at run time from
-parts (``globals()["test_" + rest]``). Collection does not see a run-time skip; the full run reports
-it as skipped.
+protected file loads (the line that loads it is context); a protected name built at run time from
+parts (``globals()["test_" + rest]``); and the value a parametrized case takes from code outside its
+file (its id is pinned, the value behind it is not). Collection does not see a run-time skip; the full
+run reports it as skipped.
 """
 
 import hashlib
@@ -45,6 +52,7 @@ from tools import protected_tests
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = ROOT / "tests" / "fixtures" / "protected_tests.json"
 CONTEXT = ROOT / "tests" / "fixtures" / "protected_context.json"
+COLLECTED = ROOT / "tests" / "fixtures" / "protected_collected.json"
 
 GOLDEN = "tests/e2e/golden/"
 SETUP = "apps/studio/tests/test_setup.py"
@@ -170,9 +178,25 @@ def test_no_protected_tests_context_changed_since_045978b():
     )
 
 
+def test_the_collected_ids_were_pinned_from_045978b_for_every_protected_python_test():
+    fixture = json.loads(COLLECTED.read_text(encoding="utf-8"))
+    assert fixture["ref"] == json.loads(FIXTURE.read_text(encoding="utf-8"))["ref"]
+    pinned = fixture["nodes"]
+    assert len(pinned) == len(set(pinned))
+    python = [node for node in protected_tests.load(FIXTURE) if protected_tests.is_test_file(node.split("::")[0])]
+    whole = {node for node in python if "::" not in node}
+    per_test = {node for node in python if "::" in node}
+    stray = [node for node in pinned if node.split("::")[0] not in whole and node.split("[")[0] not in per_test]
+    assert stray == [], "every pinned id is an item of a protected Python test, not a neighbour"
+    assert whole <= {node.split("::")[0] for node in pinned}, "every whole-file entry's items are pinned"
+    assert per_test <= {node.split("[")[0] for node in pinned}, "every per-test node is pinned"
+
+
 def test_every_protected_test_is_collected_unmarked_and_runs_its_own_def():
     began = time.monotonic()
-    problems = protected_tests.collection_problems(protected_tests.load(FIXTURE), ROOT)
+    problems = protected_tests.collection_problems(
+        protected_tests.load(FIXTURE), ROOT, pinned=protected_tests.load_collected(COLLECTED)
+    )
     assert not problems, "Protected invariant tests would not run as written (spec D11):\n" + "\n".join(problems)
     assert time.monotonic() - began < 60
 
@@ -330,11 +354,16 @@ def _baseline(root):
     return hashes, context
 
 
-def _caught(root, baseline):
-    """(context hashes that changed, collection problems), once the own-source hashes say nothing."""
+def _caught(root, baseline, pinned=None):
+    """(context hashes that changed, collection problems), once the own-source hashes say nothing.
+
+    *pinned*: the node ids that must still be collected (default: the real fixture's, none of which is
+    in a scratch suite).
+    """
     hashes, context = baseline
     assert protected_tests.changed(hashes, root) == [], "the case must leave every own-source hash alone"
-    return protected_tests.changed(context, root, context=True), protected_tests.collection_problems(list(hashes), root)
+    problems = protected_tests.collection_problems(list(hashes), root, pinned=pinned)
+    return protected_tests.changed(context, root, context=True), problems
 
 
 def test_an_untouched_suite_and_edits_beside_the_protected_tests_pass(tmp_path):
@@ -580,6 +609,77 @@ def test_a_whole_file_test_marked_usefixtures_must_be_collected(tmp_path):
     _suite(root, files={WHOLE_FILE: whole, "elsewhere/conftest.py": DESELECT_PLAIN})
     _context, problems = _caught(root, baseline)
     assert problems == [f"{WHOLE_FILE}::test_plain: not collected (deselected)"]
+
+
+# ─────────────────── One case of a parametrized protected test ───────────────────
+#
+# One surviving case satisfies the check that every test a whole-file entry defines was collected. So a
+# deselected protected item is a problem by its own node id, and every node id the protected tests had
+# when the baseline was pinned (for the real tree, 045978b's: tests/fixtures/protected_collected.json)
+# must still be collected: a case removed by a hook that never reports it, or renamed, fails; a case
+# added passes the collection (in a whole-file entry, the file's hash catches the edit).
+
+PARAMETRIZED = (
+    "import pytest\n"
+    + WHOLE
+    + '\n\n@pytest.mark.parametrize("case", ["kept", "gone"])\ndef test_cases(case):\n    assert case\n'
+)
+CASES = (f"{WHOLE_FILE}::test_cases[kept]", f"{WHOLE_FILE}::test_cases[gone]")
+
+DESELECT_CASE = """def pytest_collection_modifyitems(config, items):
+    dropped = [item for item in items if item.name == "test_cases[gone]"]
+    config.hook.pytest_deselected(items=dropped)
+    items[:] = [item for item in items if item not in dropped]
+"""
+
+REMOVE_CASE = """def pytest_collection_modifyitems(items):
+    items[:] = [item for item in items if item.name != "test_cases[gone]"]
+"""
+
+RENAME_CASES = """def pytest_make_parametrize_id(config, val, argname):
+    return f"{val}-renamed" if argname == "case" else None
+"""
+
+
+def _pinned(root):
+    """The node ids the scratch suite's protected tests have now, as ``--collected`` pins them."""
+    pinned, problems = protected_tests.collected_ids([PROTECTED, METHOD, WHOLE_FILE], root)
+    assert problems == [] and set(CASES) <= set(pinned), (pinned, problems)
+    return pinned
+
+
+@pytest.mark.parametrize(
+    "files, expected",
+    [
+        ({"elsewhere/conftest.py": DESELECT_CASE}, [f"{CASES[1]}: not collected (deselected)"]),
+        ({"elsewhere/conftest.py": REMOVE_CASE}, [f"{CASES[1]}: not collected"]),
+        ({"pytest.ini": INI + 'addopts = -k "not gone"\n'}, [f"{CASES[1]}: not collected (deselected)"]),
+        ({"conftest.py": RENAME_CASES}, [f"{case}: not collected" for case in CASES]),
+    ],
+    ids=["deselected-through-the-hook", "removed-without-the-hook", "k-in-addopts", "renamed"],
+)
+def test_one_case_of_a_parametrized_protected_test_must_still_be_collected(tmp_path, files, expected):
+    root = _suite(tmp_path, files={WHOLE_FILE: PARAMETRIZED})
+    pinned = _pinned(root)
+    baseline = _baseline(root)
+    _suite(root, files={WHOLE_FILE: PARAMETRIZED, **files})
+    _context, problems = _caught(root, baseline, pinned)
+    assert problems == expected
+
+
+def test_a_deselected_case_is_caught_without_a_pinned_baseline(tmp_path):
+    root = _suite(tmp_path, files={WHOLE_FILE: PARAMETRIZED})
+    baseline = _baseline(root)
+    _suite(root, files={WHOLE_FILE: PARAMETRIZED, "elsewhere/conftest.py": DESELECT_CASE})
+    _context, problems = _caught(root, baseline, pinned=[])
+    assert problems == [f"{CASES[1]}: not collected (deselected)"]
+
+
+def test_a_case_added_to_a_parametrized_protected_test_passes_the_collection(tmp_path):
+    root = _suite(tmp_path, files={WHOLE_FILE: PARAMETRIZED})
+    pinned = _pinned(root)
+    _suite(root, files={WHOLE_FILE: PARAMETRIZED.replace('["kept", "gone"]', '["kept", "gone", "added"]')})
+    assert protected_tests.collection_problems([PROTECTED, METHOD, WHOLE_FILE], root, pinned=pinned) == []
 
 
 # ─────────────────── A protected method in a file pytest does not collect ───────────────────

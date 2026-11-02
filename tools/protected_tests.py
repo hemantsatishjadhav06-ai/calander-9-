@@ -36,19 +36,24 @@ Three checks, each from the working tree (no git history, so they run in CI's sh
    ``collect_ignore``, ``--ignore`` and deselection applies as in the full run. It reports a per-test
    node not collected exactly once; a test function defined in a whole-file entry (module ``test_*``
    functions, ``test_*`` methods of ``Test*`` classes, ``test*`` methods of ``TestCase`` classes) that
-   is not collected; a protected item marked skip, skipif or xfail (or unittest's skip or
-   expectedFailure); a protected item whose collected function is not the def the hash covers (a
-   later rebinding, a lambda, a wrapper written in the repository; a ``__code__`` swapped in place keeps
-   the name and line it compares, and the context's module part holds the statement that swaps it);
-   and a per-test node that uses a fixture its own module or class registers whose function the
-   context does not hash (one under an alias of ``pytest.fixture``, one imported from another file, an
-   xunit hook bound by assignment).
+   is not collected; a protected item deselected, one parametrized case among others included (``-k``,
+   ``--deselect``, a hook that reports it through ``pytest_deselected``); a node id pinned in
+   ``tests/fixtures/protected_collected.json`` that is not collected now (every item collected from the
+   protected tests on ``045978b``, written once from a clean checkout of it with ``--collected``: a case
+   a hook removes without reporting it, renames or drops fails, while ids added beside them pass); a
+   protected item marked skip, skipif or xfail (or unittest's skip or expectedFailure); a protected item
+   whose collected function is not the def the hash covers (a later rebinding, a lambda, a wrapper
+   written in the repository; a ``__code__`` swapped in place keeps the name and line it compares, and
+   the context's module part holds the statement that swaps it); and a per-test node that uses a
+   fixture its own module or class registers whose function the context does not hash (one under an
+   alias of ``pytest.fixture``, one imported from another file, an xunit hook bound by assignment).
 
 Outside the guard: code outside the protected files, and names built at run time. A ``conftest.py``
 that skips at run time (a ``pytest_runtest_setup`` hook, an autouse fixture, a fixture the test
 requests), the code of a plugin or helper module a protected file loads (the ``pytest_plugins`` line or
 import that loads it is hashed, its own code is not), another module that reaches into a protected one,
-and a statement that builds a protected name from parts (``globals()["test_" + rest]``) are not hashed;
+a statement that builds a protected name from parts (``globals()["test_" + rest]``), and the value a
+parametrized case takes from code outside its file (its id is pinned, the value is not) are not hashed;
 the collection check sees only what collection decides.
 
 Usage::
@@ -59,6 +64,9 @@ Usage::
     python tools/protected_tests.py --json NODE ...  # only these nodes, as the fixture's "nodes" map
     python tools/protected_tests.py --context ...    # the same, for each per-test node's context
     python tools/protected_tests.py --collect        # exit 1 and print every collection problem
+    python tools/protected_tests.py --collected --root CHECKOUT --ref 045978b
+                                                     # the ids protected_collected.json pins, from a
+                                                     # clean checkout of that commit
 """
 
 from __future__ import annotations
@@ -79,6 +87,17 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = ROOT / "tests" / "fixtures" / "protected_tests.json"
 CONTEXT = ROOT / "tests" / "fixtures" / "protected_context.json"
+COLLECTED = ROOT / "tests" / "fixtures" / "protected_collected.json"
+COLLECTED_ABOUT = (
+    "Spec D11 (docs/specs/03-rebuild-screens.md): every node id pytest collected from the protected Python "
+    "tests of protected_tests.json on the ref below (each item of a whole-file entry and each case of a "
+    "per-test node, not their unprotected neighbours), in collection order, with the suite's settings, "
+    "through tools/protected_collect.py; none was deselected or marked skip, skipif or xfail. Written once "
+    "from a clean checkout of the ref with tools/protected_tests.py --collected --root <checkout> --ref <ref>; "
+    "never regenerated in Phase 3. tests/test_protected_tests.py requires every id to be collected from the "
+    "working tree, so a parametrized case removed (by a hook that reports it as deselected or not, or by -k), "
+    "renamed or dropped fails; an id added beside them is allowed."
+)
 
 #: pyproject.toml's ``python_files``, ``python_classes`` and ``python_functions`` (a test keeps them equal).
 TEST_FILES = ("tests.py", "test_*.py")
@@ -331,23 +350,73 @@ def collected(files: list[str], root: Path = ROOT) -> tuple[dict[str, Any] | Non
         return json.loads(out.read_text(encoding="utf-8")), output
 
 
-def collection_problems(
-    nodes: Iterable[str], root: Path = ROOT, allowed: Mapping[str, frozenset[str]] = ALLOWED_OFF_MARKS
-) -> list[str]:
-    """Every way the protected Python tests in *nodes* would not run as written (see the module doc)."""
+def _python_targets(nodes: Iterable[str]) -> list[tuple[str, str, list[str]]]:
+    """``(node, path, names)`` for each node in *nodes* that lives in a file pytest collects."""
     targets = [(node, *_split(node)) for node in nodes]
-    targets = [(node, path, names) for node, path, names in targets if is_test_file(path)]
+    return [(node, path, names) for node, path, names in targets if is_test_file(path)]
+
+
+def _protects(path: str, nodeid: str, whole: set[str], per_test: set[str]) -> bool:
+    """Whether the item *nodeid* (in *path*) belongs to a protected node: its file is protected whole,
+    or its id without the parameters (``path::name[case]`` → ``path::name``) is a per-test node."""
+    return path in whole or nodeid.split("[", 1)[0] in per_test
+
+
+def collection_problems(
+    nodes: Iterable[str],
+    root: Path = ROOT,
+    allowed: Mapping[str, frozenset[str]] = ALLOWED_OFF_MARKS,
+    pinned: Iterable[str] | None = None,
+) -> list[str]:
+    """Every way the protected Python tests in *nodes* would not run as written (see the module doc).
+
+    *pinned*: the node ids that must still be collected (default: ``protected_collected.json``'s); only
+    those that belong to a protected node among *nodes* count.
+    """
+    targets = _python_targets(nodes)
     files = sorted({path for _, path, _ in targets})
     if not files:
         return []
     result, output = collected(files, root)
     if result is None:
         return [output]
+    return _problems(result, targets, root, allowed, load_collected() if pinned is None else pinned)
+
+
+def collected_ids(nodes: Iterable[str], root: Path = ROOT) -> tuple[list[str], list[str]]:
+    """The node ids collected from the protected Python tests in *nodes*, in collection order, and the
+    problems the same collection shows (pinning nothing): how ``protected_collected.json`` is written."""
+    targets = _python_targets(nodes)
+    files = sorted({path for _, path, _ in targets})
+    if not files:
+        return [], []
+    result, output = collected(files, root)
+    if result is None:
+        return [], [output]
+    whole = {path for _, path, names in targets if not names}
+    per_test = {node for node, _, names in targets if names}
+    ids = [item["nodeid"] for item in result["items"] if _protects(item["path"], item["nodeid"], whole, per_test)]
+    return ids, _problems(result, targets, root, ALLOWED_OFF_MARKS, ())
+
+
+def _problems(
+    result: dict[str, Any],
+    targets: list[tuple[str, str, list[str]]],
+    root: Path,
+    allowed: Mapping[str, frozenset[str]],
+    pinned: Iterable[str],
+) -> list[str]:
+    """The collection problems of one collection *result* of *targets*' files, each reported once."""
+    files = sorted({path for _, path, _ in targets})
     items: list[dict[str, Any]] = result["items"]
     deselected = set(result["deselected"])
     whole = {path for _, path, names in targets if not names}
     per_test = {node for node, _, names in targets if names}
     problems: list[str] = []
+
+    def report(problem: str) -> None:
+        if problem not in problems:
+            problems.append(problem)
 
     def missing(node: str) -> str:
         return f"{node}: not collected" + (" (deselected)" if node in deselected else "")
@@ -357,7 +426,7 @@ def collection_problems(
         try:
             trees[path] = (root / path).read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
-            problems.append(f"{path}: missing")
+            report(f"{path}: missing")
 
     for node, path, names in targets:
         if path not in trees:
@@ -366,43 +435,51 @@ def collection_problems(
             ran = {tuple(item["definition"]) for item in items if item["path"] == path}
             for (name, line), qualname in defined_tests(trees[path]).items():
                 if (path, name, line) not in ran:
-                    problems.append(missing(f"{path}::{qualname}"))
+                    report(missing(f"{path}::{qualname}"))
             continue
         matches = [item for item in items if item["nodeid"] == node]
         if len(matches) != 1:
-            problems.append(f"{node}: collected {len(matches)} times" if matches else missing(node))
+            report(f"{node}: collected {len(matches)} times" if matches else missing(node))
             continue
         try:
             tree = ast.parse(trees[path])
             line = _start(_chain(tree, names)[-1])
             spans = _context_spans(tree, trees[path].splitlines(), names, path)
         except (LookupError, SyntaxError):
-            problems.append(f"{node}: its def is gone")
+            report(f"{node}: its def is gone")
             continue
         filename, name, first = matches[0]["code"]
         if (filename, name, first) != (path, names[-1], line):
-            problems.append(f"{node}: runs {name} ({filename}, line {first}), not its def (line {line})")
+            report(f"{node}: runs {name} ({filename}, line {first}), not its def (line {line})")
         # A fixture its own module or class registers must be one the context hashes: not one under an
         # alias of pytest.fixture, nor one imported from another file.
         for fixture in matches[0]["fixtures"]:
             filename, _, first = fixture["code"]
             if filename != path or not any(start <= first <= end for start, end in spans):
-                problems.append(
+                report(
                     f"{node}: uses fixture {fixture['name']} ({filename}, line {first}), "
                     "which its hashed context does not cover"
                 )
 
+    # One surviving case satisfies the check above, so a deselected protected item (``-k``,
+    # ``--deselect``, a hook that reports it) is a problem by its own id, and so is an id pinned from the
+    # baseline that is not collected now (a case removed by a hook that does not report it, or renamed).
+    ids = {item["nodeid"] for item in items}
+    for nodeid in [*result["deselected"], *pinned]:
+        if _protects(nodeid.split("::", 1)[0], nodeid, whole, per_test) and nodeid not in ids:
+            report(missing(nodeid))
+
     for item in items:
-        if item["path"] not in whole and item["nodeid"].split("[", 1)[0] not in per_test:
+        if not _protects(item["path"], item["nodeid"], whole, per_test):
             continue
         off = set(item["markers"]) & OFF_MARKS - allowed.get(item["nodeid"], frozenset())
         if off:
-            problems.append(f"{item['nodeid']}: marked {', '.join(sorted(off))}")
+            report(f"{item['nodeid']}: marked {', '.join(sorted(off))}")
         if item["path"] in whole:
             filename, name, first = item["code"]
             own = filename == item["path"] or item["wrapper_from_library"]
             if not own or tuple(item["definition"][:2]) != (item["path"], item["name"]):
-                problems.append(
+                report(
                     f"{item['nodeid']}: runs {name} ({filename}, line {first}), not a test defined in {item['path']}"
                 )
     return problems
@@ -410,6 +487,23 @@ def collection_problems(
 
 def load(fixture: Path = FIXTURE) -> dict[str, str]:
     return dict(json.loads(fixture.read_text(encoding="utf-8"))["nodes"])
+
+
+def load_collected(fixture: Path = COLLECTED) -> list[str]:
+    """The node ids pinned in ``protected_collected.json``."""
+    return list(json.loads(fixture.read_text(encoding="utf-8"))["nodes"])
+
+
+def _checkout_of(root: Path, ref: str) -> str | None:
+    """*ref*'s full SHA when *root* is a clean checkout of it (its HEAD, nothing changed or untracked)."""
+
+    def git(*args: str) -> str | None:
+        run = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False)
+        return run.stdout.strip() if run.returncode == 0 else None
+
+    head, wanted = git("rev-parse", "HEAD"), git("rev-parse", "--verify", f"{ref}^{{commit}}")
+    clean = git("status", "--porcelain") == ""
+    return head if head is not None and head == wanted and clean else None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -422,8 +516,32 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help='print {"node": "sha256", ...}')
     parser.add_argument("--context", action="store_true", help="hash each per-test node's context, not its source")
     parser.add_argument("--collect", action="store_true", help="run the collection check; exit 1 on any problem")
+    parser.add_argument(
+        "--collected",
+        action="store_true",
+        help="print the ids collected from the protected Python tests as protected_collected.json "
+        "(with --ref: --root must be a clean checkout of it)",
+    )
     args = parser.parse_args(argv)
     fixture = args.fixture or (CONTEXT if args.context else FIXTURE)
+
+    if args.collected:
+        if not args.ref:
+            parser.error("--collected needs --ref, the commit --root is a clean checkout of")
+        sha = _checkout_of(args.root, args.ref)
+        if sha is None:
+            print(f"{args.root} is not a clean checkout of {args.ref}", file=sys.stderr)
+            return 1
+        ids, problems = collected_ids(args.nodes or load(fixture), args.root)
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        if problems or not ids:
+            print(
+                f"protected tests on {args.ref}: {len(problems)} collection problems, {len(ids)} ids", file=sys.stderr
+            )
+            return 1
+        print(json.dumps({"about": COLLECTED_ABOUT, "ref": sha, "nodes": ids}, indent=2))
+        return 0
 
     if args.collect:
         problems = collection_problems(args.nodes or load(fixture), args.root)
