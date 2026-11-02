@@ -9,6 +9,7 @@ depend on a value typed into the Blueprint form, and no secret may ever be writt
 plain https origin, then points every path at the Render web service through a signed proxy rule.
 """
 
+import itertools
 import json
 import os
 import re
@@ -328,6 +329,97 @@ def test_a_blank_value_created_empty_means_the_same_as_one_left_out(blueprint, n
     assert differences == {}
     assert left_out["ADMIN_URL"] == "admin/"
     assert left_out["SITE_NAME"] == "SM Bean"
+
+
+# --- the runbook (docs/LIVE_OPERATIONS.md, "Render with Netlify in front") -------------------------
+
+DOCS = REPO / "docs" / "LIVE_OPERATIONS.md"
+
+
+def _render_runbook() -> str:
+    text = DOCS.read_text()
+    start = text.index("## Render with Netlify in front")
+    return text[start : text.index("\n## ", start + 1)]
+
+
+def _runbook_app_paths() -> set[str]:
+    """Every path on the app the runbook names: in backticks, or after the public or Render address."""
+    runbook = _render_runbook()
+    paths = set(re.findall(r"`(/[^`\s]*)`", runbook))
+    paths |= set(re.findall(r"https://(?:sm-bean\.netlify\.app|[^/\s`'\"]+\.onrender\.com)(/[^\s`'\")]*)", runbook))
+    # "/api/v1/…" stands for a family of paths, not one.
+    return {path for path in paths if "…" not in path}
+
+
+def _resolves(path: str) -> bool:
+    from django.urls import Resolver404, resolve
+
+    holes = re.findall(r"<[^>]+>", path)
+    for values in itertools.product(("00000000-0000-0000-0000-000000000001", "1", "a-slug"), repeat=len(holes)):
+        concrete = path
+        for hole, value in zip(holes, values, strict=True):
+            concrete = concrete.replace(hole, value, 1)
+        try:
+            resolve(concrete)
+        except Resolver404:
+            continue
+        return True
+    return False
+
+
+def test_every_path_the_runbook_names_is_one_the_app_serves():
+    """A callback URL registered at a provider, or an upload listed under Netlify's timeout, must exist."""
+    paths = _runbook_app_paths()
+    missing = sorted(path for path in paths if not _resolves(path))
+    assert missing == [], f"the runbook names paths the app does not serve: {missing}"
+    assert {"/organizations/media/shared/upload/", "/accounts/google/login/callback/"} <= paths
+
+
+def _fingerprint_command() -> str:
+    commands = re.findall(r'^python manage\.py shell -c "(.*hashlib\.sha256.*)"$', _render_runbook(), re.M)
+    assert len(commands) == 1, "step 1 gives one fingerprint command"
+    return commands[0]
+
+
+def test_the_fingerprint_tells_a_worker_that_has_not_synced_from_one_that_has(blueprint):
+    """Step 1's comparison of the two services' Shells, run on the environments render.yaml gives them.
+
+    Render updates a worker's fromService value to the web service's current one on each Blueprint
+    sync, not when the web value changes. Until a Manual Sync and the worker's next deploy, the worker
+    runs on the old value: the fingerprints must then differ, whichever linked value changed, a bucket
+    name included, and agree again once the worker has caught up.
+    """
+    command = _fingerprint_command()
+    web = _first_boot_environment(blueprint, "sm-bean-web", LEFT_OUT)
+    worker = _first_boot_environment(blueprint, "sm-bean-worker", LEFT_OUT)
+    copied = {
+        "SECRET_KEY": "railway-secret-key-" + "0123456789abcdef" * 3,
+        "ENCRYPTION_KEY_SALT": "railway-salt-" + "fedcba9876543210" * 2,
+        "OPENROUTER_API_KEY": "stand-in",
+        "EMAIL_HOST_PASSWORD": "stand-in",
+    }
+    seen: dict[tuple, str] = {}
+
+    def fingerprint(environment: dict[str, str]) -> str:
+        key = tuple(sorted(environment.items()))
+        if key not in seen:
+            result = _run_production(environment, "manage.py", "shell", "-c", command)
+            assert result.returncode == 0, result.stderr
+            seen[key] = result.stdout.strip().splitlines()[-1]
+            assert re.fullmatch(r"[0-9a-f]{12}", seen[key]), result.stdout
+        return seen[key]
+
+    assert fingerprint(web) == fingerprint(worker)
+    # Railway's values copied onto the web service; the worker not synced since.
+    assert fingerprint({**web, **copied}) != fingerprint(worker)
+    # Only the mail password changed.
+    assert fingerprint({**web, "EMAIL_HOST_PASSWORD": "stand-in"}) != fingerprint(worker)
+    # Step 3: R2 set on the web service, the worker still on PendingMediaStorage.
+    assert fingerprint({**web, **R2_VALUES}) != fingerprint(worker)
+    # Both on R2, but not the same bucket.
+    assert fingerprint({**web, **R2_VALUES}) != fingerprint({**worker, **R2_VALUES, "S3_BUCKET_NAME": "another"})
+    # Synced: the worker has every value the web service has.
+    assert fingerprint({**web, **copied, **R2_VALUES}) == fingerprint({**worker, **copied, **R2_VALUES})
 
 
 # --- the Netlify front door ------------------------------------------------------------------------

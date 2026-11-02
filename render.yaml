@@ -7,9 +7,13 @@
 # Nothing typed into the Blueprint form is needed for the first boot. Every `sync: false` value may be
 # left blank there, whether Render then leaves it out or creates it empty (the settings read an empty
 # value as unset); the old deployment's values are then copied onto sm-bean-web through Render's API.
-# The worker is linked to each of them (fromService). Render does not document whether such a link
-# follows a later change or copies the value once, so the runbook compares the two services after the
-# copy. SECRET_KEY and ENCRYPTION_KEY_SALT start as generated values and are overwritten the same way.
+# The worker is linked to each of them (fromService). Render's documented rule for such a link (Blueprint
+# spec, "Referencing service properties"): it takes the referenced variable's current value on each
+# Blueprint sync, not when that value changes. So after changing any linked value on sm-bean-web, run
+# Blueprints -> the Blueprint -> Manual Sync (a merge to main syncs by itself only when it changes this
+# file), then deploy sm-bean-worker; a deploy alone leaves the worker on the old value. The runbook's
+# fingerprint (step 1) shows whether the two agree. SECRET_KEY and ENCRYPTION_KEY_SALT start as
+# generated values and are overwritten the same way.
 # No secret is ever written into this file (tests/test_render_blueprint.py).
 #
 # Both services deploy main only after GitHub's checks pass (autoDeployTrigger: checksPass).
@@ -38,14 +42,17 @@ services:
         value: sm-bean.netlify.app
       - key: CSRF_TRUSTED_ORIGINS
         value: https://sm-bean.netlify.app
-      # Render's proxy connects from its private network. The Netlify hop in front of it is
-      # recognised by its signature instead (FRONT_DOOR_SIGNING_SECRET, apps/common/net.py).
+      # Render's proxy connects from its private network and is assumed to append the address it saw
+      # to X-Forwarded-For (Render does not document it; the runbook's step 2 checks it after a
+      # deploy). The Netlify hop in front of it is recognised by its signature instead
+      # (FRONT_DOOR_SIGNING_SECRET, apps/common/net.py).
       - key: BB_TRUSTED_PROXIES
         value: 10.0.0.0/8
       - key: TELEGRAM_WEBHOOK_BASE_URL
         value: https://sm-bean.netlify.app
       # Media on Cloudflare R2. Until the bucket exists the app runs and refuses uploads (W015);
-      # setting the four blank S3_* values below is all it takes to switch. Once uploads work, make
+      # setting the four blank S3_* values below on sm-bean-web, then a Manual Sync and a deploy of
+      # both services, is all it takes to switch. Once uploads work, make
       # MEDIA_STORAGE_PENDING "false", so a lost S3_BUCKET_NAME stops the deploy (E004) instead.
       - key: STORAGE_BACKEND
         value: s3
@@ -224,8 +231,9 @@ services:
           name: sm-bean-cache
           type: keyvalue
           property: connectionString
-      # Every other value is linked to sm-bean-web: one place to set it. The runbook (step 1) checks
-      # that the two agree after the old values are copied in.
+      # Every other value is linked to sm-bean-web: one place to set it. A link takes the web value
+      # on a Blueprint sync, not when it changes: after a change on sm-bean-web, Manual Sync, then
+      # deploy this worker. The runbook (step 1) checks that the two agree.
       - key: DEBUG
         fromService:
           name: sm-bean-web

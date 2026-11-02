@@ -164,7 +164,8 @@ def test_every_other_view_keeps_its_per_address_key():
 #
 # The public address is a Netlify site that proxies every request to the Render web service, so a
 # request reaches Django as visitor -> Netlify -> Render's proxy -> gunicorn. Render's proxy is the
-# socket peer (a private 10.x address) and appends the address it saw, which for every visitor is one
+# socket peer (a private 10.x address) and appends the address it saw (Render does not document that;
+# docs/LIVE_OPERATIONS.md step 2 checks it after a deploy), which for every visitor is one
 # of Netlify's: trusting the private range alone would put everyone behind the same Netlify node in
 # one rate-limit bucket. Netlify's supported header for the visitor is X-Nf-Client-Connection-Ip (an
 # X-Forwarded-For may arrive as well, which the app does not rely on) and, for a signed proxy rule,
