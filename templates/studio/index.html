@@ -11,9 +11,10 @@
 <div class="max-w-[1180px] min-w-0">
     {# ---- Greeting and one status line ---- #}
     <header class="mb-5">
-        {# The title row ends in the primary slot: New post floats above the phone bar below 1024px and sits here from 1024px. #}
+        {% comment %}The title row ends in the primary slot: New post floats above the phone bar below 1024px and sits here from 1024px.
+           The layout classes sit on the title's wrapper, so the h1 stays class="ui-page-title" as every page title is.{% endcomment %}
         <div class="flex items-center justify-between lg:gap-4">
-            <h1 class="ui-page-title min-w-0 flex-1" data-visual-dynamic>{{ greeting }}</h1>
+            <div class="min-w-0 flex-1"><h1 class="ui-page-title" data-visual-dynamic>{{ greeting }}</h1></div>
             {% if can_start_posts %}<div data-primary-slot="header" class="shrink-0">{% include "components/primary_action.html" with label="New post" testid="new-post-open" controls="new-post-sheet" dispatch="new-post:open" %}</div>{% endif %}
         </div>
         {# Each part may wrap (a bot name can be long); only a part's link stays on one line. #}

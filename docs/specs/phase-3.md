@@ -838,6 +838,23 @@ estimate, the D5 toast note, F4's browser case done. **Stop: screen 2 starts onl
 sign-off on this
 pair is recorded.**
 
+**Open before T25: what `gated` covers on Home and Calendar (from T16's review; the owner decides).**
+T16 asks for one primary per view on both pages, but primaries other screens own are still there, and
+T16 may not restyle what it does not name. With `SCREENS["new_post"]` set to gated on T16's tree,
+`screen_findings` reports, for owner, manager and editor: Home's page view has `new-post-open` and
+the thread's `thread-composer-send` at both breakpoints (Send becomes tinted in screen 2), and
+Calendar's has `new-post-open` and the event form's *Add event* when that form renders (screen 4);
+the shell's *New idea* (*Save Idea*) and `sidebar-create-tag` (*Create*) dialogs fail the place
+rule (T18 and T19 move or remove them); the owner's `create-ws` dialog (*Create*) and Calendar's
+`bulk-confirm` dialog fail it too, and no screen-1 task touches either. T16's render test sets the
+two page-view extras aside by name (`MOVED_LATER` in `apps/studio/tests/test_new_post_sheet_render.py`),
+so the sheet and the button are checked but the page is not. Two ways to settle it: **(a)** screen 1's
+gate checks the sheet's views and the button's place only (`test_one_primary.py` gains a per-screen
+scope, so a page-level primary that a later screen owns is counted at that screen's gate), or **(b)**
+with the owner's word, screen 1 also tints *Send* and *Add event* and puts the two shell dialogs'
+buttons in their decision bars, so the whole of both pages is clean when gated. Without one of them,
+T25's `gated = True` fails `test_gated_screens_have_one_primary_per_view_in_its_place`.
+
 ## Part C — Screens 2–11 (outlines, expanded after each sign-off)
 
 Each outline becomes tasks shaped like Part B: start (shape at 390 px, *before* pair, registry entry

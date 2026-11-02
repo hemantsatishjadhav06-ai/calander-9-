@@ -308,6 +308,40 @@ def test_the_channels_are_the_workspace_s_studio_accounts_with_the_form_s_choice
     assert channels.children[0].text() == "Post to"
 
 
+@pytest.mark.parametrize("ticked", [False, True], ids=["none-ticked", "one-ticked"])
+@pytest.mark.parametrize("refusal", ["invalid-form", "chat-error"])
+def test_a_page_re_render_keeps_the_channels_and_the_person_s_choice(client, world, monkeypatch, refusal, ticked):
+    """Without HTMX a refusal after the form is read re-renders Home (400). ``studio:create`` validates
+    without the channels when none is ticked; the sheet on that page still lists them under their legend."""
+    from apps.studio import chat, customer_workflow
+
+    if refusal == "chat-error":
+
+        def refuse(*args, **kwargs):
+            raise chat.ChatError("Write a message first.")
+
+        monkeypatch.setattr(customer_workflow, "save_idea", refuse)
+    data = {"idea": "" if refusal == "invalid-form" else "Tell buyers about the new covered parking"}
+    if ticked:
+        data["accounts"] = [world.linkedin.pk]
+    client.force_login(world.editor)
+
+    response = client.post(reverse("studio:create", kwargs={"workspace_id": world.workspace.id}), data)
+
+    assert response.status_code == 400
+    html = response.content.decode()
+    channels = _one(_sheet(html), **{"data-testid": "new-post-team-channels"})
+    assert channels.children[0].tag == "legend" and channels.children[0].text() == "Post to"
+    boxes = [node for node in elements(channels) if node.tag == "input" and node.attrs.get("name") == "accounts"]
+    assert [box.attrs.get("value") for box in boxes] == [
+        str(account.pk) for account in studio_accounts(world.workspace)
+    ]
+    assert [box.attrs.get("value") for box in boxes if "checked" in box.attrs] == (
+        [str(world.linkedin.pk)] if ticked else []
+    )
+    assert "No channels are connected yet." not in html
+
+
 def test_start_a_post_is_still_absent_from_home(client, world):
     html = _page(client, world, HOME, world.owner)
 

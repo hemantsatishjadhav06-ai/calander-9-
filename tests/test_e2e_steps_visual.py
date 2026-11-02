@@ -139,8 +139,7 @@ def _world(workspace_id: str) -> dict[str, Any]:
 
 def _greeting(response) -> str:
     html = response.content.decode()
-    # The page title, whatever layout classes sit beside ui-page-title (the title row holds New post).
-    match = re.search(r'<h1 class="ui-page-title(?: [^"]*)?"[^>]*>([^<]*)</h1>', html)
+    match = re.search(r'<h1 class="ui-page-title"[^>]*>([^<]*)</h1>', html)
     assert match, "Home has its greeting"
     return match.group(1).strip()
 

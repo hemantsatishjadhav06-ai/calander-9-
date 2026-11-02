@@ -269,6 +269,17 @@ def _sheet_refusal(errors) -> HttpResponse:
     return HttpResponse(body, status=400)
 
 
+def _with_channels(form, channels):
+    """The read form, with the channels field ``create`` set aside for validation put back.
+
+    The page re-render's sheet lists the channels from the form (none ticked, as sent); without the
+    field it would show an empty legend and say no channel is connected.
+    """
+    if channels is not None:
+        form.fields["accounts"] = channels
+    return form
+
+
 def _form_errors(form) -> list[str]:
     """Each of the form's errors in its own words; a field's error is led by the field's label."""
     words = []
@@ -302,9 +313,9 @@ def create(request, workspace_id):
     workspace = _workspace(request, workspace_id)
     sheet = bool(request.htmx)
     form = BriefForm(request.POST, workspace=workspace)
-    # Destinations are optional here: the brief defaults to the workspace's usual accounts.
-    if not request.POST.getlist("accounts"):
-        form.fields.pop("accounts")
+    # Destinations are optional here: the brief defaults to the workspace's usual accounts. Only the
+    # validation goes without the field; a page re-render gets it back (see ``_with_channels``).
+    channels = None if request.POST.getlist("accounts") else form.fields.pop("accounts")
     if not llm.is_configured():
         if sheet:
             return _sheet_refusal([_NOT_CONNECTED])
@@ -318,6 +329,7 @@ def create(request, workspace_id):
     if not form.is_valid():
         if sheet:
             return _sheet_refusal(_form_errors(form))
+        form = _with_channels(form, channels)
         return render(request, "studio/index.html", _index_context(request, workspace, form), status=400)
     picture = form.cleaned_data["source_picture"]
     try:
@@ -340,6 +352,7 @@ def create(request, workspace_id):
         if sheet:
             return _sheet_refusal([str(exc)])
         form.add_error(None, str(exc))
+        form = _with_channels(form, channels)
         return render(request, "studio/index.html", _index_context(request, workspace, form), status=400)
     # No job started (the daily reply cap, say): the idea is saved and its note says why, never
     # that the idea is with the manager.
