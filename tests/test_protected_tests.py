@@ -12,14 +12,20 @@ whole (the golden browser specs, the accessibility sweep, the provider-readiness
 tests, the gate and publisher tests) are hashed whole.
 
 A protected test can also be turned off without one character of its own source changing: a module
-``pytestmark``, a mark or an autouse fixture on its class, a later rebinding or ``del`` of its name,
-a ``conftest.py`` that ignores, deselects or skips it. Two more checks close those. The context hashes
+``pytestmark``, a module fixture that overrides one it requests, a mark or an autouse fixture on its
+class, a later rebinding or ``del`` of its name, a ``conftest.py`` that ignores, deselects or marks it
+at collection. Two more checks close those. The context hashes
 (``tests/fixtures/protected_context.json``, also written once from ``045978b``) cover, for each
-per-test node, the module's ``pytestmark`` and autouse or xunit setup, and the enclosing class's
-header and every statement of its body that is not a ``test_*`` test. The collection check runs
-pytest's own collection of the protected files once, as the full suite would (``pyproject.toml``,
-every ``conftest.py``), and fails when a protected test is not collected, is marked skip, skipif or
-xfail, or would run anything but the def its hash covers.
+per-test node, the module's ``pytestmark``, fixtures and xunit setup, and the enclosing class's header
+and every statement of its body that is not a ``test_*`` test. The collection check runs pytest's own
+collection of the protected files once, as the full suite would (``pyproject.toml``, every
+``conftest.py``), and fails when a protected test is not collected, is marked skip, skipif or xfail,
+would run anything but the def its hash covers, or uses a fixture of its own module or class that the
+context does not hash (under an alias of ``pytest.fixture``, or imported).
+
+Outside the guard: a skip at run time from code outside the protected files, such as a
+``conftest.py`` hook (``pytest_runtest_setup``) or fixture, or a helper module a protected file
+imports. Collection does not see it; the full run reports it as skipped.
 """
 
 import json
@@ -241,9 +247,9 @@ def test_the_command_line_check_names_the_changed_test(tmp_path, capsys):
 
 # ─────────────────────── Turning a protected test off without editing it ───────────────────────
 #
-# Each case leaves every own-source hash unchanged; the context hashes (the module's pytestmark and
-# the enclosing class's decorators, fixtures, setup and attributes) and the collection check (pytest's
-# own collection, run as the suite runs it) must catch it.
+# Each case leaves every own-source hash unchanged; the context hashes (the module's pytestmark,
+# fixtures and xunit setup, and the enclosing class's decorators, fixtures, setup and attributes) and
+# the collection check (pytest's own collection, run as the suite runs it) must catch it.
 
 GUARDED = """import pytest
 
@@ -456,3 +462,111 @@ def test_an_edit_to_the_class_around_a_protected_method_is_caught(tmp_path, old,
     _suite(root, module.replace(old, new, 1))
     context, _problems = _caught(root, baseline)
     assert context == [METHOD]
+
+
+# A module's own fixture overrides a conftest fixture of the same name, so a fixture added beside the
+# protected tests can skip one that requests it, autouse or not.
+
+REQUESTING = GUARDED.replace("def test_protected():", "def test_protected(world):")
+WORLD = "import pytest\n\n\n@pytest.fixture\ndef world():\n    return 1\n"
+OFF_WORLD = 'import pytest\n\n\n@pytest.fixture\ndef world():\n    pytest.skip("off")\n'
+
+
+@pytest.mark.parametrize(
+    "fixture",
+    [
+        '@pytest.fixture\ndef world():\n    pytest.skip("off")\n',
+        '@pytest.fixture()\ndef world():\n    pytest.skip("off")\n',
+        '@pytest.fixture(name="world")\ndef _anything():\n    pytest.skip("off")\n',
+        'from pytest import fixture\n\n\n@fixture\ndef world():\n    pytest.skip("off")\n',
+    ],
+    ids=["bare", "called", "renamed", "imported-decorator"],
+)
+def test_a_module_fixture_that_overrides_a_requested_one_is_caught(tmp_path, fixture):
+    root = _suite(tmp_path, REQUESTING, files={"pkg/conftest.py": WORLD})
+    baseline = _baseline(root)
+    _suite(root, REQUESTING.replace("def helper():", f"{fixture}\n\ndef helper():"))
+    context, problems = _caught(root, baseline)
+    assert context == [PROTECTED, METHOD]
+    assert problems == []
+
+
+ALIAS = "ff = pytest.fixture\n\n\ndef helper():"
+AUTOUSE_ALIAS = "auto = pytest.fixture(autouse=True)\n\n\ndef helper():"
+ALIASED_OVERRIDE = '@ff\ndef world():\n    pytest.skip("off")\n\n\ndef helper():'
+ASSIGNED_HOOK = 'def _off(function):\n    pytest.skip("off")\n\n\nsetup_function = _off\n\n\ndef helper():'
+#: The autouse fixture pytest writes for a module's setup_function (named after the module's import name).
+XUNIT = "_xunit_setup_function_fixture_pkg.test_mod"
+
+
+def _named_like_a_test(decorator):
+    """An edit that adds, above TestGroup's setup_method, a fixture named like a test that skips."""
+    return (
+        "    def setup_method",
+        f'    {decorator}\n    def test_zz(self):\n        pytest.skip("off")\n\n    def setup_method',
+    )
+
+
+def test_an_autouse_fixture_named_like_a_test_under_an_alias_is_context(tmp_path):
+    """The review's case: ``@ff(autouse=True)`` is a fixture by its ``autouse=``, whatever ``ff`` names."""
+    root = _suite(tmp_path)
+    baseline = _baseline(root)
+    old, new = _named_like_a_test("@ff(autouse=True)")
+    _suite(root, GUARDED.replace("def helper():", ALIAS, 1).replace(old, new, 1))
+    assert _caught(root, baseline) == ([METHOD], [])
+
+
+@pytest.mark.parametrize(
+    "edits, files, expected",
+    [
+        # Under an alias that already says autouse=True, the context takes the fixture for a test.
+        ([("def helper():", AUTOUSE_ALIAS), _named_like_a_test("@auto")], {}, [(METHOD, "test_zz")]),
+        # An alias at module level, overriding the conftest fixture the protected test requests.
+        ([("def helper():", ALIAS), ("def helper():", ALIASED_OVERRIDE)], {}, [(PROTECTED, "world")]),
+        # A fixture imported from another file is the module's own fixture too.
+        (
+            [("def helper():", "from pkg.helpers import world  # noqa: F401\n\n\ndef helper():")],
+            {"pkg/helpers.py": OFF_WORLD},
+            [(PROTECTED, "world")],
+        ),
+        # An xunit hook bound by assignment: pytest's wrapper, autouse in the whole module, runs a
+        # function the context leaves out.
+        ([("def helper():", ASSIGNED_HOOK)], {}, [(PROTECTED, XUNIT), (METHOD, XUNIT)]),
+    ],
+    ids=["aliased-autouse-in-class", "aliased-module-override", "imported-module-override", "assigned-xunit-hook"],
+)
+def test_a_fixture_the_context_cannot_see_is_caught_by_the_collection(tmp_path, edits, files, expected):
+    root = _suite(tmp_path, REQUESTING, files={"pkg/conftest.py": WORLD})
+    baseline = _baseline(root)
+    module = REQUESTING
+    for old, new in edits:
+        module = module.replace(old, new, 1)
+    _suite(root, module, files=files)
+    _context, problems = _caught(root, baseline)
+    assert [problem.split(" (", 1)[0] for problem in problems] == [
+        f"{node}: uses fixture {name}" for node, name in expected
+    ], problems
+    assert all(problem.endswith(", which its hashed context does not cover") for problem in problems)
+
+
+def test_a_neighbour_marked_usefixtures_is_a_test_not_context(tmp_path):
+    module = GUARDED.replace("    def test_other", '    @pytest.mark.usefixtures("tmp_path")\n    def test_other')
+    root = _suite(tmp_path, module)
+    baseline = _baseline(root)
+    _suite(root, module.replace("assert self.count == 2", "assert self.count >= 2"))
+    assert _caught(root, baseline) == ([], [])
+
+
+DESELECT_PLAIN = DESELECT.replace('"test_protected"', '"test_plain"')
+
+
+def test_a_whole_file_test_marked_usefixtures_must_be_collected(tmp_path):
+    whole = "import pytest\n" + WHOLE.replace("def test_plain", '@pytest.mark.usefixtures("tmp_path")\ndef test_plain')
+    root = _suite(tmp_path, files={WHOLE_FILE: whole})
+    assert ("test_plain", whole.splitlines().index('@pytest.mark.usefixtures("tmp_path")') + 1) in (
+        protected_tests.defined_tests(whole)
+    )
+    baseline = _baseline(root)
+    _suite(root, files={WHOLE_FILE: whole, "elsewhere/conftest.py": DESELECT_PLAIN})
+    _context, problems = _caught(root, baseline)
+    assert problems == [f"{WHOLE_FILE}::test_plain: not collected (deselected)"]

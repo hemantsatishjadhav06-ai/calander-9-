@@ -14,7 +14,11 @@ item that survived from those files with
 - ``code``: ``[file, co_name, co_firstlineno]`` of the function pytest would call;
 - ``definition``: the same for that function unwrapped (``inspect.unwrap``), the def it decorates;
 - ``wrapper_from_library``: whether ``code`` is a wrapper from the standard library or an installed
-  package (``override_settings``, ``mock.patch``), rather than something written in the repository.
+  package (``override_settings``, ``mock.patch``), rather than something written in the repository;
+- ``fixtures``: each fixture it uses that its own module or one of its classes registers (the
+  fixture's ``baseid`` is in its file: overrides, autouse fixtures, imported ones), as ``name`` and the
+  ``code`` of the function that runs; for a wrapper written in a library (pytest's xunit
+  ``setup_method`` and ``setup_function`` fixtures), the functions it closes over instead.
 
 Files under the rootdir are named relative to it; others by their absolute path.
 """
@@ -72,6 +76,46 @@ def _code(function: Any, root: Path) -> list[Any]:
     return [_name(code.co_filename, root), code.co_name, code.co_firstlineno]
 
 
+def _from_library(function: Any) -> bool:
+    code = getattr(function, "__code__", None)
+    return code is not None and str(Path(code.co_filename).resolve()).startswith(
+        tuple(library + os.sep for library in _libraries)
+    )
+
+
+def _fixture_functions(fixture: Any) -> list[Any]:
+    """The functions a fixture runs: its own, or, for a wrapper written in a library (pytest's xunit
+    ``setup_method``, ``setup_function`` and the like), the functions it closes over."""
+    function = inspect.unwrap(getattr(fixture, "__func__", fixture))
+    if not _from_library(function):
+        return [function]
+    inner = []
+    for cell in getattr(function, "__closure__", None) or ():
+        try:
+            value = cell.cell_contents
+        except ValueError:  # an empty cell
+            continue
+        value = getattr(value, "__func__", value)  # a bound method or classmethod
+        if callable(value) and hasattr(value, "__code__"):
+            inner.append(inspect.unwrap(value))
+    return inner or [function]
+
+
+def _own_fixtures(item: pytest.Item, root: Path) -> list[dict[str, Any]]:
+    """The fixtures *item* uses that its own module or one of its classes registers, overrides included."""
+    module = item.nodeid.split("::", 1)[0]
+    info = getattr(item, "_fixtureinfo", None)
+    found: list[dict[str, Any]] = []
+    for name, fixturedefs in info.name2fixturedefs.items() if info is not None else ():
+        for fixturedef in fixturedefs:
+            if fixturedef.baseid.split("::", 1)[0] != module:
+                continue  # a conftest's or a plugin's
+            found.extend(
+                {"name": name, "code": _code(function, root)} for function in _fixture_functions(fixturedef.func)
+            )
+    return found
+
+
 def _record(item: pytest.Item, root: Path) -> dict[str, Any]:
     obj = getattr(item, "obj", None)
     function = getattr(obj, "__func__", obj)
@@ -82,12 +126,7 @@ def _record(item: pytest.Item, root: Path) -> dict[str, Any]:
         marks.add("unittest_skip")
     if getattr(function, "__unittest_expecting_failure__", False):
         marks.add("unittest_expecting_failure")
-    code = getattr(function, "__code__", None)
-    from_library = (
-        definition is not function
-        and code is not None
-        and str(Path(code.co_filename).resolve()).startswith(tuple(library + os.sep for library in _libraries))
-    )
+    from_library = definition is not function and _from_library(function)
     return {
         "nodeid": item.nodeid,
         "path": _name(str(item.path), root),
@@ -96,6 +135,7 @@ def _record(item: pytest.Item, root: Path) -> dict[str, Any]:
         "code": _code(function, root),
         "definition": _code(definition, root),
         "wrapper_from_library": from_library,
+        "fixtures": _own_fixtures(item, root),
     }
 
 
