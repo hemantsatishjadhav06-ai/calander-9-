@@ -99,7 +99,7 @@ class BriefForm(forms.Form):
             .order_by("-created_at")[:24]
         )
         self.photo_objects = {str(p.pk): p for p in photos}
-        self.fields["source_picture"].choices = [("", "Generate a picture with AI")] + [
+        self.fields["source_picture"].choices = [("", "The team makes the picture")] + [
             (pk, f"Use “{(p.title or p.filename)[:60]}”") for pk, p in self.photo_objects.items()
         ]
         self.fields["source_picture"].widget.attrs["class"] = _FIELD

@@ -1,0 +1,5 @@
+{% comment %}
+The New post sheet's error line: the words alone, no markup. studio:create answers a request from the
+sheet with this and status 400; base.html's htmx:responseError handler writes the text into the
+element the form names with data-inline-error. Each error is one sentence in the form's own words.
+{% endcomment %}{% for error in errors %}{{ error }}{% if not forloop.last %} {% endif %}{% endfor %}
