@@ -8,11 +8,14 @@
  * - Opens on the `new-post:open` window event (components/primary_action.html sends it; a Calendar cell
  *   adds `{mode: 'self', date, time, account}`) and on `#new-post`, on load or later.
  * - Remembers the opener (the element that sent the event, else the focused one, else the New post
- *   button) and gives focus back to it when the sheet closes (Escape, the close button, the scrim).
+ *   button) and gives focus back to it when the sheet closes (Escape, the close button, the scrim); when
+ *   the opener cannot take it (a cell's hover-only "+", hidden again), the New post button does.
  * - Puts focus in the mode's first field: Your idea, Open the editor, or the idea's title.
  * - Keeps what was typed: closing only hides the sheet.
  * - Sets `has-sheet` on body while open, and keeps the button's aria-expanded current.
  * - Clears the Ask the team error line as a new request starts (the page writes a refusal there).
+ * - editorUrl(base): Open the editor's address, composer:compose with the date, time and account the
+ *   sheet was opened with (only those, only when given); opening from the button carries none.
  */
 (function () {
   'use strict';
@@ -26,6 +29,8 @@
     idea: '[data-testid="idea-title"]',
   };
   var FOCUSABLE = 'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  /** What Open the editor carries, as the composer reads it, in the order a channel slot's own link has. */
+  var EDITOR_FIELDS = [['account', 'account'], ['scheduled_date', 'date'], ['scheduled_time', 'time']];
 
   function visible(element) {
     return !!(element && element.getClientRects && element.getClientRects().length);
@@ -87,6 +92,10 @@
         this.opener = null;
         this.$nextTick(function () {
           if (opener && typeof opener.focus === 'function') opener.focus();
+          // A Calendar cell's "+" shows on hover only (calendar.html), so once the scrim lifts it may be
+          // hidden again and cannot take focus: the New post button takes it instead of the page.
+          var trigger = document.querySelector(TRIGGER);
+          if (document.activeElement !== opener && trigger && trigger !== opener) trigger.focus();
         });
       },
 
@@ -94,6 +103,17 @@
         if (MODES.indexOf(mode) < 0) return;
         this.sheetMode = mode;
         this.focusField();
+      },
+
+      /** Open the editor's address: `base` (composer:compose) and what the sheet was opened with. */
+      editorUrl: function (base) {
+        var context = this.sheetContext || {};
+        var params = new URLSearchParams();
+        EDITOR_FIELDS.forEach(function (field) {
+          if (context[field[1]]) params.set(field[0], context[field[1]]);
+        });
+        var query = params.toString();
+        return query ? base + '?' + query : base;
       },
 
       expanded: function (value) {

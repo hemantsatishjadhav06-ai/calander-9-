@@ -1,5 +1,27 @@
 {% comment %}
-The sheet's Write it myself panel (Open the editor, composer:compose). A stub so the screen
-registry can name it (docs/specs/phase-3.md, T14); T17 fills it.
-Nothing renders it yet.
+The sheet's Write it myself panel (components/new_post_sheet.html): one sentence and Open the editor,
+the view's one primary, in its decision bar. It is a link to composer:compose, so the editor opens
+without JavaScript too; the sheet binds its href to editorUrl(), which adds scheduled_date,
+scheduled_time and account when the sheet was opened with them (a Calendar cell's "+" sends them with
+new-post:open; static/js/new-post-sheet.js builds the address with URLSearchParams). Opening the editor
+fills its fields only: nothing is scheduled, proposed or saved here.
+
+With the templates switch, Start from a template (composer:create_landing, its Templates tab) sits in
+the body as a secondary link.
+
+The body (order-1) and the decision bar (order-3, sticky at the dialog's bottom) sit in the dialog's
+column through the panel's display: contents, as Ask the team's do. Context: workspace, features.
 {% endcomment %}
+{% url 'composer:compose' workspace_id=workspace.id as compose_url %}
+<div class="order-1 grow flex flex-col items-start gap-4 px-4 pb-6 lg:px-6">
+    <p class="text-sm text-ink-700">Write the post yourself in the editor: words, pictures, channels and a time.</p>
+    {% if features.templates %}
+    <a href="{% url 'composer:create_landing' workspace_id=workspace.id %}?tab=templates" data-testid="new-post-self-template" class="ui-link inline-flex items-center min-h-11 lg:min-h-8">Start from a template</a>
+    {% endif %}
+</div>
+
+<div data-decision-bar class="order-3 sticky bottom-0 z-10 border-t border-ink-200 bg-surface px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))] lg:px-6 lg:pb-6">
+    <div class="flex items-center justify-end gap-4">
+        <a href="{{ compose_url }}" :href="editorUrl('{{ compose_url }}')" data-testid="new-post-self-open" class="ui-btn ui-btn-primary shrink-0">Open the editor</a>
+    </div>
+</div>

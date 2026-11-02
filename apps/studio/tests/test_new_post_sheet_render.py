@@ -382,11 +382,12 @@ def test_one_primary_per_view_in_its_place(client, world, role, page):
         if finding.view.startswith("dialog 'new-post-sheet'") or "'new-post-open': " in finding.reason
     ]
     assert not findings, findings
+    # Each panel's one act: Send, Open the editor (T17); the idea form's Save idea comes with T18.
+    acts = {"team": ["new-post-team-send"], "self": ["new-post-self-open"], "idea": []}
     for view in sheet_views:
         for breakpoint in BREAKPOINTS:
             shown = [node.name() for node in view.members if is_primary(node) and breakpoint in shown_at(node)]
-            expected = ["new-post-team-send"] if view.name.endswith("'team'") else []
-            assert shown == expected, (view.name, breakpoint, shown)
+            assert shown == acts[view.name.split("'")[-2]], (view.name, breakpoint, shown)
     page_view = found[0]
     for breakpoint in BREAKPOINTS:
         shown = [node.name() for node in page_view.members if is_primary(node) and breakpoint in shown_at(node)]

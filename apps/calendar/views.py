@@ -779,9 +779,11 @@ def calendar_view(request, workspace_id):
     # the form's reads.
     from apps.studio.views import can_start_posts
 
-    context["can_start_posts"] = can_start_posts(getattr(request, "workspace_membership", None)) and not getattr(
-        request, "htmx", False
-    )
+    starts_posts = can_start_posts(getattr(request, "workspace_membership", None))
+    context["can_start_posts"] = starts_posts and not getattr(request, "htmx", False)
+    # The grids' "+" open the sheet in Write it myself where it is on the page (T17), a swapped grid
+    # included: it lands on the full page that holds the sheet. Elsewhere they stay plain links.
+    context["cells_open_sheet"] = starts_posts
     if context["can_start_posts"]:
         from apps.studio.forms import BriefForm
 
