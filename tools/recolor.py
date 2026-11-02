@@ -1623,7 +1623,7 @@ def dark_problems(text: str, *, css: bool = False) -> list[tuple[int, str]]:
     white text on a background that flips in the template's CSS (the rule's own white, or the one its
     element writes without the rule's state); a colour that flips on an inverse surface, an ancestor's
     or the element's own (without the light scope that keeps its light look); an ink-300 edge, in a
-    utility or in the template's CSS. The template's CSS is its ``<style>`` blocks and ``style=`` values, or the whole
+    utility or in the template's CSS; and an ink-300 fill (``bg-ink-300`` in any state). The template's CSS is its ``<style>`` blocks and ``style=`` values, or the whole
     template when *css* says it is bare CSS, included inside a parent's ``<style>`` block.
     ``recolor: keep`` lines are accepted.
     """

@@ -1,8 +1,9 @@
 """The dark codemod and recolor's new rules (docs/specs/phase-3.md T3; spec D2 and F1).
 
 ``tools/recolor.py`` gains a dark pass and new ``--check`` rules, so the utilities that do not follow
-Layer 1 (``bg-white``, ``text-white`` on a fill, the scrims, white edges, ink-300 edges) move to tokens
-whose light value is the literal they replace, and light rendering cannot move:
+Layer 1 (``bg-white``, ``text-white`` on a fill, the scrims, white edges, ink-300 edges and fills) move
+to tokens whose light value is the literal they replace, and light rendering cannot move (in ``static/js``
+and Python class strings, each quoted string is read as one element):
 
 * the inventory of solid dark fills: every ``bg-ink-800|900|950`` on main is listed below with its
   decision, *inverse* (stays dark in both themes: ``bg-inverse``/``text-on-inverse``), *flips*

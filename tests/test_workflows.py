@@ -1,7 +1,8 @@
 """The workflows' own guards (docs/specs/phase-3.md T10 and T11; spec D9).
 
 GitHub runs these files, never this suite, so a guard written only in YAML can slip unseen. This module
-reads ``.github/workflows/visual-baselines.yml`` and ``ci.yml`` and pins what a test can pin:
+reads ``.github/workflows/visual-baselines.yml``, ``lighthouse-targets.yml`` and ``ci.yml`` and pins what a
+test can pin:
 
 - the baseline run commits its images back to the branch, and only a job that runs no dependency,
   browser or project code holds the write token, and only for a branch of this repository (never a
