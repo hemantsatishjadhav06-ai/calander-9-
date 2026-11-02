@@ -97,6 +97,11 @@ test.describe('Keyboard shortcuts (desktop-chrome only: phones have no keys)', (
     expect(target?.width ?? 0).toBeGreaterThanOrEqual(44);
     expect(target?.height ?? 0).toBeGreaterThanOrEqual(44);
     await expect(list.locator(':focus')).toHaveCount(1);
+    // Its trap holds Tab inside, both ways round (the list places the focus itself; the trap only keeps it).
+    for (const key of ['Tab', 'Tab', 'Tab', 'Shift+Tab', 'Shift+Tab', 'Shift+Tab']) {
+      await page.keyboard.press(key);
+      await expect(list.locator(':focus'), `after ${key}`).toHaveCount(1);
+    }
 
     await page.keyboard.press('Escape');
     await expect(list).toBeHidden();

@@ -351,6 +351,11 @@ function later(t, ms) {
   t.mock.timers.tick(ms);
 }
 
+/** Let the microtasks queued so far run (show() queues the trap's marker in one, after Alpine's flush). */
+function settle() {
+  return new Promise((resolve) => queueMicrotask(resolve));
+}
+
 /** The list's component with its markup: the dialog and its close button, as base.html gives them. */
 function listWithMarkup(win) {
   const doc = win.document;
@@ -365,18 +370,19 @@ function listWithMarkup(win) {
   return { component, dialog, close };
 }
 
-test('opening the list puts the focus in it at once, not when its trap starts', () => {
+test('opening the list puts the focus on its close button itself, not through its trap', () => {
   const { win, doc } = page();
   const { component, close } = listWithMarkup(win);
   component.show();
   assert.equal(doc.activeElement, close);
 });
 
-test('closing the list before the plugin has started its trap lets the trap go only once it has', (t) => {
+test('closing the list before the plugin has started its trap lets the trap go only once it has', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const { win } = page();
   const { component } = listWithMarkup(win);
   component.show();
+  await settle();
   assert.equal(component.trapped, true);
   later(t, 1);
   component.close();
@@ -386,23 +392,26 @@ test('closing the list before the plugin has started its trap lets the trap go o
   assert.equal(component.trapped, false);
 });
 
-test('closing the list after the plugin has started its trap lets the trap go at once', (t) => {
+test('closing the list after the plugin has started its trap lets the trap go at once', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const { win } = page();
   const { component } = listWithMarkup(win);
   component.show();
+  await settle();
   later(t, 100);
   component.close();
   assert.equal(component.trapped, false);
 });
 
-test('opened again before a held trap is let go, the list keeps it', (t) => {
+test('opened again before a held trap is let go, the list keeps it', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const { win } = page();
   const { component } = listWithMarkup(win);
   component.show();
+  await settle();
   component.close();
   component.show();
+  await settle();
   later(t, 100);
   assert.equal(component.open, true);
   assert.equal(component.trapped, true);
