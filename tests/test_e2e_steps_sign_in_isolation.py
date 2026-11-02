@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from unittest import mock
 from uuid import UUID
 
 import pytest
@@ -230,21 +231,29 @@ def test_isolation_rows_are_made_in_b_and_read_back_as_fingerprints(client, e2e_
 
 @pytest.mark.django_db
 def test_reset_rate_limits_clears_a_views_counter(client, e2e_urls, seeded):
+    from django_ratelimit import core as ratelimit_core
+
     from apps.accounts.models import User
 
     assert e2e_urls.RATELIMIT_ENABLE, "the limits are on under the test settings, as under config.settings.e2e"
     browser = Client()
-    browser.force_login(User.objects.get(email=seeded["users"]["owner"]["email"]))
+    owner = User.objects.get(email=seeded["users"]["owner"]["email"])
+    browser.force_login(owner)
     # members:resend_invite allows 10 a minute; a row the owner's organisation does not have is a 404.
     path = f"/members/invite/{WORKSPACE_B}/resend/"
-    assert [browser.post(path).status_code for _ in range(10)] == [404] * 10
-    assert browser.post(path).status_code == 403
+    # django-ratelimit counts in fixed one-minute windows (core._get_window); a burst that straddles a
+    # window's end starts a fresh count and lets the eleventh post through (404 where 403 is due), so
+    # the window is held where it stands for the whole test.
+    window = ratelimit_core._get_window(str(owner.pk), 60)
+    with mock.patch.object(ratelimit_core, "_get_window", return_value=window):
+        assert [browser.post(path).status_code for _ in range(10)] == [404] * 10
+        assert browser.post(path).status_code == 403
 
-    cleared = _fixture(client, "reset_rate_limits").json()["cleared"]
+        cleared = _fixture(client, "reset_rate_limits").json()["cleared"]
 
-    assert cleared >= 1
-    assert browser.post(path).status_code == 404
-    assert _fixture(client, "reset_rate_limits").json() == {"cleared": 1}
+        assert cleared >= 1
+        assert browser.post(path).status_code == 404
+        assert _fixture(client, "reset_rate_limits").json() == {"cleared": 1}
 
 
 @pytest.mark.django_db
