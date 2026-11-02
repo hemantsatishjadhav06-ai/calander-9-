@@ -369,3 +369,92 @@ test('opened with the drawer closed, nothing pulls focus back', () => {
   elsewhere.focus();
   assert.equal(win.document.activeElement, elsewhere);
 });
+
+// WebKit (CI's iPhone 13) can drop the focus the sheet has just placed: switching to Save it as an idea
+// hides the field that had it, and the title then lost it to nowhere (tests/e2e/self/emoji-picker.spec.ts
+// on WebKit; Go to's palette in base.html notes the same of WebKit). For a moment after placing it, the
+// sheet puts focus lost to nowhere back; focus someone moves to another control stays where they put it.
+
+/** Frames the test runs by hand: requestAnimationFrame callbacks wait until frame() runs them. */
+function frames(win) {
+  const queue = [];
+  win.requestAnimationFrame = (callback) => queue.push(callback);
+  return {
+    frame() {
+      queue.splice(0).forEach((callback) => callback());
+    },
+    run(count) {
+      for (let i = 0; i < count; i += 1) this.frame();
+    },
+  };
+}
+
+test('focus the idea title loses to nowhere just after it was placed goes back to the title', () => {
+  const { win, component } = ideaSheet();
+  win.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  const clock = frames(win);
+  const title = win.document.querySelector('[data-testid="idea-title"]');
+  win.document.querySelector('[data-testid="new-post-team-idea"]').focus();
+
+  component.open({});
+  component.setMode('idea');
+  assert.equal(win.document.activeElement, title);
+  title.blur(); // WebKit, a moment later
+  assert.equal(win.document.activeElement, win.document.body);
+  clock.frame();
+  assert.equal(win.document.activeElement, title);
+});
+
+test('focus that lands on a field no longer shown goes back to the field the sheet placed it in', () => {
+  const { win, component } = ideaSheet();
+  const team = win.document.querySelector('[data-testid="new-post-team-idea"]');
+  win.HTMLElement.prototype.getClientRects = function () { return this === team ? [] : [{}]; };
+  const clock = frames(win);
+  const title = win.document.querySelector('[data-testid="idea-title"]');
+
+  component.open({ mode: 'idea' });
+  team.focus(); // the hidden Ask the team field
+  clock.frame();
+  assert.equal(win.document.activeElement, title);
+});
+
+test('focus someone moves to another control stays there, and the hold ends', () => {
+  const { win, component } = ideaSheet();
+  win.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  const clock = frames(win);
+  const description = win.document.querySelector('[data-testid="idea-description"]');
+
+  component.open({ mode: 'idea' });
+  description.focus();
+  clock.run(3);
+  assert.equal(win.document.activeElement, description);
+  description.blur();
+  clock.run(3);
+  assert.equal(win.document.activeElement, win.document.body, 'once moved on, nothing is pulled back');
+});
+
+test('the hold lasts a moment, not for as long as the sheet is open', () => {
+  const { win, component } = ideaSheet();
+  win.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  const clock = frames(win);
+  const title = win.document.querySelector('[data-testid="idea-title"]');
+
+  component.open({ mode: 'idea' });
+  clock.run(120);
+  title.blur();
+  clock.run(3);
+  assert.equal(win.document.activeElement, win.document.body);
+});
+
+test('a closed sheet pulls nothing back', () => {
+  const { win, component } = ideaSheet();
+  win.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  const clock = frames(win);
+  const title = win.document.querySelector('[data-testid="idea-title"]');
+
+  component.open({ mode: 'idea' });
+  component.close();
+  title.blur();
+  clock.run(3);
+  assert.notEqual(win.document.activeElement, title);
+});

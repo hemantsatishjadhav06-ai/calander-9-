@@ -15,8 +15,14 @@ test('the idea emoji picker renders on demand, searches, inserts and reopens', a
   await page.getByTestId('new-post-save-idea').click();
   await expect(page.getByRole('dialog', { name: 'New idea' })).toBeVisible();
   // The sheet places the focus in the title asynchronously. Wait for that observable state,
-  // otherwise its title focus can steal the keyboard event used by Playwright's fill.
-  await expect(page.getByTestId('idea-title')).toBeFocused();
+  // otherwise its title focus can steal the keyboard event used by Playwright's fill. Polled by test id,
+  // so a miss names what has the focus instead (WebKit once dropped it just after the sheet placed it).
+  await expect
+    .poll(() => page.evaluate(() => {
+      const active = document.activeElement;
+      return active?.getAttribute('data-testid') || active?.tagName || 'nothing';
+    }))
+    .toBe('idea-title');
   await expect(page.getByTestId('idea-emoji-option')).toHaveCount(0);
   const description = page.getByTestId('idea-description');
   await description.fill('A bright idea ');
