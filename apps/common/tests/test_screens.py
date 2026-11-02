@@ -4,9 +4,14 @@
 - Every template the registry names exists, and every page it names reverses with a workspace id;
   every declared page and every screen's page has its root templates in ``PAGE_TEMPLATES``.
 - ``template_tree`` follows literal ``{% include %}`` and ``{% extends %}`` names (fixture templates),
-  never a commented-out one, a variable or a template that is not the project's.
+  never a commented-out one, a variable or a template that is not the project's; it follows an
+  inclusion tag's use to the template the tag renders (``inclusion_tags`` reads them from the
+  templatetags modules and refuses a form it cannot read), on fixtures and on the real Calendar and
+  Approvals templates.
 - Every page in ``PAGE_TEMPLATES``, rendered for a member who may open it, renders its listed roots,
-  so the map cannot drift from the views.
+  so the map cannot drift from the views; rendered as an owner with posts, every project template
+  it renders is inside its tree (plus its screens' fragments and a short list of templates chosen at
+  run time), so no guard misses a template the page shows.
 - ``theme_ready`` is false for every page today (no visible change). Once a page is declared in
   ``DARK_READY``, its ``<html>`` carries ``data-theme-ready`` and other pages' do not; the client
   portal's base does the same.
@@ -25,6 +30,7 @@ from django.urls import resolve, reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.approvals.tests.test_index import World
 from apps.client_portal.models import MagicLinkToken
 from apps.common import context_processors, screens
 from apps.members.models import OrgMembership, WorkspaceMembership
@@ -104,6 +110,12 @@ def team(db):
         return people[role]
 
     return SimpleNamespace(org=org, ws=ws, member=member)
+
+
+@pytest.fixture
+def world(db):
+    """The Approvals tests' workspace: an owner, connected Facebook and LinkedIn pages, and ``post``."""
+    return World()
 
 
 # ─────────────────────────────── The registry itself ───────────────────────────────
@@ -202,6 +214,145 @@ def test_template_tree_reaches_base_from_a_real_page():
     assert "base.html" in tree
 
 
+# Every inclusion-tag form the repository's templatetags use or could use readably: a positional
+# template, ``filename=`` with ``takes_context`` and a ``name=`` override, and the call form.
+FIXTURE_TAGS = """\
+from django import template
+
+register = template.Library()
+
+
+@register.inclusion_tag("components/badge.html")
+def badge(status, label=""):
+    return {"status": status}
+
+
+@register.inclusion_tag(filename="components/picker.html", takes_context=True, name="pick")
+def picker(context, model):
+    return {"model": model}
+
+
+@register.inclusion_tag("components/hidden.html")
+def hidden():
+    return {}
+
+
+@register.simple_tag
+def plain():
+    return ""
+
+
+def chip():
+    return {}
+
+
+register.inclusion_tag("components/chip.html")(chip)
+"""
+
+
+def test_inclusion_tags_reads_every_readable_form(tmp_path):
+    _write(tmp_path, "fixture_tags.py", FIXTURE_TAGS)
+    assert screens.inclusion_tags([tmp_path / "fixture_tags.py"]) == {
+        "badge": "components/badge.html",
+        "pick": "components/picker.html",  # the name= override, not the function's name
+        "hidden": "components/hidden.html",
+        "chip": "components/chip.html",
+    }
+
+
+def test_template_tree_follows_an_inclusion_tag_to_its_template_and_that_templates_includes(tmp_path):
+    _write(tmp_path, "fixture_tags.py", FIXTURE_TAGS)
+    templates = tmp_path / "templates"
+    _write(
+        templates,
+        "page.html",
+        "{% load fixture_tags %}<main>{% badge 'draft' label='Draft' %}{% pick model='x' %}{%chip%}"
+        "{% plain %}{# {% hidden %} #}{% comment %}{% hidden %}{% endcomment %}</main>",
+    )
+    _write(templates, "components/badge.html", '{% include "components/_icon.html" %}<span>{{ status }}</span>')
+    _write(templates, "components/_icon.html", "<svg></svg>")
+    # A tag used inside a tag's own template is followed too.
+    _write(
+        templates,
+        "components/picker.html",
+        "{% load fixture_tags %}{% badge model %}{% include 'components/_caret.html' %}",
+    )
+    _write(templates, "components/_caret.html", "<i></i>")
+    _write(templates, "components/chip.html", "<b>chip</b>")
+    _write(templates, "components/hidden.html", "<p>Only used in a comment</p>")
+
+    tags = screens.inclusion_tags([tmp_path / "fixture_tags.py"])
+    tree = screens.template_tree(["page.html"], dirs=[templates], tags=tags)
+
+    assert tree[0] == "page.html"
+    assert set(tree) == {
+        "page.html",
+        "components/badge.html",
+        "components/_icon.html",
+        "components/picker.html",
+        "components/_caret.html",
+        "components/chip.html",
+    }
+    assert len(tree) == len(set(tree))
+    # Without the tags, the same page reaches nothing: the literal includes live inside the tags' templates.
+    assert screens.template_tree(["page.html"], dirs=[templates], tags={}) == ("page.html",)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        pytest.param('T = "a.html"\n@register.inclusion_tag(T)\ndef a():\n    return {}\n', id="variable-template"),
+        pytest.param('@register.inclusion_tag("a/" + "b.html")\ndef a():\n    return {}\n', id="computed-template"),
+        pytest.param(
+            '@register.inclusion_tag(filename=f"{1}.html")\ndef a():\n    return {}\n', id="f-string-template"
+        ),
+        pytest.param(
+            'N = "a"\n@register.inclusion_tag("a.html", name=N)\ndef a():\n    return {}\n', id="variable-name"
+        ),
+        pytest.param('@register.inclusion_tag("a.html", None, False, "b")\ndef a():\n    return {}\n', id="positional"),
+        pytest.param("@register.inclusion_tag\ndef a():\n    return {}\n", id="bare-decorator"),
+        pytest.param('register.inclusion_tag("a.html")(make())\n', id="call-on-a-non-name"),
+        pytest.param('tag = register.inclusion_tag("a.html")\n', id="never-applied"),
+        pytest.param("@register.inclusion_tag()\ndef a():\n    return {}\n", id="no-template"),
+    ],
+)
+def test_inclusion_tags_refuses_a_form_it_cannot_read(tmp_path, source):
+    _write(tmp_path, "odd_tags.py", "from django import template\nregister = template.Library()\n" + source)
+    with pytest.raises(ValueError, match=r"odd_tags\.py:\d+"):
+        screens.inclusion_tags([tmp_path / "odd_tags.py"])
+
+
+def test_inclusion_tags_refuses_one_name_for_two_templates(tmp_path):
+    """Which one a page gets depends on its ``{% load %}`` order, so the tree cannot know."""
+    head = "from django import template\nregister = template.Library()\n"
+    _write(tmp_path, "a_tags.py", head + '@register.inclusion_tag("a.html")\ndef badge():\n    return {}\n')
+    _write(tmp_path, "b_tags.py", head + '@register.inclusion_tag("b.html")\ndef badge():\n    return {}\n')
+    with pytest.raises(ValueError, match=r"'badge'"):
+        screens.inclusion_tags([tmp_path / "a_tags.py", tmp_path / "b_tags.py"])
+
+
+def test_the_repositorys_inclusion_tags_are_read():
+    tags = screens.inclusion_tags()
+    assert tags["ui_select"] == "components/ui_select.html"
+    assert tags["status_badge"] == "approvals/partials/_status_badge.html"
+
+
+def test_template_tree_reaches_the_inclusion_tags_templates_from_real_pages():
+    """Calendar's filters are ``{% ui_select %}`` and the approvals rows' pills ``{% status_badge %}``."""
+    calendar = screens.template_tree(screens.PAGE_TEMPLATES[CALENDAR])
+    assert {"components/ui_select.html", "components/_filter_icon.html"} <= set(calendar), calendar
+    for root in (
+        "approvals/index.html",
+        "calendar/partials/publish_approvals.html",
+        "calendar/partials/list_view.html",
+    ):
+        tree = screens.template_tree((root,))
+        assert {"approvals/partials/_status_badge.html", "approvals/partials/_status_icon.html"} <= set(tree), (
+            root,
+            tree,
+        )
+
+
 # ─────────────────────────────── The map against the views ───────────────────────────────
 
 
@@ -215,6 +366,70 @@ def test_every_mapped_page_renders_its_listed_roots(client, team, page):
     # Nothing changes until a page is declared: today no page is, so no <html> carries the flag.
     assert response.context["theme_ready"] is (page in screens.DARK_READY)
     assert ("data-theme-ready" in _html_tag(response)) is (page in screens.DARK_READY)
+
+
+#: Templates a page picks at run time, through a variable ``{% include %}`` that ``template_tree``
+#: cannot follow, each with where the name comes from. Only the choice is taken on trust: the drift
+#: check adds each rendered one's own tree, so everything it reaches is still checked.
+RUNTIME_CHOSEN: dict[str, str] = {
+    "studio/partials/thread.html": "Home's thread: {% include thread.template %} (studio.chat.PANEL_TEMPLATE)",
+    "calendar/partials/publish_queue.html": "list mode's tab: {% include initial_tab_template %} (calendar.views._TAB_TEMPLATES)",
+    "calendar/partials/publish_approvals.html": "the same include, ?tab=approvals",
+}
+
+#: The queries a mapped page is opened with, beyond its plain URL: the ones that render its other
+#: templates (Calendar's list view and its list mode's tabs, where the status pills are).
+PAGE_QUERIES: dict[screens.Page, tuple[dict[str, str], ...]] = {
+    CALENDAR: ({"view": "list"}, {"mode": "list"}, {"mode": "list", "tab": "approvals"}),
+}
+
+
+def _project_templates(response):
+    """The project's templates *response* rendered (its ``templates/`` directories), by load name."""
+    names = set()
+    for template in response.templates:
+        path = Path(getattr(template.origin, "name", "") or "")
+        for directory in screens.TEMPLATE_DIRS:
+            if path.is_absolute() and path.is_relative_to(directory):
+                names.add(path.relative_to(directory).as_posix())
+                break
+    return names
+
+
+def _fragments_of(page):
+    return tuple(name for screen in screens.SCREENS.values() if page in screen.pages for name in screen.fragments)
+
+
+def test_every_template_a_mapped_page_renders_is_in_its_tree(client, world):
+    """What the guards read (``template_tree``) is what the page shows, inclusion tags included.
+
+    Rendered as an owner with connected channels and posts in every state, so the filters
+    (``{% ui_select %}``) and the status pills (``{% status_badge %}``) render.
+    """
+    for status in ("pending_review", "pending_client", "approved", "changes_requested", "rejected", "on_hold"):
+        world.post(status, tags=("launch",))
+    for status in ("scheduled", "published", "failed"):
+        post = world.post(status, account=world.linkedin, when=timezone.now())
+        post.platform_posts.update(scheduled_at=timezone.now())
+    client.force_login(world.owner)
+
+    strays: dict[str, list[str]] = {}
+    chosen: set[str] = set()
+    for page in sorted(screens.PAGE_TEMPLATES):
+        for query in ({}, *PAGE_QUERIES.get(page, ())):
+            response = client.get(reverse(f"{page[0]}:{page[1]}", kwargs={"workspace_id": world.workspace.id}), query)
+            assert response.status_code == 200, (page, query, response.status_code)
+            rendered = _project_templates(response)
+            assert set(screens.PAGE_TEMPLATES[page]) <= rendered, (page, query)
+            picked = rendered & set(RUNTIME_CHOSEN)
+            chosen |= picked
+            tree = set(screens.template_tree((*screens.PAGE_TEMPLATES[page], *_fragments_of(page), *sorted(picked))))
+            if rendered - tree:
+                strays[f"{':'.join(page)} {query}"] = sorted(rendered - tree)
+
+    assert not strays, f"rendered but outside template_tree, so no guard reads them: {strays}"
+    # Every entry of the allowlist is still chosen at run time on a mapped page, so it cannot go stale.
+    assert chosen == set(RUNTIME_CHOSEN), sorted(set(RUNTIME_CHOSEN) - chosen)
 
 
 # ─────────────────────────────── The readiness flag ───────────────────────────────
