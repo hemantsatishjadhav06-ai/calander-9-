@@ -203,7 +203,9 @@ https://dashboard.render.com/blueprint/new?repo=https://github.com/hemantsatishj
 give the Blueprint a name, leave every field the form asks for **blank**, and
 choose **Deploy Blueprint**. Nothing typed there is needed for the first boot:
 `check --deploy` passes with warnings only (email, Sentry, the agency's keys,
-and W015 for the bucket that does not exist yet), `migrate` runs, and the web
+W015 for the bucket that does not exist yet, and Django's security.W009 for
+Render's generated `SECRET_KEY`, which goes once Railway's key is copied in),
+`migrate` runs, and the web
 service answers `/health/`. Whether Render leaves a blank value out or creates
 it empty, the app reads it as not set and uses its default
 (`tests/test_render_blueprint.py` boots both services both ways). Note the web
@@ -615,8 +617,11 @@ keep approval enforcement on, never reverse migrations destructively.
   recovery creates a new database, which the services then point at. Export a
   logical backup there before a risky migration.
 * **The address:** Railway is stopped, not deleted. Until it is removed, going
-  back means starting its services again and moving the OAuth callbacks and the
-  Telegram webhook back; data written on Render since the move stays on Render.
+  back means suspending `sm-bean-worker` on Render **first** (the two
+  deployments use separate databases, so the worker lease cannot stop both
+  workers publishing the same scheduled post), then starting Railway's
+  services again and moving the OAuth callbacks and the Telegram webhook back;
+  data written on Render since the move stays on Render.
 * **The front door:** a failed Netlify deploy never goes live. To undo a bad
   one, revert the commit and let Netlify build again.
 
