@@ -60,6 +60,16 @@ def is_plain_client(membership) -> bool:
     )
 
 
+def can_start_posts(membership) -> bool:
+    """Who gets New post (the button and the sheet on Home and Calendar): ``create_posts`` and not a
+    plain client, the rule ``create`` itself enforces (``require_permission`` and ``_workspace``)."""
+    return bool(
+        membership is not None
+        and membership.effective_permissions.get("create_posts", False)
+        and not is_plain_client(membership)
+    )
+
+
 def _workspace(request, workspace_id):
     """The workspace of the URL, for its staff. Clients use the client portal instead.
 
@@ -172,6 +182,8 @@ def _index_context(request, workspace, form=None):
         "routine_rows": routine_rows,
         "can_manage_settings": bool(perms.get("manage_workspace_settings")),
         "can_create": perms.get("create_posts", False),
+        # New post: the button and the sheet, whose Ask the team panel renders ``form`` (index builds it).
+        "can_start_posts": can_start_posts(request.workspace_membership),
         "can_approve": perms.get("approve_posts", False),
         "can_edit_brand": _can_edit_brand(request),
         "greeting": _greeting(request, workspace),

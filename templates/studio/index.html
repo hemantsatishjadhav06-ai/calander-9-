@@ -1,13 +1,21 @@
 {% extends "base.html" %}
-{% load tz %}
+{% load static tz %}
 
 {% block title %}Home - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{# New post (screen 1): the floating button lifts the toasts (has-fab); the sheet's script runs before Alpine. #}
+{% block body_class %}{% if can_start_posts %} has-fab{% endif %}{% endblock %}
+{% block page_vendor_scripts %}{% if can_start_posts %}<script src="{% static 'js/new-post-sheet.js' %}" defer></script>{% endif %}{% endblock %}
 
 {% block content %}
 <div class="max-w-[1180px] min-w-0">
     {# ---- Greeting and one status line ---- #}
     <header class="mb-5">
-        <h1 class="ui-page-title" data-visual-dynamic>{{ greeting }}</h1>
+        {# The title row ends in the primary slot: New post floats above the phone bar below 1024px and sits here from 1024px. #}
+        <div class="flex items-center justify-between lg:gap-4">
+            <h1 class="ui-page-title min-w-0 flex-1" data-visual-dynamic>{{ greeting }}</h1>
+            {% if can_start_posts %}<div data-primary-slot="header" class="shrink-0">{% include "components/primary_action.html" with label="New post" testid="new-post-open" controls="new-post-sheet" dispatch="new-post:open" %}</div>{% endif %}
+        </div>
         {# Each part may wrap (a bot name can be long); only a part's link stays on one line. #}
         <p class="ui-page-status break-words" data-home-status>
             {% for part in status_parts %}{% if not forloop.first %}<span class="mx-1.5 text-ink-400" aria-hidden="true">·</span>{% endif %}<span>{{ part.text }}{% if part.url %} · <a href="{{ part.url }}" class="whitespace-nowrap font-medium link-inline">{{ part.link }}</a>{% endif %}</span>{% endfor %}
@@ -229,4 +237,5 @@
         {% endif %}
     </section>
 </div>
+{% if can_start_posts %}{% include "components/new_post_sheet.html" %}{% endif %}
 {% endblock %}

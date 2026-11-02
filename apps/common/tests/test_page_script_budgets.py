@@ -73,3 +73,33 @@ def test_calendar_dnd_download_does_not_block_parsing_and_executes_before_alpine
     assert "defer" in sortable
     assert "defer" in alpine
     assert scripts.index(sortable) < scripts.index(alpine)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("route", "query", "sheet"),
+    [
+        ("studio:index", "", True),
+        ("calendar:calendar", "?mode=calendar&view=week", True),
+        ("calendar:calendar", "?mode=list&tab=approvals", True),
+        ("approvals:index", "", False),
+        ("inbox:feed", "", False),
+        ("analytics:account", "", False),
+    ],
+)
+def test_the_new_post_sheet_script_is_deferred_before_alpine_on_home_and_calendar_only(pages, route, query, sheet):
+    """The sheet's script (static/js/new-post-sheet.js, Phase 3 T16) defines newPostSheet() before Alpine
+    starts, on the two pages that carry the sheet; no other page downloads it."""
+    client, workspace, account = pages
+    kwargs = {"workspace_id": workspace.pk}
+    if route == "analytics:account":
+        kwargs["account_id"] = account.pk
+    response = client.get(reverse(route, kwargs=kwargs) + query)
+    assert response.status_code == 200
+    scripts = ScriptSources(response.content.decode()).scripts
+    found = [script for script in scripts if "js/new-post-sheet" in script["src"]]
+    assert len(found) == (1 if sheet else 0)
+    if sheet:
+        alpine = next(script for script in scripts if "/alpine.min" in script["src"])
+        assert "defer" in found[0]
+        assert scripts.index(found[0]) < scripts.index(alpine)

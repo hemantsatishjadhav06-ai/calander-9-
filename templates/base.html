@@ -235,7 +235,7 @@
     </style>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="text-ink-900 min-h-screen bg-ink-50">
+<body class="text-ink-900 min-h-screen bg-ink-50{% block body_class %}{% endblock %}">
     <a href="#main-content" data-control class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:bg-surface focus:px-4 focus:py-3 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-semibold focus:text-ink-900">Skip to content</a>
     {% csrf_token %}
     <!-- Global HTMX loading indicator: a thin top progress bar shown during

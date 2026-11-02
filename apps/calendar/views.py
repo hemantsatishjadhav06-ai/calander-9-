@@ -774,6 +774,18 @@ def calendar_view(request, workspace_id):
         "is_today_in_view": is_today_in_view,
         **publish_ctx,
     }
+    # New post (screen 1): the button and the sheet, whose Ask the team panel renders the form, for
+    # whoever may start posts. Only the full page shows them; an HTMX swap renders a partial and skips
+    # the form's reads.
+    from apps.studio.views import can_start_posts
+
+    context["can_start_posts"] = can_start_posts(getattr(request, "workspace_membership", None)) and not getattr(
+        request, "htmx", False
+    )
+    if context["can_start_posts"]:
+        from apps.studio.forms import BriefForm
+
+        context["new_post_form"] = BriefForm(workspace=workspace)
 
     # For list mode: fetch the active tab's data so the shell can render the
     # initial tab inline server-side (avoids a JS-triggered HTMX waterfall and

@@ -1,5 +1,87 @@
 {% comment %}
-The sheet's Ask the team panel (BriefForm, posting to studio:create). A stub so the screen registry
-can name it (docs/specs/phase-3.md, T14); T16 fills it.
-Nothing renders it yet.
+The sheet's Ask the team panel (components/new_post_sheet.html): BriefForm, posted to studio:create.
+The idea becomes its own thread with your manager; nothing is made until the person goes ahead.
+
+The form posts through HTMX (hx-swap none): studio:create answers 204 with HX-Redirect to the idea's
+thread, or 400 with the refusal's words alone, which base.html's htmx:responseError handler writes into
+new-post-team-error (data-inline-error). No data-no-error-toast here: that handler returns on it before
+it reads data-inline-error, and data-inline-error already keeps the toast away while its target exists.
+Without JavaScript the form still posts (method and action) and the page answers as it always has.
+
+The body (order-1) and the decision bar (order-3, sticky at the dialog's bottom, the sheet's one primary
+on the right) sit in the dialog's column through the panel's display: contents (see the sheet). Send
+starts the team's work, so the allowance line sits beside it instead of a confirm (spec D8's exemption).
+The error line is always in the page, empty until a refusal, so its role="alert" is heard; its icon
+shows only beside words (peer-empty).
+
+Each control carries the form's own name and label; the ids are the sheet's own, so nothing else on Home
+or Calendar can share them. Context: workspace, form.
 {% endcomment %}
+<form data-testid="new-post-team" class="contents" method="post" action="{% url 'studio:create' workspace_id=workspace.id %}"
+      hx-post="{% url 'studio:create' workspace_id=workspace.id %}" hx-swap="none" hx-disabled-elt="find button[type='submit']"
+      data-inline-error="#new-post-team-error">
+    {% csrf_token %}
+    <div class="order-1 grow flex flex-col gap-6 px-4 pb-6 lg:px-6">
+        <div>
+            <label for="new-post-idea" class="ui-label">{{ form.idea.label }}</label>
+            <textarea id="new-post-idea" name="{{ form.idea.html_name }}" data-testid="new-post-team-idea" rows="4" maxlength="2000" required
+                      class="ui-input" placeholder="{{ form.idea.field.widget.attrs.placeholder }}">{{ form.idea.value|default_if_none:"" }}</textarea>
+        </div>
+
+        <fieldset data-testid="new-post-team-channels" class="min-w-0">
+            <legend class="ui-label">{{ form.accounts.label }}</legend>
+            {% if form.accounts.field.choices %}
+            <div class="flex flex-wrap gap-x-6">
+                {% for choice in form.accounts %}
+                <label class="inline-flex items-center gap-2 min-h-11 lg:min-h-8 text-sm text-ink-900">
+                    <input type="checkbox" name="{{ form.accounts.html_name }}" value="{{ choice.data.value }}" class="bb-checkbox shrink-0"{% if choice.data.selected %} checked{% endif %}>
+                    <span class="min-w-0">{{ choice.choice_label }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-ink-600">No channels are connected yet.</p>
+            {% endif %}
+        </fieldset>
+
+        <details class="group">
+            <summary class="inline-flex items-center gap-2 min-h-11 lg:min-h-8 cursor-pointer select-none text-sm font-semibold text-ink-700 hover:text-ink-900">More<svg aria-hidden="true" class="size-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary>
+            <div class="mt-4 flex flex-col gap-6">
+                <div>
+                    <label for="new-post-goal" class="ui-label">{{ form.goal.label }}</label>
+                    <select id="new-post-goal" name="{{ form.goal.html_name }}" class="ui-input">
+                        {% for value, label in form.goal.field.choices %}<option value="{{ value }}"{% if value == form.goal.value|default_if_none:"" %} selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="new-post-notes" class="ui-label">{{ form.notes.label }}</label>
+                    <textarea id="new-post-notes" name="{{ form.notes.html_name }}" rows="2" maxlength="2000" class="ui-input"
+                              placeholder="{{ form.notes.field.widget.attrs.placeholder }}">{{ form.notes.value|default_if_none:"" }}</textarea>
+                </div>
+                <div>
+                    <label for="new-post-picture" class="ui-label">{{ form.source_picture.label }}</label>
+                    <select id="new-post-picture" name="{{ form.source_picture.html_name }}" class="ui-input">
+                        {% for value, label in form.source_picture.field.choices %}<option value="{{ value }}"{% if value == form.source_picture.value|default_if_none:"" %} selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                <label class="inline-flex items-center gap-2 min-h-11 lg:min-h-8 text-sm text-ink-900">
+                    <input type="checkbox" name="{{ form.style_lock.html_name }}" class="bb-checkbox shrink-0"{% if form.style_lock.value %} checked{% endif %}>
+                    <span>{{ form.style_lock.label }}</span>
+                </label>
+            </div>
+        </details>
+
+        <p class="text-[13px]/[18px] text-ink-600">Your manager replies with what we're making. Nothing is made until you go ahead.</p>
+    </div>
+
+    <div data-decision-bar class="order-3 sticky bottom-0 z-10 border-t border-ink-200 bg-surface px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))] lg:px-6 lg:pb-6">
+        <div class="flex items-start gap-2 text-danger-500 mb-2 has-[[role=alert]:empty]:mb-0">
+            <p id="new-post-team-error" data-testid="new-post-team-error" role="alert" class="peer order-2 min-w-0 flex-1 text-[13px]/[18px]"></p>
+            <svg aria-hidden="true" class="order-1 h-[18px] w-[14px] shrink-0 peer-empty:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+            <p class="text-[13px]/[18px] text-ink-600">This starts the team's work and counts toward this month's allowance.</p>
+            <button type="submit" data-testid="new-post-team-send" class="ui-btn ui-btn-primary shrink-0">Send</button>
+        </div>
+    </div>
+</form>
