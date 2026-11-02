@@ -65,8 +65,25 @@ class Screen:
     gated: bool = False
 
 
-#: The rebuilt screens by name (screen 1, ``new_post``, joins at its Start task).
-SCREENS: dict[str, Screen] = {}
+#: The rebuilt screens by name.
+SCREENS: dict[str, Screen] = {
+    # Screen 1, the New post sheet (docs/specs/03-rebuild-screens.md, screen 1; docs/specs/phase-3.md,
+    # T14-T25): a component Home and Calendar include, with its three panels (Ask the team, Write it
+    # myself, the idea form). Shown to whoever may start posts: create_posts, never a plain client.
+    "new_post": Screen(
+        templates=(
+            "components/new_post_sheet.html",
+            "studio/partials/new_post_team.html",
+            "studio/partials/new_post_self.html",
+            "composer/partials/new_post_idea.html",
+        ),
+        # studio:create's 400 answer to the sheet: HTMX loads it and the page writes its words into
+        # the sheet's error line (data-inline-error).
+        fragments=("studio/partials/new_post_team_error.html",),
+        pages=(("studio", "index"), ("calendar", "calendar")),
+        roles=("owner", "manager", "editor"),
+    ),
+}
 
 _COMMENTS_RE = re.compile(r"{%\s*comment\b.*?%}.*?{%\s*endcomment\s*%}|{#[^\n]*?#}", re.S)
 _REFERENCE_RE = re.compile(r"""{%\s*(?:include|extends)\s+(["'])([^"']+)\1""")

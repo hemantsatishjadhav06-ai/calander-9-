@@ -174,6 +174,36 @@ def test_no_page_is_declared_dark_ready_yet():
     assert not screens.DARK_READY, sorted(screens.DARK_READY)
 
 
+#: Screen 1's parts (docs/specs/phase-3.md, T14): the sheet component and its three partials, the
+#: panels T16 (Ask the team), T17 (Write it myself) and T18 (the idea form) fill.
+NEW_POST_TEMPLATES = (
+    "components/new_post_sheet.html",
+    "studio/partials/new_post_team.html",
+    "studio/partials/new_post_self.html",
+    "composer/partials/new_post_idea.html",
+)
+
+
+def test_screen_one_is_registered_as_its_start_task_adds_it():
+    """The New post sheet: its templates, on Home and Calendar, for the three roles that may start
+    posts (``create_posts`` and not a plain client), not gated until its gate (T25). Its one fragment
+    is the 400 answer ``studio:create`` gives the sheet (T15), which HTMX loads and the page writes
+    into the sheet's error line, so the guards that read a screen's fragments read it too."""
+    entry = screens.SCREENS["new_post"]
+
+    assert entry.templates == NEW_POST_TEMPLATES
+    assert entry.fragments == ("studio/partials/new_post_team_error.html",)
+    assert entry.pages == (HOME, CALENDAR)
+    assert entry.roles == ("owner", "manager", "editor")
+    assert entry.gated is False
+    assert screens.PAGE_TEMPLATES[HOME] == ("studio/index.html",)
+    assert screens.PAGE_TEMPLATES[CALENDAR] == ("calendar/calendar.html",)
+    # A component the two pages include (from T16): its own tree never holds their roots, so no guard
+    # reads those pages through it and the drift check's RUNTIME_CHOSEN rules stand for them.
+    tree = set(screens.template_tree((*entry.templates, *entry.fragments)))
+    assert not tree & {*screens.PAGE_TEMPLATES[HOME], *screens.PAGE_TEMPLATES[CALENDAR]}, sorted(tree)
+
+
 def test_a_screen_records_its_parts():
     screen = screens.Screen(templates=("studio/index.html",))
     assert (screen.fragments, screen.pages, screen.roles, screen.gated) == ((), (), (), False)
@@ -539,8 +569,11 @@ CALENDAR_TABS = tuple(calendar_views._TAB_TEMPLATES.values())
 #: lists none, as the spacing guard needs none). Gated, its gate having forgot the tabs; and listing them.
 GATED_CALENDAR = screens.Screen(templates=("calendar/calendar.html",), gated=True)
 LISTED_CALENDAR = dataclasses.replace(GATED_CALENDAR, fragments=CALENDAR_TABS)
-#: Screen 1 as its Start task adds it (docs/specs/phase-3.md, T14): a component's templates, which
-#: reach neither Home's root nor Calendar's, both pages in ``pages``, no fragments, not gated yet.
+#: Screen 1's shape as its Start task adds it (docs/specs/phase-3.md, T14): a component's templates,
+#: which reach neither Home's root nor Calendar's, both pages in ``pages``, not gated yet. Its
+#: templates stand in for the sheet's (stubs until T16-T18) with components that do render templates
+#: of their own, so the tree it is checked against is not empty; the real entry's one fragment (the
+#: sheet's error answer) reaches no page root either.
 NEW_POST = screens.Screen(
     templates=("components/ui_select.html", "approvals/partials/_status_badge.html"),
     pages=(HOME, CALENDAR),

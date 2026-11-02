@@ -254,13 +254,19 @@ Start task re-reads its tree and adds any it finds):
 | Screen | Destructive | Paid (starts the team's work) |
 |---|---|---|
 | 1 New post | — | *Ask the team*'s Send (exempt, below) |
-| 2 Home | — | thread *Send* and *Go ahead* (exempt, below) |
+| 2 Home | delete a routine in Home's Routines card (`studio/index.html:173` includes `studio/partials/routine_rows.html`; its *Delete* is the same `confirm()`, `:47`, as Activity's; found at screen 1's start) | thread *Send* and *Go ahead* (exempt, below); *Run now* in the same card (`routine_rows.html:36-39`), a proposed routine's *Turn on* in the thread (`studio/partials/thread_messages.html:56`), *Continue* on an idea in progress (`studio/partials/customer_workflow_journeys.html:25`, `studio:workflow_resume`, which calls `start_idea`) (found at screen 1's start) |
 | 3 Approvals | bulk reject (today a modal) | — |
-| 4 Calendar | bulk delete (today a modal from `calendar-bulk-bar`), event delete (`calendar/partials/event_form.html:71`, `confirm()`), the confirm modals | — |
+| 4 Calendar | bulk delete (today a modal from `calendar-bulk-bar`), event delete (`calendar/partials/event_form.html:71`, `confirm()`), the confirm modals (the bulk *Publish now?* / *Delete posts?* dialog, `calendar/calendar.html:330-351`, and a post's delete in the Queue and Drafts tabs, `calendar/partials/_delete_post_modal.html` from `publish_queue.html:120` and `publish_drafts.html:81`) | — |
 | 5 Post page | *Stop and discard* and *Discard* (`studio/detail.html:33, 56, 357`, no confirm at all today) | *Retry* (`:51`), choosing an angle (`studio:use_angle`, `:175`), *Start over with three new angles* (`:343`), *Request changes* (`studio-revise-send`, exempt, below) |
 | 6 Inbox | discard a draft reply (`inbox/partials/_draft_reply_item.html:40`, `hx-confirm`) | *Draft replies with the team* |
 | 8 Activity | delete a routine (`studio/partials/routine_rows.html:47`, `confirm()`) | *Run now* (`routine_rows.html:36-39`), a job's retry and resume controls |
 | 9 Settings | remove a member (`members/partials/member_row.html:75`), revoke an invitation (`invitation_row.html:35`, `client_portal/admin/partials/pending_invites_section.html:38`), revoke a portal link and remove a client (`client_portal/admin/partials/client_row.html:39, 49`), all `hx-confirm` today; the danger zone (its typed confirmation stays) | — |
+
+The routine rows are one partial on Home and Activity, so whichever of screens 2 and 8 rebuilds
+`routine_rows.html` first moves its *Delete* and *Run now* for both. The morning briefing's one tap on Home
+(`studio/index.html:179`) is not listed: that routine is built by code and needs no provider or budget.
+Screen 1's own parts (the New menu, the idea and tag dialogs, `studio:create`) hold no confirm and no
+destructive act (re-grep at T14; [`screen-1-new-post-notes.md`](screen-1-new-post-notes.md)).
 
 *Exempt until the owner answers:* the goldens click *Go ahead* (02:156, 03:127), the thread's *Send*
 (02:143, 03:101) and the post page's *Request changes* (06:197) and expect the work to start; an
