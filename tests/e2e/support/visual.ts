@@ -10,9 +10,11 @@
 // VISUAL_INSTANT (the `visual_clock` fixture, tests/e2e/server/steps/visual.py) and the browser's with
 // page.clock; the visual workspace is put back to the same rows on every call; what still prints the
 // real date or a time relative to it carries `data-visual-dynamic` in the template and is masked
-// here, and so is the phone bar when a locator's box reaches under it. Nothing moves while it is
-// photographed: visualWorld shows the page with reduced motion (spec D7 and D9), once for every visual
-// spec, and snap() refuses a page that is not.
+// here, and so is the phone bar when it floats over a locator's box. A locator's photograph masks only
+// what shows in it (masksFor): what the region covers, such as Home's greeting and the phone bar under
+// the New post sheet, stays unmasked, so no mask paints over the region's own words. Nothing moves while
+// it is photographed: visualWorld shows the page with reduced motion (spec D7 and D9), once for every
+// visual spec, and snap() refuses a page that is not.
 //
 // Comparing is switched on by E2E_VISUAL=1, which only CI's visual job and the baseline workflow set.
 // Not by CI: CLAUDE.md documents local `CI=1` runs, and a local machine's fonts are not the runner's,
@@ -33,7 +35,7 @@ export const VISUAL_SKIP_REASON = 'baselines are made and compared in CI (D9)';
 /** The one selector a spec may use that is not a test id: for masking only, never to find or click. */
 export const DYNAMIC = '[data-visual-dynamic]';
 
-/** Shell parts that float over a screen's own region (test ids), masked in a locator's photograph. */
+/** Shell parts that float over a screen's own region (test ids), masked in a locator's photograph where they do. */
 const FLOATING_SHELL = ['phone-bar'] as const;
 
 type Env = Record<string, string | undefined>;
@@ -126,9 +128,49 @@ async function atRest(page: Page, target: Locator | Page): Promise<void> {
   await nextFrames(page);
 }
 
-function masks(page: Page, target: Locator | Page): Locator[] {
-  const found = [page.locator(DYNAMIC)];
-  if (!isPage(target)) found.push(...FLOATING_SHELL.map((id) => page.getByTestId(id)));
+/**
+ * Which of `parts` show in `region`'s photograph, by index: each one inside the region, and each one
+ * outside it that is painted over it where the two meet (the top element at the middle of that overlap
+ * is the part or inside it). A part the region covers, or one that does not reach its box (hidden, or
+ * elsewhere on the page), is left out. Where the middle is off the screen nothing can be told, and the
+ * part counts as showing.
+ */
+async function showingIn(parts: Locator, region: Locator): Promise<number[]> {
+  const own = await region.elementHandle();
+  if (!own) return []; // atRest has seen it on the page; nothing to photograph means nothing to mask
+  try {
+    return await parts.evaluateAll((elements, element) => {
+      const area = element.getBoundingClientRect();
+      return elements.flatMap((part, index) => {
+        if (element.contains(part)) return [index];
+        const box = part.getBoundingClientRect();
+        const left = Math.max(box.left, area.left);
+        const right = Math.min(box.right, area.right);
+        const top = Math.max(box.top, area.top);
+        const bottom = Math.min(box.bottom, area.bottom);
+        if (right <= left || bottom <= top) return [];
+        const hit = document.elementFromPoint((left + right) / 2, (top + bottom) / 2);
+        return !hit || part.contains(hit) ? [index] : [];
+      });
+    }, own);
+  } finally {
+    await own.dispose();
+  }
+}
+
+/**
+ * What a photograph of `target` masks. The page: every element that prints the real date. A locator:
+ * those of them, and the floating shell, that show in its box (showingIn), so a mask never paints over
+ * what the region shows of its own: Home's greeting and the phone bar under the New post sheet are left
+ * as the sheet covers them, while on Home's own region both are masked.
+ */
+export async function masksFor(target: Locator | Page): Promise<Locator[]> {
+  if (isPage(target)) return [target.locator(DYNAMIC)];
+  const page = target.page();
+  const found: Locator[] = [];
+  for (const parts of [page.locator(DYNAMIC), ...FLOATING_SHELL.map((id) => page.getByTestId(id))]) {
+    for (const index of await showingIn(parts, target)) found.push(parts.nth(index));
+  }
   return found;
 }
 
@@ -141,7 +183,7 @@ const SHOT = { animations: 'disabled', caret: 'hide' } as const;
 export async function capture(target: Locator | Page): Promise<Buffer> {
   const page = isPage(target) ? target : target.page();
   await atRest(page, target);
-  const options = { ...SHOT, mask: masks(page, target) };
+  const options = { ...SHOT, mask: await masksFor(target) };
   return isPage(target) ? target.screenshot(options) : target.screenshot(options);
 }
 
@@ -162,7 +204,7 @@ export async function snap(target: Locator | Page, name: string): Promise<void> 
   const page = isPage(target) ? target : target.page();
   await atRest(page, target);
   const file = `${name}-${await schemeOf(page)}.png`;
-  const options = { ...SHOT, mask: masks(page, target) };
+  const options = { ...SHOT, mask: await masksFor(target) };
   if (isPage(target)) await expect(target).toHaveScreenshot(file, options);
   else await expect(target).toHaveScreenshot(file, options);
 }

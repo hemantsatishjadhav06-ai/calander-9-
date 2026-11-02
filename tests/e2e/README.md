@@ -195,18 +195,23 @@ spec meets a page it did not declare. The device's scheme is `page.emulateMedia(
 - **snap.** `snap(target, name)` (`support/visual.ts`): a locator (the screen's own region, the
   phone bar masked where it floats over it) or the page (a whole state, the shell included); waits
   until no HTMX request is in flight, the fonts are loaded and the region has settled; masks
-  `[data-visual-dynamic]`; disables animations and hides the caret; and names the file
+  `[data-visual-dynamic]` (in a locator's photograph only what shows in its box, `masksFor`: what the
+  region covers, such as Home's greeting and the phone bar under the New post sheet, is never masked
+  over it); disables animations and hides the caret; and names the file
   `<name>-<scheme>-<project>.png`. `forSchemes` (`support/schemes.ts`) declares a case once per
   colour scheme, for axe and visual cases only; behavioural flows run in light.
 - **The harness's own check.** `self/visual-harness.spec.ts` runs everywhere: no run but the
   baseline workflow's writes a baseline, two masked photographs of the visual Home two seconds apart
-  are byte-identical, so are they with the clock 90 days on, the masked elements exist, and the
+  are byte-identical, so are they with the clock 90 days on, the masked elements exist, a region's
+  photograph masks what shows in it and not what it covers, and the
   visual world is shown with reduced motion in both schemes (the stylesheet's rule holds the page's
   transitions at 0.01 ms).
 
 The first baseline is `visual/shell.spec.ts`: the shell around the visual workspace's Home, light, on
 the three projects. It is committed at the foundations gate; screen 1 (which removes the New menu) and
 screen 2 (which rebuilds Home) refresh it in their own `visual:` commits.
+`visual/new-post.spec.ts` (screen 1, T24): the New post button at rest on Home and the sheet in Ask the
+team, Write it myself and the idea form, each as its own region, in light and dark on the three projects.
 
 ## Pairs and the light diff
 

@@ -1,11 +1,16 @@
+import type { Locator } from '@playwright/test';
+
 import { updateSnapshotsFor } from '../../../playwright.config';
+import { isPhone } from '../support/nav';
 import { SCHEMES, forSchemes } from '../support/schemes';
+import { settled } from '../support/settled';
 import { expect, test } from '../support/test';
 import {
   DYNAMIC,
   VISUAL_INSTANT,
   capture,
   freezeClock,
+  masksFor,
   prefersReducedMotion,
   schemeOf,
   thawClock,
@@ -16,12 +21,30 @@ import {
 // compares nothing with a committed baseline: it proves that what the baselines rest on holds here.
 // A local run never writes a baseline; the visual workspace's Home photographs the same two seconds
 // later and with the clock 90 days on (the server's frozen clock and the browser's moved together);
-// the elements that print the real date or a time relative to it are there to be masked; each scheme
-// of forSchemes reaches the page; and a visual world is shown with reduced motion (spec D7 and D9), in
-// either scheme, so no baseline photographs a transition.
+// the elements that print the real date or a time relative to it are there to be masked; a region's
+// photograph masks what shows in it and never what the region covers; each scheme of forSchemes
+// reaches the page; and a visual world is shown with reduced motion (spec D7 and D9), in either scheme,
+// so no baseline photographs a transition.
 
 /** Ninety days after the visual instant, at the same hour of the day. */
 const NINETY_DAYS_ON = '2027-04-03T09:00:00+05:30';
+
+/** What the masks cover, element by element: `dynamic` for a data-visual-dynamic element, else its test id. */
+async function masked(masks: Locator[]): Promise<string[]> {
+  const names: string[] = [];
+  for (const mask of masks) {
+    names.push(
+      ...(await mask.evaluateAll(
+        (elements, dynamic) =>
+          elements.map((element) =>
+            element.matches(dynamic) ? 'dynamic' : ((element as HTMLElement).dataset.testid ?? element.tagName),
+          ),
+        DYNAMIC,
+      )),
+    );
+  }
+  return names;
+}
 
 test.afterEach(async ({ harness }) => {
   await thawClock(harness);
@@ -76,6 +99,30 @@ test('the visual Home photographs the same two seconds later and 90 days on', as
     (await capture(page)).equals(first),
     'with the clock 90 days on, byte for byte: nothing unmasked follows the clock',
   ).toBe(true);
+});
+
+test('a region is masked where something shows in it, never where the region covers it', async ({ page, harness, as }) => {
+  const world = await visualWorld(page, harness);
+  await as({ email: world.users.owner.email });
+  expect((await page.goto(`/workspace/${world.workspace_id}/studio/`))?.status()).toBe(200);
+  await expect(page.getByTestId('home-today')).toBeVisible();
+  const dynamic = Array<string>(7).fill('dynamic');
+
+  // The whole page: every element that prints the real date.
+  expect(await masked(await masksFor(page)), 'the page').toEqual(dynamic);
+  // Home's own region: the same seven, all inside it, and on a phone the phone bar that floats over it.
+  expect(await masked(await masksFor(page.getByTestId('main-content'))), "Home's region").toEqual(
+    isPhone(page) ? [...dynamic, 'phone-bar'] : dynamic,
+  );
+
+  // The New post sheet lies over Home's greeting and today's date, and on a phone over the phone bar:
+  // none of them shows in the sheet's photograph, so none is masked there (their boxes would paint over
+  // the sheet's title, its field and its Send). The sheet prints no date of its own.
+  await page.getByTestId('new-post-open').click();
+  await expect(page.getByTestId('new-post-team-idea')).toBeFocused();
+  const sheet = page.getByTestId('new-post-sheet');
+  await settled(sheet, 'the New post sheet');
+  expect(await masked(await masksFor(sheet)), 'the sheet').toEqual([]);
 });
 
 forSchemes((scheme) => {
