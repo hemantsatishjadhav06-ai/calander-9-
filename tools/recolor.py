@@ -27,8 +27,10 @@ sections 1-7; the system itself is docs/DESIGN_SYSTEM.md). It rewrites, in place
   ``bg-inverse``/``text-on-inverse`` (and keeps its light look through ``data-theme-scope``
   when a child uses a step that flips); scrims are ``bg-scrim/NN``; white edges are ``-surface``,
   ``-on-fill`` or ``-on-inverse`` by what they sit on; ink-300 edges (a text grey in dark) are
-  the edge token. The light content scope (``data-theme-scope="light"``: platform previews) and
-  pages that do not load the stylesheet are left alone.
+  the edge token and ink-300 fills ``bg-line-strong``. In a JS or Python file each quoted class
+  string is one element, judged by its own fills. The light content scope
+  (``data-theme-scope="light"``: platform previews) and pages that do not load the stylesheet are
+  left alone.
 
 What it leaves alone: platform and brand colours (only colours in the old palettes are
 mapped, so LinkedIn ``#0A66C2`` or a client's navy never move), user-chosen label colours
@@ -640,8 +642,9 @@ def recolor_html_colours(text: str, *, tokens: bool, defined: set[str]) -> str:
 # not follow to tokens whose light value is the literal they replace (docs/specs/phase-3.md T3):
 # bg-white -> bg-surface, text-white on a fill that flips -> text-on-fill, the elements that stay dark
 # in both themes -> bg-inverse/text-on-inverse, scrims -> bg-scrim/NN, white edges by what they sit on,
-# ink-300 edges (a text grey in dark) -> the edge token. They read the element a class sits on and its
-# ancestors, so a child's white is judged by the fill it is drawn over.
+# ink-300 edges (a text grey in dark) -> the edge token, ink-300 fills -> bg-line-strong. They read the
+# element a class sits on and its ancestors, so a child's white is judged by the fill it is drawn over;
+# a JS or Python class string is one element with nothing known around it.
 
 INVERSE, DARK, FLIP, LIGHT = "inverse", "dark", "flips", "light"
 
@@ -705,6 +708,12 @@ INK300_EDGE_RE = re.compile(
     r"(?<![\w-])((?:[a-z0-9-]+:|\[[^\]\s]+\]:)*!?)"
     r"(border(?:-[xytrbl])?|ring|divide(?:-[xy])?|outline|stroke)-ink-300(?![\w/-])"
 )
+#: An ink-300 fill, in any state, solid or from 50 % (a fill, as ``fill_kind`` reads it; a fainter tint
+#: stays): ink-300 is a text grey in dark, so whatever the fill holds loses its contrast (the collapsed
+#: sidebar's account button put its ink-600 icon at 1.49:1 on ``hover:bg-ink-300``). line-strong is
+#: ink-300 in light and a quiet fill in dark. 1 variant chain, 2 opacity modifier (empty when solid).
+INK300_FILL_RE = re.compile(r"(?<![\w-])((?:[a-z0-9-]+:|\[[^\]\s]+\]:)*!?)bg-ink-300((?:/(?:[5-9]\d|100))?)(?![\w/-])")
+INK300_FILL_FIX = r"\1bg-line-strong\2"
 #: An arbitrary-value edge class that draws in ink-300 (a copy of a component's recipe, such as
 #: ``file:shadow-[inset_0_0_0_1px_var(--ink-300)]``).
 INK300_ARBITRARY_RE = re.compile(
@@ -1288,12 +1297,13 @@ def ink300_css_edges(
 
 
 #: The rewrites that need no element, in order: bg-white, scrims, ink-300 edges (named and
-#: arbitrary-value utilities), literal arbitrary shadows.
+#: arbitrary-value utilities), ink-300 fills, literal arbitrary shadows.
 DARK_CLASS_REWRITES: tuple[tuple[re.Pattern, str | Callable[[re.Match], str]], ...] = (
     (SOLID_WHITE_RE, r"\1bg-surface"),
     (SCRIM_SRC_RE, _scrim),
     (INK300_EDGE_RE, r"\1\2-line-strong"),
     (INK300_ARBITRARY_RE, lambda m: INK300_VAR_RE.sub(EDGE_TOKEN, m.group(0))),
+    (INK300_FILL_RE, INK300_FILL_FIX),
     (ARBITRARY_SHADOW_RE, _arbitrary_shadow),
 )
 
@@ -1301,7 +1311,8 @@ DARK_CLASS_REWRITES: tuple[tuple[re.Pattern, str | Callable[[re.Match], str]], .
 def dark_class_strings(text: str, *, scoped: bool = False) -> str:
     """The rewrites that need no element (``DARK_CLASS_REWRITES``). *scoped*: the text is a template,
     whose light scope keeps its classes; a pass that changes the text moves the scope, so the next pass
-    reads it again."""
+    reads it again. Otherwise the text is a JS or Python file, whose quoted class strings are each one
+    element (``string_elements``): white on a string's own fill that flips moves as in a template."""
 
     def scope(text: str) -> list[tuple[int, int]]:
         return _scope_ranges(elements(text)) if scoped and SCOPE_ATTR in text else []
@@ -1312,11 +1323,71 @@ def dark_class_strings(text: str, *, scoped: bool = False) -> str:
         if after != text:
             ranges = scope(after)
         text = after
+    if not scoped:
+        edits = [
+            (start, end, replacement)
+            for element in string_elements(text)
+            for _, start, end, replacement in _string_whites(text, element)
+        ]
+        for start, end, replacement in sorted(edits, reverse=True):
+            text = text[:start] + replacement + text[end:]
     return text
 
 
 def _token_text(token: Token, colour: str, mod: str | None = None) -> str:
     return f"{token.chain}{token.bang}{token.util}-{colour}{token.mod if mod is None else mod}"
+
+
+#: A quoted string of a JS or Python file: ``'…'`` or ``"…"`` on one line, or a template literal
+#: ``` `…` ```, which may span lines and holds its ``${…}`` branches.
+QUOTED_RE = re.compile(r"'[^'\n]*'|\"[^\"\n]*\"|`[^`]*`")
+
+
+def string_elements(text: str) -> list[Element]:
+    """Each quoted string of a JS or Python file that holds a colour utility, as one element: its words
+    are the classes of the element it is written on. Nothing is known of what is around it, so it has
+    no ancestors and is judged by its own fills."""
+    found: list[Element] = []
+    for m in QUOTED_RE.finditer(text):
+        start, value = m.start() + 1, m.group(0)[1:-1]
+        tokens = tuple(Token(start + u.start(), start + u.end(), *u.groups()) for u in UTIL_RE.finditer(value))
+        if not tokens:
+            continue
+        classes = tuple(word for word in (part.strip("'\"{}(),:") for part in value.split()) if word)
+        found.append(
+            Element(
+                name="",
+                start=m.start(),
+                tag_end=m.end(),
+                tag=m.group(0),
+                ancestors=(),
+                in_light_scope=False,
+                classes=classes,
+                tokens=tokens,
+                close=m.end(),
+            )
+        )
+    return found
+
+
+def _string_whites(text: str, element: Element) -> list[tuple[Token, int, int, str]]:
+    """What a class string draws in white on its own fill that flips, each as (token, start, end, what
+    the dark pass writes there): ``text-white`` is ``text-on-fill``, a white tint is on-fill at its
+    opacity, and a base ``text-white`` under a state whose fill flips and writes no text colour gains
+    that state's ``text-on-fill`` after it. The template rule (``_dark_in_context``) with nothing
+    around the string; one decision for the dark pass and the check. ``recolor: keep`` lines stay."""
+    own = _own_fills(element)
+    edits: list[tuple[Token, int, int, str]] = []
+    for token in element.tokens:
+        if token.colour != "white" or _kept(text, token.start):
+            continue
+        if _white_on_flip(token, own, set()):
+            edits.append((token, token.start, token.end, _token_text(token, "on-fill")))
+        elif token.util == "text" and not token.state:
+            extra = "".join(f" {state}text-on-fill" for state in _unwritten_flip_states(element, own))
+            if extra:
+                edits.append((token, token.end, token.end, extra))
+    return edits
 
 
 def _edge_colour(own: set[str], around: set[str]) -> str | None:
@@ -1515,19 +1586,33 @@ def leftovers(paths: Iterable[Path]) -> list[str]:
 
 
 def class_string_problems(text: str, ranges: list[tuple[int, int]] | None = None) -> list[tuple[int, str]]:
-    """(line, problem) for the rules that need no element: bg-white and ink-300 edges (named and
-    arbitrary-value utilities)."""
+    """(line, problem) for the rules that need no element: bg-white, ink-300 edges (named and
+    arbitrary-value utilities) and ink-300 fills (with the line-strong fill that replaces each)."""
     ranges = ranges or []
     found = []
-    for pattern, message in (
-        (SOLID_WHITE_RE, "{token} outside the light scope"),
-        (INK300_EDGE_RE, "{token} is a text grey in dark"),
-        (INK300_ARBITRARY_RE, "{token} is a text grey in dark"),
+    for pattern, message, fix in (
+        (SOLID_WHITE_RE, "{token} outside the light scope", ""),
+        (INK300_EDGE_RE, "{token} is a text grey in dark", ""),
+        (INK300_ARBITRARY_RE, "{token} is a text grey in dark", ""),
+        (INK300_FILL_RE, "{token} is a text grey in dark: fill with {fix}", INK300_FILL_FIX),
     ):
         for m in pattern.finditer(text):
             if not (_in(ranges, m.start()) or _kept(text, m.start())):
-                found.append((_line_of(text, m.start()), message.format(token=m.group(0))))
+                problem = message.format(token=m.group(0), fix=m.expand(fix) if fix else "")
+                found.append((_line_of(text, m.start()), problem))
     return found
+
+
+def string_problems(text: str) -> list[tuple[int, str]]:
+    """(line, problem) for a JS or Python file's class strings: white on a string's own fill that
+    flips (``_string_whites``), which a template's check reads through its elements."""
+    return sorted(
+        {
+            (_line_of(text, token.start), f"{token.text} on a fill that flips")
+            for element in string_elements(text)
+            for token, *_ in _string_whites(text, element)
+        }
+    )
 
 
 def dark_problems(text: str, *, css: bool = False) -> list[tuple[int, str]]:
@@ -1683,7 +1768,7 @@ def dark_findings(paths: Iterable[Path], kinds: dict[Path, bool], partials: Iter
             if name in ready and Path(name).name != "_platform_icon.html":
                 found += raw_colour_problems(text, css=name in partials)
         else:
-            found = class_string_problems(text)
+            found = class_string_problems(text) + string_problems(text)
         lines += [f"dark: {rel}:{line}: {problem}" for line, problem in sorted(found)]
     return lines
 

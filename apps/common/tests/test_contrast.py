@@ -137,6 +137,27 @@ def test_a_status_icon_under_its_bar_on_any_surface_fails(sheet, surface, status
     assert any(label in line for line in contrast.problems(broken, "dark"))
 
 
+SIDEBAR_HOVER_ICON = "ink-600 icon on the sidebar's hover fill (line-strong)"
+
+
+def test_the_sidebar_s_hover_fill_carries_its_icon_in_both_themes(sheet):
+    """The collapsed sidebar's account button: an ink-600 icon on its hover fill. line-strong is ink-300
+    in light (light does not move) and a fill in dark; ink-300 itself is a text grey in dark (1.49:1)."""
+    (pair,) = [pair for pair in contrast.PAIRS if pair.label == SIDEBAR_HOVER_ICON]
+    assert (pair.fg, pair.bg, pair.needs, pair.light_exception) == (
+        "--ink-600",
+        "--border-hover",
+        contrast.NON_TEXT,
+        "",
+    )
+    assert contrast.resolve_name("--border-hover", sheet.theme("light")) == sheet.layer1["--ink-300"]
+    for theme in ("light", "dark"):
+        assert contrast.problems(sheet, theme, [pair]) == []
+    text_grey = replace(sheet, dark={**sheet.dark, "--border-hover": "var(--ink-300)"})
+    (line,) = contrast.problems(text_grey, "dark", [pair])
+    assert "1.49:1" in line
+
+
 def test_the_one_light_exception_is_named_pinned_and_held_in_dark(sheet):
     """success-500 on ink-100 was 2.93:1 in light before F1 and light must not move; dark holds it."""
     excepted = [pair for pair in contrast.PAIRS if pair.light_exception]

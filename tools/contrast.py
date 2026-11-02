@@ -512,6 +512,9 @@ def _pairs() -> tuple[Pair, ...]:
     add(Pair(group, "current hour and now line ink-900 on card ink-0", "--ink-900", "--ink-0", NON_TEXT))
     add(Pair(group, "toggle knob on-fill on the off track ink-400", "--on-fill", "--ink-400", NON_TEXT))
     add(Pair(group, "toggle knob on-fill on the on track brand-700", "--on-fill", "--brand-700", NON_TEXT))
+    # The collapsed sidebar's account button: its icon on the hover fill, bg-line-strong (ink-300 in
+    # light; ink-300 itself is a text grey in dark and carried the icon at 1.49:1 there).
+    add(Pair(group, "ink-600 icon on the sidebar's hover fill (line-strong)", "--ink-600", "--border-hover", NON_TEXT))
     for surface, bg in (*SURFACES, ("tinted button brand-100", "--brand-100")):
         add(Pair(group, f"focus ring on {surface}", "--focus-ring", bg, NON_TEXT))
     for creative, hexa in CREATIVES:

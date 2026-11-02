@@ -439,6 +439,14 @@ def dark(text: str, name: str = "x/page.html") -> str:
             '<i class="[&_input]:file:border-[var(--border-hover)] ring-[var(--border-hover)] '
             'outline-[var(--border-hover)]"></i>',
         ),
+        # ... and so is an ink-300 fill, in any state and from 50 % (a fill, as fill_kind reads it): it
+        # moves to line-strong (ink-300 in light, a fill in dark); a faint tint and a text colour stay.
+        (
+            '<b class="bg-ink-200 hover:bg-ink-300 md:group-hover:bg-ink-300 focus:!bg-ink-300 bg-ink-300/60 '
+            'hover:bg-ink-300/10 text-ink-300"></b><i class="bg-ink-300"></i>',
+            '<b class="bg-ink-200 hover:bg-line-strong md:group-hover:bg-line-strong focus:!bg-line-strong '
+            'bg-line-strong/60 hover:bg-ink-300/10 text-ink-300"></b><i class="bg-line-strong"></i>',
+        ),
         # An arbitrary shadow written as a literal reads its token.
         (
             '<img class="w-7 shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]">',
@@ -519,6 +527,50 @@ def test_python_and_js_class_strings_move_too():
     assert recolor.transform(Path("static/js/x.js"), js, tokens=True, defined=set()) == (
         "el.className = 'rounded bg-surface ring-1 ring-line-strong';"
     )
+
+
+#: A quoted class string of a JS or Python file is one element: white drawn on its own fill that flips
+#: moves as it does in a template (text-on-fill; a white tint on-fill at its opacity; a base text-white
+#: under a state whose fill flips gains that state's text-on-fill). Nothing is known of its ancestors.
+JS_PY_STRINGS: tuple[tuple[str, str, str], ...] = (
+    ("static/js/x.js", "el.className = 'bg-brand-700 text-white';", "el.className = 'bg-brand-700 text-on-fill';"),
+    (
+        "static/js/x.js",
+        "row.className = 'bg-ink-900 hover:bg-white/10';",
+        "row.className = 'bg-ink-900 hover:bg-on-fill/10';",
+    ),
+    (
+        "static/js/x.js",
+        'b.className = "text-white hover:bg-danger-500";',
+        'b.className = "text-white hover:text-on-fill hover:bg-danger-500";',
+    ),
+    (
+        "static/js/x.js",
+        "n.innerHTML = `<span class=\"grid ${on ? 'bg-success-500' : 'bg-ink-100'}\n  text-white\">`;",
+        "n.innerHTML = `<span class=\"grid ${on ? 'bg-success-500' : 'bg-ink-100'}\n  text-on-fill\">`;",
+    ),
+    (
+        "apps/common/widgets.py",
+        "attrs = {'class': 'bg-danger-600 text-white rounded'}",
+        "attrs = {'class': 'bg-danger-600 text-on-fill rounded'}",
+    ),
+    ("apps/x/views.py", 'CHIP = "bg-ink-800 text-white"', 'CHIP = "bg-ink-800 text-on-fill"'),
+    # Each string is its own element; a scrim, black, the inverse surface and a faint tint do not flip.
+    ("static/js/x.js", "a.className = 'text-white'; b.className = 'bg-ink-900';", ""),
+    ("static/js/x.js", "t.className = 'bg-scrim/60 text-white hover:bg-white/10';", ""),
+    ("static/js/x.js", "t.className = 'bg-black/50 text-white';", ""),
+    ("static/js/x.js", "t.className = 'bg-inverse text-on-inverse hover:text-white';", ""),
+    ("static/js/x.js", "t.className = 'hover:bg-ink-900/5 text-white';", ""),
+    ("static/js/x.js", "t.className = 'bg-brand-700 text-white'; // recolor: keep", ""),
+    ("apps/x/views.py", "MSG = \"Don't use 'bg-ink-900' here\"; WHITE = 'text-white'", ""),
+)
+
+
+@pytest.mark.parametrize(("path", "before", "after"), JS_PY_STRINGS)
+def test_white_on_a_js_or_python_class_string_s_own_fill_moves(path, before, after):
+    after = after or before
+    assert recolor.transform(Path(path), before, tokens=True, defined=set()) == after
+    assert recolor.transform(Path(path), after, tokens=True, defined=set()) == after  # idempotent
 
 
 def test_a_template_s_name_is_the_part_after_templates():
@@ -645,6 +697,19 @@ def test_the_fixture_tree_is_clean(tree, capsys):
             '<b class="file:shadow-[inset_0_0_0_1px_var(--ink-300)]"></b>',
             "shadow-[inset_0_0_0_1px_var(--ink-300)] is a text grey in dark",
         ),
+        # An ink-300 fill: the collapsed sidebar's account button put its ink-600 icon on hover:bg-ink-300,
+        # 1.49:1 in dark.
+        (
+            '<button class="bg-ink-200 hover:bg-ink-300"><svg class="text-ink-600"></svg></button>',
+            "hover:bg-ink-300 is a text grey in dark: fill with hover:bg-line-strong",
+        ),
+        ('<i class="group-hover:bg-ink-300"></i>', "group-hover:bg-ink-300 is a text grey in dark"),
+        ('<i class="focus:bg-ink-300"></i>', "focus:bg-ink-300 is a text grey in dark: fill with focus:bg-line-strong"),
+        (
+            '<span class="h-2 rounded-full bg-ink-300"></span>',
+            "bg-ink-300 is a text grey in dark: fill with bg-line-strong",
+        ),
+        ('<span class="bg-ink-300/60"></span>', "bg-ink-300/60 is a text grey in dark: fill with bg-line-strong/60"),
     ],
 )
 def test_each_check_fails_and_names_the_file(tree, capsys, markup, message):
@@ -725,6 +790,11 @@ def test_white_on_a_dark_fill_in_template_css_names_the_line_of_the_white(tree, 
         "<style>.x { color: #fff } .x::after { background: var(--ink-900) }</style>",
         '<div data-theme-scope="light"><p style="background: #fff">x</p></div>',
         "<style>.k { background: #fff } /* recolor: keep */</style>",
+        # The hover fill in line-strong; ink-300 as text, as a faint tint, in the light scope or kept.
+        '<button class="bg-ink-200 hover:bg-line-strong"><svg class="text-ink-600"></svg></button>',
+        '<b class="text-ink-300 hover:bg-ink-300/10 bg-ink-300/40"></b>',
+        '<div data-theme-scope="light"><b class="hover:bg-ink-300"></b></div>',
+        '<b class="hover:bg-ink-300"></b> {# recolor: keep #}',
     ],
 )
 def test_what_the_checks_accept(tree, capsys, markup):
@@ -736,6 +806,50 @@ def test_what_the_checks_accept(tree, capsys, markup):
 def test_a_page_without_the_stylesheet_may_use_white(tree, capsys):
     tree("email/notice.html", '<html><body><td class="bg-white">Hi</td></body></html>')
     assert run_check(capsys)[0] == 0
+
+
+def _source(path: str, line: str) -> None:
+    """A JS or Python file of the fixture tree, *line* on its second line."""
+    file = recolor.ROOT / path
+    file.parent.mkdir(parents=True, exist_ok=True)
+    first = "import os\n" if file.suffix == ".py" else "const x = 1;\n"
+    file.write_text(first + line + "\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("path", "line", "message"),
+    [
+        # The review's probes: each passed --check while its string's own fill flips.
+        ("static/js/zz_probe.js", "el.className = 'bg-brand-700 text-white';", "text-white on a fill that flips"),
+        (
+            "static/js/zz_probe.js",
+            "row.className = 'bg-ink-900 hover:bg-white/10';",
+            "hover:bg-white/10 on a fill that flips",
+        ),
+        (
+            "apps/common/zz_probe.py",
+            "attrs = {'class': 'bg-danger-600 text-white rounded'}",
+            "text-white on a fill that flips",
+        ),
+        ("static/js/zz_probe.js", 'b.className = "text-white hover:bg-danger-500";', "text-white on a fill that flips"),
+        ("static/js/zz_probe.js", "c.className = 'bg-success-500 bg-white/20';", "bg-white/20 on a fill that flips"),
+        ("apps/x/views.py", 'CHIP = "bg-ink-800 text-white"', "text-white on a fill that flips"),
+        # The ink-300 fill rule reads JS and Python class strings too.
+        ("static/js/zz_probe.js", "b.className = 'hover:bg-ink-300';", "hover:bg-ink-300 is a text grey in dark"),
+    ],
+)
+def test_white_on_a_flipping_fill_in_a_js_or_python_class_string_fails(tree, capsys, path, line, message):
+    _source(path, line)
+    code, out = run_check(capsys)
+    assert code == 1
+    assert f"dark: {path}:2: {message}" in out
+
+
+@pytest.mark.parametrize(("path", "line"), [(path, after or before) for path, before, after in JS_PY_STRINGS])
+def test_what_the_checks_accept_in_js_and_python(tree, capsys, path, line):
+    """What the dark pass writes, and what it leaves because nothing flips under the white."""
+    _source(path, line)
+    assert run_check(capsys) == (0, "recolor: nothing left to do\n")
 
 
 @pytest.mark.parametrize(
