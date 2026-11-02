@@ -12,18 +12,23 @@
   so the map cannot drift from the views; rendered as an owner with posts, on its plain URL and on
   each query in ``PAGE_QUERIES`` (Calendar's list view and every list-mode tab
   ``calendar.views._TAB_TEMPLATES`` can choose), every project template it renders is inside its tree
-  (plus its screens' fragments and a short list of templates chosen at run time), so no guard misses
-  a template those renders show; and those renders do draw the selects and the status pills.
+  plus its screens' fragments; and those renders do draw the selects and the status pills.
+  ``RUNTIME_CHOSEN`` (templates picked through a variable include) is read by no guard: it excuses
+  them only on a page no guard reads yet (in no screen's ``pages``, not in ``DARK_READY``). On a
+  page a guard reads, each must be in its screen's ``fragments``, or the check fails, so no guard
+  misses a template those renders show (a gated Calendar without its four tabs listed fails).
 - ``theme_ready`` is false for every page today (no visible change). Once a page is declared in
   ``DARK_READY``, its ``<html>`` carries ``data-theme-ready`` and other pages' do not; the client
   portal's base does the same.
 - An HTMX fragment never renders an ``<html>`` tag, so the flag never lands inside a page.
 """
 
+import dataclasses
 import os
 import subprocess
 import sys
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -372,8 +377,11 @@ def test_every_mapped_page_renders_its_listed_roots(client, team, page):
 
 
 #: Templates a page picks at run time, through a variable ``{% include %}`` that ``template_tree``
-#: cannot follow, each with where the name comes from. Only the choice is taken on trust: the drift
-#: check adds each rendered one's own tree, so everything it reaches is still checked.
+#: cannot follow, each with where the name comes from. The guards never read this list: no guard reads
+#: these templates until the screen's gate lists them in its ``fragments``. So the drift check takes
+#: the choice on trust (adding each rendered one's tree) only on a page no guard reads yet, one no
+#: screen lists in ``pages`` and not in ``DARK_READY``; on any other page each must be in the tree of
+#: its screen's ``fragments``, as the registry's rule says.
 RUNTIME_CHOSEN: dict[str, str] = {
     "studio/partials/thread.html": "Home's thread: {% include thread.template %} (studio.chat.PANEL_TEMPLATE)",
     "calendar/partials/publish_queue.html": "list mode's tab: {% include initial_tab_template %} (calendar.views._TAB_TEMPLATES)",
@@ -414,40 +422,99 @@ def _fragments_of(page):
     return tuple(name for screen in screens.SCREENS.values() if page in screen.pages for name in screen.fragments)
 
 
-def test_every_template_a_mapped_page_renders_is_in_its_tree(client, world):
-    """What the guards read (``template_tree``) is what the page shows, inclusion tags included.
+def _read_by_a_guard(page):
+    """Whether *page* is a guard's: a screen lists it in ``pages``, or it is declared dark-ready."""
+    return page in screens.DARK_READY or any(page in screen.pages for screen in screens.SCREENS.values())
 
-    Rendered as an owner with connected channels and posts in every state, so the filters
-    (``{% ui_select %}``) and the status pills (``{% status_badge %}``) render.
-    """
+
+@pytest.fixture
+def busy(client, world):
+    """An owner's client on the world's workspace, with connected channels and posts in every state,
+    so the filters (``{% ui_select %}``) and the status pills (``{% status_badge %}``) render."""
     for status in ("pending_review", "pending_client", "approved", "changes_requested", "rejected", "on_hold"):
         world.post(status, tags=("launch",))
     for status in ("scheduled", "published", "failed"):
         post = world.post(status, account=world.linkedin, when=timezone.now())
         post.platform_posts.update(scheduled_at=timezone.now())
     client.force_login(world.owner)
+    return SimpleNamespace(client=client, workspace=world.workspace)
 
+
+def _drift(busy: SimpleNamespace, pages: Iterable[screens.Page]) -> tuple[dict[str, list[str]], set[str], set[str]]:
+    """Render each of *pages* on its plain URL and each of its ``PAGE_QUERIES``.
+
+    Returns ``(strays, exempted, seen)``: per page and query, the project templates rendered outside
+    the page's tree (its roots and its screens' fragments, plus the trees of the ``RUNTIME_CHOSEN``
+    templates it rendered while no guard reads it); those exempted templates; and every project
+    template rendered. A page a guard reads gets no exemption (``_read_by_a_guard``): what it picks at
+    run time must be in its screens' ``fragments``, the only place the guards look for it.
+    """
     strays: dict[str, list[str]] = {}
-    chosen: set[str] = set()
+    exempted: set[str] = set()
     seen: set[str] = set()
-    for page in sorted(screens.PAGE_TEMPLATES):
+    for page in pages:
         for query in ({}, *PAGE_QUERIES.get(page, ())):
-            response = client.get(reverse(f"{page[0]}:{page[1]}", kwargs={"workspace_id": world.workspace.id}), query)
+            response = busy.client.get(
+                reverse(f"{page[0]}:{page[1]}", kwargs={"workspace_id": busy.workspace.id}), query
+            )
             assert response.status_code == 200, (page, query, response.status_code)
             rendered = _project_templates(response)
             assert set(screens.PAGE_TEMPLATES[page]) <= rendered, (page, query)
             seen |= rendered
-            picked = rendered & set(RUNTIME_CHOSEN)
-            chosen |= picked
+            picked = set() if _read_by_a_guard(page) else rendered & set(RUNTIME_CHOSEN)
+            exempted |= picked
             tree = set(screens.template_tree((*screens.PAGE_TEMPLATES[page], *_fragments_of(page), *sorted(picked))))
             if rendered - tree:
                 strays[f"{':'.join(page)} {query}"] = sorted(rendered - tree)
+    return strays, exempted, seen
+
+
+def test_every_template_a_mapped_page_renders_is_in_its_tree(busy):
+    """What the guards read (``template_tree``) is what the page shows, inclusion tags included."""
+    strays, exempted, seen = _drift(busy, sorted(screens.PAGE_TEMPLATES))
 
     assert not strays, f"rendered but outside template_tree, so no guard reads them: {strays}"
-    # Every entry of the allowlist is still chosen at run time on a mapped page, so it cannot go stale.
-    assert chosen == set(RUNTIME_CHOSEN), sorted(set(RUNTIME_CHOSEN) - chosen)
+    # Every entry of the allowlist is still chosen at run time on a mapped page no guard reads, so it
+    # cannot go stale: once a gate lists an entry in its screen's fragments, the entry goes.
+    assert exempted == set(RUNTIME_CHOSEN), sorted(set(RUNTIME_CHOSEN) - exempted)
     # The world still draws the selects and the pills: fewer posts would leave them unread, not stray.
     assert set(TAG_TEMPLATES_RENDERED) <= seen, sorted(set(TAG_TEMPLATES_RENDERED) - seen)
+
+
+#: The four list-mode tabs Calendar picks at run time (``{% include initial_tab_template %}``).
+CALENDAR_TABS = tuple(calendar_views._TAB_TEMPLATES.values())
+#: Calendar as a gated screen whose gate forgot its run-time templates, and as one that lists them.
+GATED_CALENDAR = screens.Screen(templates=("calendar/calendar.html",), pages=(CALENDAR,), gated=True)
+LISTED_CALENDAR = dataclasses.replace(GATED_CALENDAR, fragments=CALENDAR_TABS)
+
+
+@pytest.mark.parametrize(
+    ("dark_ready", "registry"),
+    [
+        pytest.param(frozenset(), {"calendar": GATED_CALENDAR}, id="gated-screen-without-fragments"),
+        pytest.param(frozenset({CALENDAR}), {}, id="dark-ready-page-without-a-screen"),
+    ],
+)
+def test_a_guarded_pages_run_time_templates_must_be_in_its_screens_fragments(busy, monkeypatch, dark_ready, registry):
+    """The allowlist covers only a page no guard reads yet. The guards read a gated screen's
+    ``template_tree(templates + fragments)`` and a dark-ready page's ``template_tree(roots)`` plus
+    the screens' fragments, never ``RUNTIME_CHOSEN``; so once a screen lists the page or the page is
+    declared, a template it picks at run time must be in its screen's ``fragments``: otherwise a
+    gated Calendar passes the grid guard while its four tabs render off-grid spacing unread.
+    """
+    monkeypatch.setattr(screens, "DARK_READY", dark_ready)
+    monkeypatch.setattr(screens, "SCREENS", registry)
+    strays, exempted, _ = _drift(busy, [CALENDAR])
+    unread = {name for names in strays.values() for name in names}
+    assert set(CALENDAR_TABS) <= unread, f"the tabs were taken on trust on a page a guard reads: {strays}"
+    assert not exempted, sorted(exempted)
+
+    # The screen that lists them in its fragments: no stray, and the guards' own tree holds every tab.
+    monkeypatch.setattr(screens, "SCREENS", {"calendar": LISTED_CALENDAR})
+    strays, exempted, _ = _drift(busy, [CALENDAR])
+    assert not strays, strays
+    assert not exempted, sorted(exempted)
+    assert set(CALENDAR_TABS) <= set(screens.template_tree((*LISTED_CALENDAR.templates, *LISTED_CALENDAR.fragments)))
 
 
 # ─────────────────────────────── The readiness flag ───────────────────────────────

@@ -236,7 +236,15 @@ can import it), shared by every guard below:
   (partials that HTMX loads into its pages), `pages` (`(app_name, url_name)` to render), `roles` (who
   may open them) and `gated` (flipped at its gate).
 - `template_tree(roots)` — the roots plus every template they reach through literal `{% include %}`
-  and `{% extends %}` names; dynamic includes are listed in `fragments`.
+  and `{% extends %}` names, or through an inclusion tag's use (`{% ui_select %}` reaches
+  `components/ui_select.html`), each reached template's own includes and tags followed in turn.
+  A template chosen at run time (a variable `{% include %}`, or a tag that picks its template
+  itself) cannot be followed: it is listed in its screen's `fragments`, and no guard reads it
+  until it is.
+- `inclusion_tags()` — `{tag name: template}` for every `@register.inclusion_tag` in
+  `apps/*/templatetags/`, read with `ast` (a literal first argument or `filename=`, a `name=`
+  override, the call form `register.inclusion_tag("…")(function)`); a form it cannot read, or one
+  tag name for two templates, raises, so no tag's template goes unseen.
 
 Users: the readiness flag on `<html>` (T1), recolor's raw-colour rule (T3, over
 `template_tree(PAGE_TEMPLATES[page])` for every `DARK_READY` page, plus the screens' `fragments`), the
