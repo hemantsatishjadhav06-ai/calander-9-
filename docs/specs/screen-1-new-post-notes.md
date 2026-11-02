@@ -193,9 +193,15 @@ confirm modals explicitly.
    Settings → Accounts (wording to agree); Write it myself and the idea form still work.
 5. **Idea refusals.** Today a refused idea shows in the error toast (`htmx-error`). In the sheet the
    refusal could show in the idea form's own error line, like Ask the team's. Default: inline.
-6. **The look checkbox's words.** The plan says *Keep the brand look*; the form says "Match the
-   look of the last post" (`apps/studio/forms.py`). They mean different things. Default: the
-   form's words, until the owner chooses.
+6. **The look checkbox's words.** The plan says *Keep the brand look*; the form said "Match the
+   look of the last post" (`apps/studio/forms.py`). Settled in T16's review: the sheet says the
+   plan's and spec's words, *Keep the brand look* (`BriefForm`'s label; no other template renders
+   the form). They are also the thread's words for the same choice: `style_lock` on is "the brand
+   look" and off "a fresh layout" (`apps/studio/chat.py`, "Choose the brand look or a fresh
+   layout"; `jobtypes/chat.py`, "The brand look will be followed."). Ticked, the team follows the
+   look of the workspace's latest post, or the brand profile's defaults before anything has posted;
+   unticked, it picks a fresh look within the brand (`apps/studio/style.py`). The owner may still
+   choose other words.
 7. **The keyboard on iOS.** `max-h-[92vh]` does not shrink when the keyboard opens, so the footer
    (with *Send*) can sit under the keyboard while the person types; they close the keyboard, then
    tap *Send*, as in most iOS sheets. `92dvh` would follow the visible area (iOS Safari 16+ supports
@@ -209,6 +215,14 @@ confirm modals explicitly.
 9. **Two ways to ask the team on Home.** Home keeps its thread composer (goldens 02 and 03), and the
    sheet's Ask the team starts a separate thread for the idea. Screen 2 decides how Home words its
    thread so that the two do not read as the same act.
+10. **Where the help line sits** (from T16's review, for the owner and T25's audit). The spec puts
+    "Your manager replies with what we're making. Nothing is made until you go ahead." under the
+    button (`03-rebuild-screens.md`, *Ask the team*); the plan's T16 does not say where, and these
+    notes (4, *Help line*) put it under the fields. T16 built it there: the last line of the panel's
+    scrolling body, just above the sticky footer, which keeps to the error line and one row (the
+    allowance line beside *Send*). Moving it under *Send* would add about two lines to the sticky
+    footer on a phone, over the 92vh sheet and the keyboard (7). Default: under the fields, as
+    built; T24's baselines photograph whichever stands.
 
 ## What T14 added beside these notes
 

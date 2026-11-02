@@ -73,7 +73,7 @@ class BriefForm(forms.Form):
         widget=forms.CheckboxSelectMultiple(attrs={"class": "w-4 h-4 rounded accent-brand-700"}),
     )
     style_lock = forms.BooleanField(
-        label="Match the look of the last post",
+        label="Keep the brand look",
         required=False,
         initial=True,
         widget=forms.CheckboxInput(attrs={"class": "mt-0.5 w-4 h-4 rounded accent-brand-700"}),

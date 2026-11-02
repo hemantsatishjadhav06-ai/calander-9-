@@ -47,6 +47,7 @@ TEMPLATES = Path(__file__).resolve().parents[3] / "templates"
 NEW_TEMPLATES = ("components/new_post_sheet.html", "studio/partials/new_post_team.html")
 ALLOWANCE = "This starts the team's work and counts toward this month's allowance."
 HELP = "Your manager replies with what we're making. Nothing is made until you go ahead."
+LOOK = "Keep the brand look"
 #: Primaries already on these pages that other tasks move (each in its own place, not the sheet's):
 #: Home's thread Send becomes tinted in screen 2 (spec, "Screen 2 · Home"); Calendar's Add event is
 #: screen 4's. The count below proves the button adds exactly one primary beside them.
@@ -272,6 +273,10 @@ def test_ask_the_team_posts_to_studio_create_and_shows_refusals_in_its_own_line(
     for name in ("goal", "notes", "source_picture", "style_lock"):
         assert _inside(_one(form, name=name), more[0]), name
     assert not _inside(idea, more[0]) and not _inside(_all(form, name="accounts")[0], more[0])
+    # The look checkbox in the plan's and spec's words, which are the thread's for the same choice.
+    look = _one(form, name="style_lock")
+    assert look.attrs.get("type") == "checkbox"
+    assert next(each for each in look.ancestors() if each.tag == "label").text() == LOOK
 
 
 @pytest.mark.parametrize("page", PAGES, ids=["home", "calendar"])
