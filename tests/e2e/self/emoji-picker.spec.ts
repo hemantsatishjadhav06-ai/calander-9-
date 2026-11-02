@@ -16,7 +16,7 @@ test('the idea emoji picker renders on demand, searches, inserts and reopens', a
   await expect(page.getByRole('dialog', { name: 'New idea' })).toBeVisible();
   // The sheet places the focus in the title asynchronously. Wait for that observable state,
   // otherwise its title focus can steal the keyboard event used by Playwright's fill. Polled by test id,
-  // so a miss names what has the focus instead (WebKit once dropped it just after the sheet placed it).
+  // so a miss names what has the focus instead (WebKit once put it on Close: the panel showed a frame late).
   await expect
     .poll(() => page.evaluate(() => {
       const active = document.activeElement;

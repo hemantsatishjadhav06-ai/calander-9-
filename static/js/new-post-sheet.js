@@ -50,8 +50,6 @@
   var DRAWER_HANDBACK_MS = 300;
   /** How many frames the field waits for the dialog to show before it settles for what shows. */
   var SHOW_FRAMES = 10;
-  /** How many frames (about half a second) focusField keeps the focus it placed from being lost (see _holdFocus). */
-  var HOLD_FRAMES = 30;
   var SAVE_FAILED = 'Could not save the idea. Please try again.';
   var UPLOAD_FAILED = 'One of the files failed to upload. Please try again.';
   var TOKEN_MISSING = 'Security token missing. Please reload the page.';
@@ -489,10 +487,18 @@
         var mode = this.sheetMode;
         this.$nextTick(function () {
           if (!root) return;
-          // Opened as the page loads (#new-post, where `n` lands away from the sheet: shortcuts.js), the
-          // dialog can still be hidden here, x-show not having shown it yet: try again on the next frames.
+          // The dialog, or the mode's panel, may not show yet: Alpine's x-show shows on the next frame,
+          // and this runs from $nextTick, a timer, which WebKit runs before that frame. That happens when
+          // the sheet opens as the page loads (#new-post, where `n` lands away from the sheet:
+          // shortcuts.js) and on every switch of mode (CI's iPhone 13, WebKit, put the focus on Close
+          // after Save it as an idea and Write it myself). Try again on the next frames, then settle
+          // for what shows.
           var dialog = root.querySelector('[data-testid="new-post-sheet"]');
-          if (dialog && !visible(dialog) && waited < SHOW_FRAMES && typeof window.requestAnimationFrame === 'function') {
+          var panel = root.querySelector('[data-view="' + mode + '"]');
+          var target = root.querySelector(FIRST_FIELD[mode]);
+          var panelShows = visible(target) || !!(panel && Array.prototype.some.call(panel.querySelectorAll(FOCUSABLE), visible));
+          var shows = (!dialog || visible(dialog)) && panelShows;
+          if (!shows && waited < SHOW_FRAMES && typeof window.requestAnimationFrame === 'function') {
             waited += 1;
             window.requestAnimationFrame(function () {
               if (sheet.sheetOpen && sheet.sheetMode === mode) sheet.focusField(afterDrawer);
@@ -501,8 +507,6 @@
             return;
           }
           waited = 0;
-          var panel = root.querySelector('[data-view="' + mode + '"]');
-          var target = root.querySelector(FIRST_FIELD[mode]);
           if (!visible(target) && panel) {
             target = Array.prototype.find.call(panel.querySelectorAll(FOCUSABLE), visible) || null;
           }
@@ -510,37 +514,7 @@
           if (!target) return;
           target.focus();
           if (afterDrawer) sheet._reclaimFocus(target);
-          sheet._holdFocus(target);
         });
-      },
-
-      /**
-       * For HOLD_FRAMES after focusField placed the focus on `target`, focus lost to nowhere (the body,
-       * or a control that no longer shows, such as Ask the team's field once Save it as an idea hides it)
-       * goes back to `target` on the next frame. WebKit dropped the idea title's focus that way just after
-       * the sheet placed it (CI's iPhone 13; Go to's palette in base.html notes WebKit doing the same). A
-       * control someone moves the focus to keeps it, and that ends the hold; so does closing the sheet or
-       * changing its mode (which places the focus again).
-       */
-      _holdFocus: function (target) {
-        if (typeof window.requestAnimationFrame !== 'function') return;
-        var sheet = this;
-        var mode = this.sheetMode;
-        var left = HOLD_FRAMES;
-        function lost() {
-          var active = document.activeElement;
-          return !active || active === document.body || !visible(active);
-        }
-        function check() {
-          left -= 1;
-          if (!sheet.sheetOpen || sheet.sheetMode !== mode || left < 0) return;
-          if (document.activeElement !== target) {
-            if (!lost()) return;
-            target.focus();
-          }
-          window.requestAnimationFrame(check);
-        }
-        window.requestAnimationFrame(check);
       },
 
       /** Give `target` focus back once if it leaves the sheet within DRAWER_HANDBACK_MS (see focusField). */
