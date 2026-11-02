@@ -173,8 +173,9 @@ class DraftTitleTests(ChannellessDraftBase):
 
 class SidebarActiveStateTests(ChannellessDraftBase):
     """The sidebar lights one place, by exact page name (apps/common/navigation.py). Ideas and Queues
-    left the sidebar with More (plan T9): Ideas is in the New menu, Queues in the Calendar page's
-    header. These keep pinning that a page lights its own place and never a look-alike."""
+    left the sidebar with More (plan T9): Ideas is a foot link of the New post sheet on Home and
+    Calendar (the shell's New menu that held it went with Phase 3 T19), Queues is in the Calendar
+    page's header. These keep pinning that a page lights its own place and never a look-alike."""
 
     def _active_labels(self, response):
         html = response.content.decode()
@@ -182,13 +183,15 @@ class SidebarActiveStateTests(ChannellessDraftBase):
 
     def test_new_post_does_not_light_create_idea(self):
         # Neither the composer nor the Ideas page is one of the six places: nothing is lit on either,
-        # and Ideas is a New-menu entry on both, never a sidebar item.
+        # and Ideas is never a sidebar item. Neither carries the shell's old New menu or the New post
+        # sheet (that is Home's and Calendar's).
         for name in ("composer:compose", "composer:create_landing"):
             response = self.client.get(reverse(name, kwargs=self.kw))
             self.assertEqual(response.status_code, 200, name)
             self.assertEqual(self._active_labels(response), [], name)
             self.assertNotIn("Ideas", self._labels(response), name)
-            self.assertContains(response, 'data-testid="sidebar-new-ideas"')
+            self.assertNotContains(response, "sidebar-new-")
+            self.assertNotContains(response, 'data-testid="new-post-sheet"')
 
     def _labels(self, response):
         return re.findall(r'sidebar-nav-label">([^<]+)<', response.content.decode())

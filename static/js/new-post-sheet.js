@@ -11,8 +11,8 @@
  *   button) and gives focus back to it when the sheet closes (Escape, the close button, the scrim); when
  *   the opener cannot take it (a cell's hover-only "+", hidden again), the New post button does.
  * - Puts focus in the mode's first field: Your idea, Open the editor, or the idea's title. Opened from
- *   the open phone drawer (base.html's New > Idea), the field takes focus back once when the drawer's
- *   trap returns it to the drawer's button as it lets go.
+ *   the open phone drawer (new-post:open or #new-post while it is open), the field takes focus back
+ *   once when the drawer's trap returns it to the drawer's button as it lets go.
  * - Keeps what was typed: closing only hides the sheet.
  * - Sets `has-sheet` on body while open, and keeps the button's aria-expanded current.
  * - Clears the Ask the team error line as a new request starts (the page writes a refusal there).
@@ -20,7 +20,7 @@
  *   sheet was opened with (only those, only when given); opening from the button carries none.
  *
  * Save it as an idea (T18; templates/composer/partials/new_post_idea.html), moved here from the shell's
- * New idea dialog (base.html's window.ideaModalHelpers and sidebarNewMenu(), which go with T19):
+ * New idea dialog (base.html's window.ideaModalHelpers and sidebarNewMenu(), gone with T19):
  * - The columns and tags come from the page's json_script elements (#new-post-idea-columns,
  *   #new-post-idea-tags; the tags only with the templates switch), never pasted into code.
  * - Pictures go up one by one to the form's data-upload-url and are sent as asset ids; a new tag goes to
@@ -90,7 +90,7 @@
   }
 
   /**
-   * The idea form's requests (base.html's window.ideaModalHelpers, moved here; T19 removes that copy).
+   * The idea form's requests (base.html's window.ideaModalHelpers, moved here; T19 removed that copy).
    * They answer with the server's words instead of a toast or a browser alert.
    */
   var ideaModalHelpers = {
@@ -472,8 +472,8 @@
 
       /**
        * Focus the mode's first field once the panel shows; else its first control; else Close.
-       * `afterDrawer`: the sheet was opened from the open phone drawer (base.html's New > Idea). The
-       * drawer's trap hands focus back to its button as it lets go, and that can land just after this
+       * `afterDrawer`: the sheet was opened while the phone drawer was open (new-post:open, #new-post).
+       * The drawer's trap hands focus back to its button as it lets go, and that can land just after this
        * (the sheet's own trap starts a moment later and never pulls focus in), so the field takes it back
        * once, if it comes while the sheet is still opening.
        */

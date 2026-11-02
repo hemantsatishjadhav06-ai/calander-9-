@@ -408,10 +408,13 @@ class TestHome:
         for gone in ("More", "Set up", "Notifications", "Blog &amp; SEO"):
             assert f'<span class="sidebar-nav-label">{gone}</span>' not in html, gone
         assert "sidebar-more" not in html
+        assert "sidebar-new-" not in html  # the New menu left the shell (Phase 3, T19)
         assert "Start a post" not in html and "customer_workflow" not in html
         kwargs = {"workspace_id": world.workspace.id}
-        for name in ("composer:create_landing", "composer:csv_upload"):  # the New menu
-            assert reverse(name, kwargs=kwargs) in html, name
+        sheet = html[html.index('data-testid="new-post-sheet"') :]  # the New post sheet took the New menu's links
+        for name in ("studio:create", "composer:compose", "composer:create_landing", "composer:csv_upload"):
+            assert reverse(name, kwargs=kwargs) in sheet, name
+        assert reverse("calendar:calendar", kwargs=kwargs) + "?mode=list&amp;tab=drafts" in sheet
         calendar = client.get(reverse("calendar:calendar", kwargs=kwargs)).content.decode()
         for name in ("composer:drafts_list", "calendar:posting_slots", "media_library:index"):  # its header
             assert reverse(name, kwargs=kwargs) in calendar, name

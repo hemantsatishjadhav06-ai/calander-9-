@@ -24,8 +24,8 @@ The overlay never blocks the page while closed (pointer-events-none; only its op
 events), so the scrim and the dialog can each run their own leave transition.
 
 Context: workspace, form (apps.studio.forms.BriefForm), features, idea_columns and idea_tags (the idea
-form's columns and tags, apps.composer.ideas.idea_form_context). Where it is, base.html's New > Idea
-opens its idea form (new-post:open with mode 'idea') instead of the shell's New idea dialog.
+form's columns and tags, apps.composer.ideas.idea_form_context). new-post:open with mode 'idea' opens
+its idea form; the shell's New menu and New idea dialog that did so went with T19.
 {% endcomment %}
 <div class="fixed inset-0 z-[100] flex items-end justify-center pointer-events-none lg:items-stretch lg:justify-end" x-data="newPostSheet()">
     <div x-show="sheetOpen" x-cloak class="ui-overlay pointer-events-auto" @click="close()"

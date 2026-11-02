@@ -1,7 +1,8 @@
 """Save it as an idea (Phase 3, screen 1, T18).
 
-The sheet's third view is the idea form that the shell's New idea dialog held (``base.html``, until
-T19 removes it): a column, a title (focused when the view shows), a description with the emoji picker
+The sheet's third view is the idea form that the shell's New idea dialog held (``base.html``; T19 took
+the dialog and the New menu out of the shell): a column, a title (focused when the view shows), a
+description with the emoji picker
 (its 95 options rendered only while it is open), pictures uploaded through
 ``composer:idea_upload_media`` and sent as asset ids, and, only with the ``templates`` switch, tags and
 the "Create new tag" dialog through ``composer:tag_create``. It posts to ``composer:idea_create`` and
@@ -107,9 +108,9 @@ def test_save_it_as_an_idea_instead_sits_beside_send_and_opens_the_idea_form(cli
     assert any(each is bar for each in reach.ancestors())
 
 
-#: The idea form's hooks. The shell's New idea dialog (base.html, until T19) carries the same ones, and
-#: tests/e2e/self/emoji-picker.spec.ts, phone-menu-focus.spec.ts and the Lighthouse New > Idea
-#: interaction (tests/lighthouse/targets.mjs) find them by test id alone, so a page has one of each.
+#: The idea form's hooks. tests/e2e/self/emoji-picker.spec.ts, phone-menu-focus.spec.ts and the
+#: Lighthouse idea interaction (tests/lighthouse/targets.mjs) find them by test id alone, so a page has
+#: one of each, the sheet's. The shell's New idea dialog that carried the same ones went with T19.
 IDEA_HOOKS = (
     "idea-title",
     "idea-description",
@@ -118,27 +119,31 @@ IDEA_HOOKS = (
     "idea-emoji-option",
     "idea-close",
 )
-#: The shell's New > Idea where the sheet is: the menu closes and the sheet opens on its idea form.
-OPEN_THE_SHEET_S_IDEA = "newMenuOpen = false; $dispatch('new-post:open', {mode: 'idea'})"
+#: What the shell's New menu and its New idea and Create new tag dialogs left on a page (T19 took them).
+SHELL_IDEA_MARKERS = (
+    "sidebar-new-",
+    "sidebarNewMenu",
+    "openCreateModal",
+    'aria-label="New idea"',
+    'id="sidebar-create-tag-title"',
+)
 
 
 @pytest.mark.parametrize("page", PAGES, ids=["home", "calendar"])
 @pytest.mark.parametrize("role", STARTERS)
-def test_where_the_sheet_is_the_shell_s_new_idea_opens_its_idea_form(client, world, role, page):
+def test_where_the_sheet_is_the_idea_form_is_the_sheet_s_alone(client, world, role, page):
     html = _page(client, world, page, getattr(world, role))
     root = parse(html)
     sheet = _one(root, **{"data-testid": "new-post-sheet"})
 
-    item = _one(root, **{"data-testid": "sidebar-new-idea"})
-    assert item.attrs.get("@click") == OPEN_THE_SHEET_S_IDEA
     for hook in IDEA_HOOKS:
         found = _all(root, **{"data-testid": hook})
         assert len(found) == 1, (hook, len(found))
         assert any(each is sheet for each in found[0].ancestors()), hook
-    # The shell's dialog and its Create new tag dialog are not on the page (the head's CSS stays).
+    # No New menu leads to a dialog of the shell's: the sheet's own button and new-post:open reach the form.
     assert 'class="idea-modal-overlay"' not in html
-    assert 'aria-label="New idea"' not in html
-    assert 'id="sidebar-create-tag-title"' not in html
+    for marker in SHELL_IDEA_MARKERS:
+        assert marker not in html, marker
 
 
 @pytest.mark.parametrize(
@@ -146,8 +151,9 @@ def test_where_the_sheet_is_the_shell_s_new_idea_opens_its_idea_form(client, wor
     (("approvals:index", "owner"), ("composer:create_landing", "editor"), ("calendar:calendar", "viewer")),
     ids=["approvals", "ideas", "calendar-viewer"],
 )
-def test_without_the_sheet_the_shell_s_new_idea_keeps_its_dialog(client, world, name, role):
-    """Every other place, and Calendar for someone who may not start posts, keeps it until T19."""
+def test_without_the_sheet_no_page_keeps_the_shell_s_new_menu_or_idea_dialog(client, world, name, role):
+    """Every other place, and Calendar for someone who may not start posts: neither the sheet nor the
+    shell's New menu and dialogs (the Ideas page keeps its own New idea dialog, which is not the shell's)."""
     client.force_login(getattr(world, role))
     response = client.get(reverse(name, kwargs={"workspace_id": world.workspace.id}))
     assert response.status_code == 200
@@ -155,9 +161,10 @@ def test_without_the_sheet_the_shell_s_new_idea_keeps_its_dialog(client, world, 
     root = parse(html)
 
     assert not _all(root, **{"data-testid": "new-post-sheet"})
-    assert _one(root, **{"data-testid": "sidebar-new-idea"}).attrs.get("@click") == "openCreateModal()"
-    assert "autofocus" in _one(root, **{"data-testid": "idea-title"}).attrs
-    assert 'class="idea-modal-overlay"' in html
+    for hook in IDEA_HOOKS:
+        assert not _all(root, **{"data-testid": hook}), hook
+    for marker in SHELL_IDEA_MARKERS:
+        assert marker not in html, marker
 
 
 # ── The form ────────────────────────────────────────────────────────────────────────────────────
