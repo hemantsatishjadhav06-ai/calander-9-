@@ -345,3 +345,74 @@ test('closing the list gives focus back to what had it', () => {
   assert.equal(component.open, false);
   assert.equal(doc.activeElement, link);
 });
+
+/** Move the list's timers on by `ms` (jsdom's timers run on Node's, which the test mocks). */
+function later(t, ms) {
+  t.mock.timers.tick(ms);
+}
+
+/** The list's component with its markup: the dialog and its close button, as base.html gives them. */
+function listWithMarkup(win) {
+  const doc = win.document;
+  const dialog = doc.createElement('div');
+  dialog.setAttribute('role', 'dialog');
+  const close = doc.createElement('button');
+  close.textContent = 'Close';
+  dialog.appendChild(close);
+  doc.body.appendChild(dialog);
+  const component = list(win);
+  component.$refs = { dialog, close };
+  return { component, dialog, close };
+}
+
+test('opening the list puts the focus in it at once, not when its trap starts', () => {
+  const { win, doc } = page();
+  const { component, close } = listWithMarkup(win);
+  component.show();
+  assert.equal(doc.activeElement, close);
+});
+
+test('closing the list before the plugin has started its trap lets the trap go only once it has', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { win } = page();
+  const { component } = listWithMarkup(win);
+  component.show();
+  assert.equal(component.trapped, true);
+  later(t, 1);
+  component.close();
+  assert.equal(component.open, false, 'the list closes at once');
+  assert.equal(component.trapped, true, 'its trap is kept until the plugin has started it');
+  later(t, 30);
+  assert.equal(component.trapped, false);
+});
+
+test('closing the list after the plugin has started its trap lets the trap go at once', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { win } = page();
+  const { component } = listWithMarkup(win);
+  component.show();
+  later(t, 100);
+  component.close();
+  assert.equal(component.trapped, false);
+});
+
+test('opened again before a held trap is let go, the list keeps it', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { win } = page();
+  const { component } = listWithMarkup(win);
+  component.show();
+  component.close();
+  component.show();
+  later(t, 100);
+  assert.equal(component.open, true);
+  assert.equal(component.trapped, true);
+});
+
+test("the list waits for the focus plugin's own trap delay", () => {
+  // x-trap starts its trap in setTimeout(() => trap.activate(), N): the list's marker must wait as long.
+  const plugin = fs.readFileSync(path.resolve(__dirname, '../../static/js/vendor/alpine-focus.min.js'), 'utf8');
+  const delays = [...plugin.matchAll(/setTimeout\(\(\)=>\{\w+\.activate\(\)\},(\d+)\)/g)].map((match) => Number(match[1]));
+  assert.equal(delays.length, 1, 'the plugin starts its trap in exactly one timer');
+  const { win } = page();
+  assert.equal(win.bbShortcuts.pluginTrapDelayMs, delays[0]);
+});

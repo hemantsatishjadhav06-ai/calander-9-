@@ -37,6 +37,12 @@
   /** Inputs that take no typing; any other input is a text field. */
   var NOT_TYPED = ['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'];
   var TYPED_ROLES = '[role="textbox"], [role="searchbox"], [role="combobox"], [role="spinbutton"]';
+  /**
+   * The focus plugin's wait before it starts a trap: x-trap calls setTimeout(activate, 15) when its
+   * expression turns true (static/js/vendor/alpine-focus.min.js; tests/js/shortcuts.test.cjs reads it
+   * there, so an upgrade that changes it fails a test).
+   */
+  var PLUGIN_TRAP_DELAY_MS = 15;
 
   /** The switch's value when storage cannot keep it: this page only. */
   var memory = null;
@@ -155,6 +161,8 @@
     setOn: setOn,
     match: match,
     run: run,
+    /** The focus plugin's trap delay this file waits for (tests/js/shortcuts.test.cjs checks it). */
+    pluginTrapDelayMs: PLUGIN_TRAP_DELAY_MS,
     /** Leave for `url` (a test replaces it: jsdom does not navigate). */
     navigate: function (url) { window.location.assign(url); },
   };
@@ -164,22 +172,67 @@
    * The list of keys (base.html, data-testid "shortcuts-dialog"): opened by `?` and Ctrl/Cmd-/
    * (open-shortcuts), closed by Escape, the close button and the scrim, giving the focus back to what
    * had it. Its switch reads the setting each time it opens, so a choice made in another tab shows.
+   *
+   * The list places the focus itself, like Go to and the New post sheet: on its close button the moment
+   * it opens, and back to the opener when it closes. Its x-trap (noautofocus, noreturn) only keeps Tab
+   * inside, and it starts late, so a key pressed before then would land outside the list (CI pressed
+   * Escape there and the list stayed open); Escape also closes it from anywhere (base.html's window
+   * listener).
+   *
+   * `trapped` holds the trap. A trap let go before the plugin started it would start anyway, on the
+   * closed list, and keep Tab from moving anywhere on the page (WCAG 2.1.2). So the list lets it go only
+   * once it has started: `trapStarted` turns true in a timer of the plugin's own length scheduled after
+   * the plugin's (from $nextTick, which Alpine runs after the effect that schedules it), and timers of
+   * equal length run in the order they were scheduled, however late a busy page runs them. A wall-clock
+   * margin is not enough: a busy page ran the plugin's 15 ms timer after 30 ms.
    */
   window.shortcutsList = function shortcutsList() {
     return {
       open: false,
+      trapped: false,
+      trapStarted: false,
       enabled: true,
       opener: null,
+      _marking: false,
       show: function () {
         if (this.open) return;
         var active = document.activeElement;
         this.opener = active && active !== document.body ? active : null;
         this.enabled = isOn();
+        if (!this.trapped) this.trapStarted = false;
+        this.trapped = true;
         this.open = true;
+        var list = this;
+        this.$nextTick(function () {
+          list.markTrapStarted();
+          list.placeFocus(10);
+        });
+      },
+      /** Once the plugin has started the trap: note it, and let it go if the list closed meanwhile. */
+      markTrapStarted: function () {
+        if (this._marking || this.trapStarted) return;
+        this._marking = true;
+        var list = this;
+        setTimeout(function () {
+          list._marking = false;
+          list.trapStarted = true;
+          if (!list.open) list.trapped = false;
+        }, PLUGIN_TRAP_DELAY_MS);
+      },
+      /** Put the focus on the close button, trying again on the next frames until it lands. */
+      placeFocus: function (tries) {
+        var refs = this.$refs || {};
+        if (!this.open || !refs.dialog || !refs.close || refs.dialog.contains(document.activeElement)) return;
+        refs.close.focus();
+        var list = this;
+        if (tries > 0 && document.activeElement !== refs.close && typeof window.requestAnimationFrame === 'function') {
+          window.requestAnimationFrame(function () { list.placeFocus(tries - 1); });
+        }
       },
       close: function () {
         if (!this.open) return;
         this.open = false;
+        if (this.trapStarted) this.trapped = false; // else markTrapStarted lets it go
         var opener = this.opener;
         this.opener = null;
         if (opener && opener.isConnected && typeof opener.focus === 'function') {

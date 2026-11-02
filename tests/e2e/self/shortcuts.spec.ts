@@ -136,8 +136,46 @@ test.describe('Keyboard shortcuts (desktop-chrome only: phones have no keys)', (
     await expect(toggle).toBeChecked();
     expect(await page.evaluate(() => localStorage.getItem('shortcuts'))).toBeNull();
     await page.keyboard.press('Escape');
+    await expect(page.getByTestId('shortcuts-dialog')).toBeHidden();
     await page.keyboard.press('n');
     await expect(page.getByRole('dialog', { name: 'New post' })).toBeVisible();
+  });
+
+  // Alpine's focus plugin starts a dialog's trap 15 ms after it opens (x-trap's setTimeout). Real key
+  // presses reach that window on a busy runner and not on a fast one, so these two press inside it on
+  // purpose, from the page: the list must not depend on its trap having started.
+  test('Escape pressed the moment the list opens, before anything had the focus inside it, closes it', async ({ page, harness, as }) => {
+    await as('owner');
+    await openHome(page, harness.ids.workspace_a);
+
+    await page.evaluate(async () => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    await expect(page.getByTestId('shortcuts-dialog')).toBeHidden();
+    await page.keyboard.press('n');
+    await expect(page.getByTestId('new-post-team-idea')).toBeFocused();
+  });
+
+  test('the list closed the moment it opens leaves no trap behind: Tab still moves through the page', async ({ page, harness, as }) => {
+    await as('owner');
+    await openHome(page, harness.ids.workspace_a);
+
+    await page.evaluate(async () => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      (document.querySelector('[data-testid="shortcuts-close"]') as HTMLElement).click();
+    });
+    await expect(page.getByTestId('shortcuts-dialog')).toBeHidden();
+    // Long enough for a trap the plugin started late to be in place.
+    await page.waitForTimeout(100);
+    const focused: string[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      await page.keyboard.press('Tab');
+      focused.push(await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80) ?? ''));
+    }
+    expect(new Set(focused).size, `Tab moved through ${JSON.stringify(focused)}`).toBe(3);
   });
 
   test('/ opens Go to with nothing typed in it', async ({ page, harness, as }) => {

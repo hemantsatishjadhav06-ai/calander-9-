@@ -848,10 +848,20 @@ def test_the_shortcut_list_is_a_labelled_trapped_dialog_with_a_switch(client, te
 
     root = _shortcuts_root(html)
     assert 'x-data="shortcutsList()"' in root and '@open-shortcuts.window="show()"' in root
+    # Escape closes the list wherever the focus is, before its trap has started too (shortcuts.js).
+    assert "@keydown.escape.window=" in root and "close()" in root
     dialog = _tag(html, 'data-testid="shortcuts-dialog"')
-    for attr in ('role="dialog"', 'aria-modal="true"', 'aria-labelledby="shortcuts-title"', 'x-trap.noscroll="open"'):
+    # The list places the focus itself (x-ref close); its trap only keeps Tab inside, held on `trapped`.
+    for attr in (
+        'role="dialog"',
+        'aria-modal="true"',
+        'aria-labelledby="shortcuts-title"',
+        'x-trap.noscroll.noautofocus.noreturn="trapped"',
+        'x-ref="dialog"',
+    ):
         assert attr in dialog, attr
     assert "@keydown.escape" in dialog
+    assert 'x-ref="close"' in _tag(html, 'data-testid="shortcuts-close"')
     assert re.search(r'<h2 id="shortcuts-title"[^>]*>Keyboard shortcuts</h2>', html)
 
     toggle = _tag(html, 'data-testid="shortcuts-toggle"')

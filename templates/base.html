@@ -733,8 +733,10 @@
     </div>
     {% comment %}
       Keyboard shortcuts (spec D16): static/js/shortcuts.js runs the keys from 1024 px (n, / and ?) and
-      this list's shortcutsList(). ? and Ctrl/Cmd-/ open it; Escape, Close and the scrim close it, and
-      x-trap gives the focus back. The switch turns the single keys off on this device
+      this list's shortcutsList(). ? and Ctrl/Cmd-/ open it; Escape (from anywhere: the window listener),
+      Close and the scrim close it. The list places the focus itself, on Close as it opens and back to the
+      opener as it closes; its x-trap (noautofocus, noreturn) only keeps Tab inside, on `trapped`, which
+      shortcutsList() holds until the plugin has started the trap (see there). The switch turns the single keys off on this device
       (localStorage.shortcuts, WCAG 2.1.4); Ctrl/Cmd-/ still opens the list, so it can be turned back on.
       n is listed, and data-new-post-url names where it goes away from the sheet (Home's #new-post), only
       for someone who may start posts (new_post_url). Ctrl/Cmd-K does nothing while the list is open.
@@ -742,14 +744,15 @@
       large as the other switches' target, so it is the control a click reaches; the visible label's
       for= keeps the words clickable too and stays its one label. data-control: a control's own steps.
     {% endcomment %}
-    <div x-data="shortcutsList()" data-shortcuts{% if new_post_url %} data-new-post-url="{{ new_post_url }}"{% endif %} @open-shortcuts.window="show()">
+    <div x-data="shortcutsList()" data-shortcuts{% if new_post_url %} data-new-post-url="{{ new_post_url }}"{% endif %} @open-shortcuts.window="show()"
+         @keydown.escape.window="if (open) { $event.preventDefault(); close(); }">
         <div x-show="open" x-cloak class="fixed inset-0 z-[110] flex items-start justify-center px-4 pt-[12vh]">
             <div class="ui-overlay" @click="close()"></div>
-            <div data-testid="shortcuts-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" x-trap.noscroll="open"
+            <div data-testid="shortcuts-dialog" x-ref="dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" x-trap.noscroll.noautofocus.noreturn="trapped"
                  @keydown.escape.prevent.stop="close()" @keydown.ctrl.k.prevent.stop @keydown.meta.k.prevent.stop class="ui-modal max-w-md">
                 <div class="flex items-center justify-between gap-4 px-6 pt-6 pb-2">
                     <h2 id="shortcuts-title" class="text-h2 text-ink-950">Keyboard shortcuts</h2>
-                    <button type="button" data-testid="shortcuts-close" class="ui-btn ui-btn-icon -mr-2" @click="close()" aria-label="Close">
+                    <button type="button" data-testid="shortcuts-close" x-ref="close" class="ui-btn ui-btn-icon -mr-2" @click="close()" aria-label="Close">
                         <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
