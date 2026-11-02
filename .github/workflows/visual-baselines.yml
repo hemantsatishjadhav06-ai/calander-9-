@@ -117,6 +117,13 @@ jobs:
             fi
             checked="$checked $spec"
           done
+          # No input (the label's run) means the whole folder, above. Spaces, tabs or newlines alone
+          # select nothing: refused, not read as the default, because `npx playwright test` given no
+          # path would write every spec's baselines and the commit would name none.
+          if [ -z "$checked" ]; then
+            echo "::error::The specs input is blank; name files or folders under tests/e2e/visual/, or leave it empty for all of them."
+            exit 1
+          fi
           # Only the checked paths, on one line, go on to the next step and to the commit's message.
           echo "SPECS=${checked# }" >> "$GITHUB_ENV"
           echo "specs=${checked# }" >> "$GITHUB_OUTPUT"

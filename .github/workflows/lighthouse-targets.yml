@@ -7,11 +7,15 @@ name: Lighthouse targets
 #
 #   gh workflow run lighthouse-targets.yml --ref claude/trusting-dijkstra-m7nul1 -f targets=home,calendar
 #
-# Its own file and concurrency group, so starting it never cancels a CI run (ci.yml cancels an
-# in-progress run of the same ref), and a second dispatch waits for the first instead of cutting its
-# measurement short. GitHub offers a workflow for dispatch once it has run or is on the default
-# branch: the `lighthouse-targets` label on the pull request runs it once (CI's three) and registers
-# it; if a dispatch is refused, re-label once.
+# Its own file, so starting it never cancels a CI run (ci.yml cancels an in-progress run of the same
+# ref). Its concurrency group is the job's, per branch, and queues instead of cancelling, so a second
+# dispatch or the label waits for the first instead of cutting its measurement short. It is not at
+# workflow level because every label added to the pull request starts this workflow (its job then
+# skips), and such a run in a workflow-level group would replace a measurement waiting its turn
+# (GitHub cancels a pending run of a group in favour of the newer one, cancel-in-progress or not).
+# GitHub offers a workflow for dispatch once it has run or is on the default branch: the
+# `lighthouse-targets` label on the pull request runs it once (CI's three) and registers it; if a
+# dispatch is refused, re-label once.
 
 on:
   workflow_dispatch:
@@ -26,14 +30,14 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: lighthouse-targets-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   lighthouse:
     name: Lighthouse targets
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'lighthouse-targets'
+    # Per branch, whichever way it was started; a second run waits for this one instead of cancelling it.
+    concurrency:
+      group: lighthouse-targets-${{ github.head_ref || github.ref_name }}
+      cancel-in-progress: false
     # Keep browser installation on the image supported by the locked version.
     runs-on: ubuntu-24.04
     timeout-minutes: 30

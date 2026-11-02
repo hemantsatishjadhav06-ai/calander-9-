@@ -6,17 +6,25 @@ reads ``.github/workflows/visual-baselines.yml`` and ``ci.yml`` and pins what a 
 - the baseline run commits its images back to the branch, and only a job that runs no dependency,
   browser or project code holds the write token, and only for a branch of this repository (never a
   fork's pull request, never the default branch);
-- a label added to the pull request cannot cancel a baseline run in progress (no workflow-level
-  concurrency; each job queues instead of cancelling);
-- CI's Visual job compares only once a baseline is committed, and then compares as before.
+- a label added to the pull request cannot cancel a baseline run in progress, nor replace a pending
+  Lighthouse targets measurement (no workflow-level concurrency; each job queues instead of cancelling);
+- the specs input names what is photographed: blank is the default folder, whitespace alone or a path
+  outside ``tests/e2e/visual/`` is refused (the step's own script is run here with bash);
+- CI's Visual job compares once a baseline is committed in the tree or in the commit it is compared
+  against, so a change that deletes every baseline fails the check instead of skipping it (the look
+  job's own script is run here against small git histories), and then compares as before.
 """
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,6 +69,94 @@ def _condition(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
 
+def _step(job: dict[str, Any], **match: str) -> dict[str, Any]:
+    """The one step whose `name` or `id` is the given value."""
+    found = [step for step in _steps(job) if all(step.get(key) == value for key, value in match.items())]
+    assert len(found) == 1, match
+    return found[0]
+
+
+def _run_step(step: dict[str, Any], cwd: Path, tmp: Path, **env: str) -> tuple[int, str, dict[str, str]]:
+    """Run a step's script as GitHub runs `shell: bash` (`bash --noprofile --norc -eo pipefail {0}`).
+
+    Returns the exit status, the output (where `::error::` and `::notice` lines go) and what the step
+    wrote to $GITHUB_ENV and $GITHUB_OUTPUT, read as `key=value` lines.
+    """
+    assert step.get("shell") == "bash", step.get("name")
+    script = tmp / "step.sh"
+    script.write_text(str(step["run"]))
+    files = {"GITHUB_ENV": tmp / "github_env", "GITHUB_OUTPUT": tmp / "github_output"}
+    for path in files.values():
+        path.write_text("")
+    done = subprocess.run(
+        ["bash", "--noprofile", "--norc", "-eo", "pipefail", str(script)],
+        cwd=cwd,
+        env={**_hermetic_env(tmp), **{key: str(path) for key, path in files.items()}, **env},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    written: dict[str, str] = {}
+    for path in files.values():
+        for line in path.read_text().splitlines():
+            key, _, value = line.partition("=")
+            written[key] = value
+    return done.returncode, done.stdout + done.stderr, written
+
+
+def _hermetic_env(tmp: Path) -> dict[str, str]:
+    """PATH and a HOME of the test's own, so no person's git or shell configuration takes part."""
+    return {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(tmp),
+        "LANG": "C.UTF-8",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+    }
+
+
+def _git(repo: Path, tmp: Path, *args: str) -> str:
+    done = subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Workflow test",
+            "-c",
+            "user.email=workflow-test@e2e.test",
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "init.defaultBranch=main",
+            *args,
+        ],
+        cwd=repo,
+        env=_hermetic_env(tmp),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    )
+    return done.stdout
+
+
+def _assert_label_runs_cannot_cancel_or_replace(workflow: dict[str, Any]) -> None:
+    """Every label added to the pull request starts a labelled workflow (its jobs then skip).
+
+    A workflow-level group would put that run in the same group as the real one: with
+    cancel-in-progress it cancels the run in progress, and even without it GitHub cancels a pending run
+    of the group in favour of the newer one. Each job holds its own group instead, which a skipped job
+    never enters, and queues.
+    """
+    assert "concurrency" not in workflow
+    for name, job in workflow["jobs"].items():
+        group = job.get("concurrency")
+        assert isinstance(group, dict), f"{name} has no concurrency group of its own"
+        assert group.get("cancel-in-progress") is False, name
+        # One group per branch, whichever way the run was started (a dispatch and a label queue behind
+        # each other).
+        assert "github.head_ref || github.ref_name" in str(group["group"]), name
+
+
 class TestVisualBaselinesWorkflow:
     workflow = _load("visual-baselines.yml")
     jobs: dict[str, dict[str, Any]] = workflow["jobs"]
@@ -75,15 +171,7 @@ class TestVisualBaselinesWorkflow:
         assert self.workflow["permissions"] == {"contents": "read"}
 
     def test_a_label_cannot_cancel_a_running_baseline(self) -> None:
-        # Every label added to the pull request starts this workflow (its jobs then skip). A
-        # workflow-level group with cancel-in-progress would cancel the run that is photographing.
-        assert "concurrency" not in self.workflow
-        for name, job in self.jobs.items():
-            group = job.get("concurrency")
-            assert isinstance(group, dict), f"{name} has no concurrency group of its own"
-            assert group.get("cancel-in-progress") is False, name
-            # One group per branch, whichever way the run was started.
-            assert "github.head_ref || github.ref_name" in str(group["group"]), name
+        _assert_label_runs_cannot_cancel_or_replace(self.workflow)
 
     def test_the_photographs_are_still_uploaded_as_the_artifact(self) -> None:
         photographer = self.jobs["baselines"]
@@ -155,6 +243,39 @@ class TestVisualBaselinesWorkflow:
         for name, job in self.jobs.items():
             assert "${{" not in _script(job), name
 
+    @pytest.mark.parametrize(
+        ("given", "checked"),
+        [
+            # No input (the label's run) or an emptied field: the whole folder.
+            ("", "tests/e2e/visual"),
+            ("tests/e2e/visual/shell.spec.ts", "tests/e2e/visual/shell.spec.ts"),
+            (
+                "  tests/e2e/visual/shell.spec.ts\ttests/e2e/visual/ ",
+                "tests/e2e/visual/shell.spec.ts tests/e2e/visual/",
+            ),
+        ],
+        ids=["empty", "one-spec", "two-paths-spaced"],
+    )
+    def test_the_specs_input_passes_on_only_checked_paths(self, tmp_path: Path, given: str, checked: str) -> None:
+        step = _step(self.jobs["baselines"], name="Check the specs input")
+        status, output, written = _run_step(step, tmp_path, tmp_path, SPECS=given)
+        assert status == 0, output
+        assert written == {"SPECS": checked, "specs": checked}
+
+    @pytest.mark.parametrize(
+        "given",
+        [" ", "\t", " \t ", "\n", "tests/e2e/golden", "tests/e2e/visual/../golden", "--update-snapshots"],
+        ids=["space", "tab", "space-and-tab", "newline", "outside", "dot-dot", "option"],
+    )
+    def test_the_specs_input_refuses_a_blank_selection_or_another_path(self, tmp_path: Path, given: str) -> None:
+        # Whitespace alone selects no spec: passed on, the next step would run `npx playwright test`
+        # with no filter, every spec in baseline-writing mode, and the commit would name no spec.
+        step = _step(self.jobs["baselines"], name="Check the specs input")
+        status, output, written = _run_step(step, tmp_path, tmp_path, SPECS=given)
+        assert status != 0, output
+        assert "::error::" in output
+        assert written == {}, "nothing goes on to the next step or the commit"
+
 
 class TestCiVisualJob:
     workflow = _load("ci.yml")
@@ -182,9 +303,101 @@ class TestCiVisualJob:
         assert "E2E_UPDATE_BASELINES" not in str(visual), "the visual job compares and never writes"
         assert "npm run test:e2e -- tests/e2e/visual" in _script(visual)
 
+    def _look(self) -> dict[str, Any]:
+        return _step(self.jobs["visual-baselines-present"], id="look")
+
+    def test_the_look_job_can_read_the_commit_before_without_a_token(self) -> None:
+        look = self.jobs["visual-baselines-present"]
+        checkout = next(step for step in _steps(look) if str(step.get("uses", "")).startswith("actions/checkout@"))
+        # The checked-out commit and the one before it: for a pull request GitHub's merge commit and its
+        # first parent, the base branch's head; for a push to main, main before the push's last commit.
+        assert checkout["with"].get("fetch-depth") == 2
+        assert checkout["with"]["persist-credentials"] is False
+        assert "permissions" not in look and "secrets." not in str(look) and "github.token" not in str(look)
+        assert "${{" not in _script(look), "nothing is interpolated into the script"
+
+    @staticmethod
+    def _history(tmp: Path, commits: Sequence[Mapping[str, bytes | None]], *, merge: bool = False) -> Path:
+        """A repository whose commits apply each dict in turn ({path: content, or None to delete}).
+
+        With `merge`, the last commit is made on a branch and merged into main with a merge commit, as
+        GitHub builds `refs/pull/<n>/merge` (first parent: the base branch's head).
+        """
+        origin = tmp / "origin"
+        origin.mkdir()
+        _git(origin, tmp, "init", "--quiet")
+        for index, files in enumerate(commits):
+            if merge and index == len(commits) - 1:
+                _git(origin, tmp, "checkout", "--quiet", "-b", "change")
+            for relative, content in files.items():
+                path = origin / relative
+                if content is None:
+                    _git(origin, tmp, "rm", "--quiet", relative)
+                else:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(content)
+                    _git(origin, tmp, "add", relative)
+            _git(origin, tmp, "commit", "--quiet", "--allow-empty", "-m", f"commit {index}")
+        if merge:
+            _git(origin, tmp, "checkout", "--quiet", "main")
+            _git(origin, tmp, "merge", "--quiet", "--no-ff", "-m", "Merge change into main", "change")
+        return origin
+
+    def _look_in(self, tmp: Path, origin: Path, depth: int = 2) -> tuple[int, str, dict[str, str]]:
+        # A shallow clone as actions/checkout makes it (fetch-depth), run where the job runs.
+        clone = tmp / "clone"
+        _git(tmp, tmp, "clone", "--quiet", f"--depth={depth}", origin.as_uri(), str(clone))
+        work = tmp / "step"
+        work.mkdir()
+        return _run_step(self._look(), clone, work)
+
+    KEEP = {f"{SCREENSHOTS}/.gitkeep": b""}
+    PNG = f"{SCREENSHOTS}/visual/shell.spec.ts/home-light-desktop-chrome.png"
+
+    def test_no_baseline_anywhere_skips_with_the_notice(self, tmp_path: Path) -> None:
+        origin = self._history(tmp_path, [self.KEEP, {"README.md": b"x"}], merge=True)
+        status, output, written = self._look_in(tmp_path, origin)
+        assert status == 0, output
+        assert written == {"present": "false"}
+        assert "::notice" in output
+
+    def test_a_baseline_in_the_tree_turns_the_comparison_on(self, tmp_path: Path) -> None:
+        origin = self._history(tmp_path, [self.KEEP, {self.PNG: b"png"}], merge=True)
+        status, output, written = self._look_in(tmp_path, origin)
+        assert status == 0, output
+        assert written == {"present": "true"}
+
+    @pytest.mark.parametrize("merge", [True, False], ids=["pull-request", "push-to-main"])
+    def test_deleting_every_baseline_still_compares_and_fails(self, tmp_path: Path, merge: bool) -> None:
+        # The base (or main before the push) has a baseline and this change deletes it: the Visual job
+        # must run and fail on the missing image, not skip (a skipped check counts as passing).
+        origin = self._history(tmp_path, [{**self.KEEP, self.PNG: b"png"}, {self.PNG: None}], merge=merge)
+        status, output, written = self._look_in(tmp_path, origin)
+        assert status == 0, output
+        assert written == {"present": "true"}
+        assert "::warning title=Every baseline removed::" in output
+
+    def test_without_the_commit_before_it_stops_instead_of_skipping(self, tmp_path: Path) -> None:
+        # A checkout one commit deep cannot see the base; the job fails rather than guess "no baseline".
+        origin = self._history(tmp_path, [{**self.KEEP, self.PNG: b"png"}, {self.PNG: None}], merge=True)
+        status, output, written = self._look_in(tmp_path, origin, depth=1)
+        assert status != 0, output
+        assert "::error" in output
+        assert written == {}
+
     def test_no_job_condition_uses_hash_files(self) -> None:
         # hashFiles() is not available in a job's `if` (GitHub evaluates it before the job has a
         # workspace), so a job-level guard on files must go through another job's output.
         for name in ("ci.yml", "visual-baselines.yml", "lighthouse-targets.yml"):
             for job_name, job in _load(name)["jobs"].items():
                 assert "hashFiles" not in str(job.get("if", "")), f"{name}: {job_name}"
+
+
+class TestLighthouseTargetsWorkflow:
+    workflow = _load("lighthouse-targets.yml")
+
+    def test_a_label_cannot_replace_a_pending_measurement(self) -> None:
+        # Every label added to the pull request starts this workflow too; a workflow-level group would
+        # let that run replace a measurement waiting for its turn.
+        assert _triggers(self.workflow)["pull_request"] == {"types": ["labeled"]}
+        _assert_label_runs_cannot_cancel_or_replace(self.workflow)
