@@ -51,6 +51,26 @@ class IdeaMediaFlowsTests(TestCase):
             source="upload",
         )
 
+    def test_ideas_page_alerts_the_servers_reason_for_a_refused_upload(self):
+        """A refused file (400 {"error": ...}) is alerted with the server's sentence on Ideas.
+
+        The create and edit idea dialogs ran base.html's window.ideaModalHelpers until Phase 3 T19
+        removed it; the page's own helpers now read the 400's JSON into ``userMessage``, which the
+        dialogs alert before the generic sentence. tests/js/ideas_upload_message.test.cjs runs them.
+        """
+        url = reverse("composer:create_landing", kwargs={"workspace_id": self.workspace.id})
+        html = self.client.get(url).content.decode()
+
+        self.assertEqual(html.count("window.ideaModalHelpers"), 0, "nothing defines it since T19")
+        start = html.index("const ideaHelpers = ")
+        helpers = html[start : html.index("\n    return {\n", start)]
+        upload = helpers[helpers.index("uploadIdeaMediaAsset(uploadUrl, file, onUploaded) {") :]
+        refused = upload[upload.index("if (!response.ok)") : upload.index("return response.json();")]
+        self.assertIn("response.json().catch(", refused)
+        self.assertIn("err.userMessage = data && data.error;", refused)
+        alert = "window.alert((err && err.userMessage) || 'One of the files failed to upload. Please try again.');"
+        self.assertEqual(html.count(alert), 1)
+
     def _edit_url(self, idea_id):
         return reverse("composer:idea_edit", kwargs={"workspace_id": self.workspace.id, "idea_id": idea_id})
 

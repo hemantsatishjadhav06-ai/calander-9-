@@ -5,7 +5,8 @@
   idea columns and tags (the New post sheet's, read by Home and Calendar).
 - Six real pages (Drafts, Queues, Posting schedule, Templates, Categories,
   CSV import) are reachable by clicking, from the Calendar page's header and
-  the New menu; Queues, Templates and Categories follow their switches.
+  the New post sheet's foot links (the shell's New menu went with Phase 3
+  T19); Queues, Templates and Categories follow their switches.
 - The calendar's repeat-icon lookup no longer costs one query per chip.
 - Logging out is a POST: a GET must not end the session.
 - An external client does not get the org roster.
@@ -114,8 +115,8 @@ class SidebarTests(WorkspaceBase):
         self.assertLessEqual(len(ctx.captured_queries), 4, [q["sql"] for q in ctx.captured_queries])
 
     def test_the_six_orphaned_pages_are_linked(self):
-        """From the Calendar page: its header and the New menu (plan T9), Queues, Templates and
-        Categories with their switches on."""
+        """From the Calendar page: its header (plan T9) and the New post sheet's foot links (Phase 3
+        T19 took the shell's New menu away), Queues, Templates and Categories with their switches on."""
         AgencySettings.objects.create(workspace=self.ws, features={"queues": True, "templates": True})
         self.client.force_login(self.owner)
         response = self.client.get(self.calendar_url)

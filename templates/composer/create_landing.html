@@ -1090,7 +1090,8 @@
 {% block extra_js %}
 <script nonce="{{ request.csp_nonce }}">
 function kanbanBoard() {
-    const ideaHelpers = window.ideaModalHelpers || {
+    // The page's own idea helpers: base.html's shared copy left the shell with Phase 3 T19.
+    const ideaHelpers = {
         mediaAssetIdsCsv(items) {
             return (items || []).map(function(item) { return item.asset_id; }).join(',');
         },
@@ -1122,7 +1123,14 @@ function kanbanBoard() {
                 body: formData,
             })
                 .then(function(response) {
-                    if (!response.ok) throw new Error('upload_failed');
+                    if (!response.ok) {
+                        // A 400 names why the file was refused (wrong type, too large, quota).
+                        return response.json().catch(function() { return {}; }).then(function(data) {
+                            var err = new Error('upload_failed');
+                            err.userMessage = data && data.error;
+                            throw err;
+                        });
+                    }
                     return response.json();
                 })
                 .then((data) => {
