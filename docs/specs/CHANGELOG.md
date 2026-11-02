@@ -177,7 +177,10 @@ pair is in the baseline run's
 (kept until 16 Nov). Also asked: acknowledge the light contrast exception, and choose the selected
 filter chip before T22.
 
-**Result: foundations complete; stopped for the owner's sign-off on the shell.**
+**Result: foundations complete. The owner signed off on 2 Nov 2026** ("approved, go ahead with screen 1", on
+the shell pair taken from `364fc61` and the gate recorded at `cfaacb0`; the approval covers the light contrast
+exception listed above). The selected filter chip takes the recommended default, ink-900 with on-fill text,
+at T22. Screen 1 starts.
 
 ## 1 Nov 2026 — Phase 2: cut and merge, gate passed
 

@@ -8,7 +8,7 @@ Where each phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md) stands, and what is l
 | 0 · Agree the cut | **Done.** Spec approved, gate passed, released to production (24 Oct, main `6d9cf1d`). |
 | 1 · Test harness first | **Gate passed** on `0d9f7a9` (31 Oct): CI green on all nine jobs, three consecutive complete browser runs, TOTP pending for Phase 4. Merged to main (`1b6172f`); release waits for production to be back online. |
 | 2 · Cut and merge, no restyling | **Gate passed** on `ff90678` (1 Nov): CI green on all nine jobs (pytest 6,081, browsers 225 with WebKit, Lighthouse Home 98), a complete local browser run, no 404 on the product map's URLs, TOTP pending for Phase 4. Merge and release authorized by the owner; release waits for production. |
-| 3 · Rebuild the nine screens | **Foundations done** (Part A, T1–T13; evidence on `c2b8a09`, 2 Nov): dark mode built but switched off, the type floor, the 8 px grid with the shell on it, shared components, motion, visual baselines in CI, per-screen Lighthouse targets. **Waiting for the owner's sign-off on the shell pair** before screen 1 (the New post sheet). |
+| 3 · Rebuild the nine screens | **Foundations done** (Part A, T1–T13; evidence on `c2b8a09`, 2 Nov): dark mode built but switched off, the type floor, the 8 px grid with the shell on it, shared components, motion, visual baselines in CI, per-screen Lighthouse targets. Shell signed off by the owner (2 Nov). **Screen 1 (the New post sheet) in progress.** |
 | 4 · Standards | Not started (three pieces landed early: dependency audits and `compilemessages` in CI, and HTML compression in Phase 2). |
 | 5 · Platform connections | Not started; most of it waits on the owner's developer apps. |
 | 6 · Beta release | Not started. |
@@ -28,8 +28,8 @@ review caught a focus loop in Go to, and the Lighthouse job caught that HTML was
 Open follow-ups: [issue #24](https://github.com/hemantsatishjadhav06-ai/calander-9-/issues/24),
 a possible deadlock between a person approving and the worker (the e2e harness retries its
 fixture; the application is unchanged). Production is still offline, so Phases 1 and 2 wait to be
-released together. Phase 3's foundations are done (2 Nov); screen 1 starts after the owner signs off
-the shell pair, and each later screen needs its own before/after sign-off.
+released together. Phase 3's foundations are done and signed off (2 Nov); screen 1 is in progress, and
+each screen needs its own before/after sign-off.
 
 ## Phase 1 — gate passed (31 Oct)
 
