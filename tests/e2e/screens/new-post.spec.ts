@@ -22,10 +22,10 @@
 //   - Save it as an idea shows the dialog named "New idea" and saves the idea; with the templates
 //     switch it has tags, and with it off there is no tag control.
 //   - The foot links reach their pages.
-//   - axe with the sheet closed and open in each mode, in both schemes. Home and Calendar are not yet
-//     declared dark-ready (T22 declares them); each axe case declares them for itself through
-//     `dark_ready` and clears that after it, as self/shortcuts.spec.ts does, so the dark case reads
-//     the dark page and the light case the light one.
+//   - axe with the sheet closed and open in each mode, in both schemes. Home and Calendar are declared
+//     dark-ready (T22, apps/common/screens.py); each axe case still declares them through `dark_ready`
+//     and clears that after it (back to the code's own set), as self/shortcuts.spec.ts does, so the dark
+//     case reads the dark page and the light case the light one whatever the registry holds.
 import type { Locator, Page } from '@playwright/test';
 
 import { csrfToken, isPhone } from '../support/nav';
@@ -415,8 +415,8 @@ test.describe('axe', () => {
       ['Calendar', calendar],
     ] as const) {
       test(`${where} passes axe with the sheet closed and open in each mode (${scheme})`, async ({ page, as, axe, harness }) => {
-        // Not declared dark-ready until T22: each case declares Home and Calendar for itself, so the
-        // page follows the device's scheme as it will once they are declared.
+        // Declared dark-ready since T22; the case declares them for itself too, so the page follows the
+        // device's scheme whatever the registry holds.
         await harness.fixture('dark_ready', { add: ['studio:index', 'calendar:calendar'] });
         await as('owner');
         await ready(page, path(harness.ids.workspace_a));

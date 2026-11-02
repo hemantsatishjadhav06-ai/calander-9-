@@ -3,5 +3,5 @@
         hx-target="#tab-content" hx-swap="innerHTML"
         aria-pressed="{% if status_filter == pid %}true{% else %}false{% endif %}"
         class="ui-filter-chip">
-    {{ label }} <span class="tabular-nums {% if status_filter == pid %}text-ink-300{% else %}text-ink-500{% endif %}">{{ count }}</span>
+    {{ label }} <span class="tabular-nums {% if status_filter == pid %}text-on-fill-muted{% else %}text-ink-500{% endif %}">{{ count }}</span>
 </button>

@@ -9,6 +9,7 @@ new tokens keep light where it was, and the light content scope equals the light
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 
 import pytest
@@ -156,6 +157,48 @@ def test_the_sidebar_s_hover_fill_carries_its_icon_in_both_themes(sheet):
     text_grey = replace(sheet, dark={**sheet.dark, "--border-hover": "var(--ink-300)"})
     (line,) = contrast.problems(text_grey, "dark", [pair])
     assert "1.49:1" in line
+
+
+#: The selected filter chip (the owner's choice before Home and Calendar were declared ready, T22).
+SELECTED_CHIP_RULE = re.compile(r'\.ui-filter-chip\[aria-pressed="true"\], \.ui-filter-chip\.is-selected \{([^}]*)\}')
+SELECTED_CHIP_PAIRS = (
+    "selected filter chip ink-900 on card ink-0",
+    "selected filter chip ink-900 on canvas ink-50",
+    "its words on-fill on ink-900",
+    "its count on-fill-muted on ink-900",
+)
+
+
+def test_the_selected_filter_chip_is_ink_900_with_on_fill_words(sheet):
+    """ink-900 with on-fill words, as the current hour keeps ink-900: light does not move (the inverse
+    surface and its words were the same #1C1F24 and white), and in dark the chip stands off the card and
+    the canvas, where the inverse surface sat 1.32:1 and 1.41:1 and the selected state rested on that.
+    Its count takes on-fill-muted, ink-300 in light (as before) and readable on the light chip in dark."""
+    rule = SELECTED_CHIP_RULE.search(contrast.STYLES.read_text(encoding="utf-8"))
+    assert rule, "styles.css has no rule for the selected filter chip"
+    assert "background: var(--ink-900);" in rule.group(1) and "color: var(--on-fill);" in rule.group(1)
+    light = sheet.theme("light")
+    for now, was in (("--ink-900", "--surface-inverse"), ("--on-fill", "--text-on-inverse")):
+        assert contrast.hex_of(contrast.colour_of(now, light)) == contrast.hex_of(contrast.colour_of(was, light))
+    assert contrast.hex_of(contrast.colour_of("--on-fill-muted", light)) == sheet.layer1["--ink-300"]
+
+    pairs = {pair.label: pair for pair in contrast.PAIRS}
+    assert set(SELECTED_CHIP_PAIRS) <= set(pairs), sorted(set(SELECTED_CHIP_PAIRS) - set(pairs))
+    chip = [pairs[label] for label in SELECTED_CHIP_PAIRS]
+    assert [(pair.fg, pair.bg, pair.needs) for pair in chip] == [
+        ("--ink-900", "--ink-0", contrast.NON_TEXT),
+        ("--ink-900", "--ink-50", contrast.NON_TEXT),
+        ("--on-fill", "--ink-900", contrast.TEXT),
+        ("--on-fill-muted", "--ink-900", contrast.TEXT),
+    ]
+    for theme in ("light", "dark"):
+        assert contrast.problems(sheet, theme, chip) == []
+    # What the inverse surface would have been in dark: under 3:1 on both.
+    dark = sheet.theme("dark")
+    was = [contrast.measure(replace(pair, fg="--surface-inverse"), dark) for pair in chip[:2]]
+    assert [f"{result.ratio:.2f}" for result in was] == ["1.32", "1.41"]
+    # And ink-300, the count's light colour, on the dark chip.
+    assert not contrast.measure(replace(chip[3], fg="--ink-300"), dark).passed
 
 
 def test_the_one_light_exception_is_named_pinned_and_held_in_dark(sheet):

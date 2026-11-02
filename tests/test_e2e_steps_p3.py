@@ -84,8 +84,10 @@ def test_dark_ready_declares_a_page_for_the_next_request(client, e2e_urls, seede
     assert ACCOUNT in screens.DARK_READY
 
     assert " data-theme-ready" in _html_tag(owner.get("/accounts/settings/"))
-    # Only the declared page: Home of workspace A still renders as it did.
-    assert "data-theme-ready" not in _html_tag(owner.get(f"/workspace/{WORKSPACE_A}/studio/"))
+    # Only the declared page: one neither the step nor the code declares (Approvals of workspace A, light
+    # until screen 3; Home and Calendar are the code's own since T22) still renders as it did.
+    assert ("approvals", "index") not in screens.DARK_READY
+    assert "data-theme-ready" not in _html_tag(owner.get(f"/workspace/{WORKSPACE_A}/approvals/"))
 
 
 @pytest.mark.django_db

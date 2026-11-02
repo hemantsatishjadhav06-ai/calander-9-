@@ -1169,7 +1169,7 @@
                     <template x-for="accId in selectedAccounts" :key="'toggle-' + accId">
                         <button type="button"
                                 class="inline-flex items-center gap-1 h-8 max-lg:h-11 px-3 text-xs font-semibold rounded-full transition-colors cursor-pointer"
-                                :class="overrides[accId] ? 'bg-inverse text-on-inverse' : 'bg-surface text-ink-700 ring-1 ring-inset ring-line-strong hover:bg-ink-25'"
+                                :class="overrides[accId] ? 'bg-ink-900 text-on-fill' : 'bg-surface text-ink-700 ring-1 ring-inset ring-line-strong hover:bg-ink-25'"
                                 :data-testid="'compose-override-toggle-' + accId"
                                 @click="overrides[accId] = !overrides[accId]"
                                 x-show="!overrides[accId]">

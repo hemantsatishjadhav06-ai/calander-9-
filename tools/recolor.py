@@ -23,7 +23,7 @@ sections 1-7; the system itself is docs/DESIGN_SYSTEM.md). It rewrites, in place
   the literal it replaces, so light cannot move: ``bg-white`` is ``bg-surface``; ``text-white``
   on a fill that flips (its own or the nearest ancestor's) is ``text-on-fill``; a solid
   ``bg-ink-800|900|950`` whose children use white or 200/300 steps, or that ``INVERSE_ROLES``
-  names (logo marks, a tooltip, a selected chip), stays dark in both themes as
+  names (logo marks, a tooltip), stays dark in both themes as
   ``bg-inverse``/``text-on-inverse`` (and keeps its light look through ``data-theme-scope``
   when a child uses a step that flips); scrims are ``bg-scrim/NN``; white edges are ``-surface``,
   ``-on-fill`` or ``-on-inverse`` by what they sit on; ink-300 edges (a text grey in dark) are
@@ -649,9 +649,10 @@ def recolor_html_colours(text: str, *, tokens: bool, defined: set[str]) -> str:
 INVERSE, DARK, FLIP, LIGHT = "inverse", "dark", "flips", "light"
 
 #: Elements that stay dark in both themes by role though nothing inside them is white: per template,
-#: markers of the element's start tag. The workspace initial (the logo mark), the composer's tooltip and
-#: its selected override chip (a selected filter chip). The selection bars and toasts need no entry:
-#: their children use white or 200/300 steps, which makes a dark fill inverse by itself.
+#: markers of the element's start tag. The workspace initial (the logo mark) and the composer's tooltip.
+#: The selection bars and toasts need no entry: their children use white or 200/300 steps, which makes a
+#: dark fill inverse by itself. A selected filter chip is not inverse: it is ink-900 with on-fill words,
+#: which flips (the owner's choice at T22; the composer's override chip is one).
 INVERSE_ROLES: dict[str, tuple[str, ...]] = {
     "base.html": ("rounded-[7px] flex items-center justify-center",),
     "client_portal/portal_base.html": ("flex size-7 flex-shrink-0 items-center justify-center rounded-[7px]",),
@@ -659,10 +660,7 @@ INVERSE_ROLES: dict[str, tuple[str, ...]] = {
     "workspaces/list.html": ("grid size-9 shrink-0 place-items-center rounded-[7px]",),
     "organizations/partials/workspace_card.html": ("grid size-9 shrink-0 place-items-center rounded-[7px]",),
     "onboarding/connection_page.html": ("inline-flex h-14 w-14 items-center justify-center rounded-2xl",),
-    "composer/compose.html": (
-        "pointer-events-none absolute left-3 -top-6",
-        ":data-testid=\"'compose-override-toggle-' + accId\"",
-    ),
+    "composer/compose.html": ("pointer-events-none absolute left-3 -top-6",),
 }
 #: Component classes that paint a fill (styles.css and the toast partial).
 CLASS_FILLS: dict[str, str] = {

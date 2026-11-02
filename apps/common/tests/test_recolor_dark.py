@@ -50,13 +50,15 @@ DARK_FILLS: tuple[tuple[str, str | tuple[str, ...], str, int], ...] = (
     ("workspaces/list.html", "grid size-9 shrink-0 place-items-center rounded-[7px]", INVERSE, 1),
     ("organizations/partials/workspace_card.html", "grid size-9 shrink-0 place-items-center rounded-[7px]", INVERSE, 1),
     ("onboarding/connection_page.html", "inline-flex h-14 w-14 items-center justify-center rounded-2xl", INVERSE, 1),
-    # The two selection bars (their children use white and 200/300 steps), the composer's error toast,
-    # its tooltip, and its selected override chip (a selected filter chip).
+    # The two selection bars (their children use white and 200/300 steps), the composer's error toast and
+    # its tooltip.
     ("calendar/calendar.html", 'data-testid="calendar-bulk-bar"', INVERSE, 1),
     ("calendar/partials/publish_approvals.html", "flex items-center gap-1 pl-4 pr-1.5 py-1.5", INVERSE, 1),
     ("composer/compose.html", 'x-show="formError"', INVERSE, 1),
     ("composer/compose.html", "pointer-events-none absolute left-3 -top-6", INVERSE, 1),
-    ("composer/compose.html", ":data-testid=\"'compose-override-toggle-' + accId\"", INVERSE, 1),
+    # The composer's selected override chip, a selected filter chip: ink-900 with on-fill words, which flips
+    # (the owner's choice at T22; the inverse surface would sit 1.32:1 on a dark card).
+    ("composer/compose.html", ":data-testid=\"'compose-override-toggle-' + accId\"", FLIPS, 1),
     # Avatars, step numbers, today's date, badges and marks: an ink fill that flips with its text.
     ("components/agent_avatar.html", "{% if agent.slug == 'account_manager' %}bg-ink-900", FLIPS, 1),
     (

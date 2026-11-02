@@ -44,8 +44,11 @@ TAG_FILES: tuple[Path, ...] = tuple(sorted(ROOT.glob("apps/*/templatetags/*.py")
 #: A page, as ``request.resolver_match`` names it: ``(app_name, url_name)``.
 Page = tuple[str, str]
 
-#: The pages declared dark-ready. Empty until a screen's gate declares its pages.
-DARK_READY: frozenset[Page] = frozenset()
+#: The pages declared dark-ready, each once its spec passes axe in dark on three devices (spec D2).
+#: Home and Calendar first, with screen 1 (the sheet lives on them; docs/specs/phase-3.md, T22,
+#: tests/e2e/screens/dark-shell.spec.ts); every other page at its own screen's gate. Approvals
+#: (``approvals:index``) renders Calendar's list partial but stays light until screen 3.
+DARK_READY: frozenset[Page] = frozenset({("studio", "index"), ("calendar", "calendar")})
 
 #: The root templates each page renders, for every page in ``DARK_READY`` or in a screen's ``pages``.
 PAGE_TEMPLATES: dict[Page, tuple[str, ...]] = {
@@ -82,6 +85,29 @@ SCREENS: dict[str, Screen] = {
         fragments=("studio/partials/new_post_team_error.html",),
         pages=(("studio", "index"), ("calendar", "calendar")),
         roles=("owner", "manager", "editor"),
+    ),
+    # Home (screen 2) and Calendar (screen 4), declared dark-ready with screen 1 (T22) before their own
+    # screens rebuild them. Each entry holds its page's root and what the page picks at run time (a
+    # variable include, which template_tree cannot follow), so recolor's raw-colour rule reads those
+    # templates with the page. Not gated: the spacing, one-primary, inline-confirm and motion guards
+    # read a screen from its gate on; each screen's Start task completes its entry (its roles, and
+    # anything else it rebuilds).
+    "home": Screen(
+        templates=("studio/index.html",),
+        # Home's thread: {% include thread.template %} (studio.chat.PANEL_TEMPLATE).
+        fragments=("studio/partials/thread.html",),
+        pages=(("studio", "index"),),
+    ),
+    "calendar": Screen(
+        templates=("calendar/calendar.html",),
+        # List mode's tabs: {% include initial_tab_template %} (calendar.views._TAB_TEMPLATES).
+        fragments=(
+            "calendar/partials/publish_queue.html",
+            "calendar/partials/publish_drafts.html",
+            "calendar/partials/publish_approvals.html",
+            "calendar/partials/publish_sent.html",
+        ),
+        pages=(("calendar", "calendar"),),
     ),
 }
 

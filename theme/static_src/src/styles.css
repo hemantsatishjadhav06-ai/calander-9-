@@ -122,9 +122,11 @@
   --color-line-strong: var(--border-hover);
   --color-control: var(--border-control);
   --color-focus: var(--focus-ring);
-  /* text-on-fill (text and icons on a solid fill), bg-inverse and text-on-inverse (dark in both
-     themes), bg-scrim (behind dialogs; bg-scrim/NN for its opacity) */
+  /* text-on-fill (text and icons on a solid fill), text-on-fill-muted (secondary words on an ink-900
+     fill), bg-inverse and text-on-inverse (dark in both themes), bg-scrim (behind dialogs; bg-scrim/NN
+     for its opacity) */
   --color-on-fill: var(--on-fill);
+  --color-on-fill-muted: var(--on-fill-muted);
   --color-inverse: var(--surface-inverse);
   --color-on-inverse: var(--text-on-inverse);
   --color-scrim: var(--scrim);
@@ -251,6 +253,7 @@
   /* On a fill, inverse surfaces, scrims. Each light value is the literal it replaces, so light
      cannot move: text-white on a fill, the ink-900 toast and its white text, ink-950 behind a dialog. */
   --on-fill: var(--ink-0);                  /* text and icons on a solid fill: brand 700-900, danger, ink 800-900, status 500 */
+  --on-fill-muted: var(--ink-300);          /* secondary words on an ink-900 fill: the selected filter chip's count */
   --surface-inverse: var(--ink-900);        /* dark in both themes: toast, tooltip, chart tip, the selection bars */
   --text-on-inverse: var(--ink-0);
   --scrim: var(--ink-950);                  /* behind dialogs and sheets (bg-scrim/NN) */
@@ -394,6 +397,7 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --on-fill: var(--ink-50);
+  --on-fill-muted: color-mix(in srgb, var(--on-fill) 70%, var(--ink-900));
   --surface-inverse: var(--ink-200);
   --text-on-inverse: var(--ink-950);
   --scrim: var(--ink-50);
@@ -439,6 +443,7 @@
   :root[data-theme-ready]:not([data-theme="light"]) {
     color-scheme: dark;
     --on-fill: var(--ink-50);
+    --on-fill-muted: color-mix(in srgb, var(--on-fill) 70%, var(--ink-900));
     --surface-inverse: var(--ink-200);
     --text-on-inverse: var(--ink-950);
     --scrim: var(--ink-50);
@@ -509,6 +514,7 @@
   --text-secondary: var(--ink-600); --text-tertiary: var(--ink-500); --text-ghost: var(--ink-500);
   --text-inverse: var(--text-on-inverse); --text-link: var(--brand-700); --text-link-hover: var(--brand-800);
   --on-fill: var(--ink-0);
+  --on-fill-muted: var(--ink-300);
   --surface-inverse: var(--ink-900);
   --text-on-inverse: var(--ink-0);
   --scrim: var(--ink-950);
@@ -1107,10 +1113,12 @@ span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--te
   .ui-chip button { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 9999px; color: var(--ink-500); }
   .ui-chip button:hover { background: var(--ink-200); color: var(--ink-900); }
 
-  /* Filter chip: aria-pressed="true" turns it the inverse surface, dark in both themes (never the accent) */
+  /* Filter chip: aria-pressed="true" turns it ink (never the accent) */
   .ui-filter-chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9999px; font-size: 0.8125rem; font-weight: 500; color: var(--ink-700); white-space: nowrap; }
   .ui-filter-chip:hover { background: var(--ink-100); }
-  .ui-filter-chip[aria-pressed="true"], .ui-filter-chip.is-selected { background: var(--surface-inverse); color: var(--text-on-inverse); font-weight: 600; }
+  /* Selected: ink-900 with on-fill words (a count in text-on-fill-muted), dark in light and light in dark,
+     so the chip stands off the card and the canvas in both themes (DESIGN_SYSTEM.md §21). */
+  .ui-filter-chip[aria-pressed="true"], .ui-filter-chip.is-selected { background: var(--ink-900); color: var(--on-fill); font-weight: 600; }
   @media (max-width: 1023px) { .ui-filter-chip { height: 44px; } }
 
   /* Segmented control (peer views: Home / Routines / Team / Settings).

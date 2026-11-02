@@ -25,8 +25,10 @@
   for a dark-ready page), or the check fails, so no guard misses a template those renders show (a
   gated Calendar screen without its four tabs in ``fragments`` fails, whatever its ``pages``).
 - A gated screen lists a page and a role, so the one-primary test renders something of it.
-- ``theme_ready`` is false for every page today (no visible change). Once a page is declared in
-  ``DARK_READY``, its ``<html>`` carries ``data-theme-ready`` and other pages' do not; the client
+- Home and Calendar are declared dark-ready (T22, with screen 1) and no other page is yet: Approvals
+  renders Calendar's list partial but stays light until screen 3. What the two pages pick at run time
+  is in their own screens' ``fragments`` (screens 2 and 4, registered for that at T22, not gated). A
+  declared page's ``<html>`` carries ``data-theme-ready`` and other pages' do not; the client
   portal's base does the same.
 - An HTMX fragment never renders an ``<html>`` tag, so the flag never lands inside a page.
 """
@@ -36,7 +38,7 @@ import os
 import subprocess
 import sys
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -56,6 +58,7 @@ from apps.workspaces.models import Workspace
 ROOT = Path(__file__).resolve().parents[3]
 HOME = ("studio", "index")
 CALENDAR = ("calendar", "calendar")
+APPROVALS = ("approvals", "index")
 
 
 def _templates():
@@ -169,9 +172,44 @@ def test_every_declared_and_screen_page_has_its_roots_mapped():
     assert all(roots for roots in screens.PAGE_TEMPLATES.values())
 
 
-def test_no_page_is_declared_dark_ready_yet():
-    """Each screen's gate declares its own pages (Home and Calendar first, at T22); until then none is."""
-    assert not screens.DARK_READY, sorted(screens.DARK_READY)
+def test_home_and_calendar_are_declared_dark_ready_and_no_other_page_yet():
+    """Screen 1 declares the two pages its sheet lives on (T22, spec D2); every other page waits for its
+    own screen's gate. Approvals renders Calendar's list partial but stays light until screen 3."""
+    declared = set(screens.DARK_READY)
+    assert declared == {HOME, CALENDAR}, sorted(declared)
+    assert APPROVALS not in declared
+
+
+#: What Home and Calendar pick at run time, through a variable ``{% include %}`` that ``template_tree``
+#: cannot follow, each with where the name comes from. Both pages are declared dark-ready (T22), so a
+#: guard reads them and none of this is taken on trust: each is in the ``fragments`` of its page's own
+#: screen (``_guard_reads``). The tests below that put back a registry of T22's eve read it as the
+#: allowlist those pages had then.
+CHOSEN_ON_HOME_AND_CALENDAR: dict[str, str] = {
+    "studio/partials/thread.html": "Home's thread: {% include thread.template %} (studio.chat.PANEL_TEMPLATE)",
+    "calendar/partials/publish_queue.html": "list mode's tab: {% include initial_tab_template %} (calendar.views._TAB_TEMPLATES)",
+    "calendar/partials/publish_drafts.html": "the same include, ?tab=drafts",
+    "calendar/partials/publish_approvals.html": "the same include, ?tab=approvals",
+    "calendar/partials/publish_sent.html": "the same include, ?tab=sent",
+}
+
+
+def test_home_and_calendar_list_what_they_pick_at_run_time_in_their_own_screens():
+    """recolor reads a declared page's ``template_tree(roots)`` and every screen's ``fragments``, so the
+    thread and the four list tabs are listed there: in the entries of screens 2 (Home) and 4 (Calendar),
+    each holding its page's root and not gated, so no guard but recolor's reads them before their gates.
+    Not in screen 1's: its tree is the sheet's, and its gate would hold them to its guards."""
+    home, calendar = screens.SCREENS["home"], screens.SCREENS["calendar"]
+    assert (home.templates, home.pages, home.gated) == (screens.PAGE_TEMPLATES[HOME], (HOME,), False)
+    assert (calendar.templates, calendar.pages, calendar.gated) == (
+        screens.PAGE_TEMPLATES[CALENDAR],
+        (CALENDAR,),
+        False,
+    )
+    assert home.fragments == ("studio/partials/thread.html",)
+    assert set(calendar.fragments) == set(calendar_views._TAB_TEMPLATES.values())
+    assert {*home.fragments, *calendar.fragments} == set(CHOSEN_ON_HOME_AND_CALENDAR)
+    assert not set(CHOSEN_ON_HOME_AND_CALENDAR) & set(screens.SCREENS["new_post"].fragments)
 
 
 #: Screen 1's parts (docs/specs/phase-3.md, T14): the sheet component and its three partials, the
@@ -199,7 +237,7 @@ def test_screen_one_is_registered_as_its_start_task_adds_it():
     assert screens.PAGE_TEMPLATES[HOME] == ("studio/index.html",)
     assert screens.PAGE_TEMPLATES[CALENDAR] == ("calendar/calendar.html",)
     # A component the two pages include (from T16): its own tree never holds their roots, so no guard
-    # reads those pages through it and the drift check's RUNTIME_CHOSEN rules stand for them.
+    # reads those pages through it; their own screens (2 and 4) hold what they pick at run time.
     tree = set(screens.template_tree((*entry.templates, *entry.fragments)))
     assert not tree & {*screens.PAGE_TEMPLATES[HOME], *screens.PAGE_TEMPLATES[CALENDAR]}, sorted(tree)
 
@@ -429,7 +467,7 @@ def test_every_mapped_page_renders_its_listed_roots(client, team, page):
     assert response.status_code == 200, response.status_code
     rendered = {template.name for template in response.templates}
     assert set(screens.PAGE_TEMPLATES[page]) <= rendered, sorted(rendered)
-    # Nothing changes until a page is declared: today no page is, so no <html> carries the flag.
+    # Only a declared page carries the flag (Home and Calendar, from T22).
     assert response.context["theme_ready"] is (page in screens.DARK_READY)
     assert ("data-theme-ready" in _html_tag(response)) is (page in screens.DARK_READY)
 
@@ -440,14 +478,11 @@ def test_every_mapped_page_renders_its_listed_roots(client, team, page):
 #: guard reads: not in ``DARK_READY``, and in no screen's ``template_tree(templates + fragments)``,
 #: gated or not yet (a screen's ``pages`` do not count). Once a guard reads them, each must be inside
 #: what that guard reads: the fragments of the screen whose tree holds the page's roots, and for a
-#: dark-ready page the fragments of any screen, as recolor reads them (``_guard_reads``).
-RUNTIME_CHOSEN: dict[str, str] = {
-    "studio/partials/thread.html": "Home's thread: {% include thread.template %} (studio.chat.PANEL_TEMPLATE)",
-    "calendar/partials/publish_queue.html": "list mode's tab: {% include initial_tab_template %} (calendar.views._TAB_TEMPLATES)",
-    "calendar/partials/publish_drafts.html": "the same include, ?tab=drafts",
-    "calendar/partials/publish_approvals.html": "the same include, ?tab=approvals",
-    "calendar/partials/publish_sent.html": "the same include, ?tab=sent",
-}
+#: dark-ready page the fragments of any screen, as recolor reads them (``_guard_reads``). Empty since
+#: T22: Home's and Calendar's entries left when the two pages were declared
+#: (``CHOSEN_ON_HOME_AND_CALENDAR``, now in their screens' fragments). A mapped page that a guard does
+#: not read yet and that picks a template at run time adds its entry here.
+RUNTIME_CHOSEN: dict[str, str] = {}
 
 #: The queries a mapped page is opened with, beyond its plain URL: the ones that render its other
 #: templates (Calendar's list view and its list mode, on its default tab and on every tab
@@ -514,16 +549,19 @@ def busy(client, world):
     return SimpleNamespace(client=client, workspace=world.workspace)
 
 
-def _drift(busy: SimpleNamespace, pages: Iterable[screens.Page]) -> tuple[dict[str, list[str]], set[str], set[str]]:
+def _drift(
+    busy: SimpleNamespace, pages: Iterable[screens.Page], allow: Mapping[str, str] | None = None
+) -> tuple[dict[str, list[str]], set[str], set[str]]:
     """Render each of *pages* on its plain URL and each of its ``PAGE_QUERIES``.
 
     Returns ``(strays, exempted, seen)``: per page and query, the project templates rendered outside
     what a guard that reads the page's roots reads (``_guard_reads``, each such guard on its own); or,
-    when no guard reads them, outside the page's own tree plus the trees of the ``RUNTIME_CHOSEN``
-    templates it rendered; those exempted templates; and every project template rendered. A page a
-    guard reads gets no exemption: what it picks at run time must be in what that guard reads (the
-    fragments of the screen that reaches the page; every screen's fragments for recolor).
+    when no guard reads them, outside the page's own tree plus the trees of the templates in *allow*
+    (default ``RUNTIME_CHOSEN``) it rendered; those exempted templates; and every project template
+    rendered. A page a guard reads gets no exemption: what it picks at run time must be in what that
+    guard reads (the fragments of the screen that reaches the page; every screen's fragments for recolor).
     """
+    allowed = RUNTIME_CHOSEN if allow is None else allow
     strays: dict[str, list[str]] = {}
     exempted: set[str] = set()
     seen: set[str] = set()
@@ -541,7 +579,7 @@ def _drift(busy: SimpleNamespace, pages: Iterable[screens.Page]) -> tuple[dict[s
             if reads:
                 unread = {name for read in reads for name in rendered - read}
             else:
-                picked = rendered & set(RUNTIME_CHOSEN)
+                picked = rendered & set(allowed)
                 exempted |= picked
                 unread = rendered - set(screens.template_tree((*roots, *sorted(picked))))
             if unread:
@@ -621,18 +659,19 @@ def test_a_screen_that_reaches_a_pages_roots_and_lists_its_run_time_templates_pa
 @pytest.mark.parametrize("gated", [False, True], ids=["at-its-start", "at-its-gate"])
 def test_a_screen_that_does_not_reach_its_pages_roots_imposes_nothing_on_them(busy, monkeypatch, gated):
     """Screen 1's entry lists Home and Calendar in ``pages`` but its templates (a component's) reach
-    neither page's root, so no guard reads those pages through it: Home's thread and Calendar's tabs
-    stay on the allowlist, and nothing asks for them in screen 1's ``fragments``."""
+    neither page's root, so no guard reads those pages through it: with neither page declared (the
+    registry of T22's eve), Home's thread and Calendar's tabs stay on that day's allowlist, and nothing
+    asks for them in screen 1's ``fragments``."""
     monkeypatch.setattr(screens, "DARK_READY", frozenset())
     entry = dataclasses.replace(NEW_POST, gated=gated)
     monkeypatch.setattr(screens, "SCREENS", {"new_post": entry})
     read = set(screens.template_tree((*entry.templates, *entry.fragments)))
     assert not read & {*screens.PAGE_TEMPLATES[HOME], *screens.PAGE_TEMPLATES[CALENDAR]}, sorted(read)
 
-    strays, exempted, _ = _drift(busy, [HOME, CALENDAR])
+    strays, exempted, _ = _drift(busy, [HOME, CALENDAR], allow=CHOSEN_ON_HOME_AND_CALENDAR)
 
     assert not strays, f"a screen that does not reach these pages' roots was made to read their templates: {strays}"
-    assert exempted == set(RUNTIME_CHOSEN), sorted(set(RUNTIME_CHOSEN) ^ exempted)
+    assert exempted == set(CHOSEN_ON_HOME_AND_CALENDAR), sorted(set(CHOSEN_ON_HOME_AND_CALENDAR) ^ exempted)
 
 
 @pytest.mark.parametrize(

@@ -42,16 +42,20 @@ DARK_MEDIA = "@media (prefers-color-scheme:dark)"
 DARK_MEDIA_SELECTOR = ':root[data-theme-ready]:not([data-theme="light"])'
 LIGHT_SCOPE = '[data-theme-scope="light"]'
 
-#: The tokens F1 adds, with the light value of the literal each one replaces (so light cannot move).
+#: The tokens F1 adds (and T22's on-fill-muted), with the light value of the literal each one replaces
+#: (so light cannot move).
 NEW_TOKENS: dict[str, str] = {
     "--on-fill": "#FFFFFF",  # text-white on a fill
-    "--surface-inverse": "#1C1F24",  # the toast, tooltip and selected chip fill (ink-900)
+    "--on-fill-muted": "#CED2D7",  # text-ink-300 on an ink-900 fill: the selected filter chip's count (T22)
+    "--surface-inverse": "#1C1F24",  # the toast, tooltip and selection bars' fill (ink-900)
     "--text-on-inverse": "#FFFFFF",  # their white text
     "--scrim": "#0E1114",  # bg-ink-950/NN behind a dialog
 }
-#: Their utilities (``@theme inline``): text-on-fill, bg-inverse, text-on-inverse, bg-scrim.
+#: Their utilities (``@theme inline``): text-on-fill, text-on-fill-muted, bg-inverse, text-on-inverse,
+#: bg-scrim.
 UTILITIES: dict[str, str] = {
     "--color-on-fill": "var(--on-fill)",
+    "--color-on-fill-muted": "var(--on-fill-muted)",
     "--color-inverse": "var(--surface-inverse)",
     "--color-on-inverse": "var(--text-on-inverse)",
     "--color-scrim": "var(--scrim)",
@@ -500,6 +504,15 @@ def _pairs() -> tuple[Pair, ...]:
         ("focus outline on-inverse on surface-inverse", "--text-on-inverse", "--surface-inverse", NON_TEXT),
     ):
         add(Pair(group, f"{label} (light scope)", fg, bg, needs, scope="light"))
+
+    # The selected filter chip (the owner's choice at T22): ink-900 with on-fill words, as the current
+    # hour keeps ink-900, so its fill stands off the card and the canvas in both themes (the inverse
+    # surface sat 1.32:1 and 1.41:1 there in dark); its count in on-fill-muted (ink-300 in light).
+    group = "Selected filter chip (ink-900 with on-fill words)"
+    add(Pair(group, "selected filter chip ink-900 on card ink-0", "--ink-900", "--ink-0", NON_TEXT))
+    add(Pair(group, "selected filter chip ink-900 on canvas ink-50", "--ink-900", "--ink-50", NON_TEXT))
+    add(Pair(group, "its words on-fill on ink-900", "--on-fill", "--ink-900", TEXT))
+    add(Pair(group, "its count on-fill-muted on ink-900", "--on-fill-muted", "--ink-900", TEXT))
 
     group = EDGES
     for surface, bg in SURFACES[:4]:
