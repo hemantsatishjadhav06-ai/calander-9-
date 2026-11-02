@@ -601,7 +601,10 @@ would move light from `#000` to ink-950 `#0E1114` (`composer/partials/media_list
 each drawn in its theme's `--text-tertiary`, not a CSS mask over `var(--text-tertiary)`; (c)
 `.hour-bar.is-now` and `.timeline-now` keep ink-900, which flips (14.6:1 on a dark card), instead of
 the inverse surface, which would sit at 1.32:1 on a dark card (DESIGN_SYSTEM.md §21 explains all
-three), the open decision on the selected filter chip that T22 needs (below), and that
+three), the one pair T2 accepts under its bar in light (`success-500` icon on the sidebar's
+`ink-100`, 2.93:1 against 3:1, the same on `045978b`: light does not move, D2, so it is excepted in
+light only and passes in dark; `tools/contrast.py` `LIGHT_EXCEPTIONS`, DESIGN_SYSTEM.md §21), the open
+decision on the selected filter chip that T22 needs (below), and that
 `frontend-design` was unavailable and `impeccable`'s shape step stood in. **Stop: screen 1 starts after the owner signs off the shell pair.**
 
 ## Part B — Screen 1 · New post sheet (size L)
