@@ -80,6 +80,18 @@ notification per operator for a sent request. Their fixtures and probe are in
 a switch makes its own workspace: `workspace_switches` refuses the seeded A and B, which every spec
 shares. The existing golden specs were not edited for Phase 2; every route they use still answers.
 
+**Screens (Phase 3).** `screens/new-post.spec.ts` drives the New post sheet on Home and Calendar on
+all three projects: one tap opens it, Ask the team lands on the idea's thread, an over-budget Send
+shows the sheet's own sentence and makes nothing, a viewer and a plain client get no button (and the
+client's direct POST answers 403), Write it myself opens the editor (from a week cell on desktop only,
+with the cell's date and time), Save it as an idea saves with or without tags as the templates
+switch says, the foot links reach their pages, and axe runs closed and open in each mode in both
+schemes. Its fixture and probe are in `server/steps/p3.py`: `workspace_over_budget` spends this
+month's allowance of a workspace the test made (it refuses A and B), and `new_post_outcome`
+(`?workspace_id&since=`) reads the conversations, messages by kind, chat jobs, briefs, ideas and tags
+made since a moment; both are pinned by `tests/test_e2e_steps_p3.py`. `self/phone-bar-overlap` holds
+the floating New post button's place and `self/reduced-motion` the sheet's still entrance.
+
 Phase 1 also checks the manager's approval and the client's request for changes in
 `golden/05-06-role-variants.spec.ts`, and foreign IDs in form bodies and query strings in
 `golden/11-isolation-inputs.spec.ts`. The existing invariant golden paths are retained unchanged.

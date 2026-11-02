@@ -14,8 +14,8 @@ import { expect, test } from '../support/test';
 // First the probe proves it sees: without reduce, each motion class runs on its token (200 ms, a
 // sheet's exit 140 ms), the sheet comes up from the bottom on a phone and in from the right on a
 // desktop; with reduce, none of them runs. Then the shell: opening Go to and the notifications drawer
-// moves nothing for longer than 0.01 ms. Screens 1 to 3 add their cases here: the New post sheet, a
-// new message and the approve fill. apps/common/tests/test_motion.py checks the same in the source.
+// moves nothing for longer than 0.01 ms. Screens 1 to 3 add their cases here: the New post sheet (it
+// slides in without reduce and appears in place under it, T21), a new message and the approve fill. apps/common/tests/test_motion.py checks the same in the source.
 
 // `reducedMotion` is a context option, not a test option: `test.use({ reducedMotion })` is ignored.
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
@@ -216,4 +216,74 @@ test('opening the notifications drawer moves nothing for longer than 0.01 ms', a
   ).toEqual(expect.arrayContaining([{ kind: 'transition', name: 'opacity', ms: REDUCED_MS, on: '#htmx-progress' }]));
   expect(motion.filter((entry) => entry.on === '#htmx-progress' && entry.name === 'width')).toEqual([]);
   expect(longerThanReduced(motion), 'what moved for longer than 0.01 ms').toEqual([]);
+});
+
+/**
+ * Sample the New post sheet's computed transform on every frame for `ms`, from now: what the sheet
+ * looks like while it opens. Read the samples with `transforms` once the sampling is done.
+ */
+async function sampleSheet(page: Page, ms: number): Promise<void> {
+  await page.evaluate((duration) => {
+    const w = window as unknown as { sheetSamples?: string[]; sheetSampled?: boolean };
+    w.sheetSamples = [];
+    w.sheetSampled = false;
+    const sheet = document.querySelector('[data-testid="new-post-sheet"]');
+    const start = performance.now();
+    const frame = () => {
+      if (sheet && getComputedStyle(sheet).display !== 'none') w.sheetSamples!.push(getComputedStyle(sheet).transform);
+      if (performance.now() - start < duration) requestAnimationFrame(frame);
+      else w.sheetSampled = true;
+    };
+    requestAnimationFrame(frame);
+  }, ms);
+}
+
+async function transforms(page: Page): Promise<string[]> {
+  await page.waitForFunction(() => (window as unknown as { sheetSampled?: boolean }).sheetSampled === true);
+  return page.evaluate(() => (window as unknown as { sheetSamples: string[] }).sheetSamples);
+}
+
+test('the New post sheet slides in without reduce, and appears in place with nothing moving under it', async ({
+  page,
+  as,
+  harness,
+}) => {
+  await as('owner');
+  await page.goto(`/workspace/${harness.ids.workspace_a}/studio/`);
+  const button = page.getByTestId('new-post-open');
+  await expect(button).toBeVisible();
+  const sheet = page.getByTestId('new-post-sheet');
+
+  // Without reduce the sampler sees the sheet move (up from the bottom on a phone, in from the right on
+  // a desktop): proof that it would see a transform under reduce too.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await sampleSheet(page, 500);
+  await button.click();
+  await expect(sheet).toBeVisible();
+  const sliding = await transforms(page);
+  expect(sliding.length, 'the sampler read the open sheet').toBeGreaterThan(0);
+  expect(sliding.some((value) => value !== 'none'), `the sheet slides in without reduce: ${sliding.join(' | ')}`).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await settled(button, 'the page after the sheet');
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await record(page);
+  await sampleSheet(page, 500);
+  await button.click();
+  await expect(sheet).toBeVisible();
+  await expect(page.getByTestId('new-post-team-idea')).toBeFocused();
+  const opening = await recorded(page);
+  const still = await transforms(page);
+  expect(still.length, 'the sampler read the open sheet').toBeGreaterThan(0);
+  expect([...new Set(still)], 'under reduce the sheet appears in place, from its first frame').toEqual(['none']);
+  await settled(sheet, 'the New post sheet');
+  expect(longerThanReduced([...opening, ...(await recorded(page))]), 'what moved for longer than 0.01 ms').toEqual([]);
+
+  // Closing moves nothing either.
+  await record(page);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await expect(button).toBeFocused();
+  expect(longerThanReduced(await recorded(page)), 'what moved for longer than 0.01 ms as it closed').toEqual([]);
 });
