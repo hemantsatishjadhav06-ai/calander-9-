@@ -83,13 +83,12 @@ def find_template(name: str, dirs: Sequence[Path] | None = None) -> Path | None:
     return None
 
 
-def _literal(node: ast.expr | None, path: Path, what: str) -> str:
+def _literal(node: ast.expr, path: Path, what: str) -> str:
     """The string *node* holds, or a ``ValueError`` naming the file and line: the tree cannot follow it."""
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
-    line = getattr(node, "lineno", "?")
     raise ValueError(
-        f"{path}:{line}: an inclusion tag's {what} is not a literal string, so template_tree cannot follow it"
+        f"{path}:{node.lineno}: an inclusion tag's {what} is not a literal string, so template_tree cannot follow it"
     )
 
 

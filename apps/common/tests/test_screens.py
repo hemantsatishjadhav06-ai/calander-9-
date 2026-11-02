@@ -9,9 +9,11 @@
   templatetags modules and refuses a form it cannot read), on fixtures and on the real Calendar and
   Approvals templates.
 - Every page in ``PAGE_TEMPLATES``, rendered for a member who may open it, renders its listed roots,
-  so the map cannot drift from the views; rendered as an owner with posts, every project template
-  it renders is inside its tree (plus its screens' fragments and a short list of templates chosen at
-  run time), so no guard misses a template the page shows.
+  so the map cannot drift from the views; rendered as an owner with posts, on its plain URL and on
+  each query in ``PAGE_QUERIES`` (Calendar's list view and every list-mode tab
+  ``calendar.views._TAB_TEMPLATES`` can choose), every project template it renders is inside its tree
+  (plus its screens' fragments and a short list of templates chosen at run time), so no guard misses
+  a template those renders show; and those renders do draw the selects and the status pills.
 - ``theme_ready`` is false for every page today (no visible change). Once a page is declared in
   ``DARK_READY``, its ``<html>`` carries ``data-theme-ready`` and other pages' do not; the client
   portal's base does the same.
@@ -30,7 +32,8 @@ from django.urls import resolve, reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.approvals.tests.test_index import World
+from apps.approvals.tests.world import World
+from apps.calendar import views as calendar_views
 from apps.client_portal.models import MagicLinkToken
 from apps.common import context_processors, screens
 from apps.members.models import OrgMembership, WorkspaceMembership
@@ -114,7 +117,7 @@ def team(db):
 
 @pytest.fixture
 def world(db):
-    """The Approvals tests' workspace: an owner, connected Facebook and LinkedIn pages, and ``post``."""
+    """The Approvals tests' workspace (``apps/approvals/tests/world.py``): an owner, connected pages, ``post``."""
     return World()
 
 
@@ -374,14 +377,25 @@ def test_every_mapped_page_renders_its_listed_roots(client, team, page):
 RUNTIME_CHOSEN: dict[str, str] = {
     "studio/partials/thread.html": "Home's thread: {% include thread.template %} (studio.chat.PANEL_TEMPLATE)",
     "calendar/partials/publish_queue.html": "list mode's tab: {% include initial_tab_template %} (calendar.views._TAB_TEMPLATES)",
+    "calendar/partials/publish_drafts.html": "the same include, ?tab=drafts",
     "calendar/partials/publish_approvals.html": "the same include, ?tab=approvals",
+    "calendar/partials/publish_sent.html": "the same include, ?tab=sent",
 }
 
 #: The queries a mapped page is opened with, beyond its plain URL: the ones that render its other
-#: templates (Calendar's list view and its list mode's tabs, where the status pills are).
+#: templates (Calendar's list view and its list mode, on its default tab and on every tab
+#: ``calendar.views._TAB_TEMPLATES`` can choose, so a new tab is opened as soon as it exists).
 PAGE_QUERIES: dict[screens.Page, tuple[dict[str, str], ...]] = {
-    CALENDAR: ({"view": "list"}, {"mode": "list"}, {"mode": "list", "tab": "approvals"}),
+    CALENDAR: (
+        {"view": "list"},
+        {"mode": "list"},
+        *({"mode": "list", "tab": tab} for tab in calendar_views._TAB_TEMPLATES),
+    ),
 }
+
+#: What the drift check exists to see: templates reached only through an inclusion tag, which the
+#: world's posts must make the pages render (or the check would pass without looking at them).
+TAG_TEMPLATES_RENDERED = ("components/ui_select.html", "approvals/partials/_status_badge.html")
 
 
 def _project_templates(response):
@@ -415,12 +429,14 @@ def test_every_template_a_mapped_page_renders_is_in_its_tree(client, world):
 
     strays: dict[str, list[str]] = {}
     chosen: set[str] = set()
+    seen: set[str] = set()
     for page in sorted(screens.PAGE_TEMPLATES):
         for query in ({}, *PAGE_QUERIES.get(page, ())):
             response = client.get(reverse(f"{page[0]}:{page[1]}", kwargs={"workspace_id": world.workspace.id}), query)
             assert response.status_code == 200, (page, query, response.status_code)
             rendered = _project_templates(response)
             assert set(screens.PAGE_TEMPLATES[page]) <= rendered, (page, query)
+            seen |= rendered
             picked = rendered & set(RUNTIME_CHOSEN)
             chosen |= picked
             tree = set(screens.template_tree((*screens.PAGE_TEMPLATES[page], *_fragments_of(page), *sorted(picked))))
@@ -430,6 +446,8 @@ def test_every_template_a_mapped_page_renders_is_in_its_tree(client, world):
     assert not strays, f"rendered but outside template_tree, so no guard reads them: {strays}"
     # Every entry of the allowlist is still chosen at run time on a mapped page, so it cannot go stale.
     assert chosen == set(RUNTIME_CHOSEN), sorted(set(RUNTIME_CHOSEN) - chosen)
+    # The world still draws the selects and the pills: fewer posts would leave them unread, not stray.
+    assert set(TAG_TEMPLATES_RENDERED) <= seen, sorted(set(TAG_TEMPLATES_RENDERED) - seen)
 
 
 # ─────────────────────────────── The readiness flag ───────────────────────────────
