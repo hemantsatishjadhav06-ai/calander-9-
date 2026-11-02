@@ -294,7 +294,15 @@ def test_every_control_in_the_sheet_is_labelled(client, world, page):
     assert not unlabelled
     for node in elements(sheet):
         if node.tag == "button":
-            assert node.text() or node.attrs.get("aria-label"), node.attrs
+            assert node.text() or node.attrs.get("aria-label") or _named_from_data(node), node.attrs
+
+
+def _named_from_data(node: Node) -> bool:
+    """A button an Alpine ``<template>`` renders once per item (an emoji, a chosen tag; T18) is named by
+    that item: its words through ``x-text`` or its label through a bound ``:aria-label``. A button outside a
+    template still needs static words or a static ``aria-label``."""
+    in_template = any(each.tag == "template" for each in node.ancestors())
+    return in_template and bool(node.attrs.get("x-text") or node.attrs.get(":aria-label"))
 
 
 @pytest.mark.parametrize("page", PAGES, ids=["home", "calendar"])
@@ -382,8 +390,8 @@ def test_one_primary_per_view_in_its_place(client, world, role, page):
         if finding.view.startswith("dialog 'new-post-sheet'") or "'new-post-open': " in finding.reason
     ]
     assert not findings, findings
-    # Each panel's one act: Send, Open the editor (T17); the idea form's Save idea comes with T18.
-    acts = {"team": ["new-post-team-send"], "self": ["new-post-self-open"], "idea": []}
+    # Each panel's one act: Send, Open the editor (T17), Save idea (T18).
+    acts = {"team": ["new-post-team-send"], "self": ["new-post-self-open"], "idea": ["idea-save"]}
     for view in sheet_views:
         for breakpoint in BREAKPOINTS:
             shown = [node.name() for node in view.members if is_primary(node) and breakpoint in shown_at(node)]
@@ -419,20 +427,28 @@ def _queries(client, world, page, monkeypatch, *, sheet: bool) -> int:
     return len(queries)
 
 
-def test_home_reads_nothing_more_for_the_sheet(client, world, monkeypatch):
-    """Home already builds the form on every visit; the sheet renders it and reads nothing else."""
-    assert _queries(client, world, HOME, monkeypatch, sheet=True) == _queries(
-        client, world, HOME, monkeypatch, sheet=False
-    )
+@pytest.mark.parametrize("templates", [False, True], ids=["templates-off", "templates-on"])
+def test_home_reads_only_the_idea_form_s_columns_and_tags_for_the_sheet(client, world, monkeypatch, templates):
+    """Home already builds the form on every visit; the sheet renders it and reads only what its idea
+    form shows (T18): the idea columns, and the tags with the ``templates`` switch. ``sidebar_context``
+    read both on every render before; it reads neither now."""
+    AgencySettings.objects.update_or_create(workspace=world.workspace, defaults={"features": {"templates": templates}})
+    with_sheet = _queries(client, world, HOME, monkeypatch, sheet=True)
+    without = _queries(client, world, HOME, monkeypatch, sheet=False)
+
+    assert with_sheet - without == (2 if templates else 1)
 
 
-def test_calendar_reads_only_what_the_form_reads(client, world, monkeypatch):
+@pytest.mark.parametrize("templates", [False, True], ids=["templates-off", "templates-on"])
+def test_calendar_reads_only_what_the_form_reads_and_the_idea_columns(client, world, monkeypatch, templates):
+    """The idea form's tags are the ones Calendar's tag filter already read, so only its columns cost a query."""
+    AgencySettings.objects.update_or_create(workspace=world.workspace, defaults={"features": {"templates": templates}})
     with CaptureQueriesContext(connection) as form_reads:
         BriefForm(workspace=world.workspace)
     with_sheet = _queries(client, world, CALENDAR, monkeypatch, sheet=True)
     without = _queries(client, world, CALENDAR, monkeypatch, sheet=False)
 
-    assert with_sheet - without == len(form_reads)
+    assert with_sheet - without == len(form_reads) + 1
 
 
 # ── The 8 px grid, ahead of the gate (T25) ──────────────────────────────────────────────────────

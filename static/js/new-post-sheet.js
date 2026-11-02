@@ -16,6 +16,17 @@
  * - Clears the Ask the team error line as a new request starts (the page writes a refusal there).
  * - editorUrl(base): Open the editor's address, composer:compose with the date, time and account the
  *   sheet was opened with (only those, only when given); opening from the button carries none.
+ *
+ * Save it as an idea (T18; templates/composer/partials/new_post_idea.html), moved here from the shell's
+ * New idea dialog (base.html's window.ideaModalHelpers and sidebarNewMenu(), which go with T19):
+ * - The columns and tags come from the page's json_script elements (#new-post-idea-columns,
+ *   #new-post-idea-tags; the tags only with the templates switch), never pasted into code.
+ * - Pictures go up one by one to the form's data-upload-url and are sent as asset ids; a new tag goes to
+ *   its data-tag-url. The emoji picker's 95 choices are rendered only while it is open (_filteredEmojis)
+ *   and an emoji goes into the sheet's own description, at the caret or over what is selected.
+ * - saveIdea posts the form to composer:idea_create. On success it fires ideaChanged, empties the idea
+ *   form and closes the sheet (Ask the team's words stay); a refusal, a refused picture or a missing
+ *   security token shows in the form's own error line (ideaError), never in a toast or a browser alert.
  */
 (function () {
   'use strict';
@@ -31,10 +42,139 @@
   var FOCUSABLE = 'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   /** What Open the editor carries, as the composer reads it, in the order a channel slot's own link has. */
   var EDITOR_FIELDS = [['account', 'account'], ['scheduled_date', 'date'], ['scheduled_time', 'time']];
+  var IDEA_FORM = '[data-testid="new-post-idea"]';
+  var SAVE_FAILED = 'Could not save the idea. Please try again.';
+  var UPLOAD_FAILED = 'One of the files failed to upload. Please try again.';
+  var TOKEN_MISSING = 'Security token missing. Please reload the page.';
+  /** The idea form's emoji picker: 95 choices, each with the words its search matches. */
+  var EMOJIS = [
+    {e:'😀',n:'grinning'},{e:'😃',n:'smiley'},{e:'😄',n:'smile'},{e:'😁',n:'grin'},{e:'😆',n:'laughing'},
+    {e:'😅',n:'sweat smile'},{e:'🤣',n:'rofl'},{e:'😂',n:'joy'},{e:'🙂',n:'slight smile'},{e:'😊',n:'blush'},
+    {e:'😇',n:'innocent'},{e:'🥰',n:'love'},{e:'😍',n:'heart eyes'},{e:'🤩',n:'star struck'},{e:'😘',n:'kiss'},
+    {e:'😜',n:'wink tongue'},{e:'🤔',n:'thinking'},{e:'🤗',n:'hugging'},{e:'🤫',n:'shushing'},{e:'😎',n:'cool'},
+    {e:'🥳',n:'party'},{e:'😤',n:'triumph'},{e:'😱',n:'scream'},{e:'🥺',n:'pleading'},{e:'😢',n:'cry'},
+    {e:'👍',n:'thumbs up'},{e:'👎',n:'thumbs down'},{e:'👏',n:'clap'},{e:'🙌',n:'raised hands'},{e:'🤝',n:'handshake'},
+    {e:'💪',n:'strong'},{e:'✌️',n:'peace'},{e:'🤞',n:'crossed fingers'},{e:'👋',n:'wave'},{e:'🫡',n:'salute'},
+    {e:'❤️',n:'red heart'},{e:'🧡',n:'orange heart'},{e:'💛',n:'yellow heart'},{e:'💚',n:'green heart'},{e:'💙',n:'blue heart'},
+    {e:'💜',n:'purple heart'},{e:'🖤',n:'black heart'},{e:'🤍',n:'white heart'},{e:'💯',n:'hundred'},{e:'💥',n:'boom'},
+    {e:'⭐',n:'star'},{e:'🌟',n:'glowing star'},{e:'✨',n:'sparkles'},{e:'⚡',n:'lightning'},{e:'🔥',n:'fire'},
+    {e:'🎉',n:'party popper'},{e:'🎊',n:'confetti'},{e:'🏆',n:'trophy'},{e:'🎯',n:'bullseye'},{e:'🚀',n:'rocket'},
+    {e:'💡',n:'light bulb'},{e:'📌',n:'pin'},{e:'📎',n:'paperclip'},{e:'📝',n:'memo'},{e:'✏️',n:'pencil'},
+    {e:'✅',n:'check mark'},{e:'❌',n:'cross mark'},{e:'⚠️',n:'warning'},{e:'❓',n:'question'},{e:'❗',n:'exclamation'},
+    {e:'💬',n:'speech'},{e:'👀',n:'eyes'},{e:'🎨',n:'art'},{e:'📸',n:'camera'},{e:'🎬',n:'clapper'},
+    {e:'📱',n:'phone'},{e:'💻',n:'laptop'},{e:'📊',n:'chart'},{e:'📈',n:'trending up'},{e:'📅',n:'calendar'},
+    {e:'⏰',n:'alarm clock'},{e:'🔗',n:'link'},{e:'🔒',n:'lock'},{e:'🏷️',n:'label'},{e:'📣',n:'megaphone'},
+    {e:'🌍',n:'globe'},{e:'☀️',n:'sun'},{e:'🌙',n:'moon'},{e:'🌈',n:'rainbow'},{e:'🍕',n:'pizza'},
+    {e:'☕',n:'coffee'},{e:'🍺',n:'beer'},{e:'🎵',n:'music'},{e:'🐶',n:'dog'},{e:'🐱',n:'cat'},
+    {e:'✍️',n:'writing'},{e:'🧠',n:'brain'},{e:'💎',n:'gem'},{e:'🪄',n:'magic wand'},{e:'🎁',n:'gift'},
+  ];
 
   function visible(element) {
     return !!(element && element.getClientRects && element.getClientRects().length);
   }
+
+  /** A json_script element's value under `root` (Django escapes <, > and & in it), or [] when absent. */
+  function readJsonList(root, id) {
+    var element = root && root.querySelector('script[id="' + id + '"]');
+    if (!element) return [];
+    try {
+      var value = JSON.parse(element.textContent || '[]');
+      return Array.isArray(value) ? value : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  /**
+   * The idea form's requests (base.html's window.ideaModalHelpers, moved here; T19 removes that copy).
+   * They answer with the server's words instead of a toast or a browser alert.
+   */
+  var ideaModalHelpers = {
+    mediaAssetIdsCsv: function (items) {
+      return (items || []).map(function (item) { return item.asset_id; }).join(',');
+    },
+    appendUploadedMedia: function (items, data, file) {
+      if (!items || !data || !data.asset_id) return;
+      var exists = items.some(function (item) { return item.asset_id === data.asset_id; });
+      if (exists) return;
+      items.push({
+        asset_id: data.asset_id,
+        url: data.url || '',
+        filename: data.filename || (file && file.name) || '',
+        media_type: data.media_type || ((file && file.type && file.type.indexOf('video/') === 0) ? 'video' : 'image'),
+      });
+    },
+    /** The form's own token, else the page's, else the cookie's. */
+    getCsrfToken: function (form) {
+      var input = (form && form.querySelector('[name=csrfmiddlewaretoken]')) || document.querySelector('[name=csrfmiddlewaretoken]');
+      if (input && input.value) return input.value;
+      var cookieMatch = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+      return cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
+    },
+    triggerIdeaChanged: function () {
+      if (window.htmx && typeof window.htmx.trigger === 'function') {
+        window.htmx.trigger(document.body, 'ideaChanged');
+        return;
+      }
+      document.body.dispatchEvent(new CustomEvent('ideaChanged', { bubbles: true }));
+    },
+    /** The server's reason as plain text (a missing title, a refused file), from a text or JSON body. */
+    refusal: function (text, fallback) {
+      var reason = (new DOMParser().parseFromString(text || '', 'text/html').body.textContent || '').trim();
+      if (reason.charAt(0) === '{') {
+        try {
+          var json = JSON.parse(reason);
+          reason = json.error || Object.values(json.errors || {}).flat().join(' ');
+        } catch (error) { /* keep the text as it came */ }
+      }
+      return reason || fallback;
+    },
+    /** POST the idea form to its action: {ok: true} after ideaChanged, or {ok: false, message}. */
+    submitIdeaForm: function (form) {
+      var helpers = this;
+      var url = form && form.getAttribute('action');
+      if (!url) return Promise.resolve({ ok: false, message: SAVE_FAILED });
+      var token = helpers.getCsrfToken(form);
+      if (!token) return Promise.resolve({ ok: false, message: TOKEN_MISSING });
+      return fetch(url, { method: 'POST', headers: { 'X-CSRFToken': token }, body: new FormData(form) })
+        .then(function (response) {
+          if (response.ok) {
+            helpers.triggerIdeaChanged();
+            return { ok: true, message: '' };
+          }
+          return response.text()
+            .catch(function () { return ''; })
+            .then(function (text) { return { ok: false, message: helpers.refusal(text, SAVE_FAILED) }; });
+        })
+        .catch(function () { return { ok: false, message: SAVE_FAILED }; });
+    },
+    /** Upload one file; resolves with {asset_id, url, filename, media_type}, rejects with a userMessage. */
+    uploadIdeaMediaAsset: function (uploadUrl, file, token) {
+      if (!uploadUrl || !token) {
+        var refused = new Error('upload_refused');
+        refused.userMessage = token ? UPLOAD_FAILED : TOKEN_MISSING;
+        return Promise.reject(refused);
+      }
+      var formData = new FormData();
+      formData.append('file', file);
+      return fetch(uploadUrl, { method: 'POST', headers: { 'X-CSRFToken': token }, body: formData })
+        .then(function (response) {
+          if (!response.ok) {
+            // A 400 names why the file was refused (wrong type, too large, quota).
+            return response.json().catch(function () { return {}; }).then(function (data) {
+              var failed = new Error('upload_failed');
+              failed.userMessage = data && data.error;
+              throw failed;
+            });
+          }
+          return response.json();
+        })
+        .then(function (data) {
+          if (!data || !data.asset_id) throw new Error('upload_failed');
+          return data;
+        });
+    },
+  };
 
   window.newPostSheet = function newPostSheet() {
     // The component's own element. In a handler, Alpine's `this.$el` is the element the expression sits
@@ -47,9 +187,30 @@
       sheetContext: {},
       opener: null,
 
+      // Save it as an idea: the idea form's state (its title and description stay in their fields).
+      ideaColumns: [],
+      ideaAllTags: [],
+      ideaGroup: '',
+      ideaTags: [],
+      ideaTagSearch: '',
+      ideaTagsOpen: false,
+      tagDialogOpen: false,
+      newTagName: '',
+      ideaMedia: [],
+      ideaUploads: 0,
+      ideaSaving: false,
+      ideaDragOver: false,
+      ideaError: '',
+      emojiPickerOpen: false,
+      _emojiSearch: '',
+      _emojiList: EMOJIS,
+
       init: function () {
         var sheet = this;
         root = this.$el;
+        this.ideaColumns = readJsonList(root, 'new-post-idea-columns');
+        this.ideaAllTags = readJsonList(root, 'new-post-idea-tags');
+        this.ideaGroup = this.defaultIdeaGroup();
         window.addEventListener('new-post:open', function (event) {
           sheet.open(event.detail || {}, event.target);
         });
@@ -114,6 +275,188 @@
         });
         var query = params.toString();
         return query ? base + '?' + query : base;
+      },
+
+      // ── Save it as an idea ──────────────────────────────────────────────────────────────────────
+
+      /** The first column of the board (what the shell's dialog chose), or none when there is none. */
+      defaultIdeaGroup: function () {
+        return this.ideaColumns.length ? String(this.ideaColumns[0].id) : '';
+      },
+
+      ideaMediaIds: function () {
+        return ideaModalHelpers.mediaAssetIdsCsv(this.ideaMedia);
+      },
+
+      ideaPrimaryMediaId: function () {
+        return this.ideaMedia.length ? this.ideaMedia[0].asset_id : '';
+      },
+
+      toggleIdeaTag: function (tag) {
+        var index = this.ideaTags.indexOf(tag);
+        if (index === -1) this.ideaTags.push(tag);
+        else this.ideaTags.splice(index, 1);
+      },
+
+      ideaTagMatches: function () {
+        var query = (this.ideaTagSearch || '').toLowerCase().trim();
+        return this.ideaAllTags.filter(function (tag) { return !query || tag.toLowerCase().indexOf(query) >= 0; });
+      },
+
+      /** Enter in the tag search: create what was typed when it is new, else choose the one match. */
+      ideaTagEnter: function () {
+        var name = (this.ideaTagSearch || '').trim();
+        var matches = this.ideaTagMatches();
+        if (name && this.ideaAllTags.indexOf(name) < 0) {
+          this.addIdeaTag(name);
+        } else if (matches.length === 1) {
+          this.toggleIdeaTag(matches[0]);
+          this.ideaTagSearch = '';
+        }
+      },
+
+      /** Choose a tag, adding it to the workspace's tags (through the form's tag address) when it is new. */
+      addIdeaTag: function (name) {
+        name = (name || '').trim();
+        if (!name) return;
+        if (this.ideaAllTags.indexOf(name) < 0) {
+          this.ideaAllTags.push(name);
+          this.ideaAllTags.sort();
+        }
+        if (this.ideaTags.indexOf(name) < 0) this.ideaTags.push(name);
+        this.ideaTagSearch = '';
+        this._persistTag(name);
+      },
+
+      openTagDialog: function () {
+        this.newTagName = (this.ideaTagSearch || '').trim();
+        this.ideaTagSearch = '';
+        this.tagDialogOpen = true;
+      },
+
+      closeTagDialog: function () {
+        this.tagDialogOpen = false;
+        this.newTagName = '';
+      },
+
+      createTagFromDialog: function () {
+        var name = (this.newTagName || '').trim();
+        if (!name) return;
+        this.addIdeaTag(name);
+        this.closeTagDialog();
+      },
+
+      /** Save a new tag at once; saving the idea keeps its tags too, so a failure here loses nothing. */
+      _persistTag: function (name) {
+        var form = root && root.querySelector(IDEA_FORM);
+        var url = form && form.getAttribute('data-tag-url');
+        var token = ideaModalHelpers.getCsrfToken(form);
+        if (!url || !token) return;
+        fetch(url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': token, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'name=' + encodeURIComponent(name),
+        }).catch(function () { /* the idea's own save keeps the tag */ });
+      },
+
+      // The emoji picker: no choices while it is closed, so a closed picker renders no buttons.
+      _filteredEmojis: function () {
+        if (!this.emojiPickerOpen) return [];
+        var q = (this._emojiSearch || '').toLowerCase().trim();
+        if (!q) return this._emojiList;
+        return this._emojiList.filter(function (em) { return em.n.includes(q); });
+      },
+
+      /** Put an emoji in the sheet's own description, at the caret or over what is selected. */
+      _insertEmoji: function (emoji) {
+        var description = root && root.querySelector('[data-testid="idea-description"]');
+        if (description) {
+          var start = description.selectionStart;
+          var end = description.selectionEnd;
+          description.value = description.value.substring(0, start) + emoji + description.value.substring(end);
+          description.selectionStart = description.selectionEnd = start + emoji.length;
+          description.focus();
+          description.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        this._emojiSearch = '';
+      },
+
+      pickIdeaFiles: function (event) {
+        var input = event.target;
+        var files = Array.prototype.slice.call(input.files || []);
+        input.value = '';
+        return this._enqueueMediaFiles(files);
+      },
+
+      dropIdeaFiles: function (event) {
+        return this._enqueueMediaFiles(event.dataTransfer ? event.dataTransfer.files : []);
+      },
+
+      _enqueueMediaFiles: function (fileList) {
+        var sheet = this;
+        return Promise.all(Array.prototype.slice.call(fileList || []).map(function (file) {
+          return sheet._uploadIdeaMediaAsset(file);
+        }));
+      },
+
+      _uploadIdeaMediaAsset: function (file) {
+        if (!file) return Promise.resolve(false);
+        var sheet = this;
+        var form = root && root.querySelector(IDEA_FORM);
+        sheet.ideaUploads += 1;
+        sheet.ideaError = '';
+        return ideaModalHelpers
+          .uploadIdeaMediaAsset(form && form.getAttribute('data-upload-url'), file, ideaModalHelpers.getCsrfToken(form))
+          .then(function (data) {
+            ideaModalHelpers.appendUploadedMedia(sheet.ideaMedia, data, file);
+            return true;
+          })
+          .catch(function (error) {
+            sheet.ideaError = (error && error.userMessage) || UPLOAD_FAILED;
+            return false;
+          })
+          .then(function (uploaded) {
+            sheet.ideaUploads = Math.max(0, sheet.ideaUploads - 1);
+            return uploaded;
+          });
+      },
+
+      removeIdeaMedia: function (index) {
+        if (index < 0 || index >= this.ideaMedia.length) return;
+        this.ideaMedia.splice(index, 1);
+      },
+
+      /** Save idea: nothing is sent while a picture is still going up or a save is under way. */
+      saveIdea: function (event) {
+        var form = event && event.target;
+        if (!form || this.ideaUploads > 0 || this.ideaSaving) return Promise.resolve(false);
+        var sheet = this;
+        sheet.ideaSaving = true;
+        sheet.ideaError = '';
+        return ideaModalHelpers.submitIdeaForm(form).then(function (result) {
+          sheet.ideaSaving = false;
+          if (!result.ok) {
+            sheet.ideaError = result.message;
+            return false;
+          }
+          sheet.resetIdea(form);
+          sheet.close();
+          return true;
+        });
+      },
+
+      /** Empty the idea form once its idea is saved; Ask the team's words are left alone. */
+      resetIdea: function (form) {
+        if (form && typeof form.reset === 'function') form.reset();
+        this.ideaGroup = this.defaultIdeaGroup();
+        this.ideaTags = [];
+        this.ideaTagSearch = '';
+        this.ideaTagsOpen = false;
+        this.ideaMedia = [];
+        this.ideaError = '';
+        this.emojiPickerOpen = false;
+        this._emojiSearch = '';
+        this.closeTagDialog();
       },
 
       expanded: function (value) {

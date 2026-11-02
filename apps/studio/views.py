@@ -23,6 +23,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 
+from apps.composer.ideas import idea_form_context
 from apps.members.decorators import require_permission
 
 from . import budget, design, images, llm, services, style
@@ -167,6 +168,7 @@ def _index_context(request, workspace, form=None):
         thread["home_panel"] = True  # Home's main column; the partial may size itself for it.
     routine_rows = _routine_rows(request, workspace, perms)
     live_strip = _live_strip(request, workspace, perms)
+    starts_posts = can_start_posts(request.workspace_membership)
     return {
         "workspace": workspace,
         "live": live_strip,
@@ -183,8 +185,10 @@ def _index_context(request, workspace, form=None):
         "routine_rows": routine_rows,
         "can_manage_settings": bool(perms.get("manage_workspace_settings")),
         "can_create": perms.get("create_posts", False),
-        # New post: the button and the sheet, whose Ask the team panel renders ``form`` (index builds it).
-        "can_start_posts": can_start_posts(request.workspace_membership),
+        # New post: the button and the sheet, whose Ask the team panel renders ``form`` (index builds it)
+        # and whose idea form offers the idea columns and, with the templates switch, the tags.
+        "can_start_posts": starts_posts,
+        **(idea_form_context(request, workspace) if starts_posts else {}),
         "can_approve": perms.get("approve_posts", False),
         "can_edit_brand": _can_edit_brand(request),
         "greeting": _greeting(request, workspace),

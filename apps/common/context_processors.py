@@ -71,7 +71,6 @@ def sidebar_context(request):
     Provides:
         sidebar_workspaces: list of workspace objects the user belongs to
         sidebar_unread_inbox_count, sidebar_pending_approvals: the badges
-        sidebar_idea_columns, sidebar_idea_tags: the quick-create idea modal
         features: the current workspace's switches (``features_for``), read
             once per request and only when a template asks; every default,
             without a lookup, when there is no workspace
@@ -125,15 +124,8 @@ def sidebar_context(request):
             .count()
         )
 
-    # Idea columns and tags for the quick-create modal in the sidebar
-    sidebar_idea_columns = []
-    sidebar_idea_tags = []
-    if workspace:
-        from apps.composer.models import IdeaGroup, Tag
-
-        groups = IdeaGroup.objects.for_workspace(workspace.id).order_by("position", "created_at")
-        sidebar_idea_columns = [{"id": str(g.id), "label": g.name} for g in groups] if groups.exists() else []
-        sidebar_idea_tags = list(Tag.objects.for_workspace(workspace.id).values_list("name", flat=True))
+    # The idea form's columns and tags are the New post sheet's: Home and Calendar read them for whoever
+    # gets the sheet (``apps.composer.ideas.idea_form_context``), not on every render here.
 
     # Workspace creation permission (org owners and admins only)
     can_create_workspace = False
@@ -151,8 +143,6 @@ def sidebar_context(request):
         "can_create_workspace": can_create_workspace,
         "sidebar_unread_inbox_count": sidebar_unread_inbox_count,
         "sidebar_pending_approvals": sidebar_pending_approvals,
-        "sidebar_idea_columns": sidebar_idea_columns,
-        "sidebar_idea_tags": sidebar_idea_tags,
         "analytics_enabled_platforms": analytics_enabled_platforms,
     }
     nav = SimpleLazyObject(lambda: navigation.build_nav(request, values))

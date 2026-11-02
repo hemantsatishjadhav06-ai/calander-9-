@@ -12,6 +12,8 @@ Without JavaScript the form still posts (method and action) and the page answers
 The body (order-1) and the decision bar (order-3, sticky at the dialog's bottom, the sheet's one primary
 on the right) sit in the dialog's column through the panel's display: contents (see the sheet). Send
 starts the team's work, so the allowance line sits beside it instead of a confirm (spec D8's exemption).
+On the bar's left, Save it as an idea instead (new-post-save-idea) shows the sheet's idea form
+(composer/partials/new_post_idea.html); what was typed here stays.
 The help line closes the body, under the fields (docs/specs/screen-1-new-post-notes.md, 4 and open
 decision 10), so the sticky bar keeps to the error line and one row.
 The error line is always in the page, empty until a refusal, so its role="alert" is heard; its icon
@@ -82,8 +84,9 @@ or Calendar can share them. Context: workspace, form.
             <p id="new-post-team-error" data-testid="new-post-team-error" role="alert" class="peer order-2 min-w-0 flex-1 text-small"></p>
             <svg aria-hidden="true" class="order-1 h-[18px] w-[14px] shrink-0 peer-empty:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>
         </div>
+        <p class="text-small text-ink-600 mb-2">This starts the team's work and counts toward this month's allowance.</p>
         <div class="flex items-center justify-between gap-4">
-            <p class="text-small text-ink-600">This starts the team's work and counts toward this month's allowance.</p>
+            <button type="button" data-testid="new-post-save-idea" class="ui-btn ui-btn-ghost min-w-0" @click="setMode('idea')">Save it as an idea instead</button>
             <button type="submit" data-testid="new-post-team-send" class="ui-btn ui-btn-primary shrink-0">Send</button>
         </div>
     </div>
