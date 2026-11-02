@@ -24,12 +24,15 @@ async function timezoneFilter(page, selectTestId, origin) {
   await toggle.press('Escape');
 }
 
-async function newIdeaEmoji(page) {
-  // The picker now initializes only when opened. Include that first opening in
-  // the interaction budget so load-time work cannot simply be moved out of sight.
-  if (await page.getByTestId('mobile-menu-toggle').isVisible()) await page.getByTestId('mobile-menu-toggle').click();
-  await page.getByTestId('sidebar-new-toggle').click();
-  await page.getByTestId('sidebar-new-idea').click();
+async function newPostSheet(page) {
+  // The New post sheet (Phase 3, screen 1): its button is the page's own, floating above the phone bar
+  // on a phone and in the header from 1024px, so no drawer opens first. Wait for the dialog, type in
+  // Ask the team, then Save it as an idea instead. The picker initializes only when opened: include
+  // that first opening in the interaction budget so load-time work cannot simply be moved out of sight.
+  await page.getByTestId('new-post-open').click();
+  await page.getByTestId('new-post-sheet').waitFor({ state: 'visible' });
+  await page.getByTestId('new-post-team-idea').pressSequentially('Site visits this Saturday', { delay: 40 });
+  await page.getByTestId('new-post-save-idea').click();
   await page.getByTestId('idea-emoji-toggle').click();
   await page.getByTestId('idea-emoji-option').first().waitFor();
   await page.getByTestId('idea-emoji-search').pressSequentially('sparkles', { delay: 40 });
@@ -48,7 +51,7 @@ export const TARGETS = Object.freeze([
       await composer.pressSequentially('Plan next week', { delay: 40 });
       await composer.press('ControlOrMeta+A');
       await composer.press('Backspace');
-      await newIdeaEmoji(page);
+      await newPostSheet(page);
     },
   },
   {
@@ -60,7 +63,7 @@ export const TARGETS = Object.freeze([
       const details = page.getByTestId(`approvals-row-${reviewId}`).getByTestId('approvals-row-details');
       await details.click();
       await details.click();
-      await newIdeaEmoji(page);
+      // No New post here (the sheet lives on Home and Calendar): the filter and the details only.
     },
   },
   {
@@ -76,7 +79,7 @@ export const TARGETS = Object.freeze([
       await page.getByTestId('calendar-mode-calendar').click();
       if (!(await calendarResponse).ok()) throw new Error('Calendar mode switch failed.');
       await page.getByTestId('calendar-shell').waitFor();
-      await newIdeaEmoji(page);
+      await newPostSheet(page);
     },
   },
 ].map((target) => Object.freeze(target)));

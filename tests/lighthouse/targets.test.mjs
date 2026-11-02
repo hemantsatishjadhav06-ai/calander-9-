@@ -126,11 +126,14 @@ function recordingPage({ visible = true, ok = true } = {}) {
   return { page, steps, predicates };
 }
 
-const NEW_IDEA_EMOJI = [
-  'visible? mobile-menu-toggle',
-  'click mobile-menu-toggle',
-  'click sidebar-new-toggle',
-  'click sidebar-new-idea',
+// The New post sheet (Phase 3, screen 1, T23): its own button opens it (floating on a phone, in the
+// header on a desktop), Ask the team takes a few words, Save it as an idea instead shows the idea form,
+// and the emoji picker's first opening, a search and a choice are measured before Back to New post.
+const SHEET_IDEA_EMOJI = [
+  'click new-post-open',
+  'wait new-post-sheet visible',
+  'type new-post-team-idea Site visits this Saturday',
+  'click new-post-save-idea',
   'click idea-emoji-toggle',
   'wait idea-emoji-option:first',
   'type idea-emoji-search sparkles',
@@ -147,27 +150,26 @@ const timezone = (select) => [
 ];
 const byName = Object.fromEntries(TARGETS.map((entry) => [entry.name, entry]));
 
-test('the CI targets keep the inputs the runner measured before they moved', async () => {
+test('the CI targets keep the inputs the runner measured before they moved, the New post sheet in the old menu\'s place', async () => {
   const expected = {
     home: [
       'click thread-composer-body',
       'type thread-composer-body Plan next week',
       'press thread-composer-body ControlOrMeta+A',
       'press thread-composer-body Backspace',
-      ...NEW_IDEA_EMOJI,
+      ...SHEET_IDEA_EMOJI,
     ],
     approvals: [
       ...timezone('ui-select-displayTimezone'),
       'click approvals-row-42 > approvals-row-details',
       'click approvals-row-42 > approvals-row-details',
-      ...NEW_IDEA_EMOJI,
     ],
     calendar: [
       ...timezone('ui-select-calendarFilters.tz'),
       'click calendar-mode-list',
       'click calendar-mode-calendar',
       'wait calendar-shell',
-      ...NEW_IDEA_EMOJI,
+      ...SHEET_IDEA_EMOJI,
     ],
   };
   for (const [name, steps] of Object.entries(expected)) {
@@ -175,10 +177,28 @@ test('the CI targets keep the inputs the runner measured before they moved', asy
     await byName[name].interact(recorded.page, { origin, reviewId: 42 });
     assert.deepEqual(recorded.steps, steps, name);
   }
-  // On a desktop the phone drawer's toggle is hidden and is not pressed.
-  const desktop = recordingPage({ visible: false });
-  await byName.home.interact(desktop.page, { origin, reviewId: 42 });
-  assert.ok(!desktop.steps.includes('click mobile-menu-toggle'));
+});
+
+test('Home and Calendar open the New post sheet; Approvals has no trigger and touches neither it nor the old menu', async () => {
+  // The shell's New menu left with T19; the sheet's button is on the page itself at every width, so
+  // no target opens the phone drawer to reach it.
+  for (const visible of [true, false]) {
+    for (const entry of TARGETS) {
+      const { page, steps } = recordingPage({ visible });
+      await entry.interact(page, { origin, reviewId: 42 });
+      const touched = steps.join('\n');
+      assert.doesNotMatch(touched, /sidebar-new-|mobile-menu-toggle/, entry.name);
+      if (entry.name === 'approvals') {
+        assert.doesNotMatch(touched, /new-post-|idea-/, entry.name);
+        continue;
+      }
+      const opened = steps.indexOf('click new-post-open');
+      assert.ok(opened >= 0, `${entry.name} presses New post`);
+      assert.equal(steps[opened + 1], 'wait new-post-sheet visible', `${entry.name} waits for the sheet before typing in it`);
+      assert.ok(steps.indexOf('click new-post-save-idea') > opened, `${entry.name} reaches the idea form through the sheet`);
+      assert.equal(steps.at(-1), 'click idea-close', entry.name);
+    }
+  }
 });
 
 test('the filter and mode switches wait for this server\'s answers and fail when one fails', async () => {

@@ -3,6 +3,32 @@
 One entry per phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md): the date, what changed, and what the
 phase gate (section 6) said. Newest first.
 
+## In progress — Phase 3 · Screen 1: New post sheet
+
+Plan [`phase-3.md`](phase-3.md) Part B (T14–T25); T25's gate entry takes this one's place.
+
+- *Lighthouse measures the sheet (T23).* The shell's New menu left with T19, so the measured inputs
+  (`tests/lighthouse/targets.mjs`) no longer press `sidebar-new-*`: on this branch the old inputs
+  failed the runner's first Home run (`locator.click` timed out waiting for `sidebar-new-toggle`).
+  Home (after the thread typing) and Calendar (after the timezone filter and the mode switch) now
+  press New post (`new-post-open`, floating on a phone), wait for `new-post-sheet`, type in *Ask the
+  team*, press *Save it as an idea instead*, and measure the emoji picker's first opening, a search, a
+  choice and *Back to New post*. Approvals has no trigger and measures its filter and details only.
+  `run.mjs` is unchanged: T11 had already moved its New-menu lines (`:134-142` on `045978b`) here.
+- Local C9, budgets as configured, three alternating rounds against main `045978b` on its own server
+  and database (this machine misses the lab INP budget on main too, so it is compared with main, not
+  the budgets). Median of the rounds' medians, this branch against main: Home 0.92 / 0.91, LCP 2,172
+  / 2,157 ms, CLS 0.061 / 0.078, lab INP 336 (272–360) / 248 (240–256) ms; Approvals 0.89 / 0.91,
+  2,072 / 2,085 ms, 0.011 / 0.011, 112 (96–120) / 240 (224–288) ms; Calendar 0.89 / 0.88, 1,383 /
+  1,388 ms, 0.007 / 0.007, 304 (256–312) / 224 (192–256) ms. gzip JavaScript 79,959 / 70,520,
+  63,848 / 62,623 and 89,646 / 80,347 bytes. Every interaction completed on all three targets in
+  every run; the runs that missed a budget missed lab INP or performance, as main's did. Home's one
+  layout shift is its main column, as on main; neither the floating button nor the sheet shifts.
+  The slowest input on Home and Calendar, on both sides, is the emoji picker's first opening (replays
+  at 4× slowdown: Home 192–248 ms against main's 168–224, Calendar 288–312 against 224–264); the
+  sheet's opening takes 96–152 ms on Home, where main's New menu and New idea took 200–224. The
+  Lighthouse CI job and C12 at T25 give the numbers the gate records.
+
 ## 2 Nov 2026 — Phase 3 · Foundations: gate evidence, waiting for the owner's sign-off on the shell
 
 Spec [`03-rebuild-screens.md`](03-rebuild-screens.md), plan [`phase-3.md`](phase-3.md) (Part A, T1–T13).
