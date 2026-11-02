@@ -14,15 +14,21 @@ Three checks, each from the working tree (no git history, so they run in CI's sh
 
 2. **Context.** ``tests/fixtures/protected_context.json`` holds, for every per-test node, the SHA-256 of
    what in its own file decides, from outside its own source, whether and how it runs, also written
-   once from ``045978b``: the module's statements that touch ``pytestmark``, its module-level fixtures
-   (autouse or not: a module's fixture overrides a conftest fixture of the same name) and its xunit
-   module and function setup and teardown; and, for a ``path::Class::name`` node in a test file, the
-   enclosing class's header (decorators and bases) and every statement of its body that is not a
-   ``test_*`` test (fixtures, ``setup_method`` and the like, attributes, ``pytestmark``, ``__test__``).
+   from ``045978b``. Its module part: every module-level statement other than the node's own
+   definition (or the class around it) that touches ``pytestmark`` or ``pytest_plugins`` or names the
+   node or a class around it, as an identifier, an attribute or a string (so a later rebinding,
+   ``del``, ``setattr`` or ``__code__`` swap); the module-level fixtures (autouse or not: a module's
+   fixture overrides a conftest fixture of the same name); and the xunit module and function setup and
+   teardown. Its class part, for every ``path::Class::name`` node: the enclosing class's header
+   (decorators and bases) and every statement of its body that is not a test (fixtures,
+   ``setup_method`` and the like, attributes, ``pytestmark``, ``__test__``, an assignment or ``del`` of
+   the node's name, every other method). In a file pytest does not collect (``live_verify``'s
+   ``Command``) nothing is a test, so the class part is every statement but the node's own def; there
+   the context is all that guards the node beyond its own source, since collection never sees the file.
    A fixture is a function under a decorator whose callee is ``fixture`` (``@pytest.fixture``,
    ``@fixture(...)``) or under any decorator called with ``autouse=``; a ``test_*`` function under
-   anything else (``@pytest.mark.usefixtures(...)`` among them) is a test. Nothing, when a module has
-   none of these. A neighbouring test added or edited leaves it alone.
+   anything else (``@pytest.mark.usefixtures(...)`` among them) is a test. Nothing, when a node has
+   none of these. A neighbouring test added or edited leaves it alone, unless it names the node.
 
 3. **Collection.** :func:`collection_problems` runs pytest's own collection once, from the rootdir with
    the suite's settings (``pyproject.toml``), through ``tools/protected_collect.py``, which ignores
@@ -32,13 +38,18 @@ Three checks, each from the working tree (no git history, so they run in CI's sh
    functions, ``test_*`` methods of ``Test*`` classes, ``test*`` methods of ``TestCase`` classes) that
    is not collected; a protected item marked skip, skipif or xfail (or unittest's skip or
    expectedFailure); a protected item whose collected function is not the def the hash covers (a
-   later rebinding, a lambda, a wrapper written in the repository); and a per-test node that uses a
-   fixture its own module or class registers whose function the context does not hash (one under an
-   alias of ``pytest.fixture``, one imported from another file, an xunit hook bound by assignment).
+   later rebinding, a lambda, a wrapper written in the repository; a ``__code__`` swapped in place keeps
+   the name and line it compares, and the context's module part holds the statement that swaps it);
+   and a per-test node that uses a fixture its own module or class registers whose function the
+   context does not hash (one under an alias of ``pytest.fixture``, one imported from another file, an
+   xunit hook bound by assignment).
 
-Outside the guard: code outside the protected files. A ``conftest.py`` that skips at run time (a
-``pytest_runtest_setup`` hook, an autouse fixture, a fixture the test requests) and a helper module a
-protected file imports are not hashed; the collection check sees only what collection decides.
+Outside the guard: code outside the protected files, and names built at run time. A ``conftest.py``
+that skips at run time (a ``pytest_runtest_setup`` hook, an autouse fixture, a fixture the test
+requests), the code of a plugin or helper module a protected file loads (the ``pytest_plugins`` line or
+import that loads it is hashed, its own code is not), another module that reaches into a protected one,
+and a statement that builds a protected name from parts (``globals()["test_" + rest]``) are not hashed;
+the collection check sees only what collection decides.
 
 Usage::
 
@@ -77,6 +88,9 @@ TEST_FUNCTIONS = ("test_*",)
 MODULE_HOOKS = frozenset(
     {"setup_module", "teardown_module", "setup_function", "teardown_function", "setUpModule", "tearDownModule"}
 )
+#: Module-level names that decide whether and how a module's tests run: its marks, and the plugins it
+#: loads (whose hooks can skip at run time, which collection never sees).
+MODULE_SWITCHES = frozenset({"pytestmark", "pytest_plugins"})
 #: Marks that turn a test off or excuse its failure (the last two are unittest's own decorators).
 OFF_MARKS = frozenset({"skip", "skipif", "xfail", "unittest_skip", "unittest_expecting_failure"})
 #: The OFF_MARKS a protected test already carried on 045978b, by node id. None did: every protected
@@ -136,9 +150,10 @@ def node_source(text: str, names: list[str]) -> str:
     return "\n".join(text.splitlines()[_start(found) - 1 : found.end_lineno or found.lineno])
 
 
-def _callee(decorator: ast.expr) -> str:
-    """The name a decorator calls: ``fixture`` for ``@pytest.fixture``, ``@fixture(scope="module")`` and the like."""
-    target = decorator.func if isinstance(decorator, ast.Call) else decorator
+def _callee(expr: ast.expr) -> str:
+    """The name a decorator calls, or a base class names: ``fixture`` for ``@pytest.fixture`` and
+    ``@fixture(scope="module")``, ``TestCase`` for ``unittest.TestCase``."""
+    target = expr.func if isinstance(expr, ast.Call) else expr
     if isinstance(target, ast.Name):
         return target.id
     return target.attr if isinstance(target, ast.Attribute) else ""
@@ -163,12 +178,20 @@ def _is_test(stmt: ast.stmt) -> bool:
     return isinstance(stmt, Function) and _matches(stmt.name, TEST_FUNCTIONS) and not _is_fixture(stmt)
 
 
-def _touches_pytestmark(stmt: ast.stmt) -> bool:
-    return any(
-        (isinstance(node, ast.Name) and node.id == "pytestmark")
-        or (isinstance(node, ast.Constant) and node.value == "pytestmark")
-        for node in ast.walk(stmt)
-    )
+def _mentions(stmt: ast.stmt, names: Iterable[str]) -> bool:
+    """Whether *stmt*, anywhere inside it, holds one of *names* as an identifier or a string.
+
+    Every identifier and string field counts: a name, an attribute, an import's name or alias, a
+    keyword, a parameter, a ``global``, a nested definition's name, a string constant (``setattr(C,
+    "name", ...)``, ``globals()["name"]``). A name computed at run time (``"test_" + rest``) escapes it.
+    """
+    wanted = set(names)
+    for node in ast.walk(stmt):
+        for _, value in ast.iter_fields(node):
+            values = value if isinstance(value, list) else [value]
+            if any(isinstance(item, str) and item in wanted for item in values):
+                return True
+    return False
 
 
 def _span(stmt: ast.stmt) -> tuple[int, int]:
@@ -181,18 +204,21 @@ def _context_spans(tree: ast.Module, lines: list[str], names: list[str], path: s
     spans = [
         _span(stmt)
         for stmt in tree.body
-        if _touches_pytestmark(stmt)
-        or (isinstance(stmt, Function) and (stmt.name in MODULE_HOOKS or _is_fixture(stmt)))
+        if stmt is not chain[0]
+        and (
+            _mentions(stmt, MODULE_SWITCHES | {definition.name for definition in chain})
+            or (isinstance(stmt, Function) and (stmt.name in MODULE_HOOKS or _is_fixture(stmt)))
+        )
     ]
-    if is_test_file(path):
-        for owner, inner in zip(chain[:-1], chain[1:], strict=True):
-            if not isinstance(owner, ast.ClassDef):
-                continue
-            first, last = _start(owner), max(owner.lineno, _start(owner.body[0]) - 1)
-            while last > first and (not lines[last - 1].strip() or lines[last - 1].lstrip().startswith("#")):
-                last -= 1  # blank lines and comments before the first statement are not the header
-            spans.append((first, last))
-            spans.extend(_span(stmt) for stmt in owner.body if stmt is not inner and not _is_test(stmt))
+    collected = is_test_file(path)  # in a file pytest does not collect, nothing is a test
+    for owner, inner in zip(chain[:-1], chain[1:], strict=True):
+        if not isinstance(owner, ast.ClassDef):
+            continue
+        first, last = _start(owner), max(owner.lineno, _start(owner.body[0]) - 1)
+        while last > first and (not lines[last - 1].strip() or lines[last - 1].lstrip().startswith("#")):
+            last -= 1  # blank lines and comments before the first statement are not the header
+        spans.append((first, last))
+        spans.extend(_span(stmt) for stmt in owner.body if stmt is not inner and not (collected and _is_test(stmt)))
     return spans
 
 
@@ -246,12 +272,6 @@ def changed(expected: Mapping[str, str], root: Path = ROOT, *, context: bool = F
     return different
 
 
-def _base_name(base: ast.expr) -> str:
-    if isinstance(base, ast.Name):
-        return base.id
-    return base.attr if isinstance(base, ast.Attribute) else ""
-
-
 def _last_of_each_name(body: list[ast.stmt]) -> list[Definition]:
     last = {stmt.name: stmt for stmt in body if isinstance(stmt, Definition)}
     return [stmt for stmt in body if isinstance(stmt, Definition) and last[stmt.name] is stmt]
@@ -265,7 +285,7 @@ def defined_tests(text: str) -> dict[tuple[str, int], str]:
         if _is_test(stmt):
             found[(stmt.name, _start(stmt))] = stmt.name
         elif isinstance(stmt, ast.ClassDef):
-            bases = {_base_name(base) for base in stmt.bases}
+            bases = {_callee(base) for base in stmt.bases}
             case = any(name.endswith("TestCase") or name in unittest_cases for name in bases)
             if case:
                 unittest_cases.add(stmt.name)

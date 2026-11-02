@@ -12,22 +12,27 @@ whole (the golden browser specs, the accessibility sweep, the provider-readiness
 tests, the gate and publisher tests) are hashed whole.
 
 A protected test can also be turned off without one character of its own source changing: a module
-``pytestmark``, a module fixture that overrides one it requests, a mark or an autouse fixture on its
-class, a later rebinding or ``del`` of its name, a ``conftest.py`` that ignores, deselects or marks it
-at collection. Two more checks close those. The context hashes
-(``tests/fixtures/protected_context.json``, also written once from ``045978b``) cover, for each
-per-test node, the module's ``pytestmark``, fixtures and xunit setup, and the enclosing class's header
-and every statement of its body that is not a ``test_*`` test. The collection check runs pytest's own
+``pytestmark`` or ``pytest_plugins``, a module fixture that overrides one it requests, a mark or an
+autouse fixture on its class, a later rebinding, ``del`` or ``setattr`` of its name, a ``conftest.py``
+that ignores, deselects or marks it at collection. Two more checks close those. The context hashes
+(``tests/fixtures/protected_context.json``, also written from ``045978b``) cover, for each per-test
+node, the module's statements that touch ``pytestmark`` or ``pytest_plugins`` or name the node or a
+class around it, its fixtures and xunit setup, and, for a node in a class, the class's header and every
+statement of its body that is not a test (in a file pytest does not collect, such as ``live_verify``'s
+``Command``, nothing is: every statement but the node's own def). The collection check runs pytest's own
 collection of the protected files once, as the full suite would (``pyproject.toml``, every
 ``conftest.py``), and fails when a protected test is not collected, is marked skip, skipif or xfail,
 would run anything but the def its hash covers, or uses a fixture of its own module or class that the
 context does not hash (under an alias of ``pytest.fixture``, or imported).
 
 Outside the guard: a skip at run time from code outside the protected files, such as a
-``conftest.py`` hook (``pytest_runtest_setup``) or fixture, or a helper module a protected file
-imports. Collection does not see it; the full run reports it as skipped.
+``conftest.py`` hook (``pytest_runtest_setup``) or fixture, or the code of a plugin or helper module a
+protected file loads (the line that loads it is context); and a protected name built at run time from
+parts (``globals()["test_" + rest]``). Collection does not see a run-time skip; the full run reports
+it as skipped.
 """
 
+import hashlib
 import json
 import time
 import tomllib
@@ -154,6 +159,10 @@ def test_no_protected_tests_context_changed_since_045978b():
     fixture = json.loads(CONTEXT.read_text(encoding="utf-8"))
     assert fixture["ref"] == json.loads(FIXTURE.read_text(encoding="utf-8"))["ref"]
     assert list(fixture["nodes"]) == [node for node in protected_tests.load(FIXTURE) if "::" in node]
+    # A class node's context holds at least its class's header, wherever the class lives (live_verify's
+    # Command too, in a file pytest does not collect); the SHA-256 of nothing would mean it holds none.
+    nothing = hashlib.sha256(b"").hexdigest()
+    assert [node for node, sha in fixture["nodes"].items() if node.count("::") > 1 and sha == nothing] == []
     changed = protected_tests.changed(fixture["nodes"], ROOT, context=True)
     assert not changed, (
         "What decides whether these protected tests run (their module's pytestmark or autouse setup, their "
@@ -248,8 +257,9 @@ def test_the_command_line_check_names_the_changed_test(tmp_path, capsys):
 # ─────────────────────── Turning a protected test off without editing it ───────────────────────
 #
 # Each case leaves every own-source hash unchanged; the context hashes (the module's pytestmark,
-# fixtures and xunit setup, and the enclosing class's decorators, fixtures, setup and attributes) and
-# the collection check (pytest's own collection, run as the suite runs it) must catch it.
+# pytest_plugins, fixtures, xunit setup and statements naming the test, and the enclosing class's
+# decorators, fixtures, setup and attributes) and the collection check (pytest's own collection, run
+# as the suite runs it) must catch it.
 
 GUARDED = """import pytest
 
@@ -570,3 +580,122 @@ def test_a_whole_file_test_marked_usefixtures_must_be_collected(tmp_path):
     _suite(root, files={WHOLE_FILE: whole, "elsewhere/conftest.py": DESELECT_PLAIN})
     _context, problems = _caught(root, baseline)
     assert problems == [f"{WHOLE_FILE}::test_plain: not collected (deselected)"]
+
+
+# ─────────────────── A protected method in a file pytest does not collect ───────────────────
+#
+# live_verify's Command holds two protected nodes. pytest never collects that file, so the collection
+# check cannot help: the context alone must catch what turns the method off or stops the run that holds
+# it, in the class (its header, attributes, every other method) and at module level (a statement that
+# names the method or its class).
+
+COMMANDS = """class Base:
+    def check(self):
+        return None
+
+
+class Command(Base):
+    help = "Check the deployment."
+
+    def handle(self):
+        self.check()
+        self.record("checked")
+
+    def record(self, line):
+        print(line)
+
+    def check(self):
+        assert 1 + 1 == 2
+
+
+def helper():
+    return 1
+"""
+
+COMMAND = "pkg/commands.py::Command::check"
+CHECK_BODY = "        assert 1 + 1 == 2\n"
+
+
+def _command_baseline(root):
+    (root / "pkg").mkdir(exist_ok=True)
+    (root / "pkg" / "commands.py").write_text(COMMANDS, encoding="utf-8")
+    return protected_tests.digest(COMMAND, root), protected_tests.context_digest(COMMAND, root)
+
+
+def _command_caught(root, baseline, module):
+    """Whether the context of COMMAND changed once *module* replaces the file (its own source must not)."""
+    (root / "pkg" / "commands.py").write_text(module, encoding="utf-8")
+    source, context = baseline
+    assert protected_tests.changed({COMMAND: source}, root) == [], "the case must leave the method's own hash alone"
+    assert protected_tests.collection_problems([COMMAND], root) == [], "pytest never collects this file"
+    return protected_tests.changed({COMMAND: context}, root, context=True) == [COMMAND]
+
+
+def test_edits_beside_a_protected_class_in_a_file_pytest_does_not_collect_pass(tmp_path):
+    baseline = _command_baseline(tmp_path)
+    beside = COMMANDS.replace("    return 1\n", "    return 2\n")
+    beside += "\n\ndef other():\n    return helper()\n"
+    assert not _command_caught(tmp_path, baseline, beside)
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        # Case X3: rebound by an assignment in the class, after the def.
+        COMMANDS.replace(CHECK_BODY, CHECK_BODY + "\n    check = lambda self: None  # noqa: E731\n"),
+        COMMANDS.replace(CHECK_BODY, CHECK_BODY + "\n    del check\n"),
+        # Case X4: rebound, deleted or set at module level.
+        COMMANDS + "\n\nCommand.check = lambda self: None\n",
+        COMMANDS + "\n\ndel Command.check\n",
+        COMMANDS + '\n\nsetattr(Command, "check", lambda self: None)\n',
+        COMMANDS + "\n\n_command = Command\n_command.check = Base.check\n",
+        # The run that holds it: the class's other methods, its header, and their rebinding.
+        COMMANDS.replace("        self.check()\n", ""),
+        COMMANDS.replace("class Command(Base):", "@staticmethod\nclass Command(Base):"),
+        COMMANDS + "\n\nCommand.handle = lambda self: None\n",
+    ],
+    ids=[
+        "in-class-assignment",
+        "in-class-del",
+        "module-assignment",
+        "module-del",
+        "module-setattr",
+        "module-alias",
+        "edited-handle",
+        "class-decorator",
+        "module-rebinds-handle",
+    ],
+)
+def test_a_protected_method_in_a_file_pytest_does_not_collect_is_guarded_by_its_context(tmp_path, module):
+    baseline = _command_baseline(tmp_path)
+    assert _command_caught(tmp_path, baseline, module)
+
+
+# ─────────────────── What collection cannot see, in a protected test's own file ───────────────────
+
+OFF_PLUGIN = 'import pytest\n\n\ndef pytest_runtest_setup(item):\n    pytest.skip("off")\n'
+
+
+def test_a_module_pytest_plugins_is_context(tmp_path):
+    """A plugin the module loads can skip at run time, which collection never sees."""
+    root = _suite(tmp_path, files={"pkg/_offplugin.py": OFF_PLUGIN})
+    baseline = _baseline(root)
+    _suite(root, GUARDED.replace("import pytest\n", 'import pytest\n\npytest_plugins = ["pkg._offplugin"]\n'))
+    assert _caught(root, baseline) == ([PROTECTED, METHOD], [])
+
+
+CODE_SWAP = (
+    "_f = {name}\n"
+    "_f.__code__ = (lambda *a, **k: None).__code__.replace(\n"
+    "    co_name=_f.__code__.co_name, co_firstlineno=_f.__code__.co_firstlineno\n"
+    ")\n"
+)
+
+
+@pytest.mark.parametrize("name, node", [("test_protected", PROTECTED), ("TestGroup.test_method", METHOD)])
+def test_a_swapped_code_object_is_context(tmp_path, name, node):
+    """A swapped ``__code__`` keeps the name and first line collection compares; the statement naming it is context."""
+    root = _suite(tmp_path)
+    baseline = _baseline(root)
+    _suite(root, GUARDED + "\n\n" + CODE_SWAP.format(name=name))
+    assert _caught(root, baseline) == ([node], [])
