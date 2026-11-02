@@ -482,7 +482,8 @@
                                 <div class="text-xs text-ink-500">Publish content to a channel</div>
                             </div>
                         </a>
-                        <button type="button" data-testid="sidebar-new-idea" @click="openCreateModal()"
+                        {# Where the New post sheet is (Home and Calendar, can_start_posts), Idea opens its idea form; elsewhere the dialog below, until T19. #}
+                        <button type="button" data-testid="sidebar-new-idea" {% if can_start_posts %}@click="newMenuOpen = false; $dispatch('new-post:open', {mode: 'idea'})"{% else %}@click="openCreateModal()"{% endif %}
                                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-ink-50 transition-colors cursor-pointer">
                             <div class="w-9 h-9 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0">
                                 <svg class="w-[18px] h-[18px] text-ink-700" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
@@ -516,6 +517,8 @@
                 </div>
 
                 <!-- Create Idea Modal -->
+                {# Not where the New post sheet is: its idea form carries the same test ids (idea-title, idea-emoji-*, idea-close). #}
+                {% if not can_start_posts %}
                 <template x-teleport="body">
                     <div x-show="showCreateModal" x-cloak
                          class="idea-modal-overlay"
@@ -724,6 +727,7 @@
                         </div>
                     </div>
                 </template>
+                {% endif %}
             </div>
             {% endif %}
 

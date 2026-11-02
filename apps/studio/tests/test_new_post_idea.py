@@ -107,6 +107,59 @@ def test_save_it_as_an_idea_instead_sits_beside_send_and_opens_the_idea_form(cli
     assert any(each is bar for each in reach.ancestors())
 
 
+#: The idea form's hooks. The shell's New idea dialog (base.html, until T19) carries the same ones, and
+#: tests/e2e/self/emoji-picker.spec.ts, phone-menu-focus.spec.ts and the Lighthouse New > Idea
+#: interaction (tests/lighthouse/targets.mjs) find them by test id alone, so a page has one of each.
+IDEA_HOOKS = (
+    "idea-title",
+    "idea-description",
+    "idea-emoji-toggle",
+    "idea-emoji-search",
+    "idea-emoji-option",
+    "idea-close",
+)
+#: The shell's New > Idea where the sheet is: the menu closes and the sheet opens on its idea form.
+OPEN_THE_SHEET_S_IDEA = "newMenuOpen = false; $dispatch('new-post:open', {mode: 'idea'})"
+
+
+@pytest.mark.parametrize("page", PAGES, ids=["home", "calendar"])
+@pytest.mark.parametrize("role", STARTERS)
+def test_where_the_sheet_is_the_shell_s_new_idea_opens_its_idea_form(client, world, role, page):
+    html = _page(client, world, page, getattr(world, role))
+    root = parse(html)
+    sheet = _one(root, **{"data-testid": "new-post-sheet"})
+
+    item = _one(root, **{"data-testid": "sidebar-new-idea"})
+    assert item.attrs.get("@click") == OPEN_THE_SHEET_S_IDEA
+    for hook in IDEA_HOOKS:
+        found = _all(root, **{"data-testid": hook})
+        assert len(found) == 1, (hook, len(found))
+        assert any(each is sheet for each in found[0].ancestors()), hook
+    # The shell's dialog and its Create new tag dialog are not on the page (the head's CSS stays).
+    assert 'class="idea-modal-overlay"' not in html
+    assert 'aria-label="New idea"' not in html
+    assert 'id="sidebar-create-tag-title"' not in html
+
+
+@pytest.mark.parametrize(
+    ("name", "role"),
+    (("approvals:index", "owner"), ("composer:create_landing", "editor"), ("calendar:calendar", "viewer")),
+    ids=["approvals", "ideas", "calendar-viewer"],
+)
+def test_without_the_sheet_the_shell_s_new_idea_keeps_its_dialog(client, world, name, role):
+    """Every other place, and Calendar for someone who may not start posts, keeps it until T19."""
+    client.force_login(getattr(world, role))
+    response = client.get(reverse(name, kwargs={"workspace_id": world.workspace.id}))
+    assert response.status_code == 200
+    html = response.content.decode()
+    root = parse(html)
+
+    assert not _all(root, **{"data-testid": "new-post-sheet"})
+    assert _one(root, **{"data-testid": "sidebar-new-idea"}).attrs.get("@click") == "openCreateModal()"
+    assert "autofocus" in _one(root, **{"data-testid": "idea-title"}).attrs
+    assert 'class="idea-modal-overlay"' in html
+
+
 # ── The form ────────────────────────────────────────────────────────────────────────────────────
 
 

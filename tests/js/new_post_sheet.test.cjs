@@ -329,3 +329,43 @@ test('nothing is sent while a picture is still going up', async () => {
 
   assert.equal(calls.length, 0);
 });
+
+// ── New > Idea from the phone drawer (T18's review) ──────────────────────────────────────────────
+// Where the sheet is, base.html's New > Idea sends new-post:open with {mode: 'idea'} from inside the
+// open phone drawer. open() closes the drawer first, but the drawer's own trap hands focus back to its
+// button as it lets go, and in the browser that can land just after the sheet put focus in its field
+// (tests/e2e/self/phone-menu-focus.spec.ts). The field takes it back once; nothing else is pulled in.
+
+test('opened from the open phone drawer, the field keeps focus when the drawer hands it back', () => {
+  const { win, component } = ideaSheet();
+  win.HTMLElement.prototype.getClientRects = function () { return [{}]; }; // jsdom lays nothing out
+  const drawerButton = win.document.createElement('button');
+  const item = win.document.createElement('button');
+  win.document.body.append(drawerButton, item);
+  const title = win.document.querySelector('[data-testid="idea-title"]');
+  component.mobileMenuOpen = true;
+  item.focus();
+
+  win.dispatchEvent(new win.CustomEvent('new-post:open', { detail: { mode: 'idea' } }));
+  assert.equal(component.mobileMenuOpen, false);
+  assert.equal(component.sheetMode, 'idea');
+  assert.equal(win.document.activeElement, title);
+
+  drawerButton.focus(); // the drawer's trap, letting go
+  assert.equal(win.document.activeElement, title);
+  drawerButton.focus(); // once only: from here the sheet's own trap keeps focus in
+  assert.equal(win.document.activeElement, drawerButton);
+});
+
+test('opened with the drawer closed, nothing pulls focus back', () => {
+  const { win, component } = ideaSheet();
+  win.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  const elsewhere = win.document.createElement('button');
+  win.document.body.append(elsewhere);
+  const title = win.document.querySelector('[data-testid="idea-title"]');
+
+  component.open({ mode: 'idea' });
+  assert.equal(win.document.activeElement, title);
+  elsewhere.focus();
+  assert.equal(win.document.activeElement, elsewhere);
+});

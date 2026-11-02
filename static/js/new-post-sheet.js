@@ -10,7 +10,9 @@
  * - Remembers the opener (the element that sent the event, else the focused one, else the New post
  *   button) and gives focus back to it when the sheet closes (Escape, the close button, the scrim); when
  *   the opener cannot take it (a cell's hover-only "+", hidden again), the New post button does.
- * - Puts focus in the mode's first field: Your idea, Open the editor, or the idea's title.
+ * - Puts focus in the mode's first field: Your idea, Open the editor, or the idea's title. Opened from
+ *   the open phone drawer (base.html's New > Idea), the field takes focus back once when the drawer's
+ *   trap returns it to the drawer's button as it lets go.
  * - Keeps what was typed: closing only hides the sheet.
  * - Sets `has-sheet` on body while open, and keeps the button's aria-expanded current.
  * - Clears the Ask the team error line as a new request starts (the page writes a refusal there).
@@ -43,6 +45,8 @@
   /** What Open the editor carries, as the composer reads it, in the order a channel slot's own link has. */
   var EDITOR_FIELDS = [['account', 'account'], ['scheduled_date', 'date'], ['scheduled_time', 'time']];
   var IDEA_FORM = '[data-testid="new-post-idea"]';
+  /** How long, after opening from the phone drawer, the field may take back the focus the drawer returns. */
+  var DRAWER_HANDBACK_MS = 300;
   var SAVE_FAILED = 'Could not save the idea. Please try again.';
   var UPLOAD_FAILED = 'One of the files failed to upload. Please try again.';
   var TOKEN_MISSING = 'Security token missing. Please reload the page.';
@@ -228,6 +232,7 @@
       open: function (detail, source) {
         detail = detail || {};
         // The phone drawer is a modal with its own focus trap: close it first (base.html's shell scope).
+        var fromDrawer = !!this.mobileMenuOpen;
         this.mobileMenuOpen = false;
         if (!this.sheetOpen) {
           var element = source && source.nodeType === 1 ? source : document.activeElement;
@@ -238,7 +243,7 @@
         this.sheetOpen = true;
         document.body.classList.add('has-sheet');
         this.expanded(true);
-        this.focusField();
+        this.focusField(fromDrawer);
       },
 
       close: function () {
@@ -465,8 +470,15 @@
         });
       },
 
-      /** Focus the mode's first field once the panel shows; else its first control; else Close. */
-      focusField: function () {
+      /**
+       * Focus the mode's first field once the panel shows; else its first control; else Close.
+       * `afterDrawer`: the sheet was opened from the open phone drawer (base.html's New > Idea). The
+       * drawer's trap hands focus back to its button as it lets go, and that can land just after this
+       * (the sheet's own trap starts a moment later and never pulls focus in), so the field takes it back
+       * once, if it comes while the sheet is still opening.
+       */
+      focusField: function (afterDrawer) {
+        var sheet = this;
         var mode = this.sheetMode;
         this.$nextTick(function () {
           if (!root) return;
@@ -476,8 +488,26 @@
             target = Array.prototype.find.call(panel.querySelectorAll(FOCUSABLE), visible) || null;
           }
           if (!visible(target)) target = root.querySelector('[data-testid="new-post-close"]');
-          if (target) target.focus();
+          if (!target) return;
+          target.focus();
+          if (afterDrawer) sheet._reclaimFocus(target);
         });
+      },
+
+      /** Give `target` focus back once if it leaves the sheet within DRAWER_HANDBACK_MS (see focusField). */
+      _reclaimFocus: function (target) {
+        var sheet = this;
+        var timer = null;
+        function stop() {
+          document.removeEventListener('focusin', reclaim, true);
+          clearTimeout(timer);
+        }
+        function reclaim(event) {
+          stop();
+          if (sheet.sheetOpen && root && !root.contains(event.target)) target.focus();
+        }
+        document.addEventListener('focusin', reclaim, true);
+        timer = setTimeout(stop, DRAWER_HANDBACK_MS);
       },
     };
   };

@@ -23,7 +23,9 @@ column while each panel stays one element.
 The overlay never blocks the page while closed (pointer-events-none; only its open children take
 events), so the scrim and the dialog can each run their own leave transition.
 
-Context: workspace, form (apps.studio.forms.BriefForm), features.
+Context: workspace, form (apps.studio.forms.BriefForm), features, idea_columns and idea_tags (the idea
+form's columns and tags, apps.composer.ideas.idea_form_context). Where it is, base.html's New > Idea
+opens its idea form (new-post:open with mode 'idea') instead of the shell's New idea dialog.
 {% endcomment %}
 <div class="fixed inset-0 z-[100] flex items-end justify-center pointer-events-none lg:items-stretch lg:justify-end" x-data="newPostSheet()">
     <div x-show="sheetOpen" x-cloak class="ui-overlay pointer-events-auto" @click="close()"

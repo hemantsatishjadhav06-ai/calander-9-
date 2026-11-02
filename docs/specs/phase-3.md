@@ -744,6 +744,22 @@ Verify: C1 `apps/common apps/studio apps/composer`, `test_a11y_sweep.py` unedite
 two dialogs on every swept page plus the sheet keep the count above ten), C8 `tests/e2e/self`
 (emoji-picker, phone-menu-focus, session) and `tests/e2e/screens/navigation.spec.ts`.
 
+**From T18's review (where T19 starts).** So that no commit leaves the browser specs or the Lighthouse
+New > Idea interaction meeting two `idea-title`s, T18 already routes the menu on the sheet's pages: on
+Home and Calendar with `can_start_posts`, `sidebar-new-idea` sends `new-post:open` with
+`{mode: 'idea'}` and `base.html` leaves out its idea and tag dialogs; every other page keeps them.
+`emoji-picker.spec.ts` and `phone-menu-focus.spec.ts` (unedited) and the Lighthouse interaction
+(`tests/lighthouse/targets.mjs` `newIdeaEmoji`) therefore drive the sheet's form on Home and Calendar
+through the same ids, and `new-post-sheet.js` gives the title focus back once when the closing phone
+drawer returns it to its button. `apps/common/tests/test_shell_a11y.py` reads the dialog's autofocus
+and heading from Approvals and checks the sheet's open order on Calendar; the rest of its move, and
+the other tests listed above, stay T19's. Until T19, on the pages that keep the dialog it shows a
+column button labelled "Unassigned" with an empty list and offers no tag suggestions, because
+`sidebar_idea_columns` and `sidebar_idea_tags` left `sidebar_context` with T18 while `base.html:553,
+1435, 1447-1450` still read them; its ideas still land in the board's first column
+(`composer:idea_create` defaults an empty group, `apps/composer/views.py:3120-3124`). T19 removes the
+dialog and these reads together; T23 still moves the Lighthouse interaction onto `new-post-open`.
+
 **T20. Keyboard (D16, the parts screen 1 needs).** Files: new `static/js/shortcuts.js` (deferred on
 workspace pages: `n` opens the sheet where the trigger is and otherwise goes to Home's `#new-post` for
 someone who may start posts; `/` opens Go to; `?` opens the list; ignored in a text field, select or

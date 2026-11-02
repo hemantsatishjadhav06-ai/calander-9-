@@ -5,7 +5,10 @@
   is now inert; open, it is a modal dialog that traps focus and hands it back on close.
 - Opening New idea from the open phone drawer left the drawer's trap active behind the dialog, so it
   pulled focus back from the dialog's title. Opening New idea now closes the drawer first, and the
-  title carries autofocus, which the dialog's trap uses as its initial focus.
+  title carries autofocus, which the dialog's trap uses as its initial focus. Where the New post sheet
+  is (Home and Calendar, for whoever may start posts; Phase 3 T18), New > Idea opens the sheet's idea
+  form instead, whose open() closes the drawer before it shows and then focuses the title; every
+  other page keeps the dialog until T19 takes the menu out of the shell.
 - The workspace switcher and the New menu closed only on an outside click; Escape now closes them and
   returns focus to their button (and only stops the event while a menu is open, so Escape still
   closes the phone drawer).
@@ -18,6 +21,7 @@
 
 import re
 
+from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -44,9 +48,18 @@ class ShellA11yTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.html = response.content.decode()
 
-    def _tag(self, marker):
-        start = self.html.rindex("<", 0, self.html.index(marker))
-        return self.html[start : self.html.index(">", self.html.index(marker))]
+    def _tag(self, marker, html=None):
+        html = self.html if html is None else html
+        start = html.rindex("<", 0, html.index(marker))
+        return html[start : html.index(">", html.index(marker))]
+
+    def _without_the_sheet(self):
+        """A page that keeps the shell's New idea dialog (no New post sheet there until T19)."""
+        response = self.client.get(reverse("approvals:index", kwargs={"workspace_id": self.ws.id}))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertNotIn('data-testid="new-post-sheet"', html)
+        return html
 
     def test_closed_drawer_is_inert_and_open_drawer_traps_focus(self):
         aside = self._tag('id="app-sidebar"')
@@ -59,12 +72,26 @@ class ShellA11yTests(TestCase):
         self.assertIn('aria-controls="app-sidebar"', toggle)
 
     def test_new_idea_closes_the_phone_drawer_before_taking_focus(self):
-        start = self.html.index("openCreateModal() {")
-        body = self.html[start : self.html.index("closeCreateModal() {", start)]
+        html = self._without_the_sheet()
+        start = html.index("openCreateModal() {")
+        body = html[start : html.index("closeCreateModal() {", start)]
         self.assertLess(body.index("this.mobileMenuOpen = false;"), body.index("this.showCreateModal = true;"))
         self.assertIn("this.$refs.sidebarIdeaTitle.focus()", body)
-        title = self._tag('data-testid="idea-title"')
+        title = self._tag('data-testid="idea-title"', html)
         self.assertIn("autofocus", title)
+
+    def test_where_the_sheet_is_new_idea_opens_it_closing_the_phone_drawer_first(self):
+        item = self._tag('data-testid="sidebar-new-idea"')
+        self.assertIn("@click=\"newMenuOpen = false; $dispatch('new-post:open', {mode: 'idea'})\"", item)
+        self.assertEqual(self.html.count('data-testid="idea-title"'), 1)
+        sheet = self.html[self.html.index('data-testid="new-post-sheet"') :]
+        self.assertIn('data-testid="idea-title"', sheet)
+        script = (settings.BASE_DIR / "static" / "js" / "new-post-sheet.js").read_text(encoding="utf-8")
+        start = script.index("open: function (detail, source) {")
+        body = script[start : script.index("close: function () {", start)]
+        self.assertLess(body.index("this.mobileMenuOpen = false;"), body.index("this.sheetOpen = true;"))
+        self.assertLess(body.index("this.sheetOpen = true;"), body.index("this.focusField(fromDrawer);"))
+        self.assertIn("idea: '[data-testid=\"idea-title\"]'", script)
 
     def test_menus_close_on_escape_and_return_focus(self):
         self.assertIn(
@@ -113,7 +140,9 @@ class ShellA11yTests(TestCase):
         page = re.sub(r"<!--.*?-->", "", self.html, flags=re.S)
         for old in ("Create Idea", "Posting Schedule", "Import CSV"):
             self.assertNotIn(old, page)
-        self.assertIn('<h2 class="text-h2 text-ink-950">New idea</h2>', self.html)
+        # The idea form's heading: the shell's dialog where it stays, the sheet's title in its idea view.
+        self.assertIn('<h2 class="text-h2 text-ink-950">New idea</h2>', self._without_the_sheet())
+        self.assertIn("sheetMode === 'idea' ? 'New idea' : 'New post'", self._tag('id="new-post-title"'))
         kw = {"workspace_id": self.ws.id}
         pages = {
             "Ideas": reverse("composer:create_landing", kwargs=kw),
