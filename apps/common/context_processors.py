@@ -1,6 +1,7 @@
 """Context processors for sidebar and global template data."""
 
 from django.conf import settings
+from django.urls import reverse
 from django.utils.functional import SimpleLazyObject
 
 from apps.common import navigation, screens
@@ -78,6 +79,10 @@ def sidebar_context(request):
             command palette's destinations (``navigation.build_palette``), built
             from these values when a template first reads them, so a page builds
             them once and an HTMX fragment, which never reads them, never does
+        new_post_url: where the ``n`` shortcut goes from a page without the New
+            post sheet (``static/js/shortcuts.js``): Home's ``#new-post`` for
+            whoever may start posts (``apps.studio.views.can_start_posts``), else
+            empty; worked out only when a template reads it
     """
     if not hasattr(request, "user") or not request.user.is_authenticated:
         return {}
@@ -148,4 +153,14 @@ def sidebar_context(request):
     nav = SimpleLazyObject(lambda: navigation.build_nav(request, values))
     values["nav"] = nav
     values["nav_palette"] = SimpleLazyObject(lambda: navigation.build_palette(request, nav))
+    values["new_post_url"] = SimpleLazyObject(lambda: _new_post_url(request, workspace))
     return values
+
+
+def _new_post_url(request, workspace) -> str:
+    """Home's ``#new-post`` (the sheet opens on it) for whoever may start posts, else ``""``."""
+    from apps.studio.views import can_start_posts
+
+    if workspace is None or not can_start_posts(getattr(request, "workspace_membership", None)):
+        return ""
+    return reverse("studio:index", kwargs={"workspace_id": workspace.id}) + "#new-post"

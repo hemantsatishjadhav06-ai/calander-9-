@@ -10,7 +10,8 @@
  * - Remembers the opener (the element that sent the event, else the focused one, else the New post
  *   button) and gives focus back to it when the sheet closes (Escape, the close button, the scrim); when
  *   the opener cannot take it (a cell's hover-only "+", hidden again), the New post button does.
- * - Puts focus in the mode's first field: Your idea, Open the editor, or the idea's title. Opened from
+ * - Puts focus in the mode's first field: Your idea, Open the editor, or the idea's title, once the dialog
+ *   shows (opened as the page loads, it waits a few frames for x-show). Opened from
  *   the open phone drawer (new-post:open or #new-post while it is open), the field takes focus back
  *   once when the drawer's trap returns it to the drawer's button as it lets go.
  * - Keeps what was typed: closing only hides the sheet.
@@ -47,6 +48,8 @@
   var IDEA_FORM = '[data-testid="new-post-idea"]';
   /** How long, after opening from the phone drawer, the field may take back the focus the drawer returns. */
   var DRAWER_HANDBACK_MS = 300;
+  /** How many frames the field waits for the dialog to show before it settles for what shows. */
+  var SHOW_FRAMES = 10;
   var SAVE_FAILED = 'Could not save the idea. Please try again.';
   var UPLOAD_FAILED = 'One of the files failed to upload. Please try again.';
   var TOKEN_MISSING = 'Security token missing. Please reload the page.';
@@ -184,6 +187,8 @@
     // The component's own element. In a handler, Alpine's `this.$el` is the element the expression sits
     // on (the mode button, the close button), so the sheet keeps its root from init.
     var root = null;
+    // The frames focusField has waited for the dialog to show (see there).
+    var waited = 0;
     return {
       sheetOpen: false,
       sheetMode: 'team',
@@ -482,6 +487,18 @@
         var mode = this.sheetMode;
         this.$nextTick(function () {
           if (!root) return;
+          // Opened as the page loads (#new-post, where `n` lands away from the sheet: shortcuts.js), the
+          // dialog can still be hidden here, x-show not having shown it yet: try again on the next frames.
+          var dialog = root.querySelector('[data-testid="new-post-sheet"]');
+          if (dialog && !visible(dialog) && waited < SHOW_FRAMES && typeof window.requestAnimationFrame === 'function') {
+            waited += 1;
+            window.requestAnimationFrame(function () {
+              if (sheet.sheetOpen && sheet.sheetMode === mode) sheet.focusField(afterDrawer);
+              else waited = 0;
+            });
+            return;
+          }
+          waited = 0;
           var panel = root.querySelector('[data-view="' + mode + '"]');
           var target = root.querySelector(FIRST_FIELD[mode]);
           if (!visible(target) && panel) {

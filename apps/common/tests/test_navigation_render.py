@@ -53,6 +53,7 @@ from apps.notifications.engine import notify
 from apps.notifications.models import EventType
 from apps.organizations.models import Organization
 from apps.social_accounts.models import AnalyticsPlatformConfig, SocialAccount
+from apps.studio import views as studio_views
 from apps.studio.models import AgencySettings, StudioBrief
 from apps.workspaces.models import Workspace
 
@@ -829,6 +830,90 @@ def test_a_plain_client_is_offered_no_agency_screen(client, team):
     # Their Approvals is the Calendar's approvals tab, which lets them in; the Approvals screen does not.
     assert _href(html, "palette-item-approvals") == _url("calendar:calendar", team.ws) + CLIENT_APPROVALS
     assert client.get(_url("approvals:index", team.ws)).status_code == 403
+
+
+# --- the keyboard shortcuts (spec D16, Phase 3 T20) ----------------------------------------------------
+# static/js/shortcuts.js runs the keys; the list is the shell's dialog. The browser cases are
+# tests/e2e/self/shortcuts.spec.ts, the guards case by case tests/js/shortcuts.test.cjs.
+
+
+def _shortcuts_root(html):
+    return _tag(html, "data-shortcuts")
+
+
+@pytest.mark.django_db
+def test_the_shortcut_list_is_a_labelled_trapped_dialog_with_a_switch(client, team):
+    _switches(team.ws)
+    html = _page(client, team.owner, _url("approvals:index", team.ws))
+
+    root = _shortcuts_root(html)
+    assert 'x-data="shortcutsList()"' in root and '@open-shortcuts.window="show()"' in root
+    dialog = _tag(html, 'data-testid="shortcuts-dialog"')
+    for attr in ('role="dialog"', 'aria-modal="true"', 'aria-labelledby="shortcuts-title"', 'x-trap.noscroll="open"'):
+        assert attr in dialog, attr
+    assert "@keydown.escape" in dialog
+    assert re.search(r'<h2 id="shortcuts-title"[^>]*>Keyboard shortcuts</h2>', html)
+
+    toggle = _tag(html, 'data-testid="shortcuts-toggle"')
+    assert toggle.startswith("<input") and 'type="checkbox"' in toggle and 'role="switch"' in toggle
+    labelled_by = re.search(r'aria-labelledby="([^"]+)"', toggle).group(1)
+    assert re.search(rf'id="{labelled_by}"[^>]*>Single-key shortcuts<', html)
+    # The keys the list names, and the one that brings the list back with single keys off.
+    assert 'data-testid="shortcuts-go-to"' in html and 'data-testid="shortcuts-list"' in html
+    assert "<kbd" in html[html.index('data-testid="shortcuts-dialog"') :]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("role", "starts_posts"),
+    [("owner", True), ("manager", True), ("editor", True), ("contributor", True), ("viewer", False), ("client", False)],
+)
+def test_n_goes_to_homes_new_post_only_for_whoever_may_start_posts(client, team, role, starts_posts):
+    """`n` away from the sheet goes to Home's #new-post: the page names that address only for someone
+    who may start posts (``apps.studio.views.can_start_posts``), and lists `n` only for them."""
+    _switches(team.ws)
+    html = _calendar(client, team, role)
+    root = _shortcuts_root(html)
+
+    if starts_posts:
+        assert f'data-new-post-url="{_url("studio:index", team.ws)}#new-post"' in root
+        assert 'data-testid="shortcuts-new-post"' in html
+    else:
+        assert "data-new-post-url" not in root
+        assert 'data-testid="shortcuts-new-post"' not in html
+
+
+@pytest.mark.django_db
+def test_go_to_does_not_open_over_the_new_post_sheet(client, team):
+    """Ctrl/Cmd-K inside the sheet does nothing: Go to's open handler returns while the sheet is open
+    (the sheet sets has-sheet on body), before it remembers an opener or opens."""
+    _switches(team.ws)
+    html = _page(client, team.owner, _url("studio:index", team.ws))
+    component = html[html.index("function commandPalette(") :]
+    show = component[component.index("show() {") : component.index("placeFocus(tries) {")]
+
+    guard = show.index("document.body.classList.contains('has-sheet')")
+    assert "return;" in show[guard : show.index("\n", guard)]
+    assert guard < show.index("this.opener = document.activeElement") < show.index("this.open = true")
+
+
+@pytest.mark.django_db
+def test_who_may_start_posts_is_read_only_when_a_page_asks(team):
+    """The address `n` goes to is lazy, like the navigation: a fragment that never reads it never
+    looks at the membership's permissions for it."""
+    url = _url("approvals:index", team.ws)
+    request = RequestFactory().get(url)
+    request.user = team.editor
+    request.workspace = team.ws
+    request.workspace_membership = WorkspaceMembership.objects.get(user=team.editor, workspace=team.ws)
+    request.org_membership = OrgMembership.objects.get(user=team.editor, organization=team.org)
+    request.resolver_match = resolve(url)
+
+    with mock.patch.object(studio_views, "can_start_posts", wraps=studio_views.can_start_posts) as spy:
+        context = context_processors.sidebar_context(request)
+        assert spy.call_count == 0
+        assert str(context["new_post_url"]) == _url("studio:index", team.ws) + "#new-post"
+        assert spy.call_count == 1
 
 
 # --- the sidebar and the phone bar offer only places this person may open ----------------------------
