@@ -861,6 +861,9 @@ def test_the_shortcut_list_is_a_labelled_trapped_dialog_with_a_switch(client, te
     # The keys the list names, and the one that brings the list back with single keys off.
     assert 'data-testid="shortcuts-go-to"' in html and 'data-testid="shortcuts-list"' in html
     assert "<kbd" in html[html.index('data-testid="shortcuts-dialog"') :]
+    # Every key has one look: base.html writes the class once, so the seven keys cannot drift apart.
+    keys = re.findall(r'<kbd class="([^"]*)">', html[html.index('data-testid="shortcuts-dialog"') :])
+    assert len(keys) == 7 and len(set(keys)) == 1 and "font-mono" in keys[0], keys
 
 
 @pytest.mark.django_db

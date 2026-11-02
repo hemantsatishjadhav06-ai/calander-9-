@@ -11,9 +11,10 @@
  * - `?` opens the list (open-shortcuts).
  * Each is ignored while a text field, a select or an editable region has the focus, with Ctrl, Alt or
  * Meta (Shift only where it makes the character: `?`, and `/` on keyboards that need it; Shift-N is
- * not `n`), while a dialog is open, below 1024 px, on auto-repeat, while a key is being composed, when
- * another handler already took the key, and when single keys are off on this device
- * (localStorage.shortcuts = 'off', the list's switch: WCAG 2.1.4). The key is never typed.
+ * not `n`), while a dialog is open (one that shows: a closed drawer kept in the page does not count,
+ * shows()), below 1024 px, on auto-repeat, while a key is being composed, when another handler
+ * already took the key, and when single keys are off on this device (localStorage.shortcuts = 'off',
+ * the list's switch: WCAG 2.1.4). The key is never typed.
  * - Ctrl-/ or Cmd-/ opens the list too, with single keys on or off and from a field (a modifier
  *   shortcut, like Ctrl-K for Go to), so the switch can always be turned back on.
  *
@@ -31,6 +32,8 @@
   var ROOT = '[data-shortcuts]';
   var NEW_POST = '#new-post';
   var DIALOGS = '[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]';
+  /** Hidden from everyone, whatever its box: a closed drawer says so, and so does what a trap shuts. */
+  var UNSEEN = '[aria-hidden="true"], [inert]';
   /** Inputs that take no typing; any other input is a text field. */
   var NOT_TYPED = ['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'];
   var TYPED_ROLES = '[role="textbox"], [role="searchbox"], [role="combobox"], [role="spinbutton"]';
@@ -65,8 +68,16 @@
     return window.innerWidth >= 1024;
   }
 
+  /**
+   * Whether `element` really shows. Having a box is not enough: a drawer that stays in the page while
+   * closed (Analytics' Post details) keeps its box slid out of view and is hidden by visibility: hidden
+   * and aria-hidden="true" instead. Computed visibility is inherited, so a hidden ancestor counts.
+   */
   function shows(element) {
-    return !!(element && element.getClientRects && element.getClientRects().length);
+    if (!element || !element.getClientRects || !element.getClientRects().length) return false;
+    if (element.closest(UNSEEN)) return false;
+    var style = window.getComputedStyle(element);
+    return style.visibility !== 'hidden' && style.visibility !== 'collapse';
   }
 
   /** Whether `element` takes typing: a text field, a text area, a select or an editable region. */

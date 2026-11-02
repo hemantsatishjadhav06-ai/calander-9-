@@ -92,6 +92,10 @@ test.describe('Keyboard shortcuts (desktop-chrome only: phones have no keys)', (
     const toggle = page.getByRole('switch', { name: 'Single-key shortcuts' });
     await expect(toggle).toHaveAttribute('data-testid', 'shortcuts-toggle');
     await expect(toggle).toBeChecked();
+    // The switch's own target is 44 by 44 px, as large as the other switches', not just its 36 by 20 track.
+    const target = await toggle.boundingBox();
+    expect(target?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(target?.height ?? 0).toBeGreaterThanOrEqual(44);
     await expect(list.locator(':focus')).toHaveCount(1);
 
     await page.keyboard.press('Escape');
@@ -144,6 +148,33 @@ test.describe('Keyboard shortcuts (desktop-chrome only: phones have no keys)', (
     await expect(page.getByTestId('palette-dialog')).toBeVisible();
     await expect(page.getByTestId('palette-input')).toBeFocused();
     await expect(page.getByTestId('palette-input')).toHaveValue('');
+  });
+
+  test("on Analytics, whose closed Post details drawer stays in the page, /, ? and n still work", async ({ page, harness, as }) => {
+    await as('owner');
+    await page.goto(`/workspace/${harness.ids.workspace_a}/analytics/`);
+    // The index answers with the first account's page (analytics:account), which holds the drawer.
+    await expect(page).toHaveURL(new RegExp(`/workspace/${harness.ids.workspace_a}/analytics/[0-9a-f-]{36}/`));
+    const drawer = page.getByRole('dialog', { name: 'Post details', includeHidden: true });
+    await expect(drawer).toHaveCount(1);
+    await expect(drawer).toHaveAttribute('aria-hidden', 'true');
+    await expect(drawer).toBeHidden();
+
+    await page.keyboard.press('/');
+    await expect(page.getByTestId('palette-dialog')).toBeVisible();
+    await expect(page.getByTestId('palette-input')).toBeFocused();
+    await expect(page.getByTestId('palette-input')).toHaveValue('');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('palette-dialog')).toBeHidden();
+
+    await page.keyboard.press('Shift+Slash');
+    await expect(page.getByTestId('shortcuts-dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('shortcuts-dialog')).toBeHidden();
+
+    await page.keyboard.press('n');
+    await expect(page).toHaveURL(new RegExp(`${home(harness.ids.workspace_a)}#new-post$`));
+    await expect(page.getByRole('dialog', { name: 'New post' })).toBeVisible();
   });
 
   test('Ctrl-K inside the sheet does nothing', async ({ page, harness, as }) => {

@@ -189,6 +189,58 @@ test('ignored while a dialog is open; a hidden one does not count', () => {
   assert.deepEqual(hidden.fired, ['new-post:open']);
 });
 
+/** A drawer that stays in the page while closed, as Analytics' Post details does: it keeps its box
+ * (slid out of view) and is hidden by visibility: hidden and aria-hidden="true" instead. */
+function drawer(open) {
+  return '<style>.drawer { visibility: hidden; transform: translateX(100%); }'
+    + ' .drawer.open { visibility: visible; transform: none; }</style>'
+    + `<div class="drawer${open ? ' open' : ''}" role="dialog" aria-modal="true" aria-label="Post details"`
+    + ` aria-hidden="${open ? 'false' : 'true'}"></div>`;
+}
+
+test('a closed drawer that keeps its box does not count: the keys work beside it', () => {
+  const closed = page({ trigger: false, body: drawer(false) });
+  press(closed.win, 'n');
+  press(closed.win, '/');
+  press(closed.win, '?', { shiftKey: true });
+  press(closed.win, '/', { ctrlKey: true });
+  assert.deepEqual(closed.fired, ['open-palette', 'open-shortcuts', 'open-shortcuts']);
+  assert.deepEqual(closed.went, [HOME]);
+
+  const open = page({ trigger: false, body: drawer(true) });
+  press(open.win, 'n');
+  press(open.win, '/');
+  press(open.win, '?', { shiftKey: true });
+  assert.deepEqual(open.fired, [], 'the same drawer open blocks every key');
+  assert.deepEqual(open.went, []);
+});
+
+test('a dialog hidden by visibility: hidden, aria-hidden="true" or inert does not count', () => {
+  const hidden = [
+    '<div role="dialog" aria-modal="true" aria-label="Post details" aria-hidden="true" style="visibility: hidden;"></div>',
+    '<div role="dialog" aria-modal="true" aria-label="Post details" style="visibility: hidden;"></div>',
+    '<div style="visibility: hidden;"><div role="dialog" aria-modal="true" aria-label="Go to"></div></div>',
+    '<div role="dialog" aria-modal="true" aria-label="Post details" aria-hidden="true"></div>',
+    '<div aria-hidden="true"><div role="dialog" aria-modal="true" aria-label="Go to"></div></div>',
+    '<div inert><div role="dialog" aria-modal="true" aria-label="Go to"></div></div>',
+  ];
+  for (const body of hidden) {
+    const { win, fired } = page({ trigger: true, body });
+    press(win, 'n');
+    assert.deepEqual(fired, ['new-post:open'], body);
+  }
+
+  const shown = [
+    '<div role="dialog" aria-modal="true" aria-label="Post details" aria-hidden="false"></div>',
+    '<div style="visibility: hidden;"><div role="dialog" aria-modal="true" aria-label="Go to" style="visibility: visible;"></div></div>',
+  ];
+  for (const body of shown) {
+    const { win, fired } = page({ trigger: true, body });
+    press(win, 'n');
+    assert.deepEqual(fired, [], body);
+  }
+});
+
 test('ignored below 1024 px', () => {
   const { win, fired, went } = page({ trigger: true, width: 1023 });
   press(win, 'n');

@@ -738,8 +738,9 @@
       (localStorage.shortcuts, WCAG 2.1.4); Ctrl/Cmd-/ still opens the list, so it can be turned back on.
       n is listed, and data-new-post-url names where it goes away from the sheet (Home's #new-post), only
       for someone who may start posts (new_post_url). Ctrl/Cmd-K does nothing while the list is open.
-      The switch's input covers its track (which lets clicks through), so it is the control a click
-      reaches.
+      The switch's input covers its track (which lets clicks through) and the 44 by 44 px around it, as
+      large as the other switches' target, so it is the control a click reaches; the visible label's
+      for= keeps the words clickable too and stays its one label. data-control: a control's own steps.
     {% endcomment %}
     <div x-data="shortcutsList()" data-shortcuts{% if new_post_url %} data-new-post-url="{{ new_post_url }}"{% endif %} @open-shortcuts.window="show()">
         <div x-show="open" x-cloak class="fixed inset-0 z-[110] flex items-start justify-center px-4 pt-[12vh]">
@@ -752,39 +753,42 @@
                         <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
+                {# Every key has one look: the class is written once. #}
+                {% with kbd_class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line-strong bg-ink-25 px-2 font-mono text-sm font-semibold text-ink-900" %}
                 <dl class="px-6 divide-y divide-ink-200">
                     {% if new_post_url %}
                     <div data-testid="shortcuts-new-post" class="flex items-center justify-between gap-4 py-2">
                         <dt class="text-sm text-ink-900">New post</dt>
-                        <dd class="flex items-center gap-2"><kbd class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line-strong bg-ink-25 px-2 font-mono text-sm font-semibold text-ink-900">n</kbd></dd>
+                        <dd class="flex items-center gap-2"><kbd class="{{ kbd_class }}">n</kbd></dd>
                     </div>
                     {% endif %}
                     <div data-testid="shortcuts-go-to" class="flex items-center justify-between gap-4 py-2">
                         <dt class="text-sm text-ink-900">Go to a page</dt>
                         <dd class="flex items-center gap-2">
-                            <kbd class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line-strong bg-ink-25 px-2 font-mono text-sm font-semibold text-ink-900">/</kbd>
+                            <kbd class="{{ kbd_class }}">/</kbd>
                             <span class="text-sm text-ink-600">or</span>
-                            <kbd class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line-strong bg-ink-25 px-2 font-mono text-sm font-semibold text-ink-900">Ctrl</kbd>
-                            <kbd class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line-strong bg-ink-25 px-2 font-mono text-sm font-semibold text-ink-900">K</kbd>
+                            <kbd class="{{ kbd_class }}">Ctrl</kbd>
+                            <kbd class="{{ kbd_class }}">K</kbd>
                         </dd>
                     </div>
                     <div data-testid="shortcuts-list" class="flex items-center justify-between gap-4 py-2">
                         <dt class="text-sm text-ink-900">Keyboard shortcuts</dt>
                         <dd class="flex items-center gap-2">
-                            <kbd class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line-strong bg-ink-25 px-2 font-mono text-sm font-semibold text-ink-900">?</kbd>
+                            <kbd class="{{ kbd_class }}">?</kbd>
                             <span class="text-sm text-ink-600">or</span>
-                            <kbd class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line-strong bg-ink-25 px-2 font-mono text-sm font-semibold text-ink-900">Ctrl</kbd>
-                            <kbd class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line-strong bg-ink-25 px-2 font-mono text-sm font-semibold text-ink-900">/</kbd>
+                            <kbd class="{{ kbd_class }}">Ctrl</kbd>
+                            <kbd class="{{ kbd_class }}">/</kbd>
                         </dd>
                     </div>
                 </dl>
+                {% endwith %}
                 <div class="mx-6 mt-2 mb-6 flex items-center justify-between gap-4 border-t border-ink-200 pt-4">
                     <div class="min-w-0">
                         <label for="shortcuts-toggle" id="shortcuts-toggle-label" class="text-sm font-semibold text-ink-900">Single-key shortcuts</label>
                         <p id="shortcuts-toggle-note" class="mt-2 text-sm text-ink-600">Turn them off if they get in your way, for example with speech input. Ctrl / still opens this list. Kept on this device.</p>
                     </div>
-                    <span class="bb-toggle">
-                        <input id="shortcuts-toggle" type="checkbox" role="switch" data-testid="shortcuts-toggle" class="!size-full !m-0 cursor-pointer"
+                    <span class="bb-toggle" data-control>
+                        <input id="shortcuts-toggle" type="checkbox" role="switch" data-testid="shortcuts-toggle" class="!size-11 -top-3 -left-1 !m-0 cursor-pointer"
                                aria-labelledby="shortcuts-toggle-label" aria-describedby="shortcuts-toggle-note"
                                :checked="enabled" @change="setEnabled($event.target.checked)">
                         <span class="bb-toggle-track pointer-events-none" aria-hidden="true"></span>
