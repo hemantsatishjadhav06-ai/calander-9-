@@ -166,9 +166,9 @@ def test_every_other_view_keeps_its_per_address_key():
 # request reaches Django as visitor -> Netlify -> Render's proxy -> gunicorn. Render's proxy is the
 # socket peer (a private 10.x address) and appends the address it saw, which for every visitor is one
 # of Netlify's: trusting the private range alone would put everyone behind the same Netlify node in
-# one rate-limit bucket. Netlify does not support X-Forwarded-For; it names the visitor in
-# X-Nf-Client-Connection-Ip and, for a signed proxy rule, signs each request with X-Nf-Sign (an HS256
-# JWS made from FRONT_DOOR_SIGNING_SECRET). Only a request carrying that signature has its
+# one rate-limit bucket. Netlify's supported header for the visitor is X-Nf-Client-Connection-Ip (an
+# X-Forwarded-For may arrive as well, which the app does not rely on) and, for a signed proxy rule,
+# it signs each request with X-Nf-Sign (an HS256 JWS made from FRONT_DOOR_SIGNING_SECRET). Only a request carrying that signature has its
 # X-Nf-Client-Connection-Ip believed. The service's own *.onrender.com address is public, so anyone
 # can send both headers straight to it; without the secret they cannot sign them.
 

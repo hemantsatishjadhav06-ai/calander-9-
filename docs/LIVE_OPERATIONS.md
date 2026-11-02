@@ -204,9 +204,12 @@ give the Blueprint a name, leave every field the form asks for **blank**, and
 choose **Deploy Blueprint**. Nothing typed there is needed for the first boot:
 `check --deploy` passes with warnings only (email, Sentry, the agency's keys,
 and W015 for the bucket that does not exist yet), `migrate` runs, and the web
-service answers `/health/`. Note the web service's address on its page
-(normally `https://sm-bean-web.onrender.com`; Render adds a suffix when the
-name is taken). It is the `RENDER_ORIGIN` of step 2.
+service answers `/health/`. Whether Render leaves a blank value out or creates
+it empty, the app reads it as not set and uses its default
+(`tests/test_render_blueprint.py` boots both services both ways). Note the web
+service's address on its page (normally `https://sm-bean-web.onrender.com`;
+Render adds a suffix when the name is taken). It is the `RENDER_ORIGIN` of
+step 2.
 
 The values in `render.yaml` written as `value:` are fixed by the file: the
 public address (`APP_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`,
@@ -218,8 +221,10 @@ the app allows that hostname, trusts it for CSRF and answers a request under it
 as `sm-bean.netlify.app`.
 
 **Values left blank, copied from Railway through the API.** Copy each onto
-`sm-bean-web` only: the worker reads every one of them from `sm-bean-web`
-(`fromService` in `render.yaml`), so nothing is copied onto the worker.
+`sm-bean-web`. The worker is linked to every one of them (`fromService` in
+`render.yaml`), but Render's documentation does not say whether such a link
+follows a value changed later through the API or copies it once when the
+Blueprint syncs, so the two services are compared after the copy (below).
 
 * `SECRET_KEY` and `ENCRYPTION_KEY_SALT`: overwrite the generated values with
   Railway's. The salt must match the data, or connected accounts' tokens no
@@ -259,8 +264,29 @@ endpoint). Then, from the web service's **Shell** tab,
 `python manage.py check --deploy` should show no error, only the warnings for
 what is still to come.
 
+**Check that the worker has the same values**, before the data move and before
+the worker runs against Railway's data. Run this in the **Shell** tab of
+`sm-bean-web` and of `sm-bean-worker`; it prints a short fingerprint of the
+keys, never the keys themselves:
+
+```bash
+python manage.py shell -c "import hashlib; from django.conf import settings as s; print(hashlib.sha256('|'.join(str(v) for v in (s.SECRET_KEY, s.ENCRYPTION_KEY_SALT, s.ANTHROPIC_API_KEY, s.OPENROUTER_API_KEY, s.FAL_KEY)).encode()).hexdigest()[:12])"
+```
+
+The last line each prints must be the same twelve characters. If they differ,
+the worker still holds the generated `SECRET_KEY` and `ENCRYPTION_KEY_SALT`
+and the empty provider keys: it could not decrypt the restored connected
+accounts, and what it encrypted the web service could not read. Run a manual
+sync of the Blueprint (Blueprints → the Blueprint → **Manual Sync**), deploy
+the worker and compare again. If they still differ, the links copy once: set
+every value copied above on `sm-bean-worker` as well, deploy it and compare
+once more, and from then on change a value on both services. (Reading both
+services' variables through the API, `GET /v1/services/<id>/env-vars`, is the
+other way to compare.)
+
 **Moving the data.** The keys above only matter with Railway's data. With the
-worker suspended (`sm-bean-worker` → Settings → Suspend), restore Railway's
+worker suspended (`sm-bean-worker` → Settings → Suspend; its fingerprint
+above matched the web service's), restore Railway's
 database into `sm-bean-db` from a machine whose Postgres client is at least
 as new as Railway's server, using the same client for both commands:
 `pg_dump --format=custom --no-owner --no-acl "<Railway public DATABASE_URL>" -f sm-bean.dump`,
@@ -271,6 +297,18 @@ address in Django admin → *Sites* (the domain in allauth's emails): set it to
 `sm-bean.netlify.app`. Media files stay in Railway's bucket until they are
 copied into R2 (step 3), for example with `rclone copy`; until then the
 pictures of existing posts do not show.
+
+`sm-bean-db` has no `ipAllowList` in `render.yaml`, so its external address
+accepts connections from anywhere (protected by its password) for the
+`pg_restore` above. Once the data is in, close it: add `ipAllowList: []` under
+`sm-bean-db` in `render.yaml` (only Render's private network may connect) and
+merge it, or remove the `0.0.0.0/0` rule under the database's **Networking**
+in the dashboard. Open it again the same way for a later dump from outside.
+
+Render looks for the port the web service listens on when it starts, and its
+probes may arrive with `Host: localhost:10000`. Django logs each as
+`Invalid HTTP_HOST header` (`DisallowedHost`); that is noise, not an attack and
+not a fault.
 
 ### 2. Point the Netlify site at Render
 
@@ -293,6 +331,36 @@ Then **Deploys → Trigger deploy**. A change to either variable needs another
 deploy. Check: `curl -sI https://sm-bean.netlify.app/health/` answers `200`, and
 the login page loads with its assets.
 
+**Then check that a visitor cannot choose their own address.** The design
+assumes Netlify replaces any `X-Nf-Client-Connection-Ip` a visitor sends with
+the address it saw. Confirm it once after the first deploy, and again after a
+change to the Netlify site. From your own computer:
+
+```bash
+curl -4 -s https://api.ipify.org; echo         # your public IPv4 address
+curl -4 -s -o /dev/null -w '%{http_code}\n' -X POST https://sm-bean.netlify.app/accounts/login/ \
+  -H 'X-Nf-Client-Connection-Ip: 203.0.113.77'
+```
+
+The POST answers `403` (it carries no CSRF token), but the login throttle has
+counted it under the address the app believed. In `sm-bean-web`'s **Shell**,
+with your address in place of `<yours>`:
+
+```bash
+python manage.py shell -c "import hashlib; from django.core.cache import cache; n = lambda ip: cache.get('auth_ratelimit:' + hashlib.md5(ip.encode()).hexdigest()); print('yours', n('<yours>'), 'forged', n('203.0.113.77'))"
+```
+
+* `yours 1` (or more) and `forged None`: correct.
+* `forged 1`: Netlify passed the visitor's header through, so anyone could
+  pick their rate-limit bucket and the address in the audit rows. Remove
+  `FRONT_DOOR_SIGNING_SECRET` from `sm-bean-web` and deploy it: every visitor
+  is then counted under the Netlify address that reached Render (coarse, but
+  not forgeable) until this is resolved.
+* `yours None` and `forged None`: the signature did not verify, so the
+  request was counted under Netlify's address. The two
+  `FRONT_DOOR_SIGNING_SECRET` values differ, or the Netlify one lacks the
+  **Runtime** scope.
+
 What reaches the app, and why it works:
 
 * **Host.** Netlify sends the Render service's own name as `Host` and sends no
@@ -305,10 +373,14 @@ What reaches the app, and why it works:
   `X-Forwarded-Proto: https`, which `SECURE_PROXY_SSL_HEADER` reads.
 * **CSRF.** The browser's `Origin` is `https://sm-bean.netlify.app`, which is
   in `CSRF_TRUSTED_ORIGINS` and is also the host the request is answered as.
-* **Client addresses.** Netlify does not support `X-Forwarded-For`; it names
-  the visitor in `X-Nf-Client-Connection-Ip`. Render's proxy, the socket peer,
-  connects from its private network (`BB_TRUSTED_PROXIES=10.0.0.0/8`) and
-  appends the address it saw, which for every visitor is one of Netlify's. The
+* **Client addresses.** Netlify's supported header for the visitor's address
+  is `X-Nf-Client-Connection-Ip`. An `X-Forwarded-For` may also arrive on a
+  proxied request (Netlify sends one, by community reports, but promises
+  nothing about it), and the app does not rely on it. Render's proxy, the
+  socket peer, connects from its private network
+  (`BB_TRUSTED_PROXIES=10.0.0.0/8`) and appends the address it saw, which for
+  every visitor is one of Netlify's, so the nearest untrusted hop in
+  `X-Forwarded-For` is always Netlify's, whatever was written before it. The
   app believes `X-Nf-Client-Connection-Ip` only on a request whose `X-Nf-Sign`
   verifies with `FRONT_DOOR_SIGNING_SECRET` (HS256, issuer `netlify`, not
   expired); `apps.common.net.front_door_client_ip`. The `*.onrender.com`
@@ -374,9 +446,20 @@ check). In the Cloudflare dashboard:
 | `S3_ADDRESSING_STYLE` | `path` (already set by `render.yaml`) |
 
 Save, then deploy both services so they read the values (the worker through
-`fromService`). `MEDIA_STORAGE_PENDING=true` has no effect once the bucket is
-set. Check: `python manage.py live_verify` in the web service's Shell reports
+`fromService`; if step 1's comparison showed that the links do not follow
+changes, set the four on `sm-bean-worker` as well). Check:
+`python manage.py live_verify` in the web service's Shell reports
 `storage.round_trip` PASS, and an uploaded picture shows on the post page.
+
+Once uploads work, change `MEDIA_STORAGE_PENDING` to `"false"` in
+`render.yaml` and merge it. While it says `"true"`, a deployment that later
+loses `S3_BUCKET_NAME` by mistake keeps running and quietly refuses uploads
+(only W015 in the deploy log and `live_verify` say so); with `"false"`,
+`check --deploy` stops that deploy with E004 (the web service's pre-deploy
+step fails and the version already running keeps serving). The
+price: a Blueprint created afresh from the file then needs the four values
+above typed into its form (`tests/test_render_blueprint.py` follows the file
+either way).
 
 ### 4. OAuth callback URLs for the new address
 
@@ -525,11 +608,13 @@ For Render, the callback URLs and steps are in
 The one canonical list. "Service" says where the value must be set: **web**
 (`sm-bean`), **worker** (`sm-bean-worker`) or **both** (the same value on each;
 a value the worker lacks shows up as work that silently never happens). On
-Render the web service is `sm-bean-web`, and the worker reads every variable
-`render.yaml` lists from it, so "both" means setting it on `sm-bean-web` once.
-"Verify" names the page or `live_verify` check that proves it works; key
-presence alone proves nothing. `.env.example` carries every variable's full
-comment.
+Render the web service is `sm-bean-web`, and the worker is linked to every
+variable `render.yaml` lists on it, so "both" means setting it on
+`sm-bean-web`, then confirming the worker agrees (step 1 of *Render with
+Netlify in front*). An empty value of a variable `render.yaml` leaves blank
+counts as unset. "Verify" names the page or `live_verify` check that proves it
+works; key presence alone proves nothing. `.env.example` carries every
+variable's full comment.
 
 ### Core
 

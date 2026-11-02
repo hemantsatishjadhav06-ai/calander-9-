@@ -183,14 +183,16 @@ def front_door_client_ip(request) -> str | None:
     """The visitor's address as our Netlify front door saw it, or None if the request did not come through it.
 
     The public address is a Netlify site that proxies every request to the Render web service.
-    Netlify does not support ``X-Forwarded-For``; it names the connecting visitor in
-    ``X-Nf-Client-Connection-Ip`` and, for the signed proxy rule in ``deploy/netlify/netlify.toml``,
-    signs each request with ``X-Nf-Sign``: a JWS (HS256) keyed with ``FRONT_DOOR_SIGNING_SECRET``,
-    issued by ``netlify`` and carrying an expiry. The service's own ``*.onrender.com`` address is
-    public, so anyone can send both headers straight to it; the visitor header is believed only
-    when the signature verifies. Without the secret, nothing is believed. The signature covers who
-    sent the request, not the header, but Netlify sets that header itself on every request it
-    proxies, and nothing but Render's proxy stands between Netlify and the app.
+    Netlify's supported header for the connecting visitor is ``X-Nf-Client-Connection-Ip`` (an
+    ``X-Forwarded-For`` may arrive as well; nothing here relies on it) and, for the signed proxy rule
+    in ``deploy/netlify/netlify.toml``, it signs each request with ``X-Nf-Sign``: a JWS (HS256) keyed
+    with ``FRONT_DOOR_SIGNING_SECRET``, issued by ``netlify`` and carrying an expiry. The service's
+    own ``*.onrender.com`` address is public, so anyone can send both headers straight to it; the
+    visitor header is believed only when the signature verifies. Without the secret, nothing is
+    believed. The signature covers who sent the request, not the header: this relies on Netlify
+    setting that header itself on every request it proxies, replacing any value the visitor sent
+    (docs/LIVE_OPERATIONS.md, step 2, checks it after a deploy), and on nothing but Render's proxy
+    standing between Netlify and the app.
     """
     secret = getattr(settings, "FRONT_DOOR_SIGNING_SECRET", "") or ""
     signature = request.META.get("HTTP_X_NF_SIGN") or ""
