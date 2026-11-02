@@ -21,6 +21,7 @@ from functools import lru_cache
 from urllib.parse import urlparse
 
 import httpx
+import jwt
 from django.conf import settings
 
 from .validators import resolve_public_ip
@@ -178,8 +179,47 @@ def ratelimit_client_network(group, request) -> str:
     return str(ip)
 
 
+def front_door_client_ip(request) -> str | None:
+    """The visitor's address as our Netlify front door saw it, or None if the request did not come through it.
+
+    The public address is a Netlify site that proxies every request to the Render web service.
+    Netlify does not support ``X-Forwarded-For``; it names the connecting visitor in
+    ``X-Nf-Client-Connection-Ip`` and, for the signed proxy rule in ``deploy/netlify/netlify.toml``,
+    signs each request with ``X-Nf-Sign``: a JWS (HS256) keyed with ``FRONT_DOOR_SIGNING_SECRET``,
+    issued by ``netlify`` and carrying an expiry. The service's own ``*.onrender.com`` address is
+    public, so anyone can send both headers straight to it; the visitor header is believed only
+    when the signature verifies. Without the secret, nothing is believed. The signature covers who
+    sent the request, not the header, but Netlify sets that header itself on every request it
+    proxies, and nothing but Render's proxy stands between Netlify and the app.
+    """
+    secret = getattr(settings, "FRONT_DOOR_SIGNING_SECRET", "") or ""
+    signature = request.META.get("HTTP_X_NF_SIGN") or ""
+    visitor = (request.META.get("HTTP_X_NF_CLIENT_CONNECTION_IP") or "").strip()
+    if not (secret and signature and visitor):
+        return None
+    try:
+        jwt.decode(
+            signature,
+            secret,
+            algorithms=["HS256"],
+            issuer="netlify",
+            options={"require": ["exp", "iss"]},
+            leeway=60,
+        )
+    except jwt.PyJWTError:
+        return None
+    try:
+        ipaddress.ip_address(visitor)
+    except ValueError:
+        return None
+    return visitor
+
+
 def client_ip(request) -> str | None:
     """The originating client IP, honouring ``X-Forwarded-For`` only from a proxy we run.
+
+    A request signed by our Netlify front door names its visitor (:func:`front_door_client_ip`);
+    every other request is read as follows.
 
     A remote client can put anything in ``X-Forwarded-For``, so honouring it
     unconditionally lets an attacker rotate the header per request to land in a
@@ -198,6 +238,10 @@ def client_ip(request) -> str | None:
     A hop that is not an IP at all means the chain cannot be trusted; the peer
     is used instead.
     """
+    visitor = front_door_client_ip(request)
+    if visitor:
+        return visitor
+
     remote = request.META.get("REMOTE_ADDR")
     if not is_trusted_proxy(remote):
         return remote

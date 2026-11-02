@@ -28,11 +28,22 @@ _ON_RAILWAY = any(
 )
 if _ON_RAILWAY and "healthcheck.railway.app" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS = [*ALLOWED_HOSTS, "healthcheck.railway.app"]
+# Render sets RENDER_EXTERNAL_HOSTNAME (the service's own *.onrender.com name) at runtime. Its HTTP
+# health check calls /health/ under that name, and the Netlify front door proxies every request to
+# it with that name as Host, so it is allowed here and trusted for CSRF below.
+# apps.common.middleware.FrontDoorHostMiddleware answers such a request as APP_URL's host.
+_RENDER_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME", default="").strip().lower()
+PLATFORM_HOSTNAMES = (_RENDER_HOSTNAME,) if _RENDER_HOSTNAME else ()
+ALLOWED_HOSTS = [*ALLOWED_HOSTS, *(host for host in PLATFORM_HOSTNAMES if host not in ALLOWED_HOSTS)]
 # Trusted origins for CSRF (scheme + host, e.g. https://app.example.com). Behind
 # a TLS-terminating proxy (Railway), a login POST is rejected 403 unless the
 # browser's Origin is trusted here, so read it from the environment in every
 # settings module rather than only in development.
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+CSRF_TRUSTED_ORIGINS = [
+    *CSRF_TRUSTED_ORIGINS,
+    *(f"https://{host}" for host in PLATFORM_HOSTNAMES if f"https://{host}" not in CSRF_TRUSTED_ORIGINS),
+]
 APP_URL = env("APP_URL")
 
 # Branding / legal / support — surfaced in templates via the ``branding``
@@ -122,6 +133,8 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    # First: everything below reads the host (the https redirect, CSRF, absolute URLs).
+    "apps.common.middleware.FrontDoorHostMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "apps.common.middleware.PermissionsPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -237,6 +250,11 @@ AUTH_USER_MODEL = "accounts.User"
 # (comma-separated) when you run the app behind Cloudflare, an ALB,
 # nginx, etc.
 BB_TRUSTED_PROXIES = tuple(p.strip() for p in env.list("BB_TRUSTED_PROXIES", default=[]) if p.strip())
+# The Netlify front door signs every request it proxies (X-Nf-Sign, an HS256 JWS) with this value,
+# set on the Netlify site under the same name. A signed request's X-Nf-Client-Connection-Ip names
+# the visitor; unsigned, that header is ignored (apps.common.net.front_door_client_ip). Empty: no
+# request is treated as coming through the front door.
+FRONT_DOOR_SIGNING_SECRET = env("FRONT_DOOR_SIGNING_SECRET", default="")
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -270,6 +288,9 @@ STORAGES = {
 # Media files
 STORAGE_BACKEND = env("STORAGE_BACKEND")
 MEDIA_STORAGE_PERSISTENT = env.bool("MEDIA_STORAGE_PERSISTENT", default=False)
+# The bucket is created after the first deploy: ``check --deploy`` warns (W015) instead of stopping
+# a deployment that has STORAGE_BACKEND=s3 and no S3_BUCKET_NAME yet. Inert once the bucket is set.
+MEDIA_STORAGE_PENDING = env.bool("MEDIA_STORAGE_PENDING", default=False)
 if STORAGE_BACKEND.lower() == "s3":
     # Object storage hands out its own presigned URLs; this process never
     # serves MEDIA_ROOT, so the env var is deliberately ignored here.
@@ -301,6 +322,10 @@ if STORAGE_BACKEND.lower() == "s3":
     AWS_S3_OBJECT_PARAMETERS = {
         "CacheControl": "max-age=86400",
     }
+    if not AWS_STORAGE_BUCKET_NAME:
+        # Without a bucket the S3 backend raises on every call, a file's URL included, so one
+        # picture on a page would fail the page. This stand-in saves nothing and refuses uploads.
+        STORAGES["default"] = {"BACKEND": "apps.common.storage.PendingMediaStorage"}
 else:
     # Local FS fallback so dev + test environments without S3 credentials
     # can still call default_storage / save uploaded files.
