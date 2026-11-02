@@ -10,15 +10,30 @@ The guard is per test where D11 protects tests inside a file that also holds ord
 (``test_setup.py``): an edit beside a protected test passes, an edit to it fails. Files D11 protects
 whole (the golden browser specs, the accessibility sweep, the provider-readiness and Telegram privacy
 tests, the gate and publisher tests) are hashed whole.
+
+A protected test can also be turned off without one character of its own source changing: a module
+``pytestmark``, a mark or an autouse fixture on its class, a later rebinding or ``del`` of its name,
+a ``conftest.py`` that ignores, deselects or skips it. Two more checks close those. The context hashes
+(``tests/fixtures/protected_context.json``, also written once from ``045978b``) cover, for each
+per-test node, the module's ``pytestmark`` and autouse or xunit setup, and the enclosing class's
+header and every statement of its body that is not a ``test_*`` test. The collection check runs
+pytest's own collection of the protected files once, as the full suite would (``pyproject.toml``,
+every ``conftest.py``), and fails when a protected test is not collected, is marked skip, skipif or
+xfail, or would run anything but the def its hash covers.
 """
 
 import json
+import time
+import tomllib
 from pathlib import Path
+
+import pytest
 
 from tools import protected_tests
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = ROOT / "tests" / "fixtures" / "protected_tests.json"
+CONTEXT = ROOT / "tests" / "fixtures" / "protected_context.json"
 
 GOLDEN = "tests/e2e/golden/"
 SETUP = "apps/studio/tests/test_setup.py"
@@ -129,6 +144,35 @@ def test_no_protected_test_changed_since_045978b():
     )
 
 
+def test_no_protected_tests_context_changed_since_045978b():
+    fixture = json.loads(CONTEXT.read_text(encoding="utf-8"))
+    assert fixture["ref"] == json.loads(FIXTURE.read_text(encoding="utf-8"))["ref"]
+    assert list(fixture["nodes"]) == [node for node in protected_tests.load(FIXTURE) if "::" in node]
+    changed = protected_tests.changed(fixture["nodes"], ROOT, context=True)
+    assert not changed, (
+        "What decides whether these protected tests run (their module's pytestmark or autouse setup, their "
+        "class's marks, fixtures, setup or attributes) differs from 045978b (spec D11): " + ", ".join(changed)
+    )
+
+
+def test_every_protected_test_is_collected_unmarked_and_runs_its_own_def():
+    began = time.monotonic()
+    problems = protected_tests.collection_problems(protected_tests.load(FIXTURE), ROOT)
+    assert not problems, "Protected invariant tests would not run as written (spec D11):\n" + "\n".join(problems)
+    assert time.monotonic() - began < 60
+
+
+def test_the_guard_collects_with_the_suites_settings():
+    options = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["pytest"]["ini_options"]
+    assert tuple(options["python_files"]) == protected_tests.TEST_FILES
+    assert tuple(options["python_classes"]) == protected_tests.TEST_CLASSES
+    assert tuple(options["python_functions"]) == protected_tests.TEST_FUNCTIONS
+    names = ("python_files", "python_classes", "python_functions")
+    scratch = "[pytest]\n" + "".join(f"{key} = {' '.join(options[key])}\n" for key in names)
+    assert scratch == INI
+    assert protected_tests.ALLOWED_OFF_MARKS == {}, "045978b's protected tests carried no skip, skipif or xfail"
+
+
 def test_the_fixture_holds_every_test_d11_protects():
     nodes = set(json.loads(FIXTURE.read_text(encoding="utf-8"))["nodes"])
     missing = [node for node in REQUIRED if node not in nodes]
@@ -193,3 +237,222 @@ def test_the_command_line_check_names_the_changed_test(tmp_path, capsys):
     _tree(root, MODULE.replace("assert helper() == 1", "assert helper() == 2"))
     assert protected_tests.main(["--check", "--root", str(root), "--fixture", str(fixture)]) == 1
     assert "pkg/test_mod.py::test_protected" in capsys.readouterr().out
+
+
+# ─────────────────────── Turning a protected test off without editing it ───────────────────────
+#
+# Each case leaves every own-source hash unchanged; the context hashes (the module's pytestmark and
+# the enclosing class's decorators, fixtures, setup and attributes) and the collection check (pytest's
+# own collection, run as the suite runs it) must catch it.
+
+GUARDED = """import pytest
+
+
+def helper():
+    return 1
+
+
+@pytest.mark.django_db
+def test_protected():
+    assert helper() == 1
+
+
+def test_neighbour():
+    assert True
+
+
+class TestGroup:
+    word = "word"
+
+    def setup_method(self):
+        self.count = 2
+
+    def test_method(self):
+        assert self.word == "word"
+
+    def test_other(self):
+        assert self.count == 2
+"""
+
+WHOLE = """import unittest
+
+
+class EngineTest(unittest.TestCase):
+    def test_engine(self):
+        self.assertEqual(1, 1)
+
+
+def test_plain():
+    assert True
+"""
+
+#: The suite's collection settings (pyproject.toml), for a scratch tree.
+INI = "[pytest]\npython_files = tests.py test_*.py\npython_classes = Test*\npython_functions = test_*\n"
+
+PROTECTED = "pkg/test_mod.py::test_protected"
+METHOD = "pkg/test_mod.py::TestGroup::test_method"
+WHOLE_FILE = "pkg/tests.py"
+WHOLE_TESTS = (f"{WHOLE_FILE}::EngineTest::test_engine", f"{WHOLE_FILE}::test_plain")
+
+
+def _suite(root, module=GUARDED, files=None):
+    """A scratch suite: a module holding two protected tests and their neighbours, and a protected file."""
+    (root / "pytest.ini").write_text(INI, encoding="utf-8")
+    (root / "pkg").mkdir(exist_ok=True)
+    (root / "pkg" / "__init__.py").write_text("", encoding="utf-8")
+    (root / "pkg" / "test_mod.py").write_text(module, encoding="utf-8")
+    (root / "pkg" / "tests.py").write_text(WHOLE, encoding="utf-8")
+    for name, text in (files or {}).items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(text, encoding="utf-8")
+    return root
+
+
+def _baseline(root):
+    hashes = {node: protected_tests.digest(node, root) for node in (PROTECTED, METHOD, WHOLE_FILE)}
+    context = {node: protected_tests.context_digest(node, root) for node in (PROTECTED, METHOD)}
+    return hashes, context
+
+
+def _caught(root, baseline):
+    """(context hashes that changed, collection problems), once the own-source hashes say nothing."""
+    hashes, context = baseline
+    assert protected_tests.changed(hashes, root) == [], "the case must leave every own-source hash alone"
+    return protected_tests.changed(context, root, context=True), protected_tests.collection_problems(list(hashes), root)
+
+
+def test_an_untouched_suite_and_edits_beside_the_protected_tests_pass(tmp_path):
+    root = _suite(tmp_path)
+    baseline = _baseline(root)
+    assert _caught(root, baseline) == ([], [])
+
+    beside = GUARDED.replace("def test_neighbour():\n    assert True", "def test_neighbour():\n    assert 2 == 2")
+    beside = beside.replace("assert self.count == 2", "assert self.count >= 2")
+    beside = beside.replace(
+        "    def test_other", "    def test_added(self):\n        assert True\n\n    def test_other"
+    )
+    beside += "\n\ndef test_new():\n    assert helper() == 1\n"
+    _suite(root, beside)
+    assert _caught(root, baseline) == ([], [])
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        'pytestmark = pytest.mark.skip(reason="off")\n',
+        'pytestmark = [pytest.mark.xfail(reason="off")]\n',
+    ],
+)
+def test_a_module_pytestmark_is_caught(tmp_path, addition):
+    root = _suite(tmp_path)
+    baseline = _baseline(root)
+    _suite(root, GUARDED.replace("import pytest\n", f"import pytest\n\n{addition}"))
+    context, problems = _caught(root, baseline)
+    assert context == [PROTECTED, METHOD]
+    mark = "skip" if "skip" in addition else "xfail"
+    assert problems == [f"{PROTECTED}: marked {mark}", f"{METHOD}: marked {mark}"]
+
+
+def test_a_module_level_autouse_fixture_is_caught(tmp_path):
+    root = _suite(tmp_path)
+    baseline = _baseline(root)
+    off = '@pytest.fixture(autouse=True)\ndef _off():\n    pytest.skip("off")\n\n\n'
+    _suite(root, GUARDED.replace("def helper():", off + "def helper():"))
+    context, _problems = _caught(root, baseline)
+    assert context == [PROTECTED, METHOD]
+
+
+def test_a_skip_on_the_enclosing_class_is_caught(tmp_path):
+    root = _suite(tmp_path)
+    baseline = _baseline(root)
+    _suite(root, GUARDED.replace("class TestGroup:", '@pytest.mark.skip(reason="off")\nclass TestGroup:'))
+    context, problems = _caught(root, baseline)
+    assert context == [METHOD]
+    assert problems == [f"{METHOD}: marked skip"]
+
+
+@pytest.mark.parametrize(
+    "rebinding, node",
+    [
+        ("test_protected = lambda: None\n", PROTECTED),
+        ("def _noop():\n    pass\n\n\ntest_protected = _noop\n", PROTECTED),
+        ("TestGroup.test_method = lambda self: None\n", METHOD),
+    ],
+)
+def test_a_later_rebinding_of_the_name_is_caught(tmp_path, rebinding, node):
+    root = _suite(tmp_path)
+    baseline = _baseline(root)
+    _suite(root, GUARDED + "\n\n" + rebinding)
+    _context, problems = _caught(root, baseline)
+    assert len(problems) == 1 and problems[0].startswith(f"{node}: runs "), problems
+
+
+@pytest.mark.parametrize(
+    "deletion, node",
+    [("del test_protected\n", PROTECTED), ("del TestGroup.test_method\n", METHOD)],
+)
+def test_a_later_del_of_the_name_is_caught(tmp_path, deletion, node):
+    root = _suite(tmp_path)
+    baseline = _baseline(root)
+    _suite(root, GUARDED + "\n\n" + deletion)
+    _context, problems = _caught(root, baseline)
+    assert problems == [f"{node}: not collected"]
+
+
+DESELECT = """def pytest_collection_modifyitems(config, items):
+    dropped = [item for item in items if item.name == "test_protected"]
+    config.hook.pytest_deselected(items=dropped)
+    items[:] = [item for item in items if item not in dropped]
+"""
+
+SKIP_ALL = """import pytest
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        item.add_marker(pytest.mark.skip(reason="off"))
+"""
+
+
+@pytest.mark.parametrize(
+    "files, expected",
+    [
+        ({"pkg/conftest.py": 'collect_ignore = ["tests.py"]\n'}, [f"{node}: not collected" for node in WHOLE_TESTS]),
+        ({"conftest.py": 'collect_ignore = ["pkg/tests.py"]\n'}, [f"{node}: not collected" for node in WHOLE_TESTS]),
+        ({"conftest.py": 'collect_ignore_glob = ["pkg/*"]\n'}, None),
+        # A conftest anywhere in the tree takes part in every run's collection.
+        ({"elsewhere/conftest.py": DESELECT}, [f"{PROTECTED}: not collected (deselected)"]),
+        ({"elsewhere/conftest.py": SKIP_ALL}, None),
+    ],
+)
+def test_a_conftest_that_drops_or_skips_protected_tests_is_caught(tmp_path, files, expected):
+    root = _suite(tmp_path)
+    baseline = _baseline(root)
+    _suite(root, files=files)
+    _context, problems = _caught(root, baseline)
+    if expected is not None:
+        assert problems == expected
+    else:
+        assert {PROTECTED, METHOD, *WHOLE_TESTS} <= {problem.split(": ", 1)[0] for problem in problems}, problems
+
+
+@pytest.mark.parametrize(
+    "old, new",
+    [
+        (
+            '    word = "word"\n',
+            '    word = "word"\n\n    @pytest.fixture(autouse=True)\n    def _off(self):\n        pytest.skip("off")\n',
+        ),
+        ("self.count = 2", 'pytest.skip("off")'),
+        ('word = "word"', 'word = "Word"'),
+        ('    word = "word"\n', '    word = "word"\n    __test__ = False\n'),
+        ("class TestGroup:", "class TestGroup(Skipping):"),
+    ],
+)
+def test_an_edit_to_the_class_around_a_protected_method_is_caught(tmp_path, old, new):
+    module = GUARDED.replace("class TestGroup:", "class Skipping:\n    pass\n\n\nclass TestGroup:")
+    root = _suite(tmp_path, module)
+    baseline = _baseline(root)
+    _suite(root, module.replace(old, new, 1))
+    context, _problems = _caught(root, baseline)
+    assert context == [METHOD]

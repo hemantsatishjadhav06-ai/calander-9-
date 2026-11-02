@@ -1,0 +1,11 @@
+{
+  "about": "Spec D11 (docs/specs/03-rebuild-screens.md): for every per-test node of protected_tests.json, the SHA-256 of what decides from outside its own source whether and how it runs: the module's statements that touch pytestmark, its module-level autouse fixtures and xunit module and function setup and teardown, and, for a path::Class::name node in a test file, the enclosing class's header (decorators, bases) and every statement of its body that is not a test_* test (fixtures, setup and teardown methods, attributes, pytestmark). A class in a file pytest does not collect (live_verify's Command) is no test class, so only its module part counts. The SHA-256 of nothing (e3b0c442...) means the node had none of these. Written once from the ref below with tools/protected_tests.py --context --ref 045978b --json; never regenerated in Phase 3. tests/test_protected_tests.py recomputes each hash from the working tree.",
+  "ref": "045978b3d3d338840c08c03a9bfa85127d4fce3e",
+  "nodes": {
+    "apps/studio/tests/test_setup.py::test_readiness_speaks_plainly_and_points_at_set_up": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "apps/studio/tests/test_setup.py::TestSetupPage::test_owners_see_the_exact_names_and_others_are_told_to_ask": "43c50d9ca500ea597ffe8cc8a0462be4a23326477d1abb889a75678ff6d7b45b",
+    "apps/studio/tests/test_setup.py::TestToday::test_private_telegram_jobs_stay_out_of_the_card": "65b638d38b19308e2d2c4d42a518165d6f930f4b67072bc00b1a88d77170b8db",
+    "apps/common/management/commands/live_verify.py::Command::check_isolation_and_approval": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "apps/common/management/commands/live_verify.py::Command::_workflow_fixture": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
