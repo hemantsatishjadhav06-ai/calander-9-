@@ -9,7 +9,7 @@
 //
 //   node tools/preview/build_static_preview.mjs --base-url http://127.0.0.1:8401 \
 //     --out <empty folder> --sha <commit> [--app-dir .] [--python .venv/bin/python]
-//     [--max-pages 500] [--max-fragments 400] [--no-demo-data]
+//     [--db-name <the server's DB_NAME>] [--max-pages 500] [--max-fragments 400] [--no-demo-data]
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -37,6 +37,7 @@ function parseArgs(argv) {
     '--sha': 'sha',
     '--app-dir': 'appDir',
     '--python': 'python',
+    '--db-name': 'dbName',
     '--max-pages': 'maxPages',
     '--max-fragments': 'maxFragments',
   };
@@ -60,6 +61,7 @@ function parseArgs(argv) {
   args.out = path.resolve(args.out);
   args.python = args.python || process.env.PREVIEW_PYTHON || path.join(args.appDir, '.venv/bin/python');
   args.baseUrl = args.baseUrl.replace(/\/+$/, '');
+  args.dbName = args.dbName || process.env.DB_NAME || '';
   return args;
 }
 
@@ -334,6 +336,33 @@ const SECRET_PATTERNS = [/\be2e-token-[\w-]+/g, /\bsk-[A-Za-z0-9_-]{8,}/g, /\bpk
 const ABSOLUTE_PATH = /(?<![\w.:/-])\/(?:home|tmp|root|opt|srv|Users|var\/lib)\/[^\s"'<>`)]*/g;
 const ALLOWED_EMAIL = /@(?:[\w-]+\.)*(?:e2e\.test|example\.(?:com|org|net))$/i;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+/**
+ * Real phone numbers that reach the demo data (the faked team's copy quotes the owner's sales line).
+ * Each is replaced in every form it is written in (spaced, run together, escaped, URL-encoded, with
+ * or without its country code) by zeros, in the text and in the team's graphics, which are drawn
+ * again from their scrubbed words; the build fails if any form is left.
+ */
+const REAL_PHONES = [{ country: '91', national: '9533686567' }];
+const PHONE_SEP = String.raw`(?:[\s.()\-]|&nbsp;|&#160;|\\u00a0|%20)`;
+/** One pattern for every number, written so that Python's `re` reads it the same way. */
+const PHONE_SOURCE = REAL_PHONES.map(
+  ({ country, national }) =>
+    String.raw`(?<!\d)(?:(?:\+|%2B)?${country}${PHONE_SEP}*)?` + [...national].join(`${PHONE_SEP}*`) + String.raw`(?!\d)`,
+).join('|');
+const REAL_PHONE = new RegExp(PHONE_SOURCE, 'gi');
+const PHONE_PLACEHOLDER = '+91 00000 00000';
+/** Anything else written like a phone number: an international number, a tel: link or a wa.me link. */
+const PHONE_LIKE = /(?<![\w.])\+\d{1,3}(?:[\s -]?\d){7,12}(?!\d)|tel:\+?\d[\d\s().-]{6,}|wa\.me\/\d{7,}/gi;
+
+function phonePlaceholder(match) {
+  const plain = match.replace(/%2B/gi, '+').replace(/&nbsp;|&#160;|\\u00a0|%20/gi, ' ');
+  const digits = plain.replace(/\D/g, '');
+  const real = REAL_PHONES.find(({ national }) => digits.endsWith(national));
+  const withCountry = real && digits.length > real.national.length;
+  const spaced = /[^\d+]/.test(plain);
+  return (plain.startsWith('+') ? '+' : '') + (withCountry ? `${real.country}${spaced ? ' ' : ''}` : '') + (spaced ? '00000 00000' : '0000000000');
+}
+
 const CSRF_VALUES = [
   // <input name="csrfmiddlewaretoken" value="..."> in either order, and JSON or JS that names the token.
   [/(name=["']csrfmiddlewaretoken["'][^>]*?\svalue=["'])[^"']*/gi, '$1preview'],
@@ -357,12 +386,20 @@ function scrubText(text, origin) {
   for (const pattern of SECRET_PATTERNS) out = out.replace(pattern, '[redacted]');
   out = out.replace(ABSOLUTE_PATH, '[path]');
   out = out.replace(EMAIL, (email) => (ALLOWED_EMAIL.test(email) ? email : 'someone@example.com'));
+  out = out.replace(REAL_PHONE, phonePlaceholder);
   return out;
 }
 
 /** What a scrubbed output may still hold that looks secret; the build fails when anything is found. */
-function findLeaks(text, cookies) {
+function findLeaks(text, cookies, { strict = true } = {}) {
   const found = [];
+  for (const m of text.matchAll(REAL_PHONE)) found.push(`a real phone number (${m[0].length} characters)`);
+  if (strict) {
+    for (const m of text.matchAll(PHONE_LIKE)) {
+      const digits = m[0].replace(/\D/g, '');
+      if (!/^\d{1,3}0+$/.test(digits) && !/^0+$/.test(digits)) found.push(`something written like a phone number: ${m[0]}`);
+    }
+  }
   for (const literal of SECRET_LITERALS) if (text.includes(literal)) found.push(literal);
   for (const pattern of SECRET_PATTERNS) for (const m of text.matchAll(pattern)) found.push(m[0]);
   for (const cookie of cookies) if (cookie && text.includes(cookie)) found.push('a session or CSRF cookie value');
@@ -694,7 +731,7 @@ class Rewriter {
       );
     }
     let html = out.join('');
-    if (isPage) html = html.replace(/<\/head>/i, `${previewStyle()}</head>`);
+    if (isPage) html = html.replace(/<\/head>/i, `${previewStyle()}${previewScript()}</head>`);
     return html;
   }
 }
@@ -772,6 +809,146 @@ function collectStatic(args, out) {
   }
   const favicon = path.join(out, 'static', 'favicon', 'favicon.ico');
   if (fs.existsSync(favicon)) fs.copyFileSync(favicon, path.join(out, 'favicon.ico'));
+}
+
+/**
+ * Read-only, in the app's own Python against the server's database: what each /media/ file the pages
+ * show may be published as. An upload is kept. A team graphic is the brief's words drawn on a picture,
+ * so text scrubbing cannot reach it: the brief's current graphic is drawn again by the app's renderer
+ * from its scrubbed design (and its thumbnail made the media library's way), and any earlier team
+ * graphic is withheld. A file the database does not know means the wrong database: the build stops.
+ */
+const MEDIA_REVIEW_PY = String.raw`
+import io
+import json
+import re
+import sys
+from pathlib import Path
+from urllib.parse import unquote
+
+import django
+
+django.setup()
+
+from django.conf import settings
+from django.db import transaction
+from django.db.models import Q
+
+from apps.media_library.models import MediaAsset
+from apps.media_library.services import generate_image_thumbnail
+from apps.studio import design, style
+from apps.studio.models import BrandProfile, StudioBrief
+
+request = json.load(sys.stdin)
+phone = re.compile(request["pattern"], re.IGNORECASE)
+out_dir = Path(request["out_dir"])
+
+
+def placeholder(match):
+    plain = re.sub(r"&nbsp;|&#160;|\\u00a0|%20", " ", re.sub(r"%2B", "+", match.group(0), flags=re.I), flags=re.I)
+    digits = re.sub(r"\D", "", plain)
+    country = next((p["country"] for p in request["phones"] if digits.endswith(p["national"]) and len(digits) > len(p["national"])), "")
+    spaced = bool(re.search(r"[^\d+]", plain))
+    prefix = ("+" if plain.startswith("+") else "") + (country + (" " if spaced else "") if country else "")
+    return prefix + ("00000 00000" if spaced else "0000000000")
+
+
+def text_of(value):
+    return json.dumps(value, ensure_ascii=False, default=str)
+
+
+verdicts = {}
+with transaction.atomic():
+    for path in request["paths"]:
+        name = unquote(path[len(settings.MEDIA_URL):]) if path.startswith(settings.MEDIA_URL) else ""
+        asset = MediaAsset.objects.filter(Q(file=name) | Q(thumbnail=name)).first() if name else None
+        if asset is None:
+            verdicts[path] = {"action": "unknown"}
+            continue
+        if asset.source != "ai-studio":
+            verdicts[path] = {"action": "keep"}
+            continue
+        brief = StudioBrief.objects.filter(graphic=asset).select_related("workspace", "picture").first()
+        if brief is None:
+            verdicts[path] = {"action": "withhold", "why": "an earlier team graphic"}
+            continue
+        spec = json.loads(phone.sub(placeholder, text_of(brief.design_spec or {})))
+        profile = BrandProfile.objects.get(workspace=brief.workspace)
+        look = design.Look.from_profile(profile, style.read_asset(profile.logo) if profile.logo_id else None)
+        picture = style.read_asset(brief.picture) if brief.picture_id and spec.get("use_picture") else None
+        try:
+            content = design.render(spec, look, picture)
+        except ValueError:
+            content = design.render(spec, look, None)
+        if name == asset.thumbnail.name:
+            thumb = generate_image_thumbnail(io.BytesIO(content))
+            if thumb is None:
+                verdicts[path] = {"action": "withhold", "why": "its thumbnail could not be made again"}
+                continue
+            content = thumb.read()
+        target = out_dir / f"{len(verdicts)}.jpg"
+        target.write_bytes(content)
+        verdicts[path] = {
+            "action": "replace",
+            "file": str(target),
+            "had_phone": bool(phone.search(text_of([brief.design_spec, brief.post_copy]))),
+        }
+    profiles_with_phone = [
+        str(profile.workspace_id)
+        for profile in BrandProfile.objects.all()
+        if phone.search(text_of({f.attname: getattr(profile, f.attname) for f in profile._meta.concrete_fields}))
+    ]
+    transaction.set_rollback(True)
+print(json.dumps({"verdicts": verdicts, "profiles_with_phone": profiles_with_phone}))
+`;
+
+function reviewMedia(args, paths) {
+  const root = fs.mkdtempSync(path.join(args.appDir, 'e2e_media', 'preview-media-'));
+  const env = {
+    ...process.env,
+    DJANGO_SETTINGS_MODULE: 'config.settings.e2e',
+    PYTHONPATH: [args.appDir, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+    E2E_STATIC: '',
+  };
+  if (args.dbName) env.DB_NAME = args.dbName;
+  const result = spawnSync(args.python, ['-c', MEDIA_REVIEW_PY], {
+    cwd: args.appDir,
+    env,
+    encoding: 'utf8',
+    input: JSON.stringify({ paths, pattern: PHONE_SOURCE, phones: REAL_PHONES, out_dir: root }),
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    fs.rmSync(root, { recursive: true, force: true });
+    throw new Error(`The media review failed: ${(result.stderr || result.stdout || String(result.error)).slice(-2000)}`);
+  }
+  const review = JSON.parse(result.stdout.trim().split('\n').pop());
+  const unknown = Object.entries(review.verdicts).filter(([, v]) => v.action === 'unknown').map(([p]) => p);
+  if (unknown.length) {
+    fs.rmSync(root, { recursive: true, force: true });
+    throw new Error(`The database (DB_NAME ${env.DB_NAME ?? 'unset'}) does not know ${unknown.length} media files the pages show, such as ${unknown[0]}: pass the server's --db-name.`);
+  }
+  return { ...review, cleanup: () => fs.rmSync(root, { recursive: true, force: true }) };
+}
+
+/**
+ * Cancels every HTMX request other than GET (there is no server to receive it) and says so after
+ * something the person did; a request a page sends on its own as it loads is dropped quietly.
+ */
+function previewScript() {
+  return (
+    '<script data-preview>(function(){var last=0,box=null,timer=0;' +
+    "function mark(){last=Date.now()}['pointerdown','keydown'].forEach(function(t){document.addEventListener(t,mark,true)});" +
+    "function ensure(){if(box||!document.body)return box;box=document.createElement('div');box.setAttribute('role','status');box.setAttribute('data-preview-note','');" +
+    `box.style.cssText='position:fixed;top:${BAR_HEIGHT + 8}px;left:50%;transform:translateX(-50%);z-index:2147483000;max-width:calc(100% - 32px);` +
+    "box-sizing:border-box;padding:8px 12px;border-radius:8px;background:#0E1114;color:#FFFFFF;font:500 13px/1.3 system-ui,-apple-system,\\'Segoe UI\\',Roboto,sans-serif;" +
+    "box-shadow:0 4px 16px rgba(14,17,20,.24);pointer-events:none;opacity:0;transition:opacity .15s';document.body.appendChild(box);return box}" +
+    "document.addEventListener('DOMContentLoaded',ensure);" +
+    "function note(){var b=ensure();if(!b)return;b.textContent='Not saved in the preview';b.style.opacity='1';clearTimeout(timer);" +
+    "timer=setTimeout(function(){b.style.opacity='0';b.textContent=''},2600)}" +
+    "document.addEventListener('htmx:beforeRequest',function(e){var c=e.detail&&e.detail.requestConfig;var verb=String((c&&c.verb)||'get').toLowerCase();" +
+    "if(verb==='get')return;e.preventDefault();if(Date.now()-last<4000)note()})})();</script>"
+  );
 }
 
 function notFoundPage() {
@@ -891,28 +1068,60 @@ async function main() {
       writeFile(args.out, `${local}index.html`, scrubText(rewriter.rewrite(fragment.body, key, fragment.world, false), origin));
     }
 
-    let media = 0;
-    const savedAssets = new Set();
+    // The pictures the pages show; /media/ files only as the media review allows (see MEDIA_REVIEW_PY).
+    const fetched = new Map();
     for (const asset of crawl.assets) {
       const { pathname } = new URL(asset, origin);
-      if (savedAssets.has(pathname) || crawl.pages.has(pathname)) continue;
+      if (fetched.has(pathname) || crawl.pages.has(pathname)) continue;
       const response = await appContext.request.get(origin + asset, { maxRedirects: 0, failOnStatusCode: false });
       const type = response.headers()['content-type'] ?? '';
       if (response.status() !== 200 || type.includes('text/html')) continue;
       const bytes = await response.body();
       if (bytes.length > 10 * 1024 * 1024) continue;
-      try {
-        writeFile(args.out, pathname, bytes);
-      } catch (error) {
-        log(`not saved: ${pathname} (${error.code ?? error.message})`);
-        continue;
-      }
-      savedAssets.add(pathname);
-      media++;
+      fetched.set(pathname, bytes);
     }
+    const review = reviewMedia(args, [...fetched.keys()].filter((p) => p.startsWith('/media/')));
+    const media = { saved: 0, redrawn: 0, withheld: [] };
+    try {
+      for (const [pathname, original] of fetched) {
+        let bytes = original;
+        const verdict = review.verdicts[pathname];
+        if (verdict?.action === 'withhold' || (!verdict && review.profiles_with_phone.some((id) => pathname.startsWith(`/workspace/${id}/`)))) {
+          media.withheld.push(pathname.replace(UUID, ':id'));
+          continue;
+        }
+        if (verdict?.action === 'replace') {
+          bytes = fs.readFileSync(verdict.file);
+          media.redrawn++;
+        }
+        try {
+          writeFile(args.out, pathname, bytes);
+        } catch (error) {
+          log(`not saved: ${pathname} (${error.code ?? error.message})`);
+          continue;
+        }
+        media.saved++;
+      }
+    } finally {
+      review.cleanup();
+    }
+    log(`media: ${media.saved} saved, ${media.redrawn} team graphics drawn again from scrubbed words, ${media.withheld.length} withheld`);
+
+    // The bell asks /notifications/unread-count/ (JSON) every minute: answer with the count the pages show.
+    const badges = new Set();
+    for (const page of crawl.pages.values()) for (const m of page.body.matchAll(/notificationBadge\((\d+)\)/g)) badges.add(Number(m[1]));
+    const unread = await appContext.request.get(`${origin}/notifications/unread-count/`, { maxRedirects: 0, failOnStatusCode: false });
+    let unreadCount = unread.ok() ? Number((await unread.json()).count) : null;
+    if (badges.size === 1) unreadCount = [...badges][0];
+    else if (badges.size > 1) log(`the bell shows ${[...badges].join(', ')} across pages; the count answers ${unreadCount}`);
+    if (Number.isInteger(unreadCount)) writeFile(args.out, '/notifications/unread-count/index.html', `${JSON.stringify({ count: unreadCount })}\n`);
 
     collectStatic(args, args.out);
-    writeFile(args.out, '/_headers', '/*\n  X-Robots-Tag: noindex, nofollow\n');
+    writeFile(
+      args.out,
+      '/_headers',
+      '/*\n  X-Robots-Tag: noindex, nofollow\n/notifications/unread-count/\n  Content-Type: application/json; charset=utf-8\n',
+    );
     writeFile(args.out, '/robots.txt', 'User-agent: *\nDisallow: /\n');
     writeFile(args.out, '/netlify.toml', '# A static preview: nothing to build.\n[build]\n  publish = "."\n');
     writeFile(args.out, '/404.html', notFoundPage());
@@ -922,18 +1131,22 @@ async function main() {
       built_at: new Date().toISOString(),
       note: 'A read-only preview with demo data from the e2e harness. Nothing you do here is saved.',
       workspace: ids.workspace_names?.a ?? null,
-      counts: { pages: written.length, fragments: paths.fragmentLocal.size, media },
+      counts: { pages: written.length, fragments: paths.fragmentLocal.size, media: media.saved, media_withheld: media.withheld.length },
       pages: written,
     };
     writeFile(args.out, '/preview.json', `${JSON.stringify(manifest, null, 2)}\n`);
 
-    // Nothing session-like, secret or local may leave this machine.
+    // Nothing session-like, secret, local or personal may leave this machine. Collected static files
+    // are third-party code: an address or a number-like string there is not data.
     const leaks = [];
     for (const file of walk(args.out)) {
-      if (!/\.(html|json|txt|toml|js|css|map|svg|webmanifest)$/.test(file) && !file.endsWith('_headers')) continue;
-      const text = fs.readFileSync(file, 'utf8');
+      const isText = /\.(html|json|txt|toml|js|css|map|svg|webmanifest)$/.test(file) || file.endsWith('_headers');
       const isStatic = file.includes(`${path.sep}static${path.sep}`);
-      const found = findLeaks(text, cookieValues).filter((hit) => !(isStatic && hit.includes('@')));
+      // A picture's bytes are read only for text written into it (metadata); a picture's pixels are the media review's.
+      const text = fs.readFileSync(file, isText ? 'utf8' : 'latin1');
+      const found = isText
+        ? findLeaks(text, cookieValues, { strict: !isStatic }).filter((hit) => !(isStatic && hit.includes('@')))
+        : [...text.matchAll(REAL_PHONE)].map(() => 'a real phone number in the file');
       for (const hit of found) leaks.push(`${path.relative(args.out, file)}: ${hit}`);
     }
     if (leaks.length) {
@@ -942,7 +1155,8 @@ async function main() {
     }
 
     const bytes = walk(args.out).reduce((sum, file) => sum + fs.statSync(file).size, 0);
-    log(`wrote ${written.length} pages, ${paths.fragmentLocal.size} fragments and ${media} media files to ${args.out}`);
+    log(`wrote ${written.length} pages, ${paths.fragmentLocal.size} fragments and ${media.saved} media files to ${args.out}`);
+    if (media.withheld.length) log('withheld pictures:', media.withheld.join(', '));
     log(`total ${(bytes / 1024 / 1024).toFixed(1)} MB`);
     const reasons = {};
     for (const reason of crawl.skipped.values()) reasons[reason] = (reasons[reason] ?? 0) + 1;
