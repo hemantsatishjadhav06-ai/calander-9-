@@ -142,3 +142,21 @@ def test_a_switched_off_telegram_webhook_needs_no_base_url():
 def test_development_does_not_require_production_services():
     with override_settings(DEBUG=True, APP_URL="http://localhost", ENCRYPTION_KEY_SALT=None):
         assert check_production_config(None) == []
+
+
+# The bucket is created after the first deploy (see test_media_storage_pending).
+def test_a_missing_bucket_still_stops_a_deploy_that_did_not_say_so():
+    with override_settings(AWS_STORAGE_BUCKET_NAME="", MEDIA_STORAGE_PENDING=False):
+        assert "smbean.E004" in ids()
+
+
+def test_a_deploy_waiting_for_its_bucket_is_warned_not_stopped():
+    with override_settings(AWS_STORAGE_BUCKET_NAME="", MEDIA_STORAGE_PENDING=True):
+        checks = check_production_config(None)
+    assert "smbean.W015" in {check.id for check in checks}
+    assert not any(isinstance(check, Error) for check in checks)
+
+
+def test_once_the_bucket_is_set_the_pending_flag_says_nothing():
+    with override_settings(AWS_STORAGE_BUCKET_NAME="sm-bean-media", MEDIA_STORAGE_PENDING=True):
+        assert check_production_config(None) == []

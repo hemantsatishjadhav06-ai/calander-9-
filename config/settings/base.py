@@ -11,12 +11,16 @@ env = environ.Env(
     CSRF_TRUSTED_ORIGINS=(list, []),
     APP_URL=(str, "http://localhost:8000"),
     STORAGE_BACKEND=(str, "local"),
-    EMAIL_BACKEND_TYPE=(str, "smtp"),
     SENTRY_DSN=(str, ""),
     REDIS_URL=(str, ""),
 )
 
 environ.Env.read_env(BASE_DIR / ".env", overwrite=False)
+
+# A value render.yaml leaves blank (`sync: false`) reaches the app either not at all or as an empty
+# string: Render's documentation does not say which. Both must mean "not set", so every setting read
+# from such a variable whose default is not empty reads an empty value as unset
+# (`env(name, default="") or default`). tests/test_render_blueprint.py compares every setting both ways.
 
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
@@ -28,11 +32,22 @@ _ON_RAILWAY = any(
 )
 if _ON_RAILWAY and "healthcheck.railway.app" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS = [*ALLOWED_HOSTS, "healthcheck.railway.app"]
+# Render sets RENDER_EXTERNAL_HOSTNAME (the service's own *.onrender.com name) at runtime. Its HTTP
+# health check calls /health/ under that name, and the Netlify front door proxies every request to
+# it with that name as Host, so it is allowed here and trusted for CSRF below.
+# apps.common.middleware.FrontDoorHostMiddleware answers such a request as APP_URL's host.
+_RENDER_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME", default="").strip().lower()
+PLATFORM_HOSTNAMES = (_RENDER_HOSTNAME,) if _RENDER_HOSTNAME else ()
+ALLOWED_HOSTS = [*ALLOWED_HOSTS, *(host for host in PLATFORM_HOSTNAMES if host not in ALLOWED_HOSTS)]
 # Trusted origins for CSRF (scheme + host, e.g. https://app.example.com). Behind
 # a TLS-terminating proxy (Railway), a login POST is rejected 403 unless the
 # browser's Origin is trusted here, so read it from the environment in every
 # settings module rather than only in development.
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+CSRF_TRUSTED_ORIGINS = [
+    *CSRF_TRUSTED_ORIGINS,
+    *(f"https://{host}" for host in PLATFORM_HOSTNAMES if f"https://{host}" not in CSRF_TRUSTED_ORIGINS),
+]
 APP_URL = env("APP_URL")
 
 # Branding / legal / support — surfaced in templates via the ``branding``
@@ -40,7 +55,7 @@ APP_URL = env("APP_URL")
 # (/terms/, /privacy/) so nothing points at an external domain out of the box;
 # override with your hosted policy URLs. SUPPORT_EMAIL falls back to
 # DEFAULT_FROM_EMAIL in the context processor when left blank.
-SITE_NAME = env("SITE_NAME", default="SM Bean")
+SITE_NAME = env("SITE_NAME", default="") or "SM Bean"
 SUPPORT_EMAIL = env("SUPPORT_EMAIL", default="")
 # Who the Terms and Privacy pages name as the operator, when they were last
 # changed, and whether counsel has signed them off (hides the "Draft" notice).
@@ -122,6 +137,8 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    # First: everything below reads the host (the https redirect, CSRF, absolute URLs).
+    "apps.common.middleware.FrontDoorHostMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "apps.common.middleware.PermissionsPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -237,6 +254,11 @@ AUTH_USER_MODEL = "accounts.User"
 # (comma-separated) when you run the app behind Cloudflare, an ALB,
 # nginx, etc.
 BB_TRUSTED_PROXIES = tuple(p.strip() for p in env.list("BB_TRUSTED_PROXIES", default=[]) if p.strip())
+# The Netlify front door signs every request it proxies (X-Nf-Sign, an HS256 JWS) with this value,
+# set on the Netlify site under the same name. A signed request's X-Nf-Client-Connection-Ip names
+# the visitor; unsigned, that header is ignored (apps.common.net.front_door_client_ip). Empty: no
+# request is treated as coming through the front door.
+FRONT_DOOR_SIGNING_SECRET = env("FRONT_DOOR_SIGNING_SECRET", default="")
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -270,6 +292,9 @@ STORAGES = {
 # Media files
 STORAGE_BACKEND = env("STORAGE_BACKEND")
 MEDIA_STORAGE_PERSISTENT = env.bool("MEDIA_STORAGE_PERSISTENT", default=False)
+# The bucket is created after the first deploy: ``check --deploy`` warns (W015) instead of stopping
+# a deployment that has STORAGE_BACKEND=s3 and no S3_BUCKET_NAME yet. Inert once the bucket is set.
+MEDIA_STORAGE_PENDING = env.bool("MEDIA_STORAGE_PENDING", default=False)
 if STORAGE_BACKEND.lower() == "s3":
     # Object storage hands out its own presigned URLs; this process never
     # serves MEDIA_ROOT, so the env var is deliberately ignored here.
@@ -301,6 +326,10 @@ if STORAGE_BACKEND.lower() == "s3":
     AWS_S3_OBJECT_PARAMETERS = {
         "CacheControl": "max-age=86400",
     }
+    if not AWS_STORAGE_BUCKET_NAME:
+        # Without a bucket the S3 backend raises on every call, a file's URL included, so one
+        # picture on a page would fail the page. This stand-in saves nothing and refuses uploads.
+        STORAGES["default"] = {"BACKEND": "apps.common.storage.PendingMediaStorage"}
 else:
     # Local FS fallback so dev + test environments without S3 credentials
     # can still call default_storage / save uploaded files.
@@ -321,7 +350,7 @@ ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
 # "none" until SMTP is configured; set ACCOUNT_EMAIL_VERIFICATION=mandatory once
 # mail can actually be delivered, or new users will be locked out waiting for it.
-ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
+ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="") or "none"
 
 # Who may create an account.
 #   invite_only (default): only people holding a team invitation link, plus
@@ -331,7 +360,7 @@ ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
 #   open: anyone can sign up.
 # SIGNUP_ALLOWLIST takes full addresses ("ana@agency.com") and whole domains
 # ("@agency.com"), comma-separated.
-SIGNUP_MODE = env("SIGNUP_MODE", default="invite_only")
+SIGNUP_MODE = env("SIGNUP_MODE", default="") or "invite_only"
 
 # Platforms the public pages may call "live". Every integration ships in the
 # code, but one only works for outside users once its developer app has passed
@@ -341,7 +370,7 @@ LAUNCHED_PLATFORMS = env.list("LAUNCHED_PLATFORMS", default=["bluesky", "mastodo
 
 # Django admin. ADMIN_URL moves it off the well-known /admin/ path, and
 # ADMIN_ALLOWED_IPS (addresses or CIDR ranges) 404s it for everyone else.
-ADMIN_URL = env("ADMIN_URL", default="admin/").strip("/") + "/"
+ADMIN_URL = (env("ADMIN_URL", default="").strip("/") or "admin") + "/"
 ADMIN_ALLOWED_IPS = env.list("ADMIN_ALLOWED_IPS", default=[])
 SIGNUP_ALLOWLIST = [entry.strip().lower() for entry in env.list("SIGNUP_ALLOWLIST", default=[]) if entry.strip()]
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
@@ -410,8 +439,8 @@ SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_SAVE_EVERY_REQUEST = True  # Sliding window
 
 # Email
-EMAIL_BACKEND_TYPE = env("EMAIL_BACKEND_TYPE")
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@localhost")
+EMAIL_BACKEND_TYPE = env("EMAIL_BACKEND_TYPE", default="") or "smtp"
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="") or "noreply@localhost"
 
 # Everything outbound goes through the budget wrapper, which then hands the
 # message to EMAIL_INNER_BACKEND. There is no send_email() helper in this
@@ -431,11 +460,11 @@ if EMAIL_BACKEND_TYPE == "gmail_api":
     EMAIL_INNER_BACKEND = "apps.common.gmail.GmailAPIEmailBackend"
 elif EMAIL_BACKEND_TYPE == "smtp":
     EMAIL_INNER_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_HOST = env("EMAIL_HOST", default="localhost")
-    EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+    EMAIL_HOST = env("EMAIL_HOST", default="") or "localhost"
+    EMAIL_PORT = int(env("EMAIL_PORT", default="") or 587)
     EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
     EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-    EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+    EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True) if env("EMAIL_USE_TLS", default="") else True
     # Without a timeout a hung SMTP server holds the request (password reset,
     # invite) or the worker's digest sweep open indefinitely.
     EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
@@ -750,7 +779,7 @@ INDEXNOW_KEY = env("INDEXNOW_KEY", default="")
 # requested model's safety classifiers decline a request (beta).
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
-STUDIO_PROVIDER = env("STUDIO_PROVIDER", default="anthropic")
+STUDIO_PROVIDER = env("STUDIO_PROVIDER", default="") or "anthropic"
 STUDIO_MODEL = env("STUDIO_MODEL", default="")
 STUDIO_EFFORT = env("STUDIO_EFFORT", default="")
 STUDIO_TIMEOUT = env.float("STUDIO_TIMEOUT", default=300.0)

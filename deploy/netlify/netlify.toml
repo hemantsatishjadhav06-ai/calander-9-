@@ -1,0 +1,25 @@
+# The front door: the Netlify site `sm-bean` (https://sm-bean.netlify.app) proxies every request to
+# the Render web service. Runbook: docs/LIVE_OPERATIONS.md, "Render with Netlify in front".
+#
+# Site settings (Netlify UI): base directory `deploy/netlify`, and two environment variables:
+#   RENDER_ORIGIN              the web service's https origin, e.g. https://sm-bean-web.onrender.com
+#   FRONT_DOOR_SIGNING_SECRET  a long random value, the same one set on sm-bean-web; its scopes
+#                              must include Runtime (Netlify signs each proxied request with it)
+# A change to either needs a new deploy (Deploys -> Trigger deploy).
+
+[build]
+  command = "bash build.sh"
+  publish = "public"
+
+# build.sh writes RENDER_ORIGIN in place of the placeholder (it edits this file, so it runs on Netlify,
+# not in a checkout); Netlify reads redirects after the build.
+# The rule lives here and not in a _redirects file because only a rule in netlify.toml can be signed,
+# and a _redirects file is matched first: a catch-all there would win and reach Render unsigned.
+# Forced, so no file in `public` is ever served instead. POSTs, cookies and other headers pass through;
+# Netlify gives up on a proxied request after 26 seconds.
+[[redirects]]
+  from = "/*"
+  to = "__RENDER_ORIGIN__/:splat"
+  status = 200
+  force = true
+  signed = "FRONT_DOOR_SIGNING_SECRET"

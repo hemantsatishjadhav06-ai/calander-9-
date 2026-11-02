@@ -1,153 +1,615 @@
+# SM Bean in production: Render runs it, https://sm-bean.netlify.app is the address people use.
+#
+# Created by the one-click Blueprint, which reads this file from main:
+#   https://dashboard.render.com/blueprint/new?repo=https://github.com/hemantsatishjadhav06-ai/calander-9-
+# docs/LIVE_OPERATIONS.md ("Render with Netlify in front") is the runbook.
+#
+# Nothing typed into the Blueprint form is needed for the first boot. Every `sync: false` value may be
+# left blank there, whether Render then leaves it out or creates it empty (the settings read an empty
+# value as unset); the old deployment's values are then copied onto sm-bean-web through Render's API.
+# The worker is linked to each of them (fromService). Render's documented rule for such a link (Blueprint
+# spec, "Referencing service properties"): it takes the referenced variable's current value on each
+# Blueprint sync, not when that value changes. So after changing any linked value on sm-bean-web, run
+# Blueprints -> the Blueprint -> Manual Sync (a merge to main syncs by itself only when it changes this
+# file), then deploy sm-bean-worker; a deploy alone leaves the worker on the old value. The runbook's
+# fingerprint (step 1) shows whether the two agree. SECRET_KEY and ENCRYPTION_KEY_SALT start as
+# generated values and are overwritten the same way.
+# No secret is ever written into this file (tests/test_render_blueprint.py).
+#
+# Both services deploy main only after GitHub's checks pass (autoDeployTrigger: checksPass).
+
 services:
   - type: web
-    name: brightbean-web
+    name: sm-bean-web
     runtime: docker
+    region: singapore
     plan: starter
     dockerfilePath: ./Dockerfile
+    autoDeployTrigger: checksPass
     healthCheckPath: /health/
-    preDeployCommand: "python manage.py check --deploy && python manage.py migrate --noinput"
+    # Through a shell on purpose: `&&` means nothing without one, and the migration would never run.
+    # Only the web service migrates; the image's own CMD runs `check --deploy` again, then gunicorn.
+    preDeployCommand: sh -c "python manage.py check --deploy && python manage.py migrate --noinput"
     envVars:
+      # Fixed by this file. A Blueprint sync puts these back, so change them here, not in the dashboard.
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
+      - key: DEBUG
+        value: "false"
+      - key: APP_URL
+        value: https://sm-bean.netlify.app
+      - key: ALLOWED_HOSTS
+        value: sm-bean.netlify.app
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://sm-bean.netlify.app
+      # Render's proxy connects from its private network and is assumed to append the address it saw
+      # to X-Forwarded-For (Render does not document it; the runbook's step 2 checks it after a
+      # deploy). The Netlify hop in front of it is recognised by its signature instead
+      # (FRONT_DOOR_SIGNING_SECRET, apps/common/net.py).
+      - key: BB_TRUSTED_PROXIES
+        value: 10.0.0.0/8
+      - key: TELEGRAM_WEBHOOK_BASE_URL
+        value: https://sm-bean.netlify.app
+      # Media on Cloudflare R2. Until the bucket exists the app runs and refuses uploads (W015);
+      # setting the four blank S3_* values below on sm-bean-web, then a Manual Sync and a deploy of
+      # both services, is all it takes to switch. Once uploads work, make
+      # MEDIA_STORAGE_PENDING "false", so a lost S3_BUCKET_NAME stops the deploy (E004) instead.
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: MEDIA_STORAGE_PENDING
+        value: "true"
+      - key: S3_REGION_NAME
+        value: auto
+      - key: S3_ADDRESSING_STYLE
+        value: path
+      # Generated once at creation, then overwritten with the old deployment's values.
       - key: SECRET_KEY
         generateValue: true
       - key: ENCRYPTION_KEY_SALT
         generateValue: true
+      # Render's own resources.
       - key: DATABASE_URL
         fromDatabase:
-          name: brightbean-db
+          name: sm-bean-db
           property: connectionString
       - key: REDIS_URL
         fromService:
-          name: brightbean-cache
+          name: sm-bean-cache
           type: keyvalue
           property: connectionString
-      - key: APP_URL
+      # The front door: the same value as the Netlify site's FRONT_DOOR_SIGNING_SECRET.
+      - key: FRONT_DOOR_SIGNING_SECRET
         sync: false
-      - key: ALLOWED_HOSTS
+      # Cloudflare R2 (docs/LIVE_OPERATIONS.md): leave blank until the bucket exists.
+      - key: S3_ENDPOINT_URL
         sync: false
-      - key: STORAGE_BACKEND
-        value: s3
       - key: S3_BUCKET_NAME
         sync: false
       - key: S3_ACCESS_KEY_ID
         sync: false
       - key: S3_SECRET_ACCESS_KEY
         sync: false
-      - key: S3_ENDPOINT_URL
+      # Left blank in the form, then copied from the old deployment through Render's API.
+      - key: SENTRY_DSN
         sync: false
-      - key: S3_REGION_NAME
+      - key: SITE_NAME
+        sync: false
+      - key: SUPPORT_EMAIL
+        sync: false
+      - key: LEGAL_ENTITY_NAME
+        sync: false
+      - key: WEBHOOK_SECRET
+        sync: false
+      - key: SIGNUP_MODE
+        sync: false
+      - key: SIGNUP_ALLOWLIST
+        sync: false
+      - key: ACCOUNT_EMAIL_VERIFICATION
+        sync: false
+      - key: ADMIN_URL
+        sync: false
+      - key: ADMIN_ALLOWED_IPS
+        sync: false
+      # Email.
+      - key: EMAIL_BACKEND_TYPE
         sync: false
       - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
         sync: false
       - key: EMAIL_HOST_USER
         sync: false
       - key: EMAIL_HOST_PASSWORD
         sync: false
+      - key: EMAIL_USE_TLS
+        sync: false
       - key: DEFAULT_FROM_EMAIL
         sync: false
-      - key: ACCOUNT_EMAIL_VERIFICATION
-        value: none
-      - key: BB_TRUSTED_PROXIES
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: RESEND_WEBHOOK_SECRET
+        sync: false
+      # Sign in with Google.
+      - key: GOOGLE_AUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_AUTH_CLIENT_SECRET
+        sync: false
+      # Platform credentials and webhooks.
+      - key: PLATFORM_FACEBOOK_APP_ID
+        sync: false
+      - key: PLATFORM_FACEBOOK_APP_SECRET
+        sync: false
+      - key: PLATFORM_FACEBOOK_CONFIG_ID
+        sync: false
+      - key: PLATFORM_INSTAGRAM_APP_ID
+        sync: false
+      - key: PLATFORM_INSTAGRAM_APP_SECRET
+        sync: false
+      - key: PLATFORM_THREADS_APP_ID
+        sync: false
+      - key: PLATFORM_THREADS_APP_SECRET
+        sync: false
+      - key: PLATFORM_LINKEDIN_COMPANY_CLIENT_ID
+        sync: false
+      - key: PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET
+        sync: false
+      - key: PLATFORM_LINKEDIN_PERSONAL_CLIENT_ID
+        sync: false
+      - key: PLATFORM_LINKEDIN_PERSONAL_CLIENT_SECRET
+        sync: false
+      - key: PLATFORM_TIKTOK_CLIENT_KEY
+        sync: false
+      - key: PLATFORM_TIKTOK_CLIENT_SECRET
+        sync: false
+      - key: PLATFORM_GOOGLE_CLIENT_ID
+        sync: false
+      - key: PLATFORM_GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: PLATFORM_PINTEREST_APP_ID
+        sync: false
+      - key: PLATFORM_PINTEREST_APP_SECRET
+        sync: false
+      - key: PLATFORM_X_CLIENT_ID
+        sync: false
+      - key: PLATFORM_X_CLIENT_SECRET
+        sync: false
+      - key: FACEBOOK_WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: INSTAGRAM_LOGIN_WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: YOUTUBE_WEBHOOK_SECRET
+        sync: false
+      - key: UNSPLASH_ACCESS_KEY
+        sync: false
+      # The agency.
+      - key: STUDIO_PROVIDER
+        sync: false
+      - key: STUDIO_MODEL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: FAL_KEY
+        sync: false
+      # Blog.
+      - key: BLOG_GITHUB_TOKEN
+        sync: false
+      - key: GSC_CLIENT_ID
+        sync: false
+      - key: GSC_CLIENT_SECRET
+        sync: false
+      - key: INDEXNOW_KEY
+        sync: false
+      # Telegram: true only once the webhook route answers 403 to a wrong secret on the new address.
+      - key: TELEGRAM_WEBHOOK_READY
         sync: false
 
   - type: worker
-    name: brightbean-worker
+    name: sm-bean-worker
     runtime: docker
+    region: singapore
     plan: starter
     dockerfilePath: ./Dockerfile
+    autoDeployTrigger: checksPass
+    # The one worker: publishing, the agency and Telegram. It exits after an hour (or on SIGTERM)
+    # and Render starts it again; never more than one instance (it holds the worker lease).
     dockerCommand: sh -c "python manage.py check --deploy && exec python manage.py run_worker --duration 3600"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
-      - key: SECRET_KEY
-        fromService:
-          name: brightbean-web
-          type: web
-          envVarKey: SECRET_KEY
-      - key: ENCRYPTION_KEY_SALT
-        fromService:
-          name: brightbean-web
-          type: web
-          envVarKey: ENCRYPTION_KEY_SALT
       - key: DATABASE_URL
         fromDatabase:
-          name: brightbean-db
+          name: sm-bean-db
           property: connectionString
       - key: REDIS_URL
         fromService:
-          name: brightbean-cache
+          name: sm-bean-cache
           type: keyvalue
           property: connectionString
+      # Every other value is linked to sm-bean-web: one place to set it. A link takes the web value
+      # on a Blueprint sync, not when it changes: after a change on sm-bean-web, Manual Sync, then
+      # deploy this worker. The runbook (step 1) checks that the two agree.
+      - key: DEBUG
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: DEBUG
       - key: APP_URL
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
           envVarKey: APP_URL
       - key: ALLOWED_HOSTS
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
           envVarKey: ALLOWED_HOSTS
+      - key: CSRF_TRUSTED_ORIGINS
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: CSRF_TRUSTED_ORIGINS
+      - key: BB_TRUSTED_PROXIES
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: BB_TRUSTED_PROXIES
+      - key: TELEGRAM_WEBHOOK_BASE_URL
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: TELEGRAM_WEBHOOK_BASE_URL
       - key: STORAGE_BACKEND
-        value: s3
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: STORAGE_BACKEND
+      - key: MEDIA_STORAGE_PENDING
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: MEDIA_STORAGE_PENDING
+      - key: S3_REGION_NAME
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: S3_REGION_NAME
+      - key: S3_ADDRESSING_STYLE
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: S3_ADDRESSING_STYLE
+      - key: SECRET_KEY
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: SECRET_KEY
+      - key: ENCRYPTION_KEY_SALT
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: ENCRYPTION_KEY_SALT
+      - key: FRONT_DOOR_SIGNING_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: FRONT_DOOR_SIGNING_SECRET
+      - key: S3_ENDPOINT_URL
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: S3_ENDPOINT_URL
       - key: S3_BUCKET_NAME
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
           envVarKey: S3_BUCKET_NAME
       - key: S3_ACCESS_KEY_ID
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
           envVarKey: S3_ACCESS_KEY_ID
       - key: S3_SECRET_ACCESS_KEY
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
           envVarKey: S3_SECRET_ACCESS_KEY
-      - key: S3_ENDPOINT_URL
+      - key: SENTRY_DSN
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
-          envVarKey: S3_ENDPOINT_URL
-      - key: S3_REGION_NAME
+          envVarKey: SENTRY_DSN
+      - key: SITE_NAME
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
-          envVarKey: S3_REGION_NAME
+          envVarKey: SITE_NAME
+      - key: SUPPORT_EMAIL
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: SUPPORT_EMAIL
+      - key: LEGAL_ENTITY_NAME
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: LEGAL_ENTITY_NAME
+      - key: WEBHOOK_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: WEBHOOK_SECRET
+      - key: SIGNUP_MODE
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: SIGNUP_MODE
+      - key: SIGNUP_ALLOWLIST
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: SIGNUP_ALLOWLIST
+      - key: ACCOUNT_EMAIL_VERIFICATION
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: ACCOUNT_EMAIL_VERIFICATION
+      - key: ADMIN_URL
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: ADMIN_URL
+      - key: ADMIN_ALLOWED_IPS
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: ADMIN_ALLOWED_IPS
+      - key: EMAIL_BACKEND_TYPE
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: EMAIL_BACKEND_TYPE
       - key: EMAIL_HOST
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
           envVarKey: EMAIL_HOST
+      - key: EMAIL_PORT
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: EMAIL_PORT
       - key: EMAIL_HOST_USER
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
           envVarKey: EMAIL_HOST_USER
       - key: EMAIL_HOST_PASSWORD
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
           envVarKey: EMAIL_HOST_PASSWORD
+      - key: EMAIL_USE_TLS
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: EMAIL_USE_TLS
       - key: DEFAULT_FROM_EMAIL
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
           envVarKey: DEFAULT_FROM_EMAIL
-      - key: BB_TRUSTED_PROXIES
+      - key: GMAIL_CLIENT_ID
         fromService:
-          name: brightbean-web
+          name: sm-bean-web
           type: web
-          envVarKey: BB_TRUSTED_PROXIES
+          envVarKey: GMAIL_CLIENT_ID
+      - key: GMAIL_CLIENT_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: GMAIL_CLIENT_SECRET
+      - key: GMAIL_REFRESH_TOKEN
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: GMAIL_REFRESH_TOKEN
+      - key: RESEND_WEBHOOK_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: RESEND_WEBHOOK_SECRET
+      - key: GOOGLE_AUTH_CLIENT_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: GOOGLE_AUTH_CLIENT_ID
+      - key: GOOGLE_AUTH_CLIENT_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: GOOGLE_AUTH_CLIENT_SECRET
+      - key: PLATFORM_FACEBOOK_APP_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_FACEBOOK_APP_ID
+      - key: PLATFORM_FACEBOOK_APP_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_FACEBOOK_APP_SECRET
+      - key: PLATFORM_FACEBOOK_CONFIG_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_FACEBOOK_CONFIG_ID
+      - key: PLATFORM_INSTAGRAM_APP_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_INSTAGRAM_APP_ID
+      - key: PLATFORM_INSTAGRAM_APP_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_INSTAGRAM_APP_SECRET
+      - key: PLATFORM_THREADS_APP_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_THREADS_APP_ID
+      - key: PLATFORM_THREADS_APP_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_THREADS_APP_SECRET
+      - key: PLATFORM_LINKEDIN_COMPANY_CLIENT_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_LINKEDIN_COMPANY_CLIENT_ID
+      - key: PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET
+      - key: PLATFORM_LINKEDIN_PERSONAL_CLIENT_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_LINKEDIN_PERSONAL_CLIENT_ID
+      - key: PLATFORM_LINKEDIN_PERSONAL_CLIENT_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_LINKEDIN_PERSONAL_CLIENT_SECRET
+      - key: PLATFORM_TIKTOK_CLIENT_KEY
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_TIKTOK_CLIENT_KEY
+      - key: PLATFORM_TIKTOK_CLIENT_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_TIKTOK_CLIENT_SECRET
+      - key: PLATFORM_GOOGLE_CLIENT_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_GOOGLE_CLIENT_ID
+      - key: PLATFORM_GOOGLE_CLIENT_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_GOOGLE_CLIENT_SECRET
+      - key: PLATFORM_PINTEREST_APP_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_PINTEREST_APP_ID
+      - key: PLATFORM_PINTEREST_APP_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_PINTEREST_APP_SECRET
+      - key: PLATFORM_X_CLIENT_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_X_CLIENT_ID
+      - key: PLATFORM_X_CLIENT_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: PLATFORM_X_CLIENT_SECRET
+      - key: FACEBOOK_WEBHOOK_VERIFY_TOKEN
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: FACEBOOK_WEBHOOK_VERIFY_TOKEN
+      - key: INSTAGRAM_LOGIN_WEBHOOK_VERIFY_TOKEN
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: INSTAGRAM_LOGIN_WEBHOOK_VERIFY_TOKEN
+      - key: YOUTUBE_WEBHOOK_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: YOUTUBE_WEBHOOK_SECRET
+      - key: UNSPLASH_ACCESS_KEY
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: UNSPLASH_ACCESS_KEY
+      - key: STUDIO_PROVIDER
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: STUDIO_PROVIDER
+      - key: STUDIO_MODEL
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: STUDIO_MODEL
+      - key: ANTHROPIC_API_KEY
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: ANTHROPIC_API_KEY
+      - key: OPENROUTER_API_KEY
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: OPENROUTER_API_KEY
+      - key: FAL_KEY
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: FAL_KEY
+      - key: BLOG_GITHUB_TOKEN
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: BLOG_GITHUB_TOKEN
+      - key: GSC_CLIENT_ID
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: GSC_CLIENT_ID
+      - key: GSC_CLIENT_SECRET
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: GSC_CLIENT_SECRET
+      - key: INDEXNOW_KEY
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: INDEXNOW_KEY
+      - key: TELEGRAM_WEBHOOK_READY
+        fromService:
+          name: sm-bean-web
+          type: web
+          envVarKey: TELEGRAM_WEBHOOK_READY
 
   - type: keyvalue
-    name: brightbean-cache
+    name: sm-bean-cache
+    region: singapore
     plan: starter
+    # Reachable only from the services in this workspace.
     ipAllowList: []
 
-# Paid PostgreSQL avoids expiry of the free database beneath a live service.
+# A paid database: the free one expires beneath a live service.
 databases:
-  - name: brightbean-db
+  - name: sm-bean-db
+    region: singapore
     plan: basic-256mb
+    postgresMajorVersion: "16"

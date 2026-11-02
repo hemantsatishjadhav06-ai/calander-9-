@@ -225,3 +225,7 @@ e2e_media/
 # Local seed scripts (not for version control)
 /seed_ad_analytics.py
 /seed_ad_calendar.py
+
+# Netlify: the CLI's link state, and the front door's build output (deploy/netlify/build.sh)
+.netlify/
+deploy/netlify/public/

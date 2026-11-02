@@ -1,10 +1,18 @@
 # SM Bean — live operations for Neopolis and More Space
 
-Production: **https://sm-bean-production-eb50.up.railway.app** (Railway project
-`sm-bean`, service `sm-bean` + `sm-bean-worker`, Postgres, Redis, bucket
-`sm-bean-media`). Deploys from `main` of `hemantsatishjadhav06-ai/calander-9-`.
+Production (from 2 November 2026): **https://sm-bean.netlify.app**, the Netlify
+site `sm-bean`, which proxies every request to the Render web service
+`sm-bean-web` (with `sm-bean-worker`, Postgres `sm-bean-db` and Key Value
+`sm-bean-cache`, all in Singapore). Render deploys `main` of
+`hemantsatishjadhav06-ai/calander-9-` once GitHub's checks pass. See
+[Render with Netlify in front](#render-with-netlify-in-front-from-2-nov-2026).
 
-Updated 23 October 2026. This document describes the code on `main`. Whether a
+Previous deployment, stopped: **https://sm-bean-production-eb50.up.railway.app**
+(Railway project `sm-bean`, service `sm-bean` + `sm-bean-worker`, Postgres,
+Redis, bucket `sm-bean-media`). Where a section below names Railway, its
+service names or that address, it describes the previous deployment.
+
+Updated 2 November 2026. This document describes the code on `main`. Whether a
 given deployment runs it, and whether its credentials work, is established by
 `python manage.py live_verify` on that deployment and by the Set up page, not
 by this document. No production post was approved or published while writing
@@ -169,7 +177,458 @@ page in the [product map](PRODUCT_MAP.md); the short version for operators:
 Nothing the team makes is approved, scheduled or published by an agent, in any
 workspace, from any channel.
 
-## One-time owner setup (still needed)
+## Render with Netlify in front (from 2 Nov 2026)
+
+The address people use is **https://sm-bean.netlify.app**. That Netlify site
+serves nothing itself: every request is proxied to the Render web service
+`sm-bean-web`. Render also runs the one worker (`sm-bean-worker`: publishing,
+the agency, Telegram), Postgres 16 (`sm-bean-db`, plan `basic-256mb`) and Key
+Value (`sm-bean-cache`), all in Singapore, because the workspaces are in
+Asia/Kolkata. Both services deploy `main` only after GitHub's checks pass
+(`autoDeployTrigger: checksPass`). Everything Render creates is described in
+[`render.yaml`](../render.yaml); the front door is [`deploy/netlify`](../deploy/netlify).
+
+```
+visitor ──https──▶ Netlify (sm-bean.netlify.app) ──https, signed──▶ Render proxy ──▶ sm-bean-web (gunicorn)
+                                                                       sm-bean-worker ──▶ sm-bean-db, sm-bean-cache
+```
+
+### 1. Create the Render services
+
+Merge the branch into `main` first: the Blueprint reads `render.yaml` from
+`main`. Then open
+
+https://dashboard.render.com/blueprint/new?repo=https://github.com/hemantsatishjadhav06-ai/calander-9-
+
+give the Blueprint a name, leave every field the form asks for **blank**, and
+choose **Deploy Blueprint**. Nothing typed there is needed for the first boot:
+`check --deploy` passes with warnings only (email, Sentry, the agency's keys,
+W015 for the bucket that does not exist yet, and Django's security.W009 for
+Render's generated `SECRET_KEY`, which goes once Railway's key is copied in),
+`migrate` runs, and the web
+service answers `/health/`. Whether Render leaves a blank value out or creates
+it empty, the app reads it as not set and uses its default
+(`tests/test_render_blueprint.py` boots both services both ways). Note the web
+service's address on its page (normally `https://sm-bean-web.onrender.com`;
+Render adds a suffix when the name is taken). It is the `RENDER_ORIGIN` of
+step 2.
+
+The values in `render.yaml` written as `value:` are fixed by the file: the
+public address (`APP_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`,
+`TELEGRAM_WEBHOOK_BASE_URL`), `DEBUG=false`, `BB_TRUSTED_PROXIES=10.0.0.0/8`,
+`STORAGE_BACKEND=s3`, `MEDIA_STORAGE_PENDING=true`, `S3_REGION_NAME=auto` and
+`S3_ADDRESSING_STYLE=path`. A Blueprint sync puts them back, so change them in
+the file, not in the dashboard. Render sets `RENDER_EXTERNAL_HOSTNAME` itself;
+the app allows that hostname, trusts it for CSRF and answers a request under it
+as `sm-bean.netlify.app`.
+
+If creating the Blueprint fails on the worker's links to values left blank
+(Render does not say whether a `fromService` link may point at a `sync: false`
+value that was never created, and this could not be tried before the first
+creation), change those worker entries in `render.yaml` to `sync: false`
+(`tests/test_render_blueprint.py` states the links; change it with them),
+merge, create the Blueprint again, and from then on copy each value onto
+**both** services through the API. An environment group is no way round it: a
+group cannot hold `sync: false` values.
+
+**Values left blank, copied from Railway through the API.** Copy each onto
+`sm-bean-web`. The worker is linked to every one of them (`fromService` in
+`render.yaml`), and Render documents when such a link follows a change
+(Blueprint spec, *Referencing service properties*): the worker's value is set
+to the web service's current one **on each Blueprint sync**, not when the web
+value changes. **So after changing any linked value on `sm-bean-web`, run
+Blueprints → the Blueprint → Manual Sync, then deploy `sm-bean-worker`.**
+Without the sync the worker keeps the old value, however often it is deployed.
+A merge to `main` syncs the Blueprint by itself only when it changes
+`render.yaml`, so waiting for one is the other way only then.
+
+* `SECRET_KEY` and `ENCRYPTION_KEY_SALT`: overwrite the generated values with
+  Railway's. The salt must match the data, or connected accounts' tokens no
+  longer decrypt. A sync does not generate them again: Render generates a
+  value only for a variable that does not exist yet.
+* `SENTRY_DSN`, `SITE_NAME`, `SUPPORT_EMAIL`, `LEGAL_ENTITY_NAME`,
+  `WEBHOOK_SECRET`, `SIGNUP_MODE`, `SIGNUP_ALLOWLIST`,
+  `ACCOUNT_EMAIL_VERIFICATION`, `ADMIN_URL`, `ADMIN_ALLOWED_IPS`.
+* Email: `EMAIL_BACKEND_TYPE`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`,
+  `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL`,
+  `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`,
+  `RESEND_WEBHOOK_SECRET`.
+* Sign-in and platforms: `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`,
+  every `PLATFORM_*` pair in `render.yaml`, `FACEBOOK_WEBHOOK_VERIFY_TOKEN`,
+  `INSTAGRAM_LOGIN_WEBHOOK_VERIFY_TOKEN`, `YOUTUBE_WEBHOOK_SECRET`,
+  `UNSPLASH_ACCESS_KEY`.
+* The agency and the blog: `STUDIO_PROVIDER`, `STUDIO_MODEL`,
+  `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `FAL_KEY`, `BLOG_GITHUB_TOKEN`,
+  `GSC_CLIENT_ID`, `GSC_CLIENT_SECRET`, `INDEXNOW_KEY`.
+
+**Every other variable Railway has, apart from the never-copy list below, is
+copied onto both `sm-bean-web` and `sm-bean-worker`, secrets included.**
+`render.yaml` does not list it, so the worker has no link to it and cannot read
+it from the web service. Not all of these are tuning values with a harmless
+default (`PUBLISHER_*`, `EMAIL_DAILY_SEND_LIMIT`, `STUDIO_TIMEOUT`); some are
+secrets or switches whose default is empty or different: the Intelligence
+add-on's five (`STUDIO_SHARED_SECRET`, `STUDIO_BASE_URL`,
+`STUDIO_DEPLOYMENT_ID`, `INTELLIGENCE_INTERNAL_URL`,
+`INTELLIGENCE_PUBLIC_URL`), the other `STUDIO_*` values (`STUDIO_EFFORT`,
+`STUDIO_FALLBACKS`, `STUDIO_WEB_SEARCH`), the older
+`PLATFORM_LINKEDIN_CLIENT_ID` / `PLATFORM_LINKEDIN_CLIENT_SECRET`,
+`TELEGRAM_MANAGED_BOTS_ENABLED` and `FAL_IMAGE_MODEL`. A value set directly on
+the worker stays: Render keeps a variable a Blueprint omits, and a sync changes
+only those `render.yaml` lists. It is not linked, though, so a later change
+goes onto both services, and the fingerprint below does not compare it.
+
+**Never copy from Railway:** `APP_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`,
+`BB_TRUSTED_PROXIES`, `DATABASE_URL`, `REDIS_URL`, `PORT`, `DEBUG`,
+`DJANGO_SETTINGS_MODULE`, `STORAGE_BACKEND`, any `S3_*` or `MEDIA_*` value (the
+Railway bucket; R2 replaces it in step 3), `TELEGRAM_WEBHOOK_BASE_URL`,
+`TELEGRAM_WEBHOOK_READY` (set in step 5), `MCP_PUBLIC_BASE_URL`,
+`MCP_OAUTH_ISSUER_URL` (both default to `APP_URL`), and anything starting with
+`RAILWAY_`.
+
+Values set through the API take effect on the next deploy, and the worker's
+links only after a sync. Once the values are in: Blueprints → the Blueprint →
+**Manual Sync**, then deploy both services (Manual Deploy → Deploy latest
+commit, or the API's deploy endpoint; if the sync has already started a deploy
+of a service, let that one finish instead). Then, from the web service's
+**Shell** tab, `python manage.py check --deploy` should show no error, only the
+warnings for what is still to come.
+
+**Check that the worker has the same values**, before the data move and after
+every change to a linked value. Run this in the **Shell** tab of `sm-bean-web`
+and of `sm-bean-worker`; it prints a short fingerprint of every value
+`render.yaml` gives the worker and of the media storage the service runs on,
+never the values themselves:
+
+```bash
+python manage.py shell -c "import hashlib, os, yaml; from django.conf import settings as s; w = [x for x in yaml.safe_load(open(s.BASE_DIR / 'render.yaml'))['services'] if x['name'] == 'sm-bean-worker'][0]; print(hashlib.sha256(repr([(e['key'], os.environ.get(e['key']) or '') for e in w['envVars']] + [s.STORAGES['default']['BACKEND'], getattr(s, 'AWS_STORAGE_BUCKET_NAME', '')]).encode()).hexdigest()[:12])"
+```
+
+The last line each prints must be the same twelve characters. If they differ,
+the worker has not caught up with a value changed on the web service. It may
+still hold the generated `SECRET_KEY` and `ENCRYPTION_KEY_SALT` (it could not
+decrypt the restored connected accounts, and what it encrypted the web service
+could not read), the empty provider keys, or no bucket (it runs on
+`PendingMediaStorage` while the web service stores on R2, and its publishes of
+posts with media fail). Run **Manual Sync**, deploy the worker and compare
+again. If they still differ, the Blueprint's page shows what the sync could not
+apply. (Reading both services' variables through the API,
+`GET /v1/services/<id>/env-vars`, is the other way to compare.)
+
+**Moving the data.** The keys above only matter with Railway's data. With the
+worker suspended (`sm-bean-worker` → Settings → Suspend; its fingerprint
+above matched the web service's), restore Railway's
+database into `sm-bean-db` from a machine whose Postgres client is at least
+as new as Railway's server, using the same client for both commands:
+`pg_dump --format=custom --no-owner --no-acl "<Railway public DATABASE_URL>" -f sm-bean.dump`,
+then `pg_restore --clean --if-exists --no-owner --no-acl -d "<sm-bean-db External Database URL>" sm-bean.dump`.
+Redeploy `sm-bean-web` (Manual Deploy → Deploy latest commit; `migrate` runs
+again) and resume the worker. The restored database still names the old
+address in Django admin → *Sites* (the domain in allauth's emails): set it to
+`sm-bean.netlify.app`. Media files stay in Railway's bucket until they are
+copied into R2 (step 3), for example with `rclone copy`; until then the
+pictures of existing posts do not show.
+
+`sm-bean-db` has no `ipAllowList` in `render.yaml`, so its external address
+accepts connections from anywhere (protected by its password) for the
+`pg_restore` above. Once the data is in, close it: add `ipAllowList: []` under
+`sm-bean-db` in `render.yaml` (only Render's private network may connect) and
+merge it, or remove the `0.0.0.0/0` rule under the database's **Networking**
+in the dashboard. Open it again the same way for a later dump from outside.
+
+Render looks for the port the web service listens on when it starts, and its
+probes may arrive with `Host: localhost:10000`. Django logs each as
+`Invalid HTTP_HOST header` (`DisallowedHost`); that is noise, not an attack and
+not a fault.
+
+### 2. Point the Netlify site at Render
+
+On the Netlify site `sm-bean`: **Project configuration → Build & deploy →
+Continuous deployment**: link this repository, branch `main`, **Base
+directory** `deploy/netlify` (the build command and publish directory come from
+`deploy/netlify/netlify.toml`). **Project configuration → Environment
+variables**, add:
+
+* `RENDER_ORIGIN` = the web service's address from step 1, e.g.
+  `https://sm-bean-web.onrender.com`. The build refuses anything but a plain
+  https origin.
+* `FRONT_DOOR_SIGNING_SECRET` = a long random value (`openssl rand -hex 32`),
+  marked as containing a secret, with scopes including **Runtime**. Set the
+  same value on `sm-bean-web` (Render → Environment), then **Manual Sync** and
+  deploy both services, as for every linked value (step 1). Netlify signs each
+  proxied request with it (`X-Nf-Sign`); without it the app cannot tell one
+  visitor from another (see *Client addresses* below).
+
+Then **Deploys → Trigger deploy**. A change to either variable needs another
+deploy. Check: `curl -sI https://sm-bean.netlify.app/health/` answers `200`, and
+the login page loads with its assets. If the Netlify site reports its builds on
+GitHub (a Netlify check beside CI's on `main`'s commits), a failed or
+still-running Netlify build also holds Render's deploys: `checksPass` waits for
+the commit's checks, Netlify's among them.
+
+**Then check that a visitor cannot choose their own address.** The design
+assumes Netlify replaces any `X-Nf-Client-Connection-Ip` a visitor sends with
+the address it saw. Confirm it once after the first deploy, and again after a
+change to the Netlify site. From your own computer:
+
+```bash
+curl -4 -s https://api.ipify.org; echo         # your public IPv4 address
+curl -4 -s -o /dev/null -w '%{http_code}\n' -X POST https://sm-bean.netlify.app/accounts/login/ \
+  -H 'X-Nf-Client-Connection-Ip: 203.0.113.77'
+```
+
+The POST answers `403` (it carries no CSRF token), but the login throttle has
+counted it under the address the app believed. The count lasts 60 seconds, so
+within a minute, in `sm-bean-web`'s **Shell**, with your address in place of
+`<yours>`:
+
+```bash
+python manage.py shell -c "import hashlib; from django.core.cache import cache; n = lambda ip: cache.get('auth_ratelimit:' + hashlib.md5(ip.encode()).hexdigest()); print('yours', n('<yours>'), 'forged', n('203.0.113.77'))"
+```
+
+* `yours 1` (or more) and `forged None`: correct.
+* `forged 1`: Netlify passed the visitor's header through, so anyone could
+  pick their rate-limit bucket and the address in the audit rows. Remove
+  `FRONT_DOOR_SIGNING_SECRET` from `sm-bean-web` and deploy it: every visitor
+  is then counted under the Netlify address that reached Render (coarse, but
+  not forgeable) until this is resolved.
+* `yours None` and `forged None`: the app did not believe Netlify's header, so
+  the request was counted under Netlify's address. Either the signature did not
+  verify (the two `FRONT_DOOR_SIGNING_SECRET` values differ, or the Netlify one
+  lacks the **Runtime** scope), or Netlify did not send
+  `X-Nf-Client-Connection-Ip` on the proxied request at all, and then
+  `front_door_client_ip` has no address to believe even with a valid
+  `X-Nf-Sign`. Check the two values and the scope first. If they are right, it
+  is the header: every visitor is counted under the Netlify node they came
+  through (coarse, but not forgeable) until Netlify sends it.
+
+**And that going round Netlify does not let one either.** The service's own
+`*.onrender.com` address is public, and the app reads `X-Forwarded-For` from
+the right, on the assumption that Render's proxy appends the address it saw.
+Render does not document that: the only public evidence is a 2021 test on
+Render's feedback board ("it only appends"), and a staff reply in the same
+thread says Render sets the first address in the list to the client's. Check
+it the same way, straight at the web service (its address from step 1, the
+`RENDER_ORIGIN` of this step):
+
+```bash
+curl -4 -s -o /dev/null -w '%{http_code}\n' -X POST https://sm-bean-web.onrender.com/accounts/login/ \
+  -H 'X-Forwarded-For: 203.0.113.78' -H 'X-Nf-Client-Connection-Ip: 203.0.113.78'
+```
+
+Then, within a minute, in `sm-bean-web`'s **Shell**:
+
+```bash
+python manage.py shell -c "import hashlib; from django.core.cache import cache; n = lambda ip: cache.get('auth_ratelimit:' + hashlib.md5(ip.encode()).hexdigest()); print('yours', n('<yours>'), 'forged', n('203.0.113.78'))"
+```
+
+* `yours 1` (or more, after the check above) and `forged None`: correct.
+* `forged 1`: Render's proxy left the sender's own `X-Forwarded-For` entry
+  nearest, so anyone going round Netlify picks their rate-limit bucket and the
+  address in the audit rows. Stop trusting the header: set
+  `BB_TRUSTED_PROXIES` on `sm-bean-web` to `127.0.0.1` (the machine itself,
+  which never connects on Render), Manual Sync and deploy both services, then
+  make `render.yaml` say the same and merge it, or the next sync puts
+  `10.0.0.0/8` back (`tests/test_render_blueprint.py` holds the file to its
+  value; change both). Visitors through Netlify keep their own addresses, since
+  the signature does not depend on that list
+  (`test_the_signature_does_not_depend_on_the_proxy_list`); requests sent
+  straight to Render are then all counted under Render's proxy address.
+* `yours None` and `forged None`: the request was counted under an address the
+  check does not name (Render's proxy's own, for one). Nothing can be forged
+  that way, but requests sent straight to Render then share one bucket.
+
+What reaches the app, and why it works:
+
+* **Host.** Netlify sends the Render service's own name as `Host` and sends no
+  `X-Forwarded-Host` (it strips one a client sends), so `USE_X_FORWARDED_HOST`
+  stays off. `apps.common.middleware.FrontDoorHostMiddleware` answers a request
+  under `RENDER_EXTERNAL_HOSTNAME` as `sm-bean.netlify.app`, so absolute URLs
+  (OAuth redirect URIs, onboarding links, the sitemap) name the public address.
+  Only that one hostname is mapped, and only to `APP_URL`'s host.
+* **https.** Netlify connects to Render over https and Render's proxy sets
+  `X-Forwarded-Proto: https`, which `SECURE_PROXY_SSL_HEADER` reads.
+* **CSRF.** The browser's `Origin` is `https://sm-bean.netlify.app`, which is
+  in `CSRF_TRUSTED_ORIGINS` and is also the host the request is answered as.
+* **Client addresses.** Netlify's supported header for the visitor's address
+  is `X-Nf-Client-Connection-Ip`. An `X-Forwarded-For` may also arrive on a
+  proxied request (Netlify sends one, by community reports, but promises
+  nothing about it), and the app does not rely on it. Render's proxy, the
+  socket peer, connects from its private network
+  (`BB_TRUSTED_PROXIES=10.0.0.0/8`) and appends the address it saw (assumed,
+  and checked after a deploy above), which for every visitor is one of
+  Netlify's, so the nearest untrusted hop in
+  `X-Forwarded-For` is always Netlify's, whatever was written before it. The
+  app believes `X-Nf-Client-Connection-Ip` only on a request whose `X-Nf-Sign`
+  verifies with `FRONT_DOOR_SIGNING_SECRET` (HS256, issuer `netlify`, not
+  expired); `apps.common.net.front_door_client_ip`. The `*.onrender.com`
+  address is public, so anyone can send both headers to it directly; without
+  the secret they cannot sign them, and such a request is bucketed by the
+  address Render's proxy saw. Login lockouts, rate limits, the admin allowlist
+  and API audit rows all use this one address.
+* **Caching.** Netlify caches a proxied response only when it says so
+  (`Cache-Control: public, max-age=…`). Pages say nothing or `private`, so
+  only the hashed static files are cached at the edge.
+* **When Render is down** Netlify shows its own error page. It offers no custom
+  page for a failed proxy (a site's `404.html` serves only missing static
+  files, which a forced catch-all never reaches), so none is configured.
+
+**Netlify gives up on a proxied request after 26 seconds**, while the app keeps
+working on it. These requests can take longer:
+
+* Uploads through the app, which travel through Netlify whole:
+  `/workspace/<id>/media/upload/`, `/workspace/<id>/compose/upload-media/`,
+  `/workspace/<id>/compose/thumbnail-upload/`, `/workspace/<id>/ideas/upload-media/`
+  and `/organizations/media/shared/upload/`. A large video on a slow connection is
+  cut; the person sees an error and nothing is saved.
+* The composer's frame picker, the first time for a video
+  (`/workspace/<id>/compose/media-filmstrip/<asset>/` downloads the whole
+  video and runs ffmpeg eight times; cached afterwards) and a long single
+  response from `/workspace/<id>/compose/media-stream/<asset>/`.
+* Unsplash import (`/workspace/<id>/compose/unsplash-import/`): up to ten
+  photos, each up to 40 seconds.
+* The blog's **Generate picture** (`/workspace/<id>/blog/<post>/generate-image/`),
+  which waits for the picture service for up to `FAL_TIMEOUT` (90 seconds by
+  default). If the browser shows an error, reload the editor: the picture is
+  usually attached a little later.
+* Long calls to the Agent API and MCP (`/api/v1/…`, `/api/v1/mcp`).
+
+For a very large upload, the web service's own address works as well (sign in
+there separately; it is a different site to the browser).
+
+### 3. Cloudflare R2 for media
+
+Until the bucket exists the app runs with uploads refused (`check --deploy`
+warns with W015; `live_verify` fails `config.durable_media` and its storage
+check). In the Cloudflare dashboard:
+
+1. **R2 object storage → Overview → Create bucket**. Name `sm-bean-media`;
+   location: a location hint of **Asia-Pacific**; default storage class
+   Standard. **Create bucket**. Leave public access off: the app hands out
+   signed links that expire after an hour.
+2. **R2 object storage → Overview**, under **Account Details**: note the
+   **Account ID**, then choose **Manage** next to **API Tokens** →
+   **Create Account API token**. Name `sm-bean`; permission **Object Read &
+   Write**; **Apply to specific buckets only** → `sm-bean-media`; TTL forever.
+   **Create Account API token**, then copy the **Access Key ID** and the
+   **Secret Access Key** (shown once).
+3. On `sm-bean-web` (Render → Environment) set:
+
+| Variable | Value |
+|---|---|
+| `S3_ENDPOINT_URL` | `https://<account id>.r2.cloudflarestorage.com` |
+| `S3_BUCKET_NAME` | `sm-bean-media` |
+| `S3_ACCESS_KEY_ID` | the token's Access Key ID |
+| `S3_SECRET_ACCESS_KEY` | the token's Secret Access Key |
+| `S3_REGION_NAME` | `auto` (already set by `render.yaml`) |
+| `S3_ADDRESSING_STYLE` | `path` (already set by `render.yaml`) |
+
+Save them on `sm-bean-web` only; the worker is linked to all six. Then
+Blueprints → the Blueprint → **Manual Sync**, so the worker's links take the new
+values, and deploy both services (if the sync has already started a deploy of
+a service, let that one finish instead). A deploy without the sync is not
+enough: the worker keeps the blank values and, because `MEDIA_STORAGE_PENDING`
+is `"true"`, still boots, on `PendingMediaStorage`, while the web service
+stores on R2. The web service's checks then pass and the worker's publishes of
+posts with media fail. Check, in this order: step 1's fingerprint prints the
+same in both services' Shells; `python manage.py live_verify` in the web
+service's Shell reports `storage.round_trip` PASS; an uploaded picture shows on
+the post page.
+
+Once uploads work, change `MEDIA_STORAGE_PENDING` to `"false"` in
+`render.yaml` and merge it (a merge that changes `render.yaml` syncs both
+services by itself). While it says `"true"`, a deployment that later
+loses `S3_BUCKET_NAME` by mistake keeps running and quietly refuses uploads
+(only W015 in the deploy log and `live_verify` say so); with `"false"`,
+`check --deploy` stops that deploy with E004 (the web service's pre-deploy
+step fails and the version already running keeps serving). The
+price: a Blueprint created afresh from the file then needs the four values
+above typed into its form (`tests/test_render_blueprint.py` follows the file
+either way).
+
+### 4. OAuth callback URLs for the new address
+
+Add each at the provider (keep the Railway ones until Railway is gone). Every
+path below is on `https://sm-bean.netlify.app`. The client connection links
+(`/onboarding/…`) are needed only where clients connect their own accounts.
+
+| Provider (where) | Paths |
+|---|---|
+| Google sign-in (Google Cloud → Credentials → the OAuth client of `GOOGLE_AUTH_CLIENT_ID` → Authorized redirect URIs) | `/accounts/google/login/callback/`; if email is sent through Gmail (`/ops/email/`), also `/ops/email/callback/` on the client of `GMAIL_CLIENT_ID` (the same client unless it is set) |
+| Search Console (the OAuth client of `GSC_CLIENT_ID`) | `/blog/search-console/callback/` |
+| YouTube and Google Business Profile (the OAuth client of `PLATFORM_GOOGLE_CLIENT_ID`) | `/social-accounts/callback/youtube/`, `/social-accounts/callback/google_business/`, `/onboarding/connect/callback/youtube/`, `/onboarding/connect/callback/google_business/` |
+| Meta: Facebook Login (Meta app → Facebook Login → Settings → Valid OAuth Redirect URIs) | `/social-accounts/callback/facebook/`, `/social-accounts/callback/instagram/`, `/onboarding/connect/callback/facebook/`, `/onboarding/connect/callback/instagram/` |
+| Meta: Instagram API with Instagram Login (`PLATFORM_INSTAGRAM_APP_ID`; Business login settings → OAuth redirect URIs) | `/social-accounts/callback/instagram_login/`, `/onboarding/connect/callback/instagram_login/` |
+| Meta: Threads (`PLATFORM_THREADS_APP_ID`; Threads use case → Settings → Redirect Callback URLs) | `/social-accounts/callback/threads/`, `/onboarding/connect/callback/threads/` |
+| Meta webhooks (Meta app → Webhooks, same verify tokens) | `/webhooks/facebook/`, `/webhooks/instagram_login/` |
+| LinkedIn (developer.linkedin.com → the app → Auth → Authorized redirect URLs) | `/social-accounts/callback/linkedin_company/`, `/social-accounts/callback/linkedin_personal/`, `/onboarding/connect/callback/linkedin_company/`, `/onboarding/connect/callback/linkedin_personal/` |
+| TikTok (TikTok for Developers → the app → Login Kit → Redirect URI) | `/social-accounts/callback/social1/`, `/onboarding/connect/callback/social1/` (TikTok refuses a path containing its name, hence `social1`) |
+| Pinterest (developers.pinterest.com → the app → Redirect URIs) | `/social-accounts/callback/pinterest/`, `/onboarding/connect/callback/pinterest/` |
+| X (console.x.com → the app → User authentication settings → Callback URI) | `/social-accounts/callback/x/`, `/onboarding/connect/callback/x/`; Website URL `https://sm-bean.netlify.app` |
+
+Also: Mastodon registers itself with each instance on first connect; if the
+database came from Railway, delete the rows under Django admin → *Mastodon app
+registrations* so the next connect registers the new address. Resend (if used)
+posts delivery events to `/webhooks/resend/`, and a YouTube push subscription
+(if one was made) to `/webhooks/youtube/`. MCP connectors (Claude and others)
+were issued by the old address and connect again once.
+
+### 5. Telegram on the new address
+
+`TELEGRAM_WEBHOOK_BASE_URL` is already `https://sm-bean.netlify.app`. Confirm
+the route answers a wrong secret with 403:
+`curl -s -o /dev/null -w '%{http_code}\n' -X POST https://sm-bean.netlify.app/webhooks/telegram/00000000-0000-0000-0000-000000000000/ -H 'X-Telegram-Bot-Api-Secret-Token: wrong'`
+prints `403` (any id answers 403 to a wrong secret, so this proves the route
+reaches the app through Netlify). Then set `TELEGRAM_WEBHOOK_READY=true` on
+`sm-bean-web`, run **Manual Sync** and deploy both services (the worker reads
+it too, through its link; step 1), and in each
+workspace with a bot open **Settings → Telegram** and press **Retry webhook**:
+it registers the webhook on the new address with Telegram and republishes the
+command menu (`python manage.py telegram_set_commands` republishes the menu
+alone). *Bot connected* shows ✓ when Telegram accepted it.
+
+### 6. Verify
+
+From the web service's **Shell** tab:
+
+```bash
+python manage.py check --deploy
+python manage.py live_verify            # add --strict for the launch gate
+```
+
+`live_verify` prints PASS / FAIL / BLOCKED lines (see *Checking the live
+deployment* below). On Render the pre-deploy step runs `check --deploy` and
+`migrate` only; it neither backs up nor runs `live_verify`, so run it after
+each deploy that matters. Also check from a browser: sign in at
+https://sm-bean.netlify.app, connect or refresh one account, and open the
+Activity page to see the worker's heartbeat.
+
+### Rollback on Render
+
+The general rules under [Rollback](#rollback) apply: pause and drain first,
+keep approval enforcement on, never reverse migrations destructively.
+
+* **Code:** the service's **Deploys** page → a previous successful deploy →
+  **Rollback** → **Rollback to this deploy**. Do it on `sm-bean-web` and
+  `sm-bean-worker` alike, so both run the same code. A dashboard rollback turns
+  automatic deploys off (Settings turns them on again); it reuses that deploy's
+  environment variables, and it does not undo a migration.
+* **Database:** `sm-bean-db` → **Recovery**. Render keeps point-in-time
+  recovery for paid databases (3 days on a Hobby workspace, 7 on Pro); a
+  recovery creates a new database, which the services then point at. Export a
+  logical backup there before a risky migration.
+* **The address:** Railway is stopped, not deleted. Until it is removed, going
+  back means suspending `sm-bean-worker` on Render **first** (the two
+  deployments use separate databases, so the worker lease cannot stop both
+  workers publishing the same scheduled post), then starting Railway's
+  services again and moving the OAuth callbacks and the Telegram webhook back;
+  data written on Render since the move stays on Render.
+* **The front door:** a failed Netlify deploy never goes live. To undo a bad
+  one, revert the commit and let Netlify build again.
+
+## One-time owner setup (Railway, the previous deployment)
+
+For Render, the callback URLs and steps are in
+[Render with Netlify in front](#render-with-netlify-in-front-from-2-nov-2026).
 
 1. **Connect accounts** — in each brand workspace: Settings → Social accounts
    → Connect → Facebook (pick that brand's Page; the picker marks it and flags
@@ -237,10 +696,17 @@ workspace, from any channel.
 
 The one canonical list. "Service" says where the value must be set: **web**
 (`sm-bean`), **worker** (`sm-bean-worker`) or **both** (the same value on each;
-a value the worker lacks shows up as work that silently never happens).
-"Verify" names the page or `live_verify` check that proves it works; key
-presence alone proves nothing. `.env.example` carries every variable's full
-comment.
+a value the worker lacks shows up as work that silently never happens). On
+Render the web service is `sm-bean-web`, and the worker is linked to every
+variable `render.yaml` lists on it. Render updates such a link on each
+Blueprint sync, not when the web value changes, so "both" means setting it on
+`sm-bean-web`, then Blueprints → the Blueprint → **Manual Sync**, then
+deploying `sm-bean-worker`, and comparing the two services' fingerprints (step
+1 of *Render with Netlify in front*). A "both" variable `render.yaml` does not
+list is set on each service directly. An empty value of a variable
+`render.yaml` leaves blank counts as unset. "Verify" names the page or `live_verify` check that proves it
+works; key presence alone proves nothing. `.env.example` carries every
+variable's full comment.
 
 ### Core
 
@@ -251,7 +717,8 @@ comment.
 | `DEBUG` | both | required, `false` | `live_verify config.debug` |
 | `ALLOWED_HOSTS`, `APP_URL`, `CSRF_TRUSTED_ORIGINS` | both | required | `live_verify config.app_url`, `config.oauth_callbacks`; the login page loads over https |
 | `APP_DOMAIN`, `POSTGRES_PASSWORD`, `CADDY_MEDIA_ROOT` | Compose only | required on a VPS | Caddy obtains the certificate; uploads load |
-| `BB_TRUSTED_PROXIES` | web | optional (behind a proxy you run) | `live_verify config.https_behind_proxy`; one person's failed logins do not lock out everyone |
+| `BB_TRUSTED_PROXIES` | web | optional (behind a proxy you run); `10.0.0.0/8` on Render, set by `render.yaml` | `live_verify config.https_behind_proxy`; one person's failed logins do not lock out everyone |
+| `FRONT_DOOR_SIGNING_SECRET` | web (and the Netlify site, same name, Runtime scope) | required behind the Netlify front door | visitors behind one Netlify node are told apart: see *Client addresses* under Render with Netlify in front |
 | `DATABASE_URL`, `DB_CONN_MAX_AGE` | both | required | `live_verify db.connection`, `db.migrations` |
 | `REDIS_URL` | both | required in multi-process production | rate limits and OAuth state hold across processes |
 | `SIGNUP_MODE`, `SIGNUP_ALLOWLIST`, `ACCOUNT_EMAIL_VERIFICATION` | web | optional (invite-only by default) | a stranger cannot register; an allowlisted address can |
@@ -267,6 +734,7 @@ comment.
 | `STORAGE_BACKEND` | both | required (`s3` on any host with an ephemeral disk) | `live_verify storage.round_trip` |
 | `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET_NAME`, `S3_CUSTOM_DOMAIN`, `S3_REGION_NAME`, `S3_ADDRESSING_STYLE`, `AWS_S3_MAX_MEMORY_SIZE` | both | required with `s3` | `live_verify storage.round_trip`; an uploaded picture renders on the post page |
 | `MEDIA_ROOT`, `SERVE_MEDIA`, `MEDIA_STORAGE_PERSISTENT` | both | required with `local` | `live_verify config.durable_media`; a platform can fetch an attachment URL |
+| `MEDIA_STORAGE_PENDING` | both | optional; `true` on Render until the R2 bucket exists (no effect once `S3_BUCKET_NAME` is set) | `check --deploy` warns W015 instead of stopping the deploy; uploads are refused |
 
 ### Email
 
@@ -337,19 +805,22 @@ comment.
 | `MCP_PUBLIC_BASE_URL`, `MCP_OAUTH_ISSUER_URL` | web | optional (split app/api hosts) | `/.well-known/oauth-authorization-server` names the public origin |
 | `INTELLIGENCE_INTERNAL_URL`, `INTELLIGENCE_PUBLIC_URL`, `STUDIO_DEPLOYMENT_ID`, `STUDIO_SHARED_SECRET`, `STUDIO_BASE_URL` | both | all five or none | the Intelligence item appears in the sidebar |
 
-`RAILWAY_ENVIRONMENT*` and `RAILWAY_GIT_COMMIT_SHA` are set by the platform and
+`RENDER_EXTERNAL_HOSTNAME` (Render), `RAILWAY_ENVIRONMENT*` and
+`RAILWAY_GIT_COMMIT_SHA` (Railway) are set by the platform and
 only read.
 
 ## Checking the live deployment
 
-The configured release uses `python manage.py release --setup-brands --verify`
-before new code takes traffic. The deploy log of the `sm-bean` service contains
-`live_verify:` lines — PASS / FAIL / BLOCKED (waiting on the owner) — covering
-configuration, storage, the worker, both brand workspaces, every connected
-account's identity (read-only API calls), workspace isolation, Telegram, and
-the full approval → publish path on a throwaway fixture that is rolled back
-(provider stubbed; nothing is posted). Run it any time with
-`python manage.py live_verify`.
+`python manage.py live_verify` prints `live_verify:` lines — PASS / FAIL /
+BLOCKED (waiting on the owner) — covering configuration, storage, the worker,
+both brand workspaces, every connected account's identity (read-only API
+calls), workspace isolation, Telegram, and the full approval → publish path on
+a throwaway fixture that is rolled back (provider stubbed; nothing is posted).
+On Render the pre-deploy step runs `check --deploy` and `migrate` only, so run
+`live_verify` from the web service's Shell (step 6 of Render with Netlify in
+front). On Railway, the previous deployment, the release command
+`python manage.py release --setup-brands --verify` ran it before new code took
+traffic, and its lines were in the deploy log of the `sm-bean` service.
 
 **Default verification is best effort:** FAIL/BLOCKED output does not by itself
 stop the release. Opt in to the critical launch gate with:
@@ -391,8 +862,10 @@ webhooks) are sent as they are. A proxy in front that compresses again sees
 
 ## Rollback
 
-The release step takes a database backup **before** migrating
-(`backups/db-<timestamp>.tar.gz` in the media bucket; the log names it).
+On Railway (the previous deployment), the release step took a database backup
+**before** migrating (`backups/db-<timestamp>.tar.gz` in the media bucket; the
+log names it). Render's pre-deploy step takes none; see
+[Rollback on Render](#rollback-on-render) for its database recovery.
 
 Do not assume older code is safe merely because it can read the migrated
 database. Reverting to `05ca828` removes source/expiry guards, durable

@@ -47,6 +47,11 @@ def public_https_origin(url: str) -> bool:
     )
 
 
+def _media_storage_pending() -> bool:
+    """The deployment says its bucket does not exist yet (MEDIA_STORAGE_PENDING=true)."""
+    return bool(getattr(settings, "MEDIA_STORAGE_PENDING", False))
+
+
 @register(Tags.security, deploy=True)
 def check_production_config(app_configs, **kwargs):
     if settings.DEBUG:
@@ -85,6 +90,18 @@ def check_production_config(app_configs, **kwargs):
     storage = str(getattr(settings, "STORAGE_BACKEND", "local")).lower()
     if storage not in ("local", "s3"):
         errors.append(CheckError("STORAGE_BACKEND must be 'local' or 's3'.", id="smbean.E003"))
+    elif storage == "s3" and not getattr(settings, "AWS_STORAGE_BUCKET_NAME", "") and _media_storage_pending():
+        errors.append(
+            CheckWarning(
+                "S3_BUCKET_NAME is not set: media storage is pending, so uploads are refused.",
+                hint=(
+                    "MEDIA_STORAGE_PENDING=true lets the app run before its bucket exists. Create the "
+                    "bucket and set S3_BUCKET_NAME, S3_ENDPOINT_URL, S3_ACCESS_KEY_ID and "
+                    "S3_SECRET_ACCESS_KEY on the web and worker services (docs/LIVE_OPERATIONS.md)."
+                ),
+                id="smbean.W015",
+            )
+        )
     elif storage == "s3" and not getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""):
         errors.append(
             CheckError(
@@ -212,7 +229,7 @@ def check_production_config(app_configs, **kwargs):
                     "X-Forwarded-For. Otherwise every client shares the proxy's IP and "
                     "one user's failed logins rate-limit everyone. On a managed platform "
                     "whose edge address is not stable per deploy, use the range it "
-                    "forwards from (Railway: 100.64.0.0/10)."
+                    "forwards from (Railway: 100.64.0.0/10; Render: 10.0.0.0/8)."
                 ),
                 id="smbean.W006",
             )
