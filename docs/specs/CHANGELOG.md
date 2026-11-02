@@ -3,6 +3,182 @@
 One entry per phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md): the date, what changed, and what the
 phase gate (section 6) said. Newest first.
 
+## 2 Nov 2026 — Phase 3 · Foundations: gate evidence, waiting for the owner's sign-off on the shell
+
+Spec [`03-rebuild-screens.md`](03-rebuild-screens.md), plan [`phase-3.md`](phase-3.md) (Part A, T1–T13).
+PR #26. Screen 1 starts only after the owner signs off the shell pair.
+
+**What changed.** The groundwork every rebuilt screen stands on; no page is dark yet and no screen
+is rebuilt yet.
+
+- *Registry and guard rails.* `apps/common/screens.py` lists the dark-ready pages (none yet), each
+  page's templates and each screen's parts; the guards read it: the 8 px grid, one primary action per
+  breakpoint and in its place, no `hx-confirm`, motion only from the tokens, raw colours, and the
+  protected-test guard, which fails if a test that enforces a `CLAUDE.md` invariant is edited, skipped
+  or dropped (T1).
+- *Dark mode, built but switched off.* A dark token layer and a codemod pass that moved every
+  utility that would read wrong in dark onto tokens whose light value is the one it replaced (T3);
+  `tools/contrast.py` checks 150 pairs in each theme (T2); charts read the theme (T4); an
+  **Appearance** choice (System, Light, Dark) in the account menu, which says "This page stays light
+  for now." until a screen's gate declares its pages (T5).
+- *Type, spacing, components, motion.* Nothing under 13 px, running text at 16 px on phones and 15 px
+  on desktop, bolder headings (T6); cards at 20 px padding on phones and 24 px from 1024 px, 32 px
+  between a screen's sections, and the 8 px guard (T7); the shared primary action, empty state,
+  inline confirm and status tones (T8); one 200 ms motion token and a reduced-motion check (T9).
+- *Harness.* Visual baselines compared in CI with a frozen clock, the browser job split into one
+  shard per device (T10); Lighthouse per-screen targets and a by-hand CI run for them (T11);
+  before/after pairs and the light diff (T12).
+- *The shell (T13).* The sidebar, header, phone bar, menus, drawer, Go to and toasts are on the 8 px
+  grid, under an `impeccable` audit at 390 and 1440 px.
+
+**Light rendering moved, on purpose.** `pairs:diff` between main (`045978b`) and the end of T12
+(`6f171ee`), light, same data, pixels differing per page: at 390 px calendar 5.91 %, compose 1.11 %,
+create 0.54 %, categories 0.52 %, inbox 0.52 %, saved replies 0.52 %, media 1.19 %, members 1.68 %,
+Home 45.55 %, Activity 28.74 %, Brand 16.62 %, Approvals 2.96 %, Calendar month 5.91 %; at 1440 px
+2.87, 1.57, 0.24, 0.18, 0.18, 0.18, 0.41, 0.54, 13.18, 21.63, 5.92, 0.46 and 2.87 %. Every pair
+was looked at: the movements are F2's type (12 px small text to 13 px, body 16/15 px, the display
+stack and weights, so long pages grow taller: Home 1,813 → 1,917 px at 390) and F3's card padding
+(16 → 20 px on phones). T3 moved light by design in two places no listed page shows (the composer's
+tooltip from ink-800 to the inverse surface, ink-900; the analytics drawer's media-kind badge from
+`bg-ink-900/80` to `bg-scrim/80`, ink-950 at 80 %). The shell's own changes are in the shell pair.
+
+**The shell audit** (`impeccable`, scoped to `base.html`, its includes and the shell's classes; 16/20
+before, 18–20 after on the states audited). Must-fix, all fixed (`288d366`, `364fc61`):
+
+- M1. 98 spacing utilities off the 8 px grid, all in `base.html`; red first
+  (`test_the_shell_spaces_on_the_8px_grid`). Controls (the skip link, switchers, the account button,
+  the phone bar's tabs, the idea dialog's pills, tag menu and emoji search) carry `data-control` and
+  keep 4 and 12 px where they make the control right; layout moved to even steps; nudges (`mt-px`,
+  `mt-0.5`) became geometry. Phone-bar targets stay 56 px tall; nothing overflows at 390.
+- M2. The sidebar had three left edges: the workspace mark, every nav icon and the avatar now start
+  at 20 px at 1440 and in the phone drawer; section labels on the same column (red first).
+- M3. Go to: the field's words and the result rows' words line up.
+- M4. Account menu: four insets became one (16 px for every line of words).
+- M5. Collapsed sidebar at 1440: the account and New menus opened under the page (only their first
+  50 px showed and took clicks); the sidebar now stacks above the page (`lg:z-30`), the workspace
+  menu opens at 220 px, and the collapsed rail no longer jumps on load.
+
+Should, recorded for the screens that own them: the notifications drawer's close button sits on a row
+of its own (S1); the phone bell's count touches the top edge (S2); `.ui-toast` pads 12/14 px (S3);
+the collapsed rail's items are 43 × 34 beside 36 px buttons (S4). Later: L1–L5 in the audit notes
+(copy in title case in the idea dialog, which screen 1 replaces, among them). Seen while measuring,
+not the shell's: on the media page at 390 px the page's own Folders button draws over the open
+drawer.
+
+**Departures, for the owner** (each with its reason):
+
+- T3 (a) `bg-black/NN` stays and is not rewritten to `bg-scrim/NN`: black is the palette lock and
+  does not flip, and the rewrite would move light from `#000` to ink-950 `#0E1114`
+  (`composer/partials/media_list.html:11`, `media_list_pending.html:11`). (b) The select chevrons are
+  a per-theme `--select-chevron` data URI drawn in each theme's tertiary text colour, not a CSS mask.
+  (c) `.hour-bar.is-now` and `.timeline-now` keep ink-900, which flips (14.6:1 on a dark card),
+  instead of the inverse surface (1.32:1 on a dark card). DESIGN_SYSTEM.md §21 explains all three.
+- One contrast pair is accepted under its bar in light: the success-500 icon on the sidebar's
+  ink-100, 2.93:1 against 3:1, the same on main. Light does not move (D2), so it is excepted in light
+  only and passes in dark (`tools/contrast.py` `LIGHT_EXCEPTIONS`). **Please acknowledge.**
+- The four menu panels (workspace, New, the idea dialog's tag menu, account) are marked as controls,
+  so their 4 px padding and separators pass the grid guard, as the select's panel already does. The
+  account panel is the weakest case (an info header and the Appearance group); the alternative is
+  8 px separators and insets inside every panel.
+- Menu rows moved from 10 to 12 px inset in every menu of the app, not only the shell's (2 px; no
+  header was aligned to the old inset, so nothing misaligns).
+- F4's browser acceptance (the floating button never covers the phone bar or a toast) completes at
+  T21 with the first page that has the button.
+- `frontend-design` is not installed; `impeccable`'s shape and audit steps stood in.
+- **Open decision before T22 (Home and Calendar dark):** the selected filter chip. T3 made it the
+  inverse surface, which in dark sits 1.32:1 on a card, so its selected state would rest on weight
+  alone. Keep it, or move it to ink-900 with on-fill text (14.6:1 in dark; light does not move).
+  Recommended: ink-900.
+
+**Code review of Part A** (`engineering:code-review` in three slices: Python and tools, templates
+and front end, CI and harnesses; `requesting-code-review` against the plan's T1–T12; every finding
+then tried by an independent agent instructed to refute it). Nine findings survived, all fixed red
+first and verified independently:
+
+- The protected-test guard hashed only each test's own lines, so a protected test could be turned off
+  without an edit: a skip on its class or module, a rebinding or `del` of its name, a conftest that
+  ignores or deselects it, a changed class fixture or setup method, or one parametrized case dropped.
+  It now also hashes each test's class and module context (`tests/fixtures/protected_context.json`),
+  collects the protected files and refuses a skip, xfail, rebinding or missing item, and pins the 299
+  node ids collected on main (`tests/fixtures/protected_collected.json`), all written once from
+  `045978b` (`da4b145`, `4ff1e35`, `235905e`, `be200db`). The hashes in `protected_tests.json` are
+  unchanged.
+- The template tree did not follow inclusion tags, so a gated Calendar would not have been read
+  where `{% ui_select %}` and `{% status_badge %}` render (off-grid spacing in `ui_select.html` among
+  them); it does now, and a drift check renders Home and Calendar with posts in every state and fails
+  on any template the guards would not read, by the same rule the guards use (`ba53ecc`, `87232f4`,
+  `f41ff89`, `c2b8a09`).
+- In dark, the collapsed sidebar's account button would have hovered at 1.49:1; it now uses the hover
+  border token (4.99:1 in dark, light unchanged), the pair is in the contrast check, and recolor now
+  flags ink-300 fills and white text on a flipping fill in scripts and Python class strings
+  (`4b03611`).
+- The baselines workflow ran the whole suite in writing mode on a blank specs input; CI's Visual job
+  would have skipped (not failed) if every baseline were deleted; a label added to the pull request
+  could replace a pending Lighthouse targets run. All three closed (`77a6853`).
+- The light exception above was not in the plan's list of departures (`0df7a09`).
+
+Refuted (each traced and found not to happen, or deferred by the plan): recolor's scrim threshold,
+white text on 500/600 fills, the frozen clock and `date.today()`, raw colours in the shell's style
+block (T22 clears them), the Lighthouse parser test's comment, the visual write switch keyed on `CI`,
+a missing page-header slot (T16 adds it), and the Visual job's skip before the first baseline.
+
+**Gate evidence.** Code at `c2b8a09ca8d7d9a1f8c15a855a079986ee31210d`; the baseline commit
+`b3cd9ca` and this record's plan line (`0df7a09`) change no code.
+
+- C10, full pytest. [CI run 41375204991](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41375204991)
+  on `c2b8a09`: **6,874 passed, 1 Redis-only skip**, 227 subtests; coverage **42,209/48,272
+  statements (87.44 %)**, above Phase 2's 87.38 %. Locally on `0df7a09` (the same code): **6,874 passed, 1 skip**, in 23 min 21 s.
+- C2 ruff and format clean (912 files); C3 mypy clean (1,006 files); C4 no missing migration; C5 the
+  CSS builds; C6 "recolor: nothing left to do"; C7 68 UI state tests and 36 Lighthouse parser tests
+  pass; C11 150 pairs in each theme, 0 problems (the one light exception above). The protected-test
+  guard: hashes unchanged, context unchanged, every protected test collected as written.
+- C8, every browser spec, locally on `c2b8a09` (Chromium for all three projects, no `CI`, so iPhone
+  13 is Chromium's emulation here, not Safari): **279 passed, 0 failed, 0 flaky, 6 skipped** (golden
+  path 12, TOTP, pending until Phase 4, on each device; and the visual spec, compared in CI only), in
+  28.3 minutes. In CI with `CI=1`, WebKit for iPhone 13, zero retries: every shard green; wall times
+  against the 35-minute limit: desktop-chrome 5 min 58 s, iPhone 13 9 min 1 s, Pixel 7 6 min 16 s
+  (the largest is 26 % of the limit).
+- Baseline: the `visual-baselines` label ran
+  [run 41376000718](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41376000718),
+  which committed `visual: baselines for tests/e2e/visual (run 41376000718)` (`b3cd9ca`: Home, light,
+  on the three projects; each image looked at). The next push's
+  [CI run 41377189571](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41377189571)
+  compared them: **Visual (Playwright) 3 passed**, job 2 min 40 s against its 20-minute limit.
+- Lighthouse, budgets unchanged, every reading inside every budget. CI's Lighthouse job: on
+  `c2b8a09` Home 0.98 / LCP 1,509 ms / CLS 0.073 / lab INP 80 ms, Approvals 0.99 / 1,582 / 0.012 /
+  72, Calendar 0.97 / 1,776 / 0.007 / 88; on `0df7a09` 0.97 / 1,837 / 0.073 / 104, 0.99 / 1,361 /
+  0.012 / 96, 0.96 / 2,098 / 0.007 / 96. C12 (`lighthouse-targets`, the same three):
+  [run 41376147878](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41376147878)
+  Home 0.96 / 1,698 / 0.073 / 152, Approvals 0.97 / 1,544 / 0.012 / 144, Calendar 0.92 / 2,211 /
+  0.007 / 160; [run 41377280052](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41377280052)
+  0.97 / 1,385 / 0.073 / 136, 0.98 / 1,329 / 0.012 / 128, 0.94 / 1,657 / 0.007 / 128. LCP and CLS
+  match CI's within its spread; performance reads 1–5 points lower and lab INP 30–70 ms higher on the
+  targets runs, with blocking time 1.5–2× CI's on byte-identical JavaScript (72,351, 64,215 and
+  81,937 gzip bytes in all four), so the difference is the runner, not the pages: the two steps are
+  the same commands on the same image. gzip JavaScript 64–82 KB against 150 KB. Locally (C9, this
+  machine, two alternating rounds against main `045978b` on its own server): this machine misses the
+  INP budget on main too (main's lab INP 224–296 ms, performance 0.85–0.93), so local numbers are
+  compared with main, not with the budgets. Branch against main, medians: Home 0.92 / 0.92 against
+  0.92 / 0.93, LCP 2,171 / 2,099 against 2,061 / 2,064 ms; Approvals 0.91 / 0.93 against 0.90 /
+  0.85, LCP 2,038 / 2,035 against 2,056 / 2,208 ms; Calendar 0.88 / 0.89 against 0.90 / 0.88, LCP
+  1,564 / 1,534 against 1,377 / 1,401 ms; lab INP 224–336 ms against 224–296 ms. Equal within noise
+  except Calendar's LCP, about 150 ms later than main's in both rounds (gzip JavaScript 81,937
+  against 80,347 bytes; the type floor and card padding make its page taller); in CI it is 1,776–2,098
+  ms against 2,500. Screen 4 rebuilds Calendar and measures it at its own gate.
+- `pairs:diff`: the result above (by design, F2 and F3).
+- Working days: Phase 3's spec and plan landed on 1 Nov at 07:57 UTC; this evidence is from 2 Nov.
+  About two days against F's estimate of about three.
+
+**Owner's sign-off, needed now.** The shell pair (Home, Approvals and Calendar month, light, at 390
+and 1440 px; main on the left, this branch on the right) went to the owner in the session (this
+environment cannot upload images to the pull request; they are never committed). Local Chromium with the local `system-ui`, so not a typeface sign-off: the WebKit type
+pair is in the baseline run's
+[`visual-baselines` artifact](https://github.com/hemantsatishjadhav06-ai/calander-9-/actions/runs/41376000718/artifacts/13110784375)
+(kept until 16 Nov). Also asked: acknowledge the light contrast exception, and choose the selected
+filter chip before T22.
+
+**Result: foundations complete; stopped for the owner's sign-off on the shell.**
+
 ## 1 Nov 2026 — Phase 2: cut and merge, gate passed
 
 Spec [`02-cut-and-merge.md`](02-cut-and-merge.md), plan [`phase-2.md`](phase-2.md), code map
