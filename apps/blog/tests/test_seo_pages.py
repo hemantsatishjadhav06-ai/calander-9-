@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from unittest import mock
+
 import pytest
 from django.core.cache import cache
 from django.urls import reverse
+from django_ratelimit import core as ratelimit_core
 
 from apps.blog.models import BlogPost, BlogPostEvent
 from apps.blog.tests.conftest import approved_post, make_post
@@ -221,5 +224,10 @@ def test_only_the_team_can_start_a_check_up(client, world, role):
 
 def test_the_check_up_button_is_rate_limited(client, world):
     client.force_login(world.editor)
-    codes = [client.post(url("seo_checkup", world)).status_code for _ in range(11)]
+    # django-ratelimit counts in fixed one-minute windows (core._get_window); a burst that straddles a
+    # window's end starts a fresh count and lets the eleventh post through (302 where 403 is due), so
+    # the window is held where it stands for the whole burst.
+    window = ratelimit_core._get_window(str(world.editor.pk), 60)
+    with mock.patch.object(ratelimit_core, "_get_window", return_value=window):
+        codes = [client.post(url("seo_checkup", world)).status_code for _ in range(11)]
     assert codes[:10] == [302] * 10 and codes[10] == 403
