@@ -7,7 +7,8 @@
 // New post button; the sheet in Ask the team and in Write it myself; the idea form in the sheet;
 // Calendar month with the button. The after side names the hooks screen 1 adds (new-post-open,
 // new-post-sheet, new-post-mode-self, new-post-save-idea …), so it fails, writing nothing, until they
-// are on the page. The dark after pair joins at T25, once Home and Calendar are dark-ready (T22).
+// are on the page. The after side also shows each state in dark (`<state>-dark-<project>.png`, T25):
+// Home and Calendar are dark-ready since T22; main has no dark, so the before side is light only.
 //
 //   # before: a server started in a worktree of main (tests/e2e/README.md, Pairs)
 //   E2E_PORT=<main's port> PAIR_SIDE=before npm run pairs -- tests/e2e/pairs/01-new-post.pair.ts
@@ -74,12 +75,16 @@ async function openSheetIdea(page: Page): Promise<void> {
   await expect(page.getByTestId('idea-title')).toBeFocused();
 }
 
-const after: PairState[] = [
+const afterLight: PairState[] = [
   { name: 'home', path: home, hook: 'new-post-open' },
   { name: 'sheet-team', path: home, hook: 'new-post-open', prepare: openSheet },
   { name: 'sheet-self', path: home, hook: 'new-post-open', prepare: openSheetSelf },
   { name: 'idea-form', path: home, hook: 'new-post-open', prepare: openSheetIdea },
   { name: 'calendar-month', path: calendarMonth, hook: 'new-post-open' },
+];
+const after: PairState[] = [
+  ...afterLight,
+  ...afterLight.map((state): PairState => ({ ...state, name: `${state.name}-dark`, scheme: 'dark' })),
 ];
 
 pairTests('01-new-post', { before, after });

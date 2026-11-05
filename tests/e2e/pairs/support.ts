@@ -7,6 +7,7 @@ import { type Page, type TestInfo, expect } from '@playwright/test';
 
 import { PAIRS_DIR, pairMasks, pairRun } from '../../../playwright.pairs.config';
 import type { Harness } from '../support/harness';
+import type { Scheme } from '../support/schemes';
 import { settled } from '../support/settled';
 import { test } from '../support/test';
 import { decodePng } from './compare.cjs';
@@ -21,6 +22,12 @@ export type PairState = {
   hook: string;
   /** Steps after the page is at rest (open a menu, a dialog) before the photograph. */
   prepare?: (page: Page) => Promise<void>;
+  /**
+   * The device's colour scheme, from the first request on; light when left out (the config's). A dark
+   * state's name ends in `-dark`, so its image never takes a light one's place. Only a page declared
+   * dark-ready (apps/common/screens.py DARK_READY) turns dark, so a dark state belongs to an after side.
+   */
+  scheme?: Scheme;
 };
 
 /** The side a pair spec takes: `PAIR_SIDE=before` for main's server, otherwise this branch's. */
@@ -208,10 +215,17 @@ export function pairTests(pair: string, states: Readonly<Record<PairSide, readon
   const side = pairSide();
   test.describe(side === 'before' ? 'before: main' : 'after: this branch', () => {
     for (const state of states[side]) {
-      test(state.name, async ({ page, as, harness }, testInfo) => {
-        await as('owner');
-        await ensurePairData(page, harness);
-        await shootState(page, testInfo, { pair, side, state, workspace: harness.ids.workspace_a });
+      const scheme = state.scheme ?? 'light';
+      if ((scheme === 'dark') !== state.name.endsWith('-dark')) {
+        throw new Error(`${pair} ${state.name}: a dark state's name ends in -dark, and only a dark state's does`);
+      }
+      test.describe(`${scheme} scheme`, () => {
+        test.use({ colorScheme: scheme });
+        test(state.name, async ({ page, as, harness }, testInfo) => {
+          await as('owner');
+          await ensurePairData(page, harness);
+          await shootState(page, testInfo, { pair, side, state, workspace: harness.ids.workspace_a });
+        });
       });
     }
   });

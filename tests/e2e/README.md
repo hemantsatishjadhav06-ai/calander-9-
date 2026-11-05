@@ -271,8 +271,10 @@ E2E_PORT=8221 DB_NAME=smbean_p3_e2e npm run pairs -- tests/e2e/pairs/00-shell.pa
 
 `npm run pairs` writes `test-results/pairs/<pair>/<side>/<state>-<project>.png`: the screen at
 390 × 844 (`pair-390`, iPhone 13) and 1440 × 900 (`pair-1440`, Desktop Chrome), light, as the device
-shows it, with nothing masked: the owner signs the pair off, so Home's greeting, today's date and
-every time show as they render (a state fails if its image holds the mask colour). The before side
+shows it (a state with `scheme: 'dark'` is photographed with the device dark and named
+`<state>-dark`; `01-new-post` has a dark after side, since its pages are dark-ready), with nothing
+masked: the owner signs the pair off, so Home's greeting, today's date and every time show as they
+render (a state fails if its image holds the mask colour). The before side
 starts no server (one must be listening on `E2E_PORT`); the after side starts this branch's with
 `--reset` when none is. Each state names a `hook`, a test id the page must show: a state whose hook
 is missing fails and writes nothing, so an *after* never shows a screen that has not been built yet.
