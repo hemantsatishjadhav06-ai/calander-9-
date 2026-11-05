@@ -15,6 +15,8 @@
 //     and what was typed is still there.
 //   - After a refusal the focus is back on the button that was pressed (Send; Save idea), not on the
 //     page behind the dialog.
+//   - A control the keyboard reaches is never hidden under the sheet's sticky header or decision bar
+//     (WCAG 2.4.11), at the device's size and in a short window under 1024 px.
 //   - Closing and reopening keeps what was typed.
 //   - An editor sees the button; a viewer and a plain client do not, and the client's direct POST to
 //     studio:create answers 403 and makes nothing.
@@ -222,6 +224,60 @@ test('after a refusal the focus is back on the button that was pressed: Send, th
   await expect(page.getByTestId('new-post-idea-error')).toHaveText(refusal);
   await expect(save).toBeEnabled();
   await expect(save, 'the focus is back on Save idea').toBeFocused();
+});
+
+/**
+ * Tab through the open sheet once, from Your idea back round to it, and name each control that took the
+ * focus while none of it showed between the sheet's sticky header and its sticky decision bar (and
+ * inside the sheet). A control in the header or the bar is never covered by them.
+ */
+async function hiddenWhenFocused(page: Page): Promise<string[]> {
+  const hidden: string[] = [];
+  await page.getByTestId('new-post-team-idea').focus();
+  for (let step = 0; step < 40; step += 1) {
+    await page.keyboard.press('Tab');
+    // The browser scrolls the control into view as it takes the focus; let a frame pass for the rest.
+    await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+    const seen = await page.evaluate(() => {
+      const control = document.activeElement as HTMLElement | null;
+      const sheet = document.getElementById('new-post-sheet');
+      if (!control || !sheet) return { name: 'nothing', shown: 0, done: true };
+      const name = control.getAttribute('data-testid') || control.getAttribute('name') || control.tagName.toLowerCase();
+      if (control.getAttribute('data-testid') === 'new-post-team-idea') return { name, shown: 1, done: true };
+      const sticky = sheet.querySelector(':scope > .sticky');
+      const bar = Array.from(sheet.querySelectorAll('[data-decision-bar]')).find((element) => element.getClientRects().length);
+      if ((sticky && sticky.contains(control)) || (bar && bar.contains(control))) return { name, shown: 1, done: false };
+      const box = control.getBoundingClientRect();
+      const frame = sheet.getBoundingClientRect();
+      const top = Math.max(frame.top, sticky ? sticky.getBoundingClientRect().bottom : frame.top);
+      const bottom = Math.min(frame.bottom, bar ? bar.getBoundingClientRect().top : frame.bottom);
+      return { name, shown: Math.min(box.bottom, bottom) - Math.max(box.top, top), done: false };
+    });
+    if (seen.done) break;
+    if (seen.shown <= 0) hidden.push(seen.name);
+  }
+  return hidden;
+}
+
+test('a control the keyboard reaches is never hidden under the sheet’s header or decision bar', async ({ page, as, harness }) => {
+  // WCAG 2.2, 2.4.11: the sheet scrolls between a sticky header (the title and the two ways to start)
+  // and a sticky decision bar, so each control Tab reaches must come clear of both. Checked at the
+  // device's own size and in a short window under 1024 px (a phone held sideways, or a laptop zoomed to
+  // 200 %), where the bottom sheet leaves the form the least room. More is open, so its fields count.
+  await as('owner');
+  for (const size of [page.viewportSize()!, { width: 844, height: 390 }]) {
+    await page.setViewportSize(size);
+    const button = await ready(page, home(harness.ids.workspace_a));
+    // By keyboard: this test is about the keyboard's reach (and desktop-chrome has no touch to tap with).
+    await button.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: 'New post' })).toBeVisible();
+    await expect(page.getByTestId('new-post-team-idea')).toBeFocused();
+    await page.locator('[data-testid="new-post-team"] details').evaluate((details) => {
+      (details as HTMLDetailsElement).open = true;
+    });
+    expect(await hiddenWhenFocused(page), `hidden under the header or the bar at ${size.width} x ${size.height}`).toEqual([]);
+  }
 });
 
 test('closing and reopening the sheet keeps what was typed', async ({ page, as, harness }) => {

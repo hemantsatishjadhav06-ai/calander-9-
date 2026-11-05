@@ -155,7 +155,7 @@ everything. Context: workspace, features, idea_columns, idea_tags.
         {% endif %}
     </div>
 
-    <div data-decision-bar class="order-3 sticky bottom-0 z-10 border-t border-ink-200 bg-surface px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))] lg:px-6 lg:pb-6">
+    <div data-decision-bar data-sheet-foot class="order-3 sticky bottom-0 z-10 border-t border-ink-200 bg-surface px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))] lg:px-6 lg:pb-6">
         <div class="flex items-start gap-2 text-danger-500 mb-2 has-[[role=alert]:empty]:mb-0">
             <p id="new-post-idea-error" data-testid="new-post-idea-error" role="alert" class="peer order-2 min-w-0 flex-1 text-small" x-text="ideaError"></p>
             <svg aria-hidden="true" class="order-1 h-[18px] w-[14px] shrink-0 peer-empty:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>

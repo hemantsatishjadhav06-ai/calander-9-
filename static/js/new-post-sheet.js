@@ -21,6 +21,11 @@
  *   that was pressed when it fell out of the sheet: each is disabled while its request is in flight, and
  *   a focused button that is disabled drops the focus to the page behind the dialog (WCAG 2.4.3). The
  *   error line is heard through its role="alert".
+ * - Keeps a control the keyboard reaches clear of the dialog's sticky header (data-sheet-head) and the
+ *   shown panel's sticky decision bar (data-sheet-foot), which would otherwise cover it, wholly on a short
+ *   screen (WCAG 2.4.11): the dialog's scroll padding follows their heights (a ResizeObserver: a mode's
+ *   bar, the error line, a new window size), and once a control has the focus, a frame later, the dialog
+ *   scrolls it clear if the browser left it under either.
  * - editorUrl(base): Open the editor's address, composer:compose with the date, time and account the
  *   sheet was opened with (only those, only when given); opening from the button carries none.
  *
@@ -51,6 +56,10 @@
   var EDITOR_FIELDS = [['account', 'account'], ['scheduled_date', 'date'], ['scheduled_time', 'time']];
   var IDEA_FORM = '[data-testid="new-post-idea"]';
   var TEAM_FORM = '[data-testid="new-post-team"]';
+  var DIALOG = '[data-testid="new-post-sheet"]';
+  /** The dialog's sticky header, and each panel's sticky decision bar (one shows at a time). */
+  var HEAD = '[data-sheet-head]';
+  var FOOT = '[data-sheet-foot]';
   /** How long, after opening from the phone drawer, the field may take back the focus the drawer returns. */
   var DRAWER_HANDBACK_MS = 300;
   /** How many frames the field waits for the dialog to show before it settles for what shows. */
@@ -241,6 +250,18 @@
           if (event.detail && event.detail.successful) return;
           var form = event.target && event.target.closest && event.target.closest(TEAM_FORM);
           if (form) sheet.returnFocus(form.querySelector('button[type="submit"]'));
+        });
+        // Keyboard reach (WCAG 2.4.11): the scroll padding follows the sticky parts, and a control that
+        // took the focus under one of them is scrolled clear a frame later (see keepClear and reveal).
+        if (typeof window.ResizeObserver === 'function') {
+          var observer = new window.ResizeObserver(function () { sheet.keepClear(); });
+          root.querySelectorAll(HEAD + ', ' + FOOT).forEach(function (part) { observer.observe(part); });
+        }
+        root.addEventListener('focusin', function (event) {
+          var control = event.target;
+          if (typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(function () { sheet.reveal(control); });
+          }
         });
         if (window.location.hash === HASH) this.$nextTick(function () { sheet.open({}); });
       },
@@ -493,6 +514,44 @@
         button.focus();
       },
 
+      /** The dialog, its sticky header and the shown panel's sticky decision bar (none while closed). */
+      _stickyParts: function () {
+        var dialog = root && root.querySelector(DIALOG);
+        return {
+          dialog: dialog,
+          head: dialog && dialog.querySelector(HEAD),
+          foot: dialog && Array.prototype.find.call(dialog.querySelectorAll(FOOT), visible),
+        };
+      },
+
+      /** Keep the dialog's scroll padding equal to its sticky header and the shown decision bar. */
+      keepClear: function () {
+        var parts = this._stickyParts();
+        if (!parts.dialog) return;
+        parts.dialog.style.scrollPaddingTop = (parts.head && visible(parts.head) ? parts.head.offsetHeight : 0) + 'px';
+        parts.dialog.style.scrollPaddingBottom = (parts.foot ? parts.foot.offsetHeight : 0) + 'px';
+      },
+
+      /**
+       * Scroll `control` clear of the sticky header and the shown decision bar if the browser left it
+       * under one of them: its bottom up above the bar, never past its own top, or its top down below
+       * the header. A control in either, or in a dialog of its own over the sheet (Create new tag), is
+       * left alone.
+       */
+      reveal: function (control) {
+        var parts = this._stickyParts();
+        var dialog = parts.dialog;
+        if (!this.sheetOpen || !dialog || !control || control !== document.activeElement || !visible(control)) return;
+        if (control.closest('[role="dialog"]') !== dialog) return;
+        if ((parts.head && parts.head.contains(control)) || (parts.foot && parts.foot.contains(control))) return;
+        var frame = dialog.getBoundingClientRect();
+        var top = parts.head && visible(parts.head) ? parts.head.getBoundingClientRect().bottom : frame.top;
+        var bottom = parts.foot ? parts.foot.getBoundingClientRect().top : frame.bottom;
+        var box = control.getBoundingClientRect();
+        if (box.bottom > bottom) dialog.scrollTop += Math.max(0, Math.min(box.bottom - bottom, box.top - top));
+        else if (box.top < top) dialog.scrollTop -= top - box.top;
+      },
+
       expanded: function (value) {
         document.querySelectorAll(TRIGGER).forEach(function (trigger) {
           trigger.setAttribute('aria-expanded', value ? 'true' : 'false');
@@ -536,6 +595,7 @@
           }
           if (!visible(target)) target = root.querySelector('[data-testid="new-post-close"]');
           if (!target) return;
+          sheet.keepClear();
           target.focus();
           if (afterDrawer) sheet._reclaimFocus(target);
         });

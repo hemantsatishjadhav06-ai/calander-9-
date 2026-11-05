@@ -20,7 +20,7 @@ column through the panel's display: contents, as Ask the team's do. Context: wor
     {% endif %}
 </div>
 
-<div data-decision-bar class="order-3 sticky bottom-0 z-10 border-t border-ink-200 bg-surface px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))] lg:px-6 lg:pb-6">
+<div data-decision-bar data-sheet-foot class="order-3 sticky bottom-0 z-10 border-t border-ink-200 bg-surface px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))] lg:px-6 lg:pb-6">
     <div class="flex items-center justify-end gap-4">
         <a href="{{ compose_url }}" :href="editorUrl('{{ compose_url }}')" data-testid="new-post-self-open" class="ui-btn ui-btn-primary shrink-0">Open the editor</a>
     </div>

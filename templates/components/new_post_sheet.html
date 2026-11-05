@@ -15,10 +15,12 @@ motion), and the scrim fades on the same tokens. Light only until its pages are 
 The heading names the dialog through a static aria-labelledby (the a11y sweep reads only static labels);
 its words follow the view: "New post", or "New idea" for the idea form.
 
-Layout: the dialog is the scroller. Its header sticks to the top and each panel's decision bar to the
-bottom. A panel (data-view: team, self, idea; one view each for the one-primary counter) is display:
-contents, so its body (order-1), the foot links (order-2) and its bar (order-3) line up in the dialog's
-column while each panel stays one element.
+Layout: the dialog is the scroller. Its header (data-sheet-head) sticks to the top and each panel's
+decision bar (data-sheet-foot) to the bottom; the script keeps the dialog's scroll padding equal to the
+two, so a control the keyboard reaches scrolls clear of both (WCAG 2.4.11). A panel (data-view: team,
+self, idea; one view each for the one-primary counter) is display: contents, so its body (order-1), the
+foot links (order-2) and its bar (order-3) line up in the dialog's column while each panel stays one
+element.
 
 The overlay never blocks the page while closed (pointer-events-none; only its open children take
 events), so the scrim and the dialog can each run their own leave transition.
@@ -36,7 +38,7 @@ its idea form; the shell's New menu and New idea dialog that did so went with T1
          x-transition:enter="motion-sheet-enter" x-transition:enter-start="motion-sheet-out" x-transition:enter-end="motion-sheet-in"
          x-transition:leave="motion-sheet-leave" x-transition:leave-start="motion-sheet-in" x-transition:leave-end="motion-sheet-out"
          class="relative pointer-events-auto flex flex-col w-full max-h-[92vh] overflow-y-auto overscroll-contain rounded-t-2xl bg-surface shadow-xl lg:h-full lg:max-h-none lg:w-[480px] lg:rounded-none lg:border-l lg:border-ink-200">
-        <div class="sticky top-0 z-10 bg-surface px-4 pb-4 lg:px-6 lg:pt-6">
+        <div data-sheet-head class="sticky top-0 z-10 bg-surface px-4 pb-4 lg:px-6 lg:pt-6">
             <div data-sheet-grabber aria-hidden="true" class="mx-auto mt-2 mb-4 h-[5px] w-9 rounded-full bg-line-strong lg:hidden"></div>
             <div class="flex items-center justify-between gap-4">
                 <h2 id="new-post-title" class="text-h2 text-ink-950" x-text="sheetMode === 'idea' ? 'New idea' : 'New post'">New post</h2>
