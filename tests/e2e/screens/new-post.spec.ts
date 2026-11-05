@@ -280,6 +280,35 @@ test('a control the keyboard reaches is never hidden under the sheet’s header 
   }
 });
 
+test('switching to Save it as an idea leaves the title, its label and the sheet where they were', async ({ page, as, harness }) => {
+  // The first field of a mode takes the focus at the top of its panel, already clear of the header, so
+  // nothing may scroll: CI's iPhone 13 (WebKit) once scrolled the sheet so the field met the header's
+  // edge, the Title label under it and the field's top cut off (a scroll padding the sheet no longer sets).
+  await as('owner');
+  await ready(page, home(harness.ids.workspace_a));
+  await openSheet(page);
+  await press(page, page.getByTestId('new-post-save-idea'));
+  await expect(page.getByRole('dialog', { name: 'New idea' })).toBeVisible();
+  await expect(page.getByTestId('idea-title')).toBeFocused();
+  // Two frames: the sheet's own scrolling (reveal) runs a frame after the focus.
+  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  const placed = await page.evaluate(() => {
+    const sheet = document.getElementById('new-post-sheet') as HTMLElement;
+    const head = sheet.querySelector('[data-sheet-head]') as HTMLElement;
+    const label = sheet.querySelector('label[for="new-post-idea-title"]') as HTMLElement;
+    const field = document.querySelector('[data-testid="idea-title"]') as HTMLElement;
+    const below = head.getBoundingClientRect().bottom;
+    return {
+      scrollTop: sheet.scrollTop,
+      labelClear: label.getBoundingClientRect().top - below,
+      fieldClear: field.getBoundingClientRect().top - below,
+    };
+  });
+  expect(placed.scrollTop, 'the sheet did not scroll').toBe(0);
+  expect(placed.labelClear, 'the Title label shows below the header').toBeGreaterThanOrEqual(0);
+  expect(placed.fieldClear, 'the title field shows below the header').toBeGreaterThan(0);
+});
+
 test('closing and reopening the sheet keeps what was typed', async ({ page, as, harness }) => {
   await as('owner');
   const button = await ready(page, home(harness.ids.workspace_a));
