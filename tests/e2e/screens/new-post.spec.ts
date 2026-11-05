@@ -13,6 +13,8 @@
 //     chat job and no brief (nothing is made before Go ahead).
 //   - Over budget, the sheet's own sentence shows in its error line, no toast shows, nothing is made
 //     and what was typed is still there.
+//   - After a refusal the focus is back on the button that was pressed (Send; Save idea), not on the
+//     page behind the dialog.
 //   - Closing and reopening keeps what was typed.
 //   - An editor sees the button; a viewer and a plain client do not, and the client's direct POST to
 //     studio:create answers 403 and makes nothing.
@@ -178,6 +180,48 @@ test("over budget, the sheet's own sentence shows in its error line, no toast, n
   await expect(field, 'what was typed is still there').toHaveValue(idea);
   expect(new URL(page.url()).pathname, 'still on Home').toBe(home(workspace));
   expect(await harness.probe<Outcome>('new_post_outcome', { workspace_id: workspace, since })).toEqual(NOTHING);
+});
+
+test('after a refusal the focus is back on the button that was pressed: Send, then Save idea', async ({ page, as, harness }) => {
+  // Send and Save idea are disabled while their request is in flight, and a focused button that is
+  // disabled drops the focus to the page behind the dialog. A refusal must give it back to the button
+  // (WCAG 2.4.3): the error line is heard (role="alert"), and the keyboard is where it was, ready to try
+  // again, instead of starting over at the top of the sheet.
+  const made = await harness.fixture<TeamWorkspace>('team_workspace', {});
+  const workspace = made.workspace_id;
+  await harness.fixture('workspace_over_budget', { workspace_id: workspace });
+  await as({ email: made.users.owner.email });
+  await ready(page, home(workspace));
+  await openSheet(page);
+  await page.getByTestId('new-post-team-idea').fill(`E2E refused ${Date.now()}: a post about the site office`);
+
+  const send = page.getByTestId('new-post-team-send');
+  await send.focus();
+  const refused = page.waitForResponse(
+    (response) => response.request().method() === 'POST' && new URL(response.url()).pathname === `${home(workspace)}new/`,
+  );
+  await page.keyboard.press('Enter');
+  expect((await refused).status()).toBe(400);
+  await expect(page.getByTestId('new-post-team-error')).toHaveText(ALLOWANCE_USED);
+  await expect(send).toBeEnabled();
+  await expect(send, 'the focus is back on Send').toBeFocused();
+
+  // Save it as an idea, refused by the server (answered here, so nothing is saved).
+  await page.getByTestId('new-post-save-idea').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'New idea' })).toBeVisible();
+  await expect(page.getByTestId('idea-title')).toBeFocused();
+  await page.getByTestId('idea-title').fill('E2E refused idea');
+  const refusal = 'That column is gone. Choose another.';
+  await page.route(`**/workspace/${workspace}/ideas/create/`, (route) =>
+    route.fulfill({ status: 400, contentType: 'text/plain', body: refusal }),
+  );
+  const save = page.getByTestId('idea-save');
+  await save.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('new-post-idea-error')).toHaveText(refusal);
+  await expect(save).toBeEnabled();
+  await expect(save, 'the focus is back on Save idea').toBeFocused();
 });
 
 test('closing and reopening the sheet keeps what was typed', async ({ page, as, harness }) => {

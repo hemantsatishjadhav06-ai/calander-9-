@@ -17,6 +17,10 @@
  * - Keeps what was typed: closing only hides the sheet.
  * - Sets `has-sheet` on body while open, and keeps the button's aria-expanded current.
  * - Clears the Ask the team error line as a new request starts (the page writes a refusal there).
+ * - After a refusal (Ask the team's Send, the idea form's Save idea), gives the focus back to the button
+ *   that was pressed when it fell out of the sheet: each is disabled while its request is in flight, and
+ *   a focused button that is disabled drops the focus to the page behind the dialog (WCAG 2.4.3). The
+ *   error line is heard through its role="alert".
  * - editorUrl(base): Open the editor's address, composer:compose with the date, time and account the
  *   sheet was opened with (only those, only when given); opening from the button carries none.
  *
@@ -46,6 +50,7 @@
   /** What Open the editor carries, as the composer reads it, in the order a channel slot's own link has. */
   var EDITOR_FIELDS = [['account', 'account'], ['scheduled_date', 'date'], ['scheduled_time', 'time']];
   var IDEA_FORM = '[data-testid="new-post-idea"]';
+  var TEAM_FORM = '[data-testid="new-post-team"]';
   /** How long, after opening from the phone drawer, the field may take back the focus the drawer returns. */
   var DRAWER_HANDBACK_MS = 300;
   /** How many frames the field waits for the dialog to show before it settles for what shows. */
@@ -227,9 +232,15 @@
           if (window.location.hash === HASH) sheet.open({});
         });
         root.addEventListener('htmx:beforeRequest', function (event) {
-          var form = event.target && event.target.closest && event.target.closest('[data-testid="new-post-team"]');
+          var form = event.target && event.target.closest && event.target.closest(TEAM_FORM);
           var error = form && form.querySelector('#new-post-team-error');
           if (error) error.textContent = '';
+        });
+        // htmx gives Send back (hx-disabled-elt) before it fires this, so the button can take the focus.
+        root.addEventListener('htmx:afterRequest', function (event) {
+          if (event.detail && event.detail.successful) return;
+          var form = event.target && event.target.closest && event.target.closest(TEAM_FORM);
+          if (form) sheet.returnFocus(form.querySelector('button[type="submit"]'));
         });
         if (window.location.hash === HASH) this.$nextTick(function () { sheet.open({}); });
       },
@@ -447,6 +458,8 @@
           sheet.ideaSaving = false;
           if (!result.ok) {
             sheet.ideaError = result.message;
+            // Save idea is enabled again once Alpine has applied ideaSaving.
+            sheet.$nextTick(function () { sheet.returnFocus(form.querySelector('button[type="submit"]')); });
             return false;
           }
           sheet.resetIdea(form);
@@ -467,6 +480,17 @@
         this.emojiPickerOpen = false;
         this._emojiSearch = '';
         this.closeTagDialog();
+      },
+
+      /**
+       * After a refusal, put the focus back on `button` (the one that was pressed) if it fell out of the
+       * sheet while the button was disabled; a focus the person has moved within the sheet stays.
+       */
+      returnFocus: function (button) {
+        if (!this.sheetOpen || !root || !button || button.disabled || !visible(button)) return;
+        var active = document.activeElement;
+        if (active && active !== document.body && root.contains(active)) return;
+        button.focus();
       },
 
       expanded: function (value) {
