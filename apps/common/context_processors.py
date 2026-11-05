@@ -1,9 +1,10 @@
 """Context processors for sidebar and global template data."""
 
 from django.conf import settings
+from django.urls import reverse
 from django.utils.functional import SimpleLazyObject
 
-from apps.common import navigation
+from apps.common import navigation, screens
 from apps.common.features import features_for, request_features
 
 
@@ -52,13 +53,25 @@ def _platform_availability():
     return {"LIVE_PLATFORM_NAMES": live, "COMING_SOON_PLATFORM_NAMES": soon}
 
 
+def theme_context(request):
+    """``theme_ready``: whether this page is declared dark-ready (``screens.DARK_READY``).
+
+    ``base.html`` and the portal's base put ``data-theme-ready`` on ``<html>`` only then, so a page
+    renders exactly as before until its screen's gate declares it. It reads the resolved URL alone
+    (no query: it runs on every render, HTMX fragments included) and reads the registry when called,
+    so a test or the e2e harness can patch ``screens.DARK_READY``.
+    """
+    match = getattr(request, "resolver_match", None)
+    page = (match.app_name, match.url_name) if match is not None else None
+    return {"theme_ready": page in screens.DARK_READY}
+
+
 def sidebar_context(request):
     """Inject sidebar data into every template context.
 
     Provides:
         sidebar_workspaces: list of workspace objects the user belongs to
         sidebar_unread_inbox_count, sidebar_pending_approvals: the badges
-        sidebar_idea_columns, sidebar_idea_tags: the quick-create idea modal
         features: the current workspace's switches (``features_for``), read
             once per request and only when a template asks; every default,
             without a lookup, when there is no workspace
@@ -66,6 +79,10 @@ def sidebar_context(request):
             command palette's destinations (``navigation.build_palette``), built
             from these values when a template first reads them, so a page builds
             them once and an HTMX fragment, which never reads them, never does
+        new_post_url: where the ``n`` shortcut goes from a page without the New
+            post sheet (``static/js/shortcuts.js``): Home's ``#new-post`` for
+            whoever may start posts (``apps.studio.views.can_start_posts``), else
+            empty; worked out only when a template reads it
     """
     if not hasattr(request, "user") or not request.user.is_authenticated:
         return {}
@@ -112,15 +129,8 @@ def sidebar_context(request):
             .count()
         )
 
-    # Idea columns and tags for the quick-create modal in the sidebar
-    sidebar_idea_columns = []
-    sidebar_idea_tags = []
-    if workspace:
-        from apps.composer.models import IdeaGroup, Tag
-
-        groups = IdeaGroup.objects.for_workspace(workspace.id).order_by("position", "created_at")
-        sidebar_idea_columns = [{"id": str(g.id), "label": g.name} for g in groups] if groups.exists() else []
-        sidebar_idea_tags = list(Tag.objects.for_workspace(workspace.id).values_list("name", flat=True))
+    # The idea form's columns and tags are the New post sheet's: Home and Calendar read them for whoever
+    # gets the sheet (``apps.composer.ideas.idea_form_context``), not on every render here.
 
     # Workspace creation permission (org owners and admins only)
     can_create_workspace = False
@@ -138,11 +148,19 @@ def sidebar_context(request):
         "can_create_workspace": can_create_workspace,
         "sidebar_unread_inbox_count": sidebar_unread_inbox_count,
         "sidebar_pending_approvals": sidebar_pending_approvals,
-        "sidebar_idea_columns": sidebar_idea_columns,
-        "sidebar_idea_tags": sidebar_idea_tags,
         "analytics_enabled_platforms": analytics_enabled_platforms,
     }
     nav = SimpleLazyObject(lambda: navigation.build_nav(request, values))
     values["nav"] = nav
     values["nav_palette"] = SimpleLazyObject(lambda: navigation.build_palette(request, nav))
+    values["new_post_url"] = SimpleLazyObject(lambda: _new_post_url(request, workspace))
     return values
+
+
+def _new_post_url(request, workspace) -> str:
+    """Home's ``#new-post`` (the sheet opens on it) for whoever may start posts, else ``""``."""
+    from apps.studio.views import can_start_posts
+
+    if workspace is None or not can_start_posts(getattr(request, "workspace_membership", None)):
+        return ""
+    return reverse("studio:index", kwargs={"workspace_id": workspace.id}) + "#new-post"

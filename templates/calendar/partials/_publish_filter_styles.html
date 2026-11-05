@@ -8,7 +8,7 @@ so a Tailwind utility on the same element still wins. Shared by the Publish page
         height: 32px; padding: 0 10px; border-radius: 8px;
         font-size: 13px; font-weight: 500;
         color: var(--ink-800); background: var(--surface-0);
-        border: 1px solid var(--ink-300);
+        border: 1px solid var(--border-hover);
         box-shadow: var(--shadow-xs);
         cursor: pointer; white-space: nowrap; flex-shrink: 0;
         transition: border-color var(--dur-instant) var(--ease-out), background-color var(--dur-instant) var(--ease-out);
@@ -26,17 +26,18 @@ so a Tailwind utility on the same element still wins. Shared by the Publish page
     .cal-filters-scroll { scrollbar-width: none; }
     .cal-filters-scroll::-webkit-scrollbar { display: none; }
 
-    /* Platform icon tiles (filter menus) */
-    .pi-facebook   { background: #1877F2; }
-    .pi-instagram  { background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF); }
-    .pi-linkedin   { background: #0A66C2; }
-    .pi-linkedin_personal { background: #0A66C2; }
-    .pi-linkedin_company  { background: #0A66C2; }
-    .pi-tiktok     { background: #010101; }
-    .pi-youtube    { background: #FF0000; }
-    .pi-pinterest  { background: #E60023; }
-    .pi-threads    { background: #000000; }
-    .pi-bluesky    { background: #0085FF; }
-    .pi-google_business { background: #4285F4; }
-    .pi-mastodon   { background: #6364FF; }
-    .pi-x          { background: #000000; }
+    /* Platform icon tiles (filter menus): each platform's own colour, content as a platform glyph is,
+       the same in both themes (CLAUDE.md, Design system), so each line is a recolor: keep. */
+    .pi-facebook   { background: #1877F2; }  /* recolor: keep */
+    .pi-instagram  { background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF); }  /* recolor: keep */
+    .pi-linkedin   { background: #0A66C2; }  /* recolor: keep */
+    .pi-linkedin_personal { background: #0A66C2; }  /* recolor: keep */
+    .pi-linkedin_company  { background: #0A66C2; }  /* recolor: keep */
+    .pi-tiktok     { background: #010101; }  /* recolor: keep */
+    .pi-youtube    { background: #FF0000; }  /* recolor: keep */
+    .pi-pinterest  { background: #E60023; }  /* recolor: keep */
+    .pi-threads    { background: #000000; }  /* recolor: keep */
+    .pi-bluesky    { background: #0085FF; }  /* recolor: keep */
+    .pi-google_business { background: #4285F4; }  /* recolor: keep */
+    .pi-mastodon   { background: #6364FF; }  /* recolor: keep */
+    .pi-x          { background: #000000; }  /* recolor: keep */

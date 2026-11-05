@@ -6,10 +6,22 @@
 //
 // One worker: the suite shares one server and one database. Each test makes its own rows through
 // fixtures, so the order does not matter. See tests/e2e/README.md.
+//
+// tests/e2e/visual/ compares screenshots with the baselines under tests/e2e/__screenshots__/ only when
+// E2E_VISUAL=1 (CI's visual job and the baseline workflow); elsewhere those specs skip, saying why.
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * Whether a run writes baselines: only the baseline workflow (.github/workflows/visual-baselines.yml),
+ * which sets CI, E2E_VISUAL=1 and E2E_UPDATE_BASELINES=1 together. Every other run, a local `CI=1`
+ * run included, compares at most and never writes (spec D9).
+ */
+export function updateSnapshotsFor(env: Record<string, string | undefined>): 'all' | 'none' {
+  return env.CI && env.E2E_VISUAL === '1' && env.E2E_UPDATE_BASELINES === '1' ? 'all' : 'none';
+}
 
 const port = Number(process.env.E2E_PORT || 8150);
 const baseURL = `http://127.0.0.1:${port}`;
@@ -27,6 +39,8 @@ export default defineConfig({
   globalSetup: './tests/e2e/support/global-setup.ts',
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}-{projectName}{ext}',
+  // Never 'missing' (Playwright's default), which would write a baseline wherever one is absent.
+  updateSnapshots: updateSnapshotsFor(process.env),
   expect: {
     toHaveScreenshot: { maxDiffPixelRatio: 0.001 },
   },

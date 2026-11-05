@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{% if theme_ready %} data-theme-ready{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +11,9 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
     <link rel="manifest" href="{% static 'favicon/site.webmanifest' %}">
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
+    <script nonce="{{ request.csp_nonce }}">
+        {% include "components/theme_script.html" %}
+    </script>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="min-h-screen bg-ink-50 text-ink-900">
@@ -20,18 +23,18 @@
             event.detail.headers['X-CSRFToken'] = document.querySelector('[name=csrfmiddlewaretoken]').value;
         });
     </script>
-    <a href="#portal-main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-ink-900 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white">Skip to content</a>
+    <a href="#portal-main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-ink-900 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-on-fill">Skip to content</a>
 
     {% with url_name=request.resolver_match.url_name %}
     <!-- Top bar: the agency's mark and the client's workspace, then the sections as underline tabs -->
-    <header class="sticky top-0 z-30 border-b border-ink-200 bg-white">
+    <header class="sticky top-0 z-30 border-b border-ink-200 bg-surface">
         <div class="mx-auto max-w-[960px] px-4 sm:px-6">
             <div class="flex h-14 items-center justify-between gap-3">
                 <div class="flex min-w-0 items-center gap-2.5">
                     {% if workspace.organization.logo_url %}
                     <img src="{{ workspace.organization.logo_url }}" alt="" class="h-7 w-auto">
                     {% else %}
-                    <div class="flex size-7 flex-shrink-0 items-center justify-center rounded-[7px] bg-ink-900 text-[13px] font-semibold text-white" aria-hidden="true">
+                    <div class="flex size-7 flex-shrink-0 items-center justify-center rounded-[7px] bg-inverse text-[13px] font-semibold text-on-inverse" aria-hidden="true">
                         {{ workspace.name|make_list|first|upper }}
                     </div>
                     {% endif %}

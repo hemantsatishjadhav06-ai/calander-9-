@@ -49,6 +49,16 @@ def status_badge(status, label=""):
 
 
 @register.filter
+def status_tone(status):
+    """The status's tone (one of the five), for a list row's ``data-tone`` status border (spec D6).
+
+    Read from ``STATUS_META``, the same mapping as the pill, so the border and the pill never disagree;
+    an unknown status is a draft's, neutral, as the pill shows it.
+    """
+    return STATUS_META.get(status, STATUS_META["draft"])["tone"]
+
+
+@register.filter
 def status_label(status):
     """The status word alone (sentence case, from the fixed list), for text that is not a pill."""
     meta = STATUS_META.get(status)

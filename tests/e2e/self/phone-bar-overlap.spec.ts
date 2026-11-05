@@ -9,6 +9,11 @@ import { expect, test } from '../support/test';
 // nothing covers it or hides under it. Desktop has no bar and keeps its places (24px from the bottom).
 // The post page and the composer have no phone bar (their own bar takes the bottom); see
 // apps/common/tests/test_navigation_render.py.
+//
+// New post (screen 1, spec D5; components/primary_action.html) floats above the phone bar on Home and
+// Calendar on a phone and sits in the page header's slot from 1024 px. The toasts ride above it (the
+// page sets has-fab on body, which lifts them, styles.css), and it hides while posts are selected, so
+// it never covers a toast or a selection bar.
 
 const DESKTOP_GAP = 24;
 
@@ -64,6 +69,103 @@ async function approvalToast(page: Page) {
   await settled(host, 'the approval toast');
   return host;
 }
+
+/**
+ * New post in its place: on a phone it floats (fixed) and ends above the phone bar; on desktop it is in
+ * the flow of the page header's slot, near the top of the page. Either way it is the slot's button.
+ */
+async function newPostInItsPlace(page: Page): Promise<Locator> {
+  const button = page.getByTestId('new-post-open');
+  await expect(button, 'New post is shown').toBeVisible();
+  await expect(page.locator('[data-primary-slot="header"]').getByTestId('new-post-open'), 'the header slot holds New post').toHaveCount(1);
+  const position = await button.evaluate((element) => getComputedStyle(element).position);
+  if (isPhone(page)) {
+    expect(position, 'New post floats on a phone').toBe('fixed');
+    await clearOfTheBar(page, button, 'New post');
+  } else {
+    expect(position, 'New post sits in the header from 1024px').toBe('static');
+    const own = await box(button, 'New post');
+    expect(own.y + own.height, 'New post is at the top of the page, in its header').toBeLessThanOrEqual(page.viewportSize()!.height / 3);
+  }
+  return button;
+}
+
+/** Two elements on screen that do not cover each other. */
+async function apart(first: Locator, second: Locator, what: string) {
+  const a = await box(first, 'the first element');
+  const b = await box(second, 'the second element');
+  const overlap = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  expect(overlap, what).toBe(false);
+}
+
+/** A toast never covers New post: above it on a phone (both float there), clear of it on desktop. */
+async function rideAbove(page: Page, button: Locator, toast: Locator, what: string) {
+  if (isPhone(page)) await above(button, toast, `${what} ends above New post`);
+  else await apart(button, toast, `${what} and New post do not cover each other`);
+}
+
+async function dismissErrorToast(page: Page) {
+  const toast = page.getByTestId('error-toast');
+  await toast.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(toast).toBeHidden();
+}
+
+test('Home: New post floats above the phone bar (in the header on desktop) and the error toast rides above it', async ({
+  page,
+  harness,
+  as,
+  axe,
+}) => {
+  await as('owner');
+  await page.goto(`/workspace/${harness.ids.workspace_a}/studio/`);
+  await expect(page.getByTestId('home-today')).toBeVisible();
+  const button = await newPostInItsPlace(page);
+
+  const toast = await errorToast(page);
+  await clearOfTheBar(page, toast, 'the error toast');
+  await rideAbove(page, button, toast, 'the error toast');
+  await expect(button, 'New post stays shown under a toast').toBeVisible();
+  await axe(page, 'Home with New post and the error toast');
+});
+
+test('Calendar: the toasts ride above New post, and New post hides while posts are selected', async ({
+  page,
+  harness,
+  as,
+  axe,
+}) => {
+  const made = await harness.fixture<{ platform_posts: { id: string }[] }>('publishing_scheduled_post', {
+    author: 'editor',
+    approver: 'owner',
+    days_ahead: 3,
+  });
+  await as('owner');
+  await page.goto(`/workspace/${harness.ids.workspace_a}/calendar/?mode=list&tab=queue`);
+  const select = page.getByTestId(`calendar-select-${made.platform_posts[0].id}`);
+  await expect(select).toBeVisible();
+  const button = await newPostInItsPlace(page);
+
+  const error = await errorToast(page);
+  await clearOfTheBar(page, error, 'the error toast');
+  await rideAbove(page, button, error, 'the error toast');
+  await dismissErrorToast(page);
+
+  const approval = await approvalToast(page);
+  await clearOfTheBar(page, approval, 'the approval toast');
+  await rideAbove(page, button, approval, 'the approval toast');
+  await axe(page, 'Calendar list with New post and a toast');
+  await page.getByTestId('toast-host').evaluate((host) => host.replaceChildren());
+
+  // Posts selected: the selection bar takes the bottom and New post steps aside until they are not.
+  await select.click();
+  const bulk = page.getByTestId('calendar-bulk-bar');
+  await settled(bulk, 'the selection bar');
+  await expect(button, 'New post hides while posts are selected').toBeHidden();
+  await select.click();
+  await expect(bulk).toBeHidden();
+  await expect(button, 'New post is back once nothing is selected').toBeVisible();
+  await newPostInItsPlace(page);
+});
 
 test('Home: the error toast sits above the phone bar', async ({ page, harness, as, axe }) => {
   await as('owner');

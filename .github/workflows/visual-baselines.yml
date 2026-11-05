@@ -1,0 +1,289 @@
+name: Visual baselines
+
+# Writes the visual baselines (tests/e2e/visual/ on the three projects, CI's own browsers and fonts) and
+# takes the WebKit type pair, uploads both as the artifact `visual-baselines` (spec D9, plan T10), then
+# commits the changed baselines back to the branch it ran on in one `visual:` commit naming the specs
+# and the run. Nothing but files under tests/e2e/__screenshots__/ is committed; an unchanged run
+# commits nothing. A person still looks at every image in that commit and puts its before/after pair
+# on the pull request (CLAUDE.md, tests/e2e/README.md).
+#
+#   gh workflow run visual-baselines.yml --ref claude/trusting-dijkstra-m7nul1 -f specs=tests/e2e/visual/shell.spec.ts
+#
+# Two jobs. `baselines` installs the locked dependencies, runs the server and the browsers and holds
+# the workflow's read-only token. `commit` holds the only write token and runs none of that: it checks
+# out the commit that was photographed, takes the images from the artifact and pushes, fast-forward
+# only, so a branch that moved on in the meantime is never overwritten (run it again on the new head).
+# It pushes only to a branch of this repository: never for a fork's pull request (whose token cannot
+# write anyway), never to the default branch. A push made with the workflow's token starts no other
+# workflow (GitHub's rule), so CI compares the new baselines on the branch's next push; pull the
+# commit before pushing again.
+#
+# Its own file, so starting it never cancels a CI run (ci.yml cancels an in-progress run of the same
+# ref). Its concurrency groups are per job and queue instead of cancelling: every label added to the
+# pull request starts this workflow (its jobs then skip), and a workflow-level group that cancelled
+# would cut short a baseline run in progress. GitHub offers a workflow for dispatch once it has run or
+# is on the default branch: the `visual-baselines` label on the pull request runs it once (all of
+# tests/e2e/visual/) and registers it; if a dispatch is refused, re-label once.
+
+on:
+  workflow_dispatch:
+    inputs:
+      specs:
+        description: "Visual specs to photograph: files or folders under tests/e2e/visual/, separated by spaces"
+        required: false
+        default: tests/e2e/visual
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  baselines:
+    name: Visual baselines (write)
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'visual-baselines'
+    # Per branch, whichever way it was started; a second run waits for this one instead of cancelling it.
+    concurrency:
+      group: visual-baselines-${{ github.head_ref || github.ref_name }}
+      cancel-in-progress: false
+    # Playwright 1.56.1 supports this image; ubuntu-latest moved to 26.04.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    outputs:
+      # The commit photographed and the checked specs, for the commit job.
+      source: ${{ steps.source.outputs.sha }}
+      specs: ${{ steps.specs.outputs.specs }}
+    env:
+      CI: "1"
+      DB_HOST: "127.0.0.1"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: smbean_baselines_e2e
+      E2E_PORT: "8155"
+      # Passed through the environment, never written into a script.
+      SPECS: ${{ inputs.specs }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # The branch as pushed (not the pull request's merge commit), with the history the type
+          # pair's before side needs (a worktree of main at 045978b).
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Record the commit photographed
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install locked Python dependencies
+        run: pip install --require-hashes -r requirements.lock
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            theme/static_src/package-lock.json
+      - name: Install locked browser dependencies and build CSS
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix theme/static_src
+          npm run build --prefix theme/static_src
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Check the specs input
+        id: specs
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -f  # no glob expansion: each word is checked as given
+          checked=""
+          for spec in ${SPECS:-tests/e2e/visual}; do
+            if [[ ! "$spec" =~ ^tests/e2e/visual(/[A-Za-z0-9._-]+)*/?$ || "$spec" == *..* ]]; then
+              echo "::error::Only tests/e2e/visual/ is photographed here; '$spec' is not under it."
+              exit 1
+            fi
+            checked="$checked $spec"
+          done
+          # No input (the label's run) means the whole folder, above. Spaces, tabs or newlines alone
+          # select nothing: refused, not read as the default, because `npx playwright test` given no
+          # path would write every spec's baselines and the commit would name none.
+          if [ -z "$checked" ]; then
+            echo "::error::The specs input is blank; name files or folders under tests/e2e/visual/, or leave it empty for all of them."
+            exit 1
+          fi
+          # Only the checked paths, on one line, go on to the next step and to the commit's message.
+          echo "SPECS=${checked# }" >> "$GITHUB_ENV"
+          echo "specs=${checked# }" >> "$GITHUB_OUTPUT"
+
+      - name: Write the baselines (CI, E2E_VISUAL and E2E_UPDATE_BASELINES together)
+        shell: bash
+        env:
+          E2E_VISUAL: "1"
+          E2E_UPDATE_BASELINES: "1"
+        run: |
+          set -euo pipefail
+          # Unquoted on purpose: one argument per spec; the step above allowed only paths.
+          npx playwright test $SPECS
+
+      - name: Take the shell pair on WebKit at 390 px, before (main 045978b) and after (this branch)
+        # The D3 type pair: a heading, body and caption on Home (home-pair-390.png), and Approvals and
+        # the Calendar month beside it, from CI's WebKit (playwright.pairs.config.ts with CI set).
+        shell: bash
+        env:
+          MAIN_SHA: 045978b
+          MAIN_DB: smbean_pair_main_e2e
+          MAIN_PORT: "8231"
+          AFTER_DB: smbean_pair_after_e2e
+          AFTER_PORT: "8232"
+        run: |
+          set -euo pipefail
+          git worktree add ../smbean-main "$MAIN_SHA"
+          npm ci --prefix ../smbean-main/theme/static_src
+          npm run build --prefix ../smbean-main/theme/static_src
+          (cd ../smbean-main && DB_NAME="$MAIN_DB" E2E_PORT="$MAIN_PORT" python -m tests.e2e.server --reset --port "$MAIN_PORT") > /tmp/pair-main.log 2>&1 &
+          main_pid=$!
+          trap 'kill "$main_pid" 2>/dev/null || true; wait "$main_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 180); do
+            if curl --fail --silent "http://127.0.0.1:$MAIN_PORT/health/" >/dev/null; then break; fi
+            if ! kill -0 "$main_pid" 2>/dev/null; then cat /tmp/pair-main.log; exit 1; fi
+            sleep 1
+          done
+          curl --fail --silent "http://127.0.0.1:$MAIN_PORT/health/" >/dev/null
+          PAIR_SIDE=before E2E_PORT="$MAIN_PORT" npm run pairs -- tests/e2e/pairs/00-shell.pair.ts --project=pair-390
+          DB_NAME="$AFTER_DB" E2E_PORT="$AFTER_PORT" npm run pairs -- tests/e2e/pairs/00-shell.pair.ts --project=pair-390
+
+      - name: Upload the baselines and the type pair
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: visual-baselines
+          path: |
+            tests/e2e/__screenshots__/
+            test-results/pairs/00-shell/
+          retention-days: 14
+
+      - name: Retain the run's report and traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: visual-baselines-evidence
+          path: |
+            playwright-report/
+            test-results/
+            !test-results/pairs/
+          retention-days: 7
+
+  commit:
+    name: Visual baselines (commit)
+    needs: baselines
+    # A branch of this repository only: a pull request whose head is this repository (never a fork's),
+    # or a dispatch on one of its branches; never the default branch. No status function here, so
+    # GitHub adds success(): a run whose photographs or type pair failed commits nothing.
+    if: >-
+      (github.head_ref || github.ref_name) != github.event.repository.default_branch && (
+        (github.event_name == 'workflow_dispatch' && github.ref_type == 'branch') ||
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      )
+    # The only job with a write token; it installs nothing and runs no project code.
+    permissions:
+      contents: write
+    # One push to a branch at a time; a second waits instead of cancelling.
+    concurrency:
+      group: visual-baselines-commit-${{ github.head_ref || github.ref_name }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # Passed through the environment, never written into a script.
+      BRANCH: ${{ github.head_ref || github.ref_name }}
+      SOURCE: ${{ needs.baselines.outputs.source }}
+      SPECS: ${{ needs.baselines.outputs.specs }}
+    steps:
+      - name: Checkout the commit that was photographed
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.baselines.outputs.source }}
+          persist-credentials: false
+      - name: Take the baselines from the artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: visual-baselines
+          path: ${{ runner.temp }}/visual-baselines
+
+      - name: Commit the changed baselines (nothing else)
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git check-ref-format --branch "$BRANCH" >/dev/null
+          if [ "$(git rev-parse HEAD)" != "$SOURCE" ]; then
+            echo "::error::The checkout is not $SOURCE, the commit photographed; nothing is committed."
+            exit 1
+          fi
+          written="$RUNNER_TEMP/visual-baselines/tests/e2e/__screenshots__"
+          if [ ! -d "$written" ]; then
+            echo "::notice title=No baselines::The run wrote no baseline; nothing to commit."
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Only PNG files, only into the baselines folder.
+          mkdir -p tests/e2e/__screenshots__
+          (cd "$written" && find . -type f -name '*.png' -print0) | while IFS= read -r -d '' file; do
+            mkdir -p "tests/e2e/__screenshots__/$(dirname "$file")"
+            cp -- "$written/$file" "tests/e2e/__screenshots__/$file"
+          done
+          git add -A -- tests/e2e/__screenshots__
+          if git diff --cached --quiet; then
+            echo "::notice title=Baselines unchanged::Every baseline this run wrote is already on $BRANCH; nothing to commit."
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          outside="$(git diff --cached --name-only | grep -v -E '^tests/e2e/__screenshots__/.+[.]png$' || true)"
+          if [ -n "$outside" ]; then
+            echo "::error::Only baselines are committed here; refusing: $outside"
+            exit 1
+          fi
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          {
+            echo "visual: baselines for $SPECS (run $GITHUB_RUN_ID)"
+            echo
+            echo "Written on CI's runner by the Visual baselines workflow from $SOURCE,"
+            echo "run $run_url (attempt $GITHUB_RUN_ATTEMPT)."
+            echo "The run's artifact visual-baselines holds the same images and the WebKit"
+            echo "type pair; the before/after pair goes on the pull request."
+            echo
+            git diff --cached --name-status
+          } > "$RUNNER_TEMP/visual-commit-message.txt"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet -F "$RUNNER_TEMP/visual-commit-message.txt"
+          git show --stat --format='%h %s' HEAD
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push the commit to the branch (fast-forward only)
+        if: steps.commit.outputs.committed == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
+          if ! git -c "http.$GITHUB_SERVER_URL/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$BRANCH"; then
+            echo "::error title=Push refused::Nothing was pushed to $BRANCH. If the branch moved on from $SOURCE, the commit photographed, run the workflow again on its new head; this run's artifact keeps the images."
+            exit 1
+          fi
+          echo "::notice title=Baselines committed::$(git log -1 --format='%h %s') is on $BRANCH."

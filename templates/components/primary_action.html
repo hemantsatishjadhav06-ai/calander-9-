@@ -1,0 +1,17 @@
+{% comment %}
+The view's one primary action (spec D5; DESIGN_SYSTEM.md 10.1 and 11): one solid Pine button, never
+more than one per view. Below 1024px it floats (.ui-fab): fixed 16px from the right, above the phone
+bar (the toasts' and selection bars' bottom), 56px tall, icon and words. From 1024px it is lg:static,
+in the page header's flow: include it inside the header's element marked data-primary-slot="header"
+(apps/common/tests/test_one_primary.py checks both places). The page sets has-fab on body while it
+shows, so the toasts rise above it; it hides while a selection bar shows (styles.css).
+Context:
+  label    the act ("New post").
+  testid   its data-testid.
+  href     a link (an <a>); without it, a <button type="button">.
+  controls the id of the dialog it opens: aria-haspopup="dialog", aria-expanded="false" (the dialog's
+           script keeps it current) and aria-controls.
+  dispatch the window event the button sends on a click (the dialog listens for it).
+The icon is a plus (New post, the one screen-level act today).
+{% endcomment %}{% if href %}<a href="{{ href }}"{% else %}<button type="button"{% if dispatch %} @click="$dispatch('{{ dispatch }}')"{% endif %}{% endif %} data-testid="{{ testid }}"{% if controls %} aria-haspopup="dialog" aria-expanded="false" aria-controls="{{ controls }}"{% endif %}
+        class="ui-btn ui-btn-primary ui-fab fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 lg:static"><svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>{{ label }}</span>{% if href %}</a>{% else %}</button>{% endif %}

@@ -774,6 +774,23 @@ def calendar_view(request, workspace_id):
         "is_today_in_view": is_today_in_view,
         **publish_ctx,
     }
+    # New post (screen 1): the button and the sheet, whose Ask the team panel renders the form, for
+    # whoever may start posts. Only the full page shows them; an HTMX swap renders a partial and skips
+    # the form's reads.
+    from apps.studio.views import can_start_posts
+
+    starts_posts = can_start_posts(getattr(request, "workspace_membership", None))
+    context["can_start_posts"] = starts_posts and not getattr(request, "htmx", False)
+    # The grids' "+" open the sheet in Write it myself where it is on the page (T17), a swapped grid
+    # included: it lands on the full page that holds the sheet. Elsewhere they stay plain links.
+    context["cells_open_sheet"] = starts_posts
+    if context["can_start_posts"]:
+        from apps.composer.ideas import idea_form_context
+        from apps.studio.forms import BriefForm
+
+        context["new_post_form"] = BriefForm(workspace=workspace)
+        # The idea form's columns, and its tags (with the switch): the names the tag filter just read.
+        context.update(idea_form_context(request, workspace, tags=context["all_tags"]))
 
     # For list mode: fetch the active tab's data so the shell can render the
     # initial tab inline server-side (avoids a JS-triggered HTMX waterfall and

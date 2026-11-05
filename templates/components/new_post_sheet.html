@@ -1,0 +1,80 @@
+{% comment %}
+The New post sheet (Phase 3, screen 1; docs/specs/03-rebuild-screens.md, "Screen 1"): one dialog with
+three ways to start a post. Home and Calendar include it for whoever may start posts
+(apps.studio.views.can_start_posts), beside components/primary_action.html labelled New post, which
+sends new-post:open; #new-post opens it on load. static/js/new-post-sheet.js (newPostSheet(), loaded
+deferred before Alpine on those two pages only) runs it inside the shell's Alpine scope: opening closes
+the phone drawer first, remembers the opener and puts focus in the mode's first field; Escape, the close
+button and the scrim close it and return focus to the opener; what was typed stays until the page goes;
+body.has-sheet while it is open.
+
+Below 1024px a bottom sheet (rounded top, at most 92vh, a grabber that is only a cue); from 1024px a
+480px drawer on the right. It enters and leaves on .motion-sheet-* (styles.css: in place under reduced
+motion), and the scrim fades on the same tokens. Light only until its pages are declared (T22).
+
+The heading names the dialog through a static aria-labelledby (the a11y sweep reads only static labels);
+its words follow the view: "New post", or "New idea" for the idea form.
+
+Layout: the dialog is the scroller. Its header (data-sheet-head) sticks to the top and each panel's
+decision bar (data-sheet-foot) to the bottom; the script keeps the dialog's scroll padding equal to the
+two, so a control the keyboard reaches scrolls clear of both (WCAG 2.4.11). A panel (data-view: team,
+self, idea; one view each for the one-primary counter) is display: contents, so its body (order-1), the
+foot links (order-2) and its bar (order-3) line up in the dialog's column while each panel stays one
+element.
+
+The overlay never blocks the page while closed (pointer-events-none; only its open children take
+events), so the scrim and the dialog can each run their own leave transition.
+
+Context: workspace, form (apps.studio.forms.BriefForm), features, idea_columns and idea_tags (the idea
+form's columns and tags, apps.composer.ideas.idea_form_context). new-post:open with mode 'idea' opens
+its idea form; the shell's New menu and New idea dialog that did so went with T19.
+{% endcomment %}
+<div class="fixed inset-0 z-[100] flex items-end justify-center pointer-events-none lg:items-stretch lg:justify-end" x-data="newPostSheet()">
+    <div x-show="sheetOpen" x-cloak class="ui-overlay pointer-events-auto" @click="close()"
+         x-transition:enter="transition-opacity ease-out duration-(--dur-snap)" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity ease-in duration-(--dur-exit)" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"></div>
+    <div id="new-post-sheet" data-testid="new-post-sheet" role="dialog" aria-modal="true" aria-labelledby="new-post-title"
+         x-show="sheetOpen" x-cloak x-trap.noscroll.noautofocus.noreturn="sheetOpen" @keydown.escape.prevent.stop="close()"
+         x-transition:enter="motion-sheet-enter" x-transition:enter-start="motion-sheet-out" x-transition:enter-end="motion-sheet-in"
+         x-transition:leave="motion-sheet-leave" x-transition:leave-start="motion-sheet-in" x-transition:leave-end="motion-sheet-out"
+         class="relative pointer-events-auto flex flex-col w-full max-h-[92vh] overflow-y-auto overscroll-contain rounded-t-2xl bg-surface shadow-xl lg:h-full lg:max-h-none lg:w-[480px] lg:rounded-none lg:border-l lg:border-ink-200">
+        <div data-sheet-head class="sticky top-0 z-10 bg-surface px-4 pb-4 lg:px-6 lg:pt-6">
+            <div data-sheet-grabber aria-hidden="true" class="mx-auto mt-2 mb-4 h-[5px] w-9 rounded-full bg-line-strong lg:hidden"></div>
+            <div class="flex items-center justify-between gap-4">
+                <h2 id="new-post-title" class="text-h2 text-ink-950" x-text="sheetMode === 'idea' ? 'New idea' : 'New post'">New post</h2>
+                <button type="button" data-testid="new-post-close" class="ui-btn ui-btn-icon -mr-2" @click="close()" aria-label="Close">
+                    <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div role="group" aria-label="How to start" class="ui-segmented flex w-full mt-4" x-show="sheetMode !== 'idea'">
+                <button type="button" data-testid="new-post-mode-team" class="ui-segment flex-1 is-active" :class="{ 'is-active': sheetMode === 'team' }"
+                        aria-pressed="true" :aria-pressed="(sheetMode === 'team').toString()" @click="setMode('team')">Ask the team</button>
+                <button type="button" data-testid="new-post-mode-self" class="ui-segment flex-1" :class="{ 'is-active': sheetMode === 'self' }"
+                        aria-pressed="false" :aria-pressed="(sheetMode === 'self').toString()" @click="setMode('self')">Write it myself</button>
+            </div>
+        </div>
+
+        <div data-view="team" class="contents" x-show="sheetMode === 'team'">
+            {% include "studio/partials/new_post_team.html" %}
+        </div>
+        <div data-view="self" class="contents" x-show="sheetMode === 'self'" x-cloak>
+            {% include "studio/partials/new_post_self.html" %}
+        </div>
+        <div data-view="idea" class="contents" x-show="sheetMode === 'idea'" x-cloak>
+            {% include "composer/partials/new_post_idea.html" %}
+        </div>
+
+        {# The composer's own pages, one tap away; Templates and Categories follow their switch. #}
+        <nav aria-label="Other ways to start" class="order-2 px-4 pb-6 lg:px-6">
+            <ul class="flex flex-wrap gap-x-6">
+                <li><a href="{% url 'composer:create_landing' workspace_id=workspace.id %}" data-testid="new-post-link-ideas" class="ui-link inline-flex items-center min-h-11 lg:min-h-8">Ideas</a></li>
+                <li><a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=list&amp;tab=drafts" data-testid="new-post-link-drafts" class="ui-link inline-flex items-center min-h-11 lg:min-h-8">Drafts</a></li>
+                <li><a href="{% url 'composer:csv_upload' workspace_id=workspace.id %}" data-testid="new-post-link-csv" class="ui-link inline-flex items-center min-h-11 lg:min-h-8">Import from CSV</a></li>
+                {% if features.templates %}
+                <li><a href="{% url 'composer:template_list' workspace_id=workspace.id %}" data-testid="new-post-link-templates" class="ui-link inline-flex items-center min-h-11 lg:min-h-8">Templates</a></li>
+                <li><a href="{% url 'composer:category_list' workspace_id=workspace.id %}" data-testid="new-post-link-categories" class="ui-link inline-flex items-center min-h-11 lg:min-h-8">Categories</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+</div>

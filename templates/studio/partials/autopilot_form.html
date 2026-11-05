@@ -35,7 +35,7 @@ Context: workspace, row, form, tzname, weekdays, next_plan, plan_due_now, spend,
                 {% if form.accounts.field.queryset.exists %}
                 <div class="flex flex-wrap gap-2">
                     {% for choice in form.accounts %}
-                    <label class="inline-flex min-h-9 max-lg:min-h-11 items-center gap-2 rounded-full bg-white px-3 text-[13px] font-medium text-ink-800 ring-1 ring-inset ring-ink-300 cursor-pointer hover:ring-ink-400 has-[:checked]:bg-brand-50 has-[:checked]:text-ink-950 has-[:checked]:ring-2 has-[:checked]:ring-brand-700">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+                    <label class="inline-flex min-h-9 max-lg:min-h-11 items-center gap-2 rounded-full bg-surface px-3 text-[13px] font-medium text-ink-800 ring-1 ring-inset ring-line-strong cursor-pointer hover:ring-ink-400 has-[:checked]:bg-brand-50 has-[:checked]:text-ink-950 has-[:checked]:ring-2 has-[:checked]:ring-brand-700">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
                     {% endfor %}
                 </div>
                 {% else %}

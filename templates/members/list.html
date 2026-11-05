@@ -16,7 +16,7 @@
     </header>
 
     <!-- Members -->
-    <section class="mb-6 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" aria-labelledby="members-title">
+    <section class="mb-6 overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-xs" aria-labelledby="members-title">
         <div class="flex items-center gap-2 border-b border-ink-200 px-4 py-3.5 sm:px-5">
             <h2 id="members-title" class="text-h3 text-ink-950">Members</h2>
             <span class="ui-badge">{{ members_data|length }}</span>
@@ -34,7 +34,7 @@
 
     <!-- Pending invitations -->
     {% if is_admin %}
-    <section class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" aria-labelledby="invites-title">
+    <section class="overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-xs" aria-labelledby="invites-title">
         <div class="border-b border-ink-200 px-4 py-3.5 sm:px-5">
             <h2 id="invites-title" class="text-h3 text-ink-950">Pending invitations</h2>
         </div>

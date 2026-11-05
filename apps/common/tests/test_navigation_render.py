@@ -8,8 +8,10 @@ Spec D8, R1 and R2 (docs/specs/02-cut-and-merge.md), plan T9 (docs/specs/phase-2
   Notifications item, Set up and Intelligence are gone from it.
 - **Their old entries moved without restyling:** Drafts, Posting schedule and
   Media sit in the Calendar page's header (Queues too, with the ``queues``
-  switch); Ideas and Import from CSV sit in the New menu (Templates and
-  Categories too, with the ``templates`` switch).
+  switch); Ideas, Drafts and Import from CSV are the New post sheet's foot links
+  on Home and Calendar (Templates and Categories too, with the ``templates``
+  switch). The shell's New menu, which held them, is gone (Phase 3, T19): no
+  template carries a ``sidebar-new-`` hook.
 - **Notifications** is a bell, in the sidebar's header and the phone's top bar,
   that opens the existing drawer partial. The account menu's settings link says
   *Account*, so *Settings* means one place.
@@ -35,6 +37,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+from django.conf import settings
 from django.test import RequestFactory, override_settings
 from django.urls import resolve, reverse
 from django.utils import timezone
@@ -50,6 +53,7 @@ from apps.notifications.engine import notify
 from apps.notifications.models import EventType
 from apps.organizations.models import Organization
 from apps.social_accounts.models import AnalyticsPlatformConfig, SocialAccount
+from apps.studio import views as studio_views
 from apps.studio.models import AgencySettings, StudioBrief
 from apps.workspaces.models import Workspace
 
@@ -179,9 +183,13 @@ def _top_bar(html):
     return html[start : html.index('<main id="main-content"', start)]
 
 
-def _new_menu(html):
-    start = html.index('data-testid="sidebar-new-toggle"')
-    return html[start : html.index("<!-- Create Idea Modal -->", start)]
+def _sheet(html):
+    """The New post sheet, from its dialog to the end of the page (Home and Calendar)."""
+    return html[html.index('data-testid="new-post-sheet"') :]
+
+
+def _home(client, team, role="owner"):
+    return _page(client, getattr(team, role), _url("studio:index", team.ws))
 
 
 def _tag(html, marker):
@@ -348,26 +356,43 @@ def test_the_calendar_header_links_queues_with_its_switch(client, team):
 
 
 @pytest.mark.django_db
-def test_the_new_menu_has_ideas_and_csv_import(client, team):
+@pytest.mark.parametrize("page", ["home", "calendar"])
+def test_the_sheet_links_ideas_drafts_and_csv_import(client, team, page):
     _switches(team.ws)
-    menu = _new_menu(_calendar(client, team))
+    html = (_home if page == "home" else _calendar)(client, team)
+    sheet = _sheet(html)
 
-    assert _href(menu, "sidebar-new-ideas") == _url("composer:create_landing", team.ws)
-    assert _href(menu, "sidebar-new-csv") == _url("composer:csv_upload", team.ws)
-    assert 'data-testid="sidebar-new-idea"' in menu  # the quick idea modal stays
-    for hidden in ("sidebar-new-templates", "sidebar-new-categories"):
-        assert f'data-testid="{hidden}"' not in menu, hidden
+    assert _href(sheet, "new-post-link-ideas") == _url("composer:create_landing", team.ws)
+    assert _href(sheet, "new-post-link-drafts") == _url("calendar:calendar", team.ws) + "?mode=list&tab=drafts"
+    assert _href(sheet, "new-post-link-csv") == _url("composer:csv_upload", team.ws)
+    assert 'data-testid="new-post-save-idea"' in sheet  # the quick idea is the sheet's idea form
+    for hidden in ("new-post-link-templates", "new-post-link-categories"):
+        assert f'data-testid="{hidden}"' not in sheet, hidden
     for name in ("composer:template_list", "composer:category_list"):
-        assert _url(name, team.ws) not in _calendar(client, team), name
+        assert _url(name, team.ws) not in html, name
+    assert "sidebar-new-" not in html  # the shell's New menu is gone
 
 
 @pytest.mark.django_db
-def test_the_new_menu_has_templates_and_categories_with_their_switch(client, team):
+@pytest.mark.parametrize("page", ["home", "calendar"])
+def test_the_sheet_links_templates_and_categories_with_their_switch(client, team, page):
     _switches(team.ws, templates=True)
-    menu = _new_menu(_calendar(client, team))
+    sheet = _sheet((_home if page == "home" else _calendar)(client, team))
 
-    assert _href(menu, "sidebar-new-templates") == _url("composer:template_list", team.ws)
-    assert _href(menu, "sidebar-new-categories") == _url("composer:category_list", team.ws)
+    assert _href(sheet, "new-post-link-templates") == _url("composer:template_list", team.ws)
+    assert _href(sheet, "new-post-link-categories") == _url("composer:category_list", team.ws)
+
+
+def test_no_template_carries_the_old_new_menu():
+    """The shell's New menu left with Phase 3 T19: neither its hooks nor its classes are anywhere."""
+    roots = [settings.BASE_DIR / "templates", *(settings.BASE_DIR / "apps").glob("*/templates")]
+    found = [
+        str(path.relative_to(settings.BASE_DIR))
+        for root in roots
+        for path in sorted(root.rglob("*.html"))
+        if "sidebar-new-" in path.read_text(encoding="utf-8")
+    ]
+    assert found == []
 
 
 # --- notifications: the bell -----------------------------------------------------------------
@@ -381,7 +406,7 @@ def test_the_bell_opens_the_notifications_drawer(client, team):
     html = _calendar(client, team)
 
     sidebar, top = _sidebar(html), _top_bar(html)
-    assert sidebar.index('data-testid="notifications-bell"') < sidebar.index('data-testid="sidebar-new-toggle"')
+    assert sidebar.index('data-testid="notifications-bell"') < sidebar.index('data-testid="nav-')  # the first place
     assert 'data-testid="notifications-bell"' in top
     for place in (sidebar, top):
         bell = _tag(place, 'data-testid="notifications-bell"')
@@ -805,6 +830,103 @@ def test_a_plain_client_is_offered_no_agency_screen(client, team):
     # Their Approvals is the Calendar's approvals tab, which lets them in; the Approvals screen does not.
     assert _href(html, "palette-item-approvals") == _url("calendar:calendar", team.ws) + CLIENT_APPROVALS
     assert client.get(_url("approvals:index", team.ws)).status_code == 403
+
+
+# --- the keyboard shortcuts (spec D16, Phase 3 T20) ----------------------------------------------------
+# static/js/shortcuts.js runs the keys; the list is the shell's dialog. The browser cases are
+# tests/e2e/self/shortcuts.spec.ts, the guards case by case tests/js/shortcuts.test.cjs.
+
+
+def _shortcuts_root(html):
+    return _tag(html, "data-shortcuts")
+
+
+@pytest.mark.django_db
+def test_the_shortcut_list_is_a_labelled_trapped_dialog_with_a_switch(client, team):
+    _switches(team.ws)
+    html = _page(client, team.owner, _url("approvals:index", team.ws))
+
+    root = _shortcuts_root(html)
+    assert 'x-data="shortcutsList()"' in root and '@open-shortcuts.window="show()"' in root
+    # Escape closes the list wherever the focus is, before its trap has started too (shortcuts.js).
+    assert "@keydown.escape.window=" in root and "close()" in root
+    dialog = _tag(html, 'data-testid="shortcuts-dialog"')
+    # The list places the focus itself (x-ref close); its trap only keeps Tab inside, held on `trapped`.
+    for attr in (
+        'role="dialog"',
+        'aria-modal="true"',
+        'aria-labelledby="shortcuts-title"',
+        'x-trap.noscroll.noautofocus.noreturn="trapped"',
+        'x-ref="dialog"',
+    ):
+        assert attr in dialog, attr
+    assert "@keydown.escape" in dialog
+    assert 'x-ref="close"' in _tag(html, 'data-testid="shortcuts-close"')
+    assert re.search(r'<h2 id="shortcuts-title"[^>]*>Keyboard shortcuts</h2>', html)
+
+    toggle = _tag(html, 'data-testid="shortcuts-toggle"')
+    assert toggle.startswith("<input") and 'type="checkbox"' in toggle and 'role="switch"' in toggle
+    labelled_by = re.search(r'aria-labelledby="([^"]+)"', toggle).group(1)
+    assert re.search(rf'id="{labelled_by}"[^>]*>Single-key shortcuts<', html)
+    # The keys the list names, and the one that brings the list back with single keys off.
+    assert 'data-testid="shortcuts-go-to"' in html and 'data-testid="shortcuts-list"' in html
+    assert "<kbd" in html[html.index('data-testid="shortcuts-dialog"') :]
+    # Every key has one look: base.html writes the class once, so the seven keys cannot drift apart.
+    keys = re.findall(r'<kbd class="([^"]*)">', html[html.index('data-testid="shortcuts-dialog"') :])
+    assert len(keys) == 7 and len(set(keys)) == 1 and "font-mono" in keys[0], keys
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("role", "starts_posts"),
+    [("owner", True), ("manager", True), ("editor", True), ("contributor", True), ("viewer", False), ("client", False)],
+)
+def test_n_goes_to_homes_new_post_only_for_whoever_may_start_posts(client, team, role, starts_posts):
+    """`n` away from the sheet goes to Home's #new-post: the page names that address only for someone
+    who may start posts (``apps.studio.views.can_start_posts``), and lists `n` only for them."""
+    _switches(team.ws)
+    html = _calendar(client, team, role)
+    root = _shortcuts_root(html)
+
+    if starts_posts:
+        assert f'data-new-post-url="{_url("studio:index", team.ws)}#new-post"' in root
+        assert 'data-testid="shortcuts-new-post"' in html
+    else:
+        assert "data-new-post-url" not in root
+        assert 'data-testid="shortcuts-new-post"' not in html
+
+
+@pytest.mark.django_db
+def test_go_to_does_not_open_over_the_new_post_sheet(client, team):
+    """Ctrl/Cmd-K inside the sheet does nothing: Go to's open handler returns while the sheet is open
+    (the sheet sets has-sheet on body), before it remembers an opener or opens."""
+    _switches(team.ws)
+    html = _page(client, team.owner, _url("studio:index", team.ws))
+    component = html[html.index("function commandPalette(") :]
+    show = component[component.index("show() {") : component.index("placeFocus(tries) {")]
+
+    guard = show.index("document.body.classList.contains('has-sheet')")
+    assert "return;" in show[guard : show.index("\n", guard)]
+    assert guard < show.index("this.opener = document.activeElement") < show.index("this.open = true")
+
+
+@pytest.mark.django_db
+def test_who_may_start_posts_is_read_only_when_a_page_asks(team):
+    """The address `n` goes to is lazy, like the navigation: a fragment that never reads it never
+    looks at the membership's permissions for it."""
+    url = _url("approvals:index", team.ws)
+    request = RequestFactory().get(url)
+    request.user = team.editor
+    request.workspace = team.ws
+    request.workspace_membership = WorkspaceMembership.objects.get(user=team.editor, workspace=team.ws)
+    request.org_membership = OrgMembership.objects.get(user=team.editor, organization=team.org)
+    request.resolver_match = resolve(url)
+
+    with mock.patch.object(studio_views, "can_start_posts", wraps=studio_views.can_start_posts) as spy:
+        context = context_processors.sidebar_context(request)
+        assert spy.call_count == 0
+        assert str(context["new_post_url"]) == _url("studio:index", team.ws) + "#new-post"
+        assert spy.call_count == 1
 
 
 # --- the sidebar and the phone bar offer only places this person may open ----------------------------

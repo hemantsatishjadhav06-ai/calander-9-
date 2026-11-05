@@ -10,7 +10,7 @@
     </div>
 
     {% if posts %}
-    <ul class="ui-list overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs">
+    <ul class="ui-list overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-xs">
         {% for post in posts %}
         <li class="flex items-start gap-4 px-5 py-4 max-sm:px-4">
             {% with first_media=post.media_attachments.first %}

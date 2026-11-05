@@ -4,7 +4,7 @@
             class="ui-btn ui-btn-ghost ui-btn-sm !px-2" data-testid="inbox-assign-toggle"
             {% if message.assigned_to %}aria-label="Assigned to {{ message.assigned_to.get_short_name|default:message.assigned_to.email }}. Change"{% endif %}>
         {% if message.assigned_to %}
-        <span class="grid size-5 flex-shrink-0 place-items-center rounded-full bg-ink-900 text-[11px] font-semibold text-white" aria-hidden="true">
+        <span class="grid size-5 flex-shrink-0 place-items-center rounded-full bg-ink-900 text-xs font-semibold text-on-fill" aria-hidden="true">
             {{ message.assigned_to.email|make_list|first|upper }}
         </span>
         <span class="max-w-[9rem] truncate text-ink-900">{{ message.assigned_to.get_short_name|default:message.assigned_to.email|truncatechars:14 }}</span>
@@ -37,7 +37,7 @@
                 @click="assignOpen = false"
                 class="ui-menu-item {% if message.assigned_to and message.assigned_to.id == membership.user.id %}font-semibold{% endif %}"
                 data-testid="inbox-assignee-{{ membership.user.id }}">
-            <span class="grid size-5 flex-shrink-0 place-items-center rounded-full bg-ink-100 text-[11px] font-semibold text-ink-700" aria-hidden="true">
+            <span class="grid size-5 flex-shrink-0 place-items-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700" aria-hidden="true">
                 {{ membership.user.email|make_list|first|upper }}
             </span>
             <span class="flex-1 truncate">{{ membership.user.get_short_name|default:membership.user.email }}</span>

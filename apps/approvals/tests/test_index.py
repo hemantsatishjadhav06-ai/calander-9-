@@ -25,12 +25,11 @@ from django.test import RequestFactory
 from django.urls import resolve, reverse
 from django.utils import timezone
 
-from apps.accounts.models import User
 from apps.approvals import gate
 from apps.approvals.actor import DASHBOARD
 from apps.approvals.models import ApprovalAction
+from apps.approvals.tests.world import World, person
 from apps.common.navigation import build_nav
-from apps.composer.models import PlatformPost, Post
 from apps.members.models import CustomRole, OrgMembership, WorkspaceMembership
 from apps.organizations.models import Organization
 from apps.social_accounts.models import SocialAccount
@@ -42,63 +41,6 @@ TESTID = re.compile(r'data-testid="(approvals-row-[a-z-]+)"')
 # Every status the tab lists, and two it leaves out.
 LISTED = ("pending_review", "pending_client", "approved", "rejected", "changes_requested", "on_hold")
 NOT_LISTED = ("draft", "scheduled")
-
-
-def _user(email):
-    """A person with no organisation or workspace of their own (sign-up may create one)."""
-    user = User.objects.create_user(email=email, password="pw-12345678", tos_accepted_at=timezone.now())
-    own = list(OrgMembership.objects.filter(user=user).values_list("organization_id", flat=True))
-    WorkspaceMembership.objects.filter(user=user).delete()
-    OrgMembership.objects.filter(user=user).delete()
-    Organization.objects.filter(id__in=own).delete()
-    return user
-
-
-class World:
-    def __init__(self):
-        self.org = Organization.objects.create(name="Agency")
-        self.workspace = Workspace.objects.create(
-            organization=self.org,
-            name="Neopolis",
-            timezone="Asia/Kolkata",
-            approval_workflow_mode="required_internal",
-            require_dashboard_approval=True,
-        )
-        self.owner = self._member("owner@example.com", "owner")
-        self.editor = self._member("editor@example.com", "editor")
-        self.viewer = self._member("viewer@example.com", "viewer")
-        self.client_user = self._member("client@example.com", "client")
-        self.facebook = self._account("facebook", "Neopolis Facebook")
-        self.linkedin = self._account("linkedin_company", "Neopolis LinkedIn")
-
-    def _member(self, email, role):
-        user = _user(email)
-        if role == "owner":
-            OrgMembership.objects.create(user=user, organization=self.org, org_role="owner")
-        WorkspaceMembership.objects.create(user=user, workspace=self.workspace, workspace_role=role)
-        return user
-
-    def _account(self, platform, name):
-        return SocialAccount.objects.create(
-            workspace=self.workspace,
-            platform=platform,
-            account_platform_id=f"{platform}-1",
-            account_name=name,
-            connection_status=SocialAccount.ConnectionStatus.CONNECTED,
-        )
-
-    def post(self, status, *, account=None, tags=(), when=None, caption=None):
-        post = Post.objects.create(
-            workspace=self.workspace,
-            author=self.editor,
-            caption=caption or f"A post that is {status}",
-            tags=list(tags),
-            proposed_publish_at=when,
-        )
-        pp = PlatformPost.objects.create(post=post, social_account=account or self.facebook, status="pending_review")
-        # Rows in other states are fixtures, not the result of a decision: skip the gate's save checks.
-        PlatformPost.objects.filter(pk=pp.pk).update(status=status)
-        return post
 
 
 @pytest.fixture
@@ -263,7 +205,7 @@ def test_a_client_with_a_custom_role_is_staff_and_sees_the_list(client, world):
 
 def test_a_member_of_another_workspace_is_refused(client, world):
     world.post("pending_review", caption="Neopolis only")
-    stranger = _user("stranger@example.com")
+    stranger = person("stranger@example.com")
     their_org = Organization.objects.create(name="Their agency")
     theirs = Workspace.objects.create(organization=their_org, name="Theirs")
     OrgMembership.objects.create(user=stranger, organization=their_org, org_role="owner")

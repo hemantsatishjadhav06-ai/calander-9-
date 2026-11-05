@@ -281,19 +281,165 @@ jobs:
         working-directory: theme/static_src
         run: npm audit --audit-level=high
 
-  e2e:
-    name: E2E (Playwright)
+  e2e-shard:
+    name: E2E (Playwright, ${{ matrix.project }})
     # Playwright 1.56.1 supports this image; ubuntu-latest moved to 26.04.
     runs-on: ubuntu-24.04
-    # Phase 2 grew the suite to about 220 cases on three projects (14-16 minutes of tests plus setup).
+    # One shard per device project (spec D10), each with its own server, database and port, one worker
+    # per server as before. The limit is per shard and stays at 35 minutes unless a measured reason
+    # raises it; every gate records each shard's wall time, which stays under 70 % of it (24.5 min).
+    # tests/e2e/visual/ skips here (no E2E_VISUAL): the visual job below compares it.
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: desktop-chrome
+            browser: chromium
+            db: smbean_browser_desktop_e2e
+            port: "8150"
+          - project: iphone-13
+            browser: webkit
+            db: smbean_browser_iphone_e2e
+            port: "8152"
+          - project: pixel-7
+            browser: chromium
+            db: smbean_browser_pixel_e2e
+            port: "8153"
     env:
       CI: "1"
       DB_HOST: "127.0.0.1"
       DB_USER: postgres
       DB_PASSWORD: postgres
-      DB_NAME: smbean_browser_e2e
-      E2E_PORT: "8150"
+      DB_NAME: ${{ matrix.db }}
+      E2E_PORT: ${{ matrix.port }}
+      E2E_PROJECT: ${{ matrix.project }}
+      E2E_BROWSER: ${{ matrix.browser }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install locked Python dependencies
+        run: pip install --require-hashes -r requirements.lock
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            theme/static_src/package-lock.json
+      - name: Install locked browser dependencies and build CSS
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix theme/static_src
+          npm run build --prefix theme/static_src
+      - name: Install this project's browser
+        run: npx playwright install --with-deps "$E2E_BROWSER"
+      - name: Run this project's browser cases (no retries)
+        run: npm run test:e2e -- --project="$E2E_PROJECT"
+
+      - name: Retain browser reports and failure traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-evidence-${{ matrix.project }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  e2e:
+    # The check the branch has always reported: green only when every shard is.
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs: [e2e-shard]
+    steps:
+      - name: Every project's shard passed
+        env:
+          SHARDS: ${{ needs.e2e-shard.result }}
+        run: |
+          echo "E2E shards: $SHARDS"
+          test "$SHARDS" = "success"
+
+  visual-baselines-present:
+    name: Visual (look for baselines)
+    # Whether any baseline is committed yet, here or in the commit this one is compared with. GitHub does
+    # not offer hashFiles() in a job's `if`, so the Visual job below reads this job's answer instead.
+    # The commit before is the checked-out commit's first parent: for a pull request, GitHub's merge
+    # commit's first parent, which is the base branch's head; for a push to main, main before the push's
+    # last commit. Two commits deep is enough to read it, with no token beyond the checkout's read-only
+    # one (not kept) and no API call; nothing from the event is written into the script.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      present: ${{ steps.look.outputs.present }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Look for a PNG under tests/e2e/__screenshots__/, here or in the commit before
+        id: look
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$(find tests/e2e/__screenshots__ -type f -name '*.png' -print -quit 2>/dev/null)" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # None here. If the commit before has one, this change deletes every baseline: the comparison
+          # still runs and fails on each missing image (a skipped check would count as passing).
+          if ! before="$(git rev-parse --verify --quiet 'HEAD^1^{commit}')"; then
+            echo "::error title=Visual (look for baselines)::The commit before this one is not in the checkout, so a deleted baseline cannot be told from none; nothing is skipped."
+            exit 1
+          fi
+          committed="$(git ls-tree -r --name-only "$before" -- tests/e2e/__screenshots__/)"
+          if [ "$(grep -c '[.]png$' <<< "$committed" || true)" -gt 0 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Every baseline removed::This change leaves no PNG under tests/e2e/__screenshots__/ while the commit it is compared with has some, so Visual (Playwright) runs and fails on each missing image."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Visual (Playwright) skipped::No baseline is committed under tests/e2e/__screenshots__/ yet, so there is nothing to compare. The first visual: commit (the shell, at the foundations gate) turns the comparison on."
+          fi
+
+  visual:
+    name: Visual (Playwright)
+    # tests/e2e/visual/ against the baselines committed under tests/e2e/__screenshots__/ (spec D9), on
+    # the three projects; it compares and never writes (no E2E_UPDATE_BASELINES). Baselines come from
+    # .github/workflows/visual-baselines.yml. Every gate records this job's wall time too.
+    # It runs only once a baseline is committed (a PNG under tests/e2e/__screenshots__/, in this commit
+    # or the one it is compared with, found by the job above) and is skipped with a notice before the
+    # first `visual:` commit; from then on a missing or changed image fails it, a change that deletes
+    # every baseline included.
+    needs: [visual-baselines-present]
+    if: needs.visual-baselines-present.outputs.present == 'true'
+    # Playwright 1.56.1 supports this image; ubuntu-latest moved to 26.04.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: "1"
+      E2E_VISUAL: "1"
+      DB_HOST: "127.0.0.1"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: smbean_visual_e2e
+      E2E_PORT: "8154"
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -327,14 +473,14 @@ jobs:
           npm run build --prefix theme/static_src
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
-      - name: Run every browser project (no retries)
-        run: npm run test:e2e
+      - name: Compare the visual specs with their baselines (no retries)
+        run: npm run test:e2e -- tests/e2e/visual
 
-      - name: Retain browser reports and failure traces
+      - name: Retain the comparisons (actual, expected and diff images)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: playwright-evidence
+          name: visual-evidence
           path: |
             playwright-report/
             test-results/

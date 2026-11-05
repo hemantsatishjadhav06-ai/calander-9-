@@ -7,6 +7,11 @@
 @source "../../../apps/**/templates/**/*.html";
 @source "../../../apps/**/*.py";
 @source "../../../static/js/*.js";
+/* Tests are not markup: their fixture strings (the utilities recolor forbids among them) stay out. */
+@source not "../../../apps/**/tests/**";
+@source not "../../../apps/**/test_*.py";
+@source not "../../../apps/**/tests.py";
+@source not "../../../apps/**/conftest.py";
 
 /* ═══════════════════════════════════════════════════════════════════════
    SM Bean design tokens: "Quiet graphite + Pine" (design system v2, Oct 2026)
@@ -15,8 +20,11 @@
    it means "this is yours to act on": the one primary button in a view,
    links, focus, a checked control, the Approvals count. Everything else is
    cool graphite (ink). Status colours carry an icon and a word, never
-   colour alone. Light mode only for now; dark mode later redefines Layer 1
-   and Layer 2 under [data-theme="dark"] and every utility follows.
+   colour alone. Dark mode redefines Layer 1 and Layer 2 under
+   :root[data-theme="dark"] (and, for a dark device on a page declared
+   ready, the same under prefers-color-scheme), so every utility follows;
+   [data-theme-scope="light"] keeps platform previews light. A page stays
+   light until it is declared ready (apps/common/screens.py).
 
    Layer 1  raw scales (the only place a colour hex lives)
    Layer 2  semantic tokens (names unchanged from the old file, so every
@@ -99,7 +107,7 @@
   --color-info-300: var(--info-300); --color-info-400: var(--info-400); --color-info-500: var(--info-500);
   --color-info-600: var(--info-600); --color-info-700: var(--info-700); --color-info-800: var(--info-800);
   --color-info-900: var(--info-900); --color-info-950: var(--info-950);
-  /* Semantic utilities for new code and for dark mode later:
+  /* Semantic utilities for new code; they follow the theme:
      bg-canvas bg-surface bg-sunken bg-sidebar text-fg text-fg-strong text-fg-muted text-fg-subtle
      border-line border-line-strong border-control outline-focus */
   --color-canvas: var(--surface-page);
@@ -114,6 +122,14 @@
   --color-line-strong: var(--border-hover);
   --color-control: var(--border-control);
   --color-focus: var(--focus-ring);
+  /* text-on-fill (text and icons on a solid fill), text-on-fill-muted (secondary words on an ink-900
+     fill), bg-inverse and text-on-inverse (dark in both themes), bg-scrim (behind dialogs; bg-scrim/NN
+     for its opacity) */
+  --color-on-fill: var(--on-fill);
+  --color-on-fill-muted: var(--on-fill-muted);
+  --color-inverse: var(--surface-inverse);
+  --color-on-inverse: var(--text-on-inverse);
+  --color-scrim: var(--scrim);
 }
 
 /* Type, depth, motion. Radii keep Tailwind's defaults on purpose
@@ -123,11 +139,14 @@
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
 
-  --shadow-xs: 0 1px 2px rgba(14, 17, 20, .05);
-  --shadow-sm: 0 1px 2px rgba(14, 17, 20, .04), 0 1px 3px rgba(14, 17, 20, .06);
-  --shadow-md: 0 4px 12px -2px rgba(14, 17, 20, .08), 0 2px 4px -1px rgba(14, 17, 20, .04);
-  --shadow-lg: 0 12px 32px -8px rgba(14, 17, 20, .16), 0 4px 8px -2px rgba(14, 17, 20, .06);
-  --shadow-xl: 0 24px 64px -12px rgba(14, 17, 20, .24), 0 8px 16px -4px rgba(14, 17, 20, .08);
+  /* shadow-xs ... shadow-xl read the Layer 2 tokens below: Tailwind inlines an @theme shadow's value
+     into its utility, so a literal here would never follow the theme. The Layer 2 :root declaration
+     wins over this one (unlayered beats @layer theme), so the reference is never circular. */
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -135,9 +154,9 @@
   --animate-live-pulse: live-pulse 2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
   --animate-skeleton: skeleton 1.4s linear infinite;
   @keyframes live-pulse {
-    0%   { box-shadow: 0 0 0 0 rgb(3 90 123 / .35); }
-    70%  { box-shadow: 0 0 0 6px rgb(3 90 123 / 0); }
-    100% { box-shadow: 0 0 0 0 rgb(3 90 123 / 0); }
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info-500) 35%, transparent); }
+    70%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--info-500) 0%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info-500) 0%, transparent); }
   }
   @keyframes skeleton {
     from { background-position: 200% 0; }
@@ -147,18 +166,23 @@
 
 /* Type roles: text-display, text-h1 ... text-micro (size + line-height +
    tracking + weight). `inline` because --text-body is also the semantic
-   body-text colour in Layer 2; inlining keeps the utility's font-size literal. */
+   body-text colour in Layer 2; inlining keeps the utility's font-size literal.
+   The floor is 13px wherever the stylesheet loads (apps/common/tests/test_type_floor.py):
+   caption and micro are 13/18, and Tailwind's own text-xs (12px by default) is redefined
+   to 13/18 here so every use follows without an edit. Titles and headings are 700 in the
+   display stack (--font-display, below). */
 @theme inline {
-  --text-display: 2.5rem;   --text-display--line-height: 2.75rem;  --text-display--letter-spacing: -0.025em; --text-display--font-weight: 700;
+  --text-display: 2.5rem;   --text-display--line-height: 2.75rem;  --text-display--letter-spacing: -0.03em;  --text-display--font-weight: 700;
   --text-h1: 1.75rem;       --text-h1--line-height: 2.125rem;      --text-h1--letter-spacing: -0.02em;       --text-h1--font-weight: 700;
-  --text-h2: 1.25rem;       --text-h2--line-height: 1.625rem;      --text-h2--letter-spacing: -0.015em;      --text-h2--font-weight: 600;
-  --text-h3: 1rem;          --text-h3--line-height: 1.375rem;      --text-h3--letter-spacing: -0.01em;       --text-h3--font-weight: 600;
+  --text-h2: 1.25rem;       --text-h2--line-height: 1.625rem;      --text-h2--letter-spacing: -0.015em;      --text-h2--font-weight: 700;
+  --text-h3: 1rem;          --text-h3--line-height: 1.375rem;      --text-h3--letter-spacing: -0.01em;       --text-h3--font-weight: 700;
   --text-body-lg: 0.9375rem; --text-body-lg--line-height: 1.5rem;  --text-body-lg--letter-spacing: -0.005em;
   --text-body: 0.875rem;    --text-body--line-height: 1.25rem;
   --text-table: 0.875rem;   --text-table--line-height: 1.375rem;
   --text-small: 0.8125rem;  --text-small--line-height: 1.125rem;
-  --text-caption: 0.75rem;  --text-caption--line-height: 1rem;     --text-caption--letter-spacing: 0.005em;  --text-caption--font-weight: 500;
-  --text-micro: 0.6875rem;  --text-micro--line-height: 0.875rem;   --text-micro--letter-spacing: 0.02em;     --text-micro--font-weight: 600;
+  --text-caption: 0.8125rem; --text-caption--line-height: 1.125rem; --text-caption--letter-spacing: 0.005em;  --text-caption--font-weight: 500;
+  --text-micro: 0.8125rem;  --text-micro--line-height: 1.125rem;   --text-micro--letter-spacing: 0.02em;     --text-micro--font-weight: 600;
+  --text-xs: 0.8125rem;     --text-xs--line-height: 1.125rem;
 }
 
 /* Layer 2 · Semantic tokens. Variable NAMES are unchanged from the old file
@@ -168,7 +192,9 @@
   color-scheme: light;
 
   /* Brand layer (white-label swaps happen here; re-run the contrast check on any swap) */
-  --brand-font-display: var(--font-sans);   /* Georgia retired: titles are the system sans at 600/700 */
+  /* Titles and headings: the system font's display cut (Apple's switches in from 20px; Windows gets
+     Segoe UI Variable Display), 0 KB and nothing from another host. */
+  --brand-font-display: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --brand-font-body: var(--font-sans);
   --brand-font-mono: var(--font-mono);
   --brand-green-100: var(--brand-100);      /* the old olive checkbox accent now follows the brand */
@@ -186,8 +212,7 @@
   --primary-soft: var(--brand-50);          /* selected row */
   --primary-muted: var(--brand-100);        /* tinted button fill, text selection */
   --primary-ring: var(--brand-600);         /* SOLID outline colour (checkbox, toggle, .focus-ring) */
-  --primary-halo: rgb(30 112 87 / .18);     /* decorative halo around a focused input; the border carries 3:1 */
-  --primary-rgb: 17, 86, 65;                /* legacy rgba(var(--primary-rgb), a) users */
+  --primary-halo: color-mix(in srgb, var(--brand-600) 18%, transparent);   /* decorative halo around a focused input; the border carries 3:1 */
   --focus-ring: var(--brand-600);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
@@ -206,12 +231,12 @@
   --surface-2: var(--ink-100);              /* neutral chip, segmented track, skeleton */
   --surface-3: var(--ink-200);
   --surface-sheet: var(--ink-25);           /* table header, row hover, internal note */
-  --surface-sticky: rgb(246 247 248 / .92); /* translucent bars: ink-600 or darker text only */
-  --overlay: rgb(14 17 20 / .36);
+  --surface-sticky: color-mix(in srgb, var(--ink-50) 92%, transparent);   /* translucent bars: ink-600 or darker text only */
+  --overlay: color-mix(in srgb, var(--scrim) 36%, transparent);
 
   /* Borders */
   --border: var(--ink-200);                 /* hairlines, dividers, card edges (decorative) */
-  --border-hover: var(--ink-300);           /* clickable card hover, secondary button edge */
+  --border-hover: var(--ink-300);           /* clickable card hover, secondary button edge (border-line-strong); dark keeps it an edge */
   --border-control: var(--ink-400);         /* inputs, checkbox, radio, toggle-off: >= 3.1:1 everywhere */
 
   /* Text */
@@ -221,13 +246,21 @@
   --text-secondary: var(--ink-600);
   --text-tertiary: var(--ink-500);          /* meta, timestamps, placeholders (>= 4.67:1 on every surface) */
   --text-ghost: var(--ink-500);             /* was a separate grey; now the same AA-safe tertiary */
-  --text-inverse: #FFFFFF;
+  --text-inverse: var(--text-on-inverse);
   --text-link: var(--brand-700);
   --text-link-hover: var(--brand-800);
 
+  /* On a fill, inverse surfaces, scrims. Each light value is the literal it replaces, so light
+     cannot move: text-white on a fill, the ink-900 toast and its white text, ink-950 behind a dialog. */
+  --on-fill: var(--ink-0);                  /* text and icons on a solid fill: brand 700-900, danger, ink 800-900, status 500 */
+  --on-fill-muted: var(--ink-300);          /* secondary words on an ink-900 fill: the selected filter chip's count */
+  --surface-inverse: var(--ink-900);        /* dark in both themes: toast, tooltip, chart tip, the selection bars */
+  --text-on-inverse: var(--ink-0);
+  --scrim: var(--ink-950);                  /* behind dialogs and sheets (bg-scrim/NN) */
+
   /* Illustrations (retired: empty states use one line icon) */
   --color-illustration-border: var(--ink-200);
-  --color-illustration-card: #FFFFFF;
+  --color-illustration-card: var(--ink-0);
   --color-illustration-element: var(--ink-200);
   --color-illustration-secondary-element: var(--ink-100);
   --color-illustration-accent: var(--ink-400);
@@ -251,17 +284,24 @@
   --accent-indigo: var(--info-500);     --accent-indigo-soft: var(--info-50);
   --accent-emerald: var(--success-500); --accent-emerald-soft: var(--success-50);
 
-  /* Shadows (same values as the @theme ones so var() and shadow-* utilities agree) */
-  --shadow-xs: 0 1px 2px rgba(14, 17, 20, .05);
-  --shadow-sm: 0 1px 2px rgba(14, 17, 20, .04), 0 1px 3px rgba(14, 17, 20, .06);
-  --shadow-md: 0 4px 12px -2px rgba(14, 17, 20, .08), 0 2px 4px -1px rgba(14, 17, 20, .04);
-  --shadow-lg: 0 12px 32px -8px rgba(14, 17, 20, .16), 0 4px 8px -2px rgba(14, 17, 20, .06);
-  --shadow-xl: 0 24px 64px -12px rgba(14, 17, 20, .24), 0 8px 16px -4px rgba(14, 17, 20, .08);
+  /* Shadows: the shadow-* utilities read these (see @theme). A shadow is the scrim's colour, which stays
+     dark in both themes; the dark theme sets its own strengths. */
+  --shadow-xs: 0 1px 2px color-mix(in srgb, var(--scrim) 5%, transparent);
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--scrim) 4%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-md: 0 4px 12px -2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 4%, transparent);
+  --shadow-lg: 0 12px 32px -8px color-mix(in srgb, var(--scrim) 16%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-xl: 0 24px 64px -12px color-mix(in srgb, var(--scrim) 24%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 8%, transparent);
   --shadow-primary: none;                   /* the orange glow is gone; kept for its existing users */
-  --shadow-button: 0 1px 2px rgba(14, 17, 20, .12), inset 0 1px 0 rgba(255, 255, 255, .12);
-  --shadow-nav-active: 0 1px 2px rgba(14, 17, 20, .06), 0 0 0 1px rgba(14, 17, 20, .04);
-  --shadow-segment: 0 1px 2px rgba(14, 17, 20, .08), 0 0 0 .5px rgba(14, 17, 20, .06);
-  --shadow-creative: inset 0 0 0 1px rgba(14, 17, 20, .06);
+  --shadow-button: 0 1px 2px color-mix(in srgb, var(--scrim) 12%, transparent), inset 0 1px 0 color-mix(in srgb, var(--on-fill) 12%, transparent);
+  --shadow-nav-active: 0 1px 2px color-mix(in srgb, var(--scrim) 6%, transparent), 0 0 0 1px color-mix(in srgb, var(--scrim) 4%, transparent);
+  --shadow-segment: 0 1px 2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 0 0 .5px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-creative: inset 0 0 0 1px color-mix(in srgb, var(--scrim) 6%, transparent);
+
+  /* The select chevron (.bb-select, select.ui-input) in --text-tertiary. A data URI cannot read a
+     variable, so each theme declares its own; apps/common/tests/test_recolor_dark.py holds the URI's
+     colour to --text-tertiary in each theme. A <select> has no pseudo-element, and a mask on it would
+     clip its focus ring, so the chevron stays a background image. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
 
   /* Radii (identical to Tailwind's defaults; nothing shifts) */
   --radius-sm: 0.25rem;   /* 4px  checkbox */
@@ -280,6 +320,10 @@
   --dur-fast: 160ms;
   --dur-base: 220ms;
   --dur-slow: 320ms;
+  /* A rebuilt screen's motion runs on --dur-fast or --dur-snap only (spec D7); --dur-base and
+     --dur-slow stay for the pages not rebuilt. A sheet or drawer leaves at 70 % of its entrance. */
+  --dur-snap: 200ms;
+  --dur-exit: calc(var(--dur-snap) * .7);
 
   /* Fonts */
   --font-display: var(--brand-font-display);
@@ -301,6 +345,203 @@
   :root { --control-height: 2.75rem; }
 }
 
+:root {
+  /* Running text (spec D3): 16/24 below 1024px, 15/22 from 1024px. Set on <body> and offered as
+     text-read for a rebuilt screen's running text; text-sm (14px) stays for dense desktop tables and
+     meta. The leading is a ratio, so what inherits it from <body> keeps scaling with its own size. */
+  --read-size: 1rem;
+  --read-leading: 1.5;
+}
+@media (min-width: 1024px) {
+  :root { --read-size: 0.9375rem; --read-leading: calc(22 / 15); }
+}
+@utility text-read { font-size: var(--read-size); line-height: var(--read-leading); }
+
+/* Dark theme (spec D2, DESIGN_SYSTEM.md §21). Layer 1 is redefined, so every bg-ink-*, text-brand-*
+   and ring-success-* utility (declared @theme inline above) follows without edits, and each step keeps
+   its role: ink-0 the card, ink-50 the canvas, ink-950 the strongest text, brand-700 the primary fill
+   and link (a lighter Pine that carries dark text through --on-fill), status 50 the soft fill, 500 the
+   icon, 600 the chip text. The brand and status 300 steps keep their light values: their role is the
+   inverse surface (toast action, toast icons), which stays dark in both themes. ink-300 is the
+   exception: it changes with the ink scale, and as the toast detail it must read 4.5:1 on the dark
+   inverse surface (ink-200), so in dark it is a text-grade grey, not a border grey; an edge drawn in
+   ink-300 uses --border-hover (border-line-strong), which dark keeps an edge. Layer 2 sets only
+   what does not follow Layer 1; it writes no colour of its own. tools/contrast.py checks every pair in
+   both themes, but for the one light pair named in its LIGHT_EXCEPTIONS (below its bar before dark
+   mode; light must not move), and apps/common/tests/test_contrast.py runs it; it prints the §21 tables.
+
+   It applies where <html> says so: data-theme="dark" (the Appearance choice), or, without JavaScript, a
+   dark device on a page declared ready (data-theme-ready, apps/common/screens.py). The media block
+   repeats the attribute block exactly; the contrast test holds them equal. */
+:root[data-theme="dark"] {
+  --ink-0: #14171C; --ink-25: #191C20; --ink-50: #0C0F13; --ink-100: #1E2127;
+  --ink-200: #2A2E34; --ink-300: #91969D; --ink-400: #959AA1; --ink-500: #9CA1A9;
+  --ink-600: #B3B8BF; --ink-700: #C8CCD3; --ink-800: #D7DBE0; --ink-900: #E5E8EC;
+  --ink-950: #F2F3F6;
+  --brand-50: #12261F; --brand-100: #113529; --brand-200: #0F4232; --brand-300: #94D2BA;
+  --brand-400: #34856A; --brand-500: #369375; --brand-600: #3EA080; --brand-700: #4CAD8C;
+  --brand-800: #68C2A2; --brand-900: #85D4B6; --brand-950: #BFE9D8;
+  --success-50: #162614; --success-100: #1A3218; --success-200: #22471E; --success-300: #95E097;
+  --success-400: #4F9B48; --success-500: #6AC361; --success-600: #82D67A; --success-700: #A0E298;
+  --success-800: #B5ECAF; --success-900: #CDF3C8; --success-950: #E2F8DF;
+  --warning-50: #2E200F; --warning-100: #3C280E; --warning-200: #573606; --warning-300: #FFCA82;
+  --warning-400: #B47825; --warning-500: #E19A3D; --warning-600: #F2B366; --warning-700: #FCC687;
+  --warning-800: #FFD5A4; --warning-900: #FFE2BD; --warning-950: #FFEED9;
+  --danger-50: #341916; --danger-100: #461D19; --danger-200: #642722; --danger-300: #FEA69C;
+  --danger-400: #C35047; --danger-500: #ED756A; --danger-600: #FB988D; --danger-700: #FFB4AB;
+  --danger-800: #FFC7BF; --danger-900: #FFD9D3; --danger-950: #FFE7E4;
+  --info-50: #12242E; --info-100: #102F3E; --info-200: #0F4359; --info-300: #95CDEB;
+  --info-400: #4189AD; --info-500: #57A9D2; --info-600: #81C5E8; --info-700: #A0D7F4;
+  --info-800: #B7E2F9; --info-900: #CEEDFE; --info-950: #E2F5FF;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --on-fill: var(--ink-50);
+  --on-fill-muted: color-mix(in srgb, var(--on-fill) 70%, var(--ink-900));
+  --surface-inverse: var(--ink-200);
+  --text-on-inverse: var(--ink-950);
+  --scrim: var(--ink-50);
+  --primary-halo: color-mix(in srgb, var(--brand-600) 32%, transparent);
+  --surface-sticky: color-mix(in srgb, var(--ink-50) 92%, transparent);
+  --overlay: color-mix(in srgb, var(--scrim) 64%, transparent);
+  --text-inverse: var(--text-on-inverse);
+  --color-illustration-card: var(--ink-0);
+  --border-hover: color-mix(in srgb, var(--ink-300) 20%, var(--ink-200));
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239CA1A9' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  --shadow-xs: 0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent);
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--scrim) 36%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 48%, transparent);
+  --shadow-md: 0 4px 12px -2px color-mix(in srgb, var(--scrim) 56%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 36%, transparent);
+  --shadow-lg: 0 12px 32px -8px color-mix(in srgb, var(--scrim) 72%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 40%, transparent);
+  --shadow-xl: 0 24px 64px -12px color-mix(in srgb, var(--scrim) 80%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 48%, transparent);
+  --shadow-button: 0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink-950) 16%, transparent);
+  --shadow-nav-active: 0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent), 0 0 0 1px color-mix(in srgb, var(--ink-950) 6%, transparent);
+  --shadow-segment: 0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), 0 0 0 .5px color-mix(in srgb, var(--ink-950) 8%, transparent);
+  --shadow-creative: inset 0 0 0 1px color-mix(in srgb, var(--ink-950) 8%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme-ready]:not([data-theme="light"]) {
+    --ink-0: #14171C; --ink-25: #191C20; --ink-50: #0C0F13; --ink-100: #1E2127;
+    --ink-200: #2A2E34; --ink-300: #91969D; --ink-400: #959AA1; --ink-500: #9CA1A9;
+    --ink-600: #B3B8BF; --ink-700: #C8CCD3; --ink-800: #D7DBE0; --ink-900: #E5E8EC;
+    --ink-950: #F2F3F6;
+    --brand-50: #12261F; --brand-100: #113529; --brand-200: #0F4232; --brand-300: #94D2BA;
+    --brand-400: #34856A; --brand-500: #369375; --brand-600: #3EA080; --brand-700: #4CAD8C;
+    --brand-800: #68C2A2; --brand-900: #85D4B6; --brand-950: #BFE9D8;
+    --success-50: #162614; --success-100: #1A3218; --success-200: #22471E; --success-300: #95E097;
+    --success-400: #4F9B48; --success-500: #6AC361; --success-600: #82D67A; --success-700: #A0E298;
+    --success-800: #B5ECAF; --success-900: #CDF3C8; --success-950: #E2F8DF;
+    --warning-50: #2E200F; --warning-100: #3C280E; --warning-200: #573606; --warning-300: #FFCA82;
+    --warning-400: #B47825; --warning-500: #E19A3D; --warning-600: #F2B366; --warning-700: #FCC687;
+    --warning-800: #FFD5A4; --warning-900: #FFE2BD; --warning-950: #FFEED9;
+    --danger-50: #341916; --danger-100: #461D19; --danger-200: #642722; --danger-300: #FEA69C;
+    --danger-400: #C35047; --danger-500: #ED756A; --danger-600: #FB988D; --danger-700: #FFB4AB;
+    --danger-800: #FFC7BF; --danger-900: #FFD9D3; --danger-950: #FFE7E4;
+    --info-50: #12242E; --info-100: #102F3E; --info-200: #0F4359; --info-300: #95CDEB;
+    --info-400: #4189AD; --info-500: #57A9D2; --info-600: #81C5E8; --info-700: #A0D7F4;
+    --info-800: #B7E2F9; --info-900: #CEEDFE; --info-950: #E2F5FF;
+  }
+  :root[data-theme-ready]:not([data-theme="light"]) {
+    color-scheme: dark;
+    --on-fill: var(--ink-50);
+    --on-fill-muted: color-mix(in srgb, var(--on-fill) 70%, var(--ink-900));
+    --surface-inverse: var(--ink-200);
+    --text-on-inverse: var(--ink-950);
+    --scrim: var(--ink-50);
+    --primary-halo: color-mix(in srgb, var(--brand-600) 32%, transparent);
+    --surface-sticky: color-mix(in srgb, var(--ink-50) 92%, transparent);
+    --overlay: color-mix(in srgb, var(--scrim) 64%, transparent);
+    --text-inverse: var(--text-on-inverse);
+    --color-illustration-card: var(--ink-0);
+    --border-hover: color-mix(in srgb, var(--ink-300) 20%, var(--ink-200));
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239CA1A9' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    --shadow-xs: 0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent);
+    --shadow-sm: 0 1px 2px color-mix(in srgb, var(--scrim) 36%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 48%, transparent);
+    --shadow-md: 0 4px 12px -2px color-mix(in srgb, var(--scrim) 56%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 36%, transparent);
+    --shadow-lg: 0 12px 32px -8px color-mix(in srgb, var(--scrim) 72%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 40%, transparent);
+    --shadow-xl: 0 24px 64px -12px color-mix(in srgb, var(--scrim) 80%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 48%, transparent);
+    --shadow-button: 0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink-950) 16%, transparent);
+    --shadow-nav-active: 0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent), 0 0 0 1px color-mix(in srgb, var(--ink-950) 6%, transparent);
+    --shadow-segment: 0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), 0 0 0 .5px color-mix(in srgb, var(--ink-950) 8%, transparent);
+    --shadow-creative: inset 0 0 0 1px color-mix(in srgb, var(--ink-950) 8%, transparent);
+  }
+}
+
+/* The light content scope: platform previews and creatives look the way the platform shows them, in
+   both themes. It re-declares the light Layer 1 and Layer 2 exactly (the contrast test holds it equal
+   to the light :root), so the utilities inside it read light values again. It resets tokens, not
+   inherited properties: an element inside it that inherits `color` from outside keeps that colour, so
+   a preview sets its own text colour. */
+[data-theme-scope="light"] {
+  --ink-0: #FFFFFF; --ink-25: #FBFCFD; --ink-50: #F6F7F8; --ink-100: #EDEFF2;
+  --ink-200: #E1E4E8; --ink-300: #CED2D7; --ink-400: #83888F; --ink-500: #656B73;
+  --ink-600: #52575F; --ink-700: #3E434A; --ink-800: #2E3238; --ink-900: #1C1F24;
+  --ink-950: #0E1114;
+  --brand-50: #EFFAF5; --brand-100: #DDF3EA; --brand-200: #BFE7D6; --brand-300: #94D2BA;
+  --brand-400: #62B194; --brand-500: #388E71; --brand-600: #1E7057; --brand-700: #115641;
+  --brand-800: #0D4534; --brand-900: #0B3629; --brand-950: #062118;
+  --success-50: #EDFCED; --success-100: #DAF8DA; --success-200: #BCF0BC; --success-300: #95E097;
+  --success-400: #6CC871; --success-500: #429E4A; --success-600: #317F38; --success-700: #28682D;
+  --success-800: #215525; --success-900: #193F1B; --success-950: #0E2810;
+  --warning-50: #FFF7EB; --warning-100: #FFEED4; --warning-200: #FFDDAE; --warning-300: #FFCA82;
+  --warning-400: #FCAA38; --warning-500: #9B5A00; --warning-600: #7F4700; --warning-700: #683904;
+  --warning-800: #552C04; --warning-900: #432105; --warning-950: #2C1302;
+  --danger-50: #FFF3F1; --danger-100: #FFE4E0; --danger-200: #FFCDC6; --danger-300: #FEA69C;
+  --danger-400: #EF675C; --danger-500: #991618; --danger-600: #7C1213; --danger-700: #6A0E0E;
+  --danger-800: #570E0D; --danger-900: #450D0B; --danger-950: #2C0806;
+  --info-50: #EFF8FD; --info-100: #DDF1FC; --info-200: #BEE3F8; --info-300: #95CDEB;
+  --info-400: #4F9CC2; --info-500: #035A7B; --info-600: #044E6B; --info-700: #064058;
+  --info-800: #073548; --info-900: #082A3A; --info-950: #041B26;
+}
+[data-theme-scope="light"] {
+  color-scheme: light;
+  --brand-green-100: var(--brand-100); --brand-green-200: var(--brand-200); --brand-green-500: var(--brand-700);
+  --brand-green-600: var(--brand-800);
+  --primary: var(--brand-700); --primary-hover: var(--brand-800); --primary-pressed: var(--brand-900);
+  --primary-strong: var(--brand-700); --primary-strong-hover: var(--brand-800); --primary-bright: var(--brand-500);
+  --primary-soft: var(--brand-50); --primary-muted: var(--brand-100); --primary-ring: var(--brand-600);
+  --primary-halo: color-mix(in srgb, var(--brand-600) 18%, transparent);
+  --focus-ring: var(--brand-600);
+  --neutral-950: var(--ink-950); --neutral-900: var(--ink-900); --neutral-800: var(--ink-800);
+  --neutral-700: var(--ink-700); --neutral-600: var(--ink-600); --neutral-500: var(--ink-500);
+  --neutral-400: var(--ink-400); --neutral-300: var(--ink-300); --neutral-200: var(--ink-200);
+  --neutral-100: var(--ink-100); --neutral-50: var(--ink-50);
+  --surface-0: var(--ink-0); --surface-page: var(--ink-50); --surface-sidebar: var(--ink-100);
+  --surface-1: var(--ink-50); --surface-2: var(--ink-100); --surface-3: var(--ink-200);
+  --surface-sheet: var(--ink-25); --surface-sticky: color-mix(in srgb, var(--ink-50) 92%, transparent);
+  --overlay: color-mix(in srgb, var(--scrim) 36%, transparent);
+  --border: var(--ink-200); --border-hover: var(--ink-300); --border-control: var(--ink-400);
+  --text-strong: var(--ink-950); --text-primary: var(--ink-900); --text-body: var(--ink-700);
+  --text-secondary: var(--ink-600); --text-tertiary: var(--ink-500); --text-ghost: var(--ink-500);
+  --text-inverse: var(--text-on-inverse); --text-link: var(--brand-700); --text-link-hover: var(--brand-800);
+  --on-fill: var(--ink-0);
+  --on-fill-muted: var(--ink-300);
+  --surface-inverse: var(--ink-900);
+  --text-on-inverse: var(--ink-0);
+  --scrim: var(--ink-950);
+  --color-illustration-border: var(--ink-200); --color-illustration-card: var(--ink-0);
+  --color-illustration-element: var(--ink-200); --color-illustration-secondary-element: var(--ink-100);
+  --color-illustration-accent: var(--ink-400);
+  --success-soft: var(--success-50);
+  --warning-soft: var(--warning-50);
+  --error-50: var(--danger-50); --error-soft: var(--danger-50); --error-200: var(--danger-200);
+  --error-500: var(--danger-500); --error-600: var(--danger-600); --error-700: var(--danger-600);
+  --accent-teal: var(--success-500); --accent-teal-soft: var(--success-50); --accent-sky: var(--info-500);
+  --accent-sky-soft: var(--info-50); --accent-rose: var(--danger-500); --accent-rose-soft: var(--danger-50);
+  --accent-amber: var(--warning-500); --accent-amber-soft: var(--warning-50); --accent-indigo: var(--info-500);
+  --accent-indigo-soft: var(--info-50); --accent-emerald: var(--success-500);
+  --accent-emerald-soft: var(--success-50);
+  --shadow-xs: 0 1px 2px color-mix(in srgb, var(--scrim) 5%, transparent);
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--scrim) 4%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-md: 0 4px 12px -2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 4%, transparent);
+  --shadow-lg: 0 12px 32px -8px color-mix(in srgb, var(--scrim) 16%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-xl: 0 24px 64px -12px color-mix(in srgb, var(--scrim) 24%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 8%, transparent);
+  --shadow-button: 0 1px 2px color-mix(in srgb, var(--scrim) 12%, transparent), inset 0 1px 0 color-mix(in srgb, var(--on-fill) 12%, transparent);
+  --shadow-nav-active: 0 1px 2px color-mix(in srgb, var(--scrim) 6%, transparent), 0 0 0 1px color-mix(in srgb, var(--scrim) 4%, transparent);
+  --shadow-segment: 0 1px 2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 0 0 .5px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --shadow-creative: inset 0 0 0 1px color-mix(in srgb, var(--scrim) 6%, transparent);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
 
 /* ─────────────────── PART B · BASE, EXISTING CLASSES, NEW COMPONENTS ─────────────────── */
 
@@ -315,6 +556,8 @@
   }
   body {
     font-family: var(--font-body);
+    font-size: var(--read-size);
+    line-height: var(--read-leading);
     background: var(--surface-page);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
@@ -322,6 +565,10 @@
     text-rendering: optimizeLegibility;
   }
   ::selection { background: var(--brand-100); color: var(--ink-900); }
+
+  /* Titles and headings in the display stack (spec D3). Their weight and tracking come from the type
+     roles and the title classes; a utility on the element (font-mono) still wins. */
+  h1, h2, .ui-page-title, .text-display, .text-h1, .text-h2, h3, .text-h3, .ui-card-title { font-family: var(--font-display); }
 
   /* Transitional: headings that still set style="font-family: var(--font-display)" were Georgia at
      400. The display font is the system sans now, so give them heading weight and tracking until
@@ -368,9 +615,11 @@
 /* ═══════════════════════════════════════════════════════════════
    SIDEBAR - uses CSS variables that Tailwind can't express
    ═══════════════════════════════════════════════════════════════ */
+/* 12px inside the 8px gutter (base.html): the icon sits at 20px, on the workspace mark's and the account
+   avatar's column, and the label 12px after it (the mark and the avatar keep the same 12px gap). */
 .sidebar-nav-item {
-  display: flex; align-items: center; gap: 10px;
-  min-height: 32px; padding: 6px 10px;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 32px; padding: 6px 12px;
   border-radius: var(--radius-lg);
   font-size: 0.875rem; line-height: 1.25rem; font-weight: 500;
   color: var(--ink-700);
@@ -378,7 +627,7 @@
   transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .sidebar-nav-item svg { color: var(--ink-500); }
-.sidebar-nav-item:hover { background: rgb(14 17 20 / .05); color: var(--ink-900); }
+.sidebar-nav-item:hover { background: color-mix(in srgb, var(--ink-950) 5%, transparent); color: var(--ink-900); }
 .sidebar-nav-item.active,
 .sidebar-nav-item[aria-current="page"] {
   background: var(--surface-0);
@@ -389,22 +638,22 @@
 .sidebar-nav-item.active svg,
 .sidebar-nav-item[aria-current="page"] svg { color: var(--brand-700); }   /* 8.64:1 on the white pill */
 .sidebar-section-label {          /* sentence case, never uppercase */
-  font-size: 0.75rem; line-height: 1rem; font-weight: 600;
+  font-size: 0.8125rem; line-height: 1rem; font-weight: 600;
   text-transform: none; letter-spacing: 0;
   color: var(--ink-500);
-  padding: 14px 10px 4px;
+  padding: 14px 12px 4px;         /* inset as .sidebar-nav-item: the words start on the icons' 20px column */
 }
 .sidebar-badge {
   margin-left: auto; min-width: 20px; height: 18px; padding: 0 6px;
-  font-size: 11px; line-height: 18px; font-weight: 600; text-align: center;
+  font-size: 13px; line-height: 18px; font-weight: 600; text-align: center;
   font-variant-numeric: tabular-nums;
   border-radius: var(--radius-full);
   background: var(--ink-200); color: var(--ink-700);
 }
-.sidebar-badge.is-turn { background: var(--brand-700); color: #fff; }   /* Approvals waiting: the only accent badge */
+.sidebar-badge.is-turn { background: var(--brand-700); color: var(--on-fill); }   /* Approvals waiting: the only accent badge */
 .sidebar-logo-mark {
   width: 28px; height: 28px; border-radius: 7px;
-  background: var(--ink-900); color: #fff;
+  background: var(--surface-inverse); color: var(--text-on-inverse);   /* the logo mark stays dark in both themes */
   font-size: 13px; font-weight: 600;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
@@ -458,7 +707,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 .btn-neutral-100 { transition: background-color var(--dur-fast) var(--ease-out); }
 .btn-neutral-100:hover { background: var(--ink-100) !important; }
 .btn-danger-soft { transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
-.btn-danger-soft:hover { background: var(--danger-500) !important; color: #fff !important; }
+.btn-danger-soft:hover { background: var(--danger-500) !important; color: var(--on-fill) !important; }
 .btn-danger-soft-bg { transition: background-color var(--dur-fast) var(--ease-out); }
 .btn-danger-soft-bg:hover { background: var(--danger-50) !important; }
 .btn-primary-hover { transition: background-color var(--dur-fast) var(--ease-out); }
@@ -466,7 +715,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 .btn-primary-lift { transition: background-color var(--dur-fast) var(--ease-out); }
 .btn-primary-lift:hover { background: var(--primary-hover) !important; transform: none; box-shadow: var(--shadow-button); }
 .card-hover-lift { transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
-.card-hover-lift:hover { border-color: var(--ink-300) !important; box-shadow: var(--shadow-sm) !important; transform: none; }
+.card-hover-lift:hover { border-color: var(--border-hover) !important; box-shadow: var(--shadow-sm) !important; transform: none; }
 .btn-surface-1:hover { background: var(--surface-1) !important; }
 .btn-surface-2:hover { background: var(--surface-2) !important; }
 .btn-error-darker { transition: background-color var(--dur-fast) var(--ease-out); }
@@ -475,7 +724,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 .btn-text-hover-primary { transition: color var(--dur-fast) var(--ease-out); }
 .btn-text-hover-primary:hover { color: var(--text-primary) !important; }
 .btn-icon-hover { transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
-.btn-icon-hover:hover { background: rgb(14 17 20 / .05) !important; color: var(--text-primary) !important; }
+.btn-icon-hover:hover { background: color-mix(in srgb, var(--ink-950) 5%, transparent) !important; color: var(--text-primary) !important; }
 .btn-surface-neutral-50 { transition: background-color var(--dur-fast) var(--ease-out); }
 .btn-surface-neutral-50:hover { background: var(--ink-25) !important; }
 .btn-amber { transition: background-color var(--dur-fast) var(--ease-out); }
@@ -518,7 +767,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
   box-shadow: 0 0 0 1px var(--focus-ring), 0 0 0 4px var(--primary-halo);
 }
 .form-input-styled.is-error { border-color: var(--danger-500); }
-.form-input-styled.is-error:focus { box-shadow: 0 0 0 1px var(--danger-500), 0 0 0 4px rgb(153 22 24 / .14); }
+.form-input-styled.is-error:focus { box-shadow: 0 0 0 1px var(--danger-500), 0 0 0 4px color-mix(in srgb, var(--danger-500) 14%, transparent); }
 /* Flatpickr alt-input inherits .form-datetime styling */
 .form-datetime.flatpickr-input + .form-datetime { cursor: pointer; }
 
@@ -532,12 +781,12 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
   border: 0; cursor: pointer; text-decoration: none;
   transition: background-color var(--dur-instant) var(--ease-out), box-shadow var(--dur-instant) var(--ease-out), transform var(--dur-instant) var(--ease-out);
 }
-.btn-brand { background: var(--brand-700); color: #fff; box-shadow: var(--shadow-button); width: 100%; }
+.btn-brand { background: var(--brand-700); color: var(--on-fill); box-shadow: var(--shadow-button); width: 100%; }
 .btn-brand:hover { background: var(--brand-800); transform: none; box-shadow: var(--shadow-button); }
 .btn-brand:active { background: var(--brand-900); transform: scale(.98); }
 .btn-outline, .btn-social {
   background: var(--surface-0); color: var(--ink-900);
-  box-shadow: inset 0 0 0 1px var(--ink-300), var(--shadow-xs); width: 100%;
+  box-shadow: inset 0 0 0 1px var(--border-hover), var(--shadow-xs); width: 100%;
 }
 .btn-social { font-weight: 500; gap: 0.75rem; }
 .btn-outline:hover, .btn-social:hover { background: var(--ink-25); box-shadow: inset 0 0 0 1px var(--ink-400), var(--shadow-xs); transform: none; }
@@ -549,7 +798,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 /* Divider with text */
 .divider-text {
   display: flex; align-items: center; gap: 1rem;
-  color: var(--text-tertiary); font-size: 0.75rem; font-weight: 500;
+  color: var(--text-tertiary); font-size: 0.8125rem; font-weight: 500;
   text-transform: none; letter-spacing: 0;
 }
 .divider-text::before,
@@ -620,7 +869,7 @@ img.sidebar-logo-mark { background: transparent; box-shadow: var(--shadow-creati
 .flatpickr-months .flatpickr-next-month:hover { background: var(--surface-2); }
 .flatpickr-months .flatpickr-prev-month svg,
 .flatpickr-months .flatpickr-next-month svg { fill: var(--text-secondary); }
-span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: none; letter-spacing: 0; }
+span.flatpickr-weekday { font-size: 0.8125rem; font-weight: 600; color: var(--text-tertiary); text-transform: none; letter-spacing: 0; }
 .flatpickr-day {
   font-size: 0.8125rem;
   font-weight: 500;
@@ -635,13 +884,13 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 .flatpickr-day:hover { background: var(--surface-2); border-color: transparent; }
 .flatpickr-day.today:not(.selected) { border-color: var(--brand-200); background: transparent; }
 .flatpickr-day.today:not(.selected):hover { background: var(--brand-50); border-color: var(--brand-200); }
-.flatpickr-day.selected, .flatpickr-day.selected:hover { background: var(--brand-700); border-color: var(--brand-700); color: #fff; }
+.flatpickr-day.selected, .flatpickr-day.selected:hover { background: var(--brand-700); border-color: var(--brand-700); color: var(--on-fill); }
 .flatpickr-day.prevMonthDay, .flatpickr-day.nextMonthDay { color: var(--text-tertiary); }
 .flatpickr-day.flatpickr-disabled, .flatpickr-day.flatpickr-disabled:hover { color: var(--ink-400); }
 /* Time picker */
 .flatpickr-time { border-top: 1px solid var(--border); }
 .flatpickr-time input { font-family: var(--font-body); font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
-.flatpickr-time .flatpickr-am-pm { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
+.flatpickr-time .flatpickr-am-pm { font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); }
 .flatpickr-time .flatpickr-am-pm:hover,
 .flatpickr-time .flatpickr-am-pm:focus { background: var(--surface-2); }
 .flatpickr-time input:hover,
@@ -661,7 +910,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
    the right border). Pair with the usual border/padding utility classes. */
 .bb-select {
   appearance: none; -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-image: var(--select-chevron);
   background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1rem 1rem;
   padding-right: 2.5rem;
 }
@@ -698,8 +947,8 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   width: 16px;
   height: 16px;
   border-radius: 9999px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgb(14 17 20 / .24);
+  background: var(--on-fill);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--scrim) 24%, transparent);
   transition: transform var(--dur-fast) var(--ease-spring);
 }
 .bb-toggle input:checked + .bb-toggle-track { background: var(--brand-700); }
@@ -714,7 +963,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   background: var(--surface-sticky);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 1px solid rgb(14 17 20 / .06);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink-950) 6%, transparent);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .translucent-bar { background: var(--ink-50); } }
 @media (prefers-reduced-transparency: reduce) { .translucent-bar { background: var(--ink-50); backdrop-filter: none; -webkit-backdrop-filter: none; } }
@@ -745,11 +994,11 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-btn:disabled, .ui-btn[aria-disabled="true"] { cursor: not-allowed; }
   .ui-btn-sm { height: 32px; padding: 0 12px; font-size: 0.8125rem; }
   .ui-btn-lg { height: 44px; padding: 0 18px; font-size: 0.9375rem; border-radius: 10px; }
-  .ui-btn-primary { background: var(--brand-700); color: #fff; box-shadow: var(--shadow-button); }
+  .ui-btn-primary { background: var(--brand-700); color: var(--on-fill); box-shadow: var(--shadow-button); }
   .ui-btn-primary:hover { background: var(--brand-800); }
   .ui-btn-primary:active { background: var(--brand-900); transform: scale(.98); }
   .ui-btn-primary:disabled, .ui-btn-primary[aria-disabled="true"] { background: var(--ink-100); color: var(--ink-500); box-shadow: none; transform: none; }
-  .ui-btn-secondary { background: var(--surface-0); color: var(--ink-900); box-shadow: inset 0 0 0 1px var(--ink-300), var(--shadow-xs); }
+  .ui-btn-secondary { background: var(--surface-0); color: var(--ink-900); box-shadow: inset 0 0 0 1px var(--border-hover), var(--shadow-xs); }
   .ui-btn-secondary:hover { background: var(--ink-25); box-shadow: inset 0 0 0 1px var(--ink-400), var(--shadow-xs); }
   .ui-btn-secondary:active { background: var(--ink-50); }
   .ui-btn-secondary:disabled, .ui-btn-secondary[aria-disabled="true"] { background: var(--ink-50); color: var(--ink-500); box-shadow: inset 0 0 0 1px var(--ink-200); }
@@ -757,19 +1006,28 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-btn-tinted:hover { background: var(--brand-200); color: var(--brand-800); }
   .ui-btn-tinted:disabled, .ui-btn-tinted[aria-disabled="true"] { background: var(--ink-100); color: var(--ink-500); }
   .ui-btn-ghost { background: transparent; color: var(--ink-700); }
-  .ui-btn-ghost:hover { background: rgb(14 17 20 / .05); color: var(--ink-900); }
-  .ui-btn-ghost:active { background: rgb(14 17 20 / .10); }
+  .ui-btn-ghost:hover { background: color-mix(in srgb, var(--ink-950) 5%, transparent); color: var(--ink-900); }
+  .ui-btn-ghost:active { background: color-mix(in srgb, var(--ink-950) 10%, transparent); }
   .ui-btn-ghost:disabled, .ui-btn-ghost[aria-disabled="true"] { color: var(--ink-500); background: transparent; }
-  .ui-btn-danger { background: var(--danger-500); color: #fff; box-shadow: var(--shadow-button); }   /* confirm in a modal only (8.46:1) */
+  .ui-btn-danger { background: var(--danger-500); color: var(--on-fill); box-shadow: var(--shadow-button); }   /* the confirm of a destructive act only: inline (components/inline_confirm.html), or a modal on a screen not yet rebuilt (8.46:1) */
   .ui-btn-danger:hover { background: var(--danger-600); }
   .ui-btn-danger-ghost { background: transparent; color: var(--danger-500); }                      /* Delete / Discard in rows and menus */
   .ui-btn-danger-ghost:hover { background: var(--danger-50); }
   .ui-btn-icon { width: 32px; height: 32px; padding: 0; color: var(--ink-500); background: transparent; }   /* always with aria-label */
-  .ui-btn-icon:hover { background: rgb(14 17 20 / .05); color: var(--ink-900); }
+  .ui-btn-icon:hover { background: color-mix(in srgb, var(--ink-950) 5%, transparent); color: var(--ink-900); }
   .ui-btn-icon svg { width: 18px; height: 18px; }
   @media (max-width: 1023px) {
     .ui-btn, .ui-btn-sm, .ui-btn-lg { min-height: 44px; }
     .ui-btn-icon { width: 44px; height: 44px; }
+  }
+
+  /* The screen's one primary, floating (components/primary_action.html, spec D5): with ui-btn
+     ui-btn-primary. Below 1024px a 56px pill with its icon and words; the component's utilities fix it
+     16px from the right above the phone bar. From 1024px it is lg:static in the page header and looks
+     like any primary button. The toasts rise above it and it hides under a selection bar (below). */
+  @media (max-width: 1023px) {
+    .ui-fab { height: 56px; padding: 0 24px 0 20px; gap: 8px; border-radius: 9999px; font-size: 1rem; line-height: 1.5rem; box-shadow: var(--shadow-lg); }
+    .ui-fab svg { width: 20px; height: 20px; }
   }
 
   /* Standalone link (card header "All threads"); inline links use .link-inline */
@@ -788,7 +1046,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   textarea.ui-input { height: auto; min-height: 88px; padding: 8px 12px; }
   select.ui-input {
     appearance: none; -webkit-appearance: none; padding-right: 2.5rem;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-image: var(--select-chevron);
     background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1rem 1rem;
   }
   .ui-input::placeholder { color: var(--ink-500); }
@@ -805,16 +1063,18 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-error { margin-top: 6px; display: flex; gap: 6px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--danger-500); }
   .ui-checkbox { width: 16px; height: 16px; border-radius: 4px; accent-color: var(--brand-700); }
 
-  /* Cards: hero cards ui-card (16px radius, 20px padding), list cards ui-card-nested (12px, 16px) */
+  /* Cards: hero cards ui-card (16px radius; 20px padding below 1024px, 24px from 1024px), list cards
+     ui-card-nested (12px, 16px). A screen's sections sit in ui-sections, 32px apart (spec D4). */
   .ui-card { background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-2xl); padding: 20px; box-shadow: var(--shadow-xs); }
   .ui-card-nested { background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 16px; }
-  @media (max-width: 639px) { .ui-card { padding: 16px; } }
+  @media (min-width: 1024px) { .ui-card { padding: 24px; } }
+  .ui-sections { display: flex; flex-direction: column; gap: 32px; }
   .ui-card-link { transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
-  .ui-card-link:hover { border-color: var(--ink-300); box-shadow: var(--shadow-sm); }
+  .ui-card-link:hover { border-color: var(--border-hover); box-shadow: var(--shadow-sm); }
   .ui-card-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .ui-card-title { font-size: 1.25rem; line-height: 1.625rem; letter-spacing: -0.015em; font-weight: 600; color: var(--ink-950); }
+  .ui-card-title { font-size: 1.25rem; line-height: 1.625rem; letter-spacing: -0.015em; font-weight: 700; color: var(--ink-950); }
   .ui-card-subtitle { margin-top: 2px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--ink-600); }
-  .ui-group-label { margin: 18px 0 4px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--ink-500); }
+  .ui-group-label { margin: 18px 0 4px; font-size: 0.8125rem; line-height: 1rem; font-weight: 600; color: var(--ink-500); }
 
   /* Page header: <h1 class="ui-page-title"> + <p class="ui-page-status"> */
   .ui-page-title { font-size: 1.75rem; line-height: 2.125rem; letter-spacing: -0.02em; font-weight: 700; color: var(--ink-950); }
@@ -825,7 +1085,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
      <span class="ui-pill ui-pill-warning"><svg …/>Ready for approval</span> */
   .ui-pill {
     display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px 0 7px;
-    border-radius: 9999px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; white-space: nowrap;
+    border-radius: 9999px; font-size: 0.8125rem; line-height: 1rem; font-weight: 600; white-space: nowrap;
     background: var(--ink-100); color: var(--ink-700); box-shadow: inset 0 0 0 1px var(--ink-200);
   }
   .ui-pill svg { width: 12px; height: 12px; flex: none; color: var(--ink-500); }
@@ -842,26 +1102,28 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-badge {
     display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; padding: 0 6px;
     border-radius: 9999px; background: var(--ink-200); color: var(--ink-700);
-    font-size: 11px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums;
+    font-size: 13px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums;
   }
-  .ui-badge-turn { background: var(--brand-700); color: #fff; }
-  .ui-badge-danger { background: var(--danger-500); color: #fff; }
+  .ui-badge-turn { background: var(--brand-700); color: var(--on-fill); }
+  .ui-badge-danger { background: var(--danger-500); color: var(--on-fill); }
 
   /* Tag chip with a 24px remove button */
-  .ui-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 2px 0 8px; border-radius: 9999px; background: var(--ink-100); color: var(--ink-700); font-size: 0.75rem; font-weight: 600; }
+  .ui-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 2px 0 8px; border-radius: 9999px; background: var(--ink-100); color: var(--ink-700); font-size: 0.8125rem; font-weight: 600; }
   .ui-chip:not(:has(button)) { padding-right: 8px; }
   .ui-chip button { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 9999px; color: var(--ink-500); }
   .ui-chip button:hover { background: var(--ink-200); color: var(--ink-900); }
 
-  /* Filter chip: aria-pressed="true" turns it ink-900 (never the accent) */
+  /* Filter chip: aria-pressed="true" turns it ink (never the accent) */
   .ui-filter-chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9999px; font-size: 0.8125rem; font-weight: 500; color: var(--ink-700); white-space: nowrap; }
   .ui-filter-chip:hover { background: var(--ink-100); }
-  .ui-filter-chip[aria-pressed="true"], .ui-filter-chip.is-selected { background: var(--ink-900); color: #fff; font-weight: 600; }
+  /* Selected: ink-900 with on-fill words (a count in text-on-fill-muted), dark in light and light in dark,
+     so the chip stands off the card and the canvas in both themes (DESIGN_SYSTEM.md §21). */
+  .ui-filter-chip[aria-pressed="true"], .ui-filter-chip.is-selected { background: var(--ink-900); color: var(--on-fill); font-weight: 600; }
   @media (max-width: 1023px) { .ui-filter-chip { height: 44px; } }
 
   /* Segmented control (peer views: Home / Routines / Team / Settings).
      <nav class="ui-segmented"><a class="ui-segment" aria-current="page">Home</a>… */
-  .ui-segmented { display: inline-flex; max-width: 100%; overflow-x: auto; padding: 2px; border-radius: 9px; background: rgb(14 17 20 / .055); scrollbar-width: none; }
+  .ui-segmented { display: inline-flex; max-width: 100%; overflow-x: auto; padding: 2px; border-radius: 9px; background: color-mix(in srgb, var(--ink-950) 5.5%, transparent); scrollbar-width: none; }
   .ui-segmented::-webkit-scrollbar { display: none; }
   .ui-segment {
     display: inline-flex; align-items: center; justify-content: center; padding: 5px 14px; border-radius: 7px;
@@ -872,6 +1134,12 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-segment[aria-current="page"], .ui-segment[aria-selected="true"], .ui-segment.is-active {
     background: var(--surface-0); color: var(--ink-950); font-weight: 600; box-shadow: var(--shadow-segment);
   }
+  /* A segment that is a choice (Appearance): <label class="ui-segment relative"><input type="radio"
+     class="absolute inset-0 size-full opacity-0">Light</label>. The invisible radio covers the segment, so
+     a tap lands on it; the checked one looks selected and the keyboard's ring is drawn on the segment.
+     Rules of their own: a browser without :has() drops only these, not the ones above. */
+  .ui-segment:has(> input:checked) { background: var(--surface-0); color: var(--ink-950); font-weight: 600; box-shadow: var(--shadow-segment); }
+  .ui-segment:has(> input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
   @media (max-width: 1023px) { .ui-segment { min-height: 44px; } }
 
   /* Section tabs (Queue / Drafts / Approvals / Sent): ink underline, never the accent */
@@ -894,12 +1162,20 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px 16px; }
   a.ui-row:hover, .ui-row.is-clickable:hover { background: var(--ink-25); }
   .ui-row[aria-selected="true"] { background: var(--brand-50); }
+  /* The status border (spec D6): a list row carries data-tone from the one status mapping
+     ({{ post.status|status_tone }}, {{ brief.status|brief_tone }}) and draws a 2px left border in the
+     tone's 500 step, the pill's icon colour. An extra cue for scanning; the row keeps its pill. */
+  [data-tone="neutral"] { border-left: 2px solid var(--ink-500); }
+  [data-tone="info"] { border-left: 2px solid var(--info-500); }
+  [data-tone="success"] { border-left: 2px solid var(--success-500); }
+  [data-tone="warning"] { border-left: 2px solid var(--warning-500); }
+  [data-tone="danger"] { border-left: 2px solid var(--danger-500); }
   .ui-thumb { width: 44px; height: 55px; flex: none; border-radius: 7px; object-fit: cover; background: var(--ink-50); box-shadow: var(--shadow-creative); }
 
   /* Tables */
   .ui-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface-0); }
   .ui-table { width: 100%; border-collapse: collapse; }
-  .ui-table th { height: 36px; padding: 0 16px; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--ink-600); background: var(--ink-25); border-bottom: 1px solid var(--ink-300); white-space: nowrap; }
+  .ui-table th { height: 36px; padding: 0 16px; text-align: left; font-size: 0.8125rem; font-weight: 600; color: var(--ink-600); background: var(--ink-25); border-bottom: 1px solid var(--border-hover); white-space: nowrap; }
   .ui-table td { padding: 14px 16px; font-size: 0.875rem; line-height: 1.375rem; color: var(--ink-900); border-bottom: 1px solid var(--border); }
   .ui-table tr:last-child td { border-bottom: 0; }
   .ui-table tbody tr:hover { background: var(--ink-25); }
@@ -917,12 +1193,12 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-callout-info { background: var(--info-50); box-shadow: inset 0 0 0 1px var(--info-200); color: var(--info-700); }
   .ui-callout-info svg { color: var(--info-500); }
   /* "For the owner" box: setting names in <code> */
-  .ui-owner-box { border-radius: var(--radius-md); background: var(--ink-50); box-shadow: inset 0 0 0 1px var(--ink-200); padding: 8px 12px; font-size: 0.75rem; line-height: 1.125rem; color: var(--ink-700); }
+  .ui-owner-box { border-radius: var(--radius-md); background: var(--ink-50); box-shadow: inset 0 0 0 1px var(--ink-200); padding: 8px 12px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--ink-700); }
   .ui-owner-box code { font-family: var(--font-mono); }
 
   /* Menus and popovers */
   .ui-menu { border-radius: var(--radius-xl); background: var(--surface-0); padding: 4px; box-shadow: var(--shadow-lg), 0 0 0 1px var(--ink-200); }
-  .ui-menu-item { display: flex; width: 100%; min-height: 34px; align-items: center; gap: 8px; border-radius: var(--radius-lg); padding: 0 10px; font-size: 0.875rem; color: var(--ink-900); text-align: left; text-decoration: none; cursor: pointer; }
+  .ui-menu-item { display: flex; width: 100%; min-height: 34px; align-items: center; gap: 8px; border-radius: var(--radius-lg); padding: 0 12px; font-size: 0.875rem; color: var(--ink-900); text-align: left; text-decoration: none; cursor: pointer; }
   .ui-menu-item:hover { background: var(--ink-50); }
   .ui-menu-item svg { width: 16px; height: 16px; flex: none; color: var(--ink-500); }
   .ui-menu-item.is-danger { color: var(--danger-500); }
@@ -938,13 +1214,14 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-modal-body { padding: 0 24px 20px; font-size: 0.875rem; line-height: 1.25rem; color: var(--ink-700); }
   .ui-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border); }
 
-  /* Toast: dark, bottom right (bottom on phones) */
-  .ui-toast { display: flex; align-items: flex-start; gap: 12px; max-width: 420px; border-radius: var(--radius-xl); background: var(--ink-900); padding: 12px 14px; font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; color: #fff; box-shadow: var(--shadow-lg); }
+  /* Toast: the inverse surface (dark in both themes), bottom right (bottom on phones) */
+  .ui-toast { display: flex; align-items: flex-start; gap: 12px; max-width: 420px; border-radius: var(--radius-xl); background: var(--surface-inverse); padding: 12px 14px; font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; color: var(--text-on-inverse); box-shadow: var(--shadow-lg); }
   .ui-toast-detail { display: block; font-size: 0.8125rem; line-height: 1.125rem; font-weight: 400; color: var(--ink-300); }
   .ui-toast-action { font-weight: 600; color: var(--brand-300); }
   .ui-toast-action:hover { text-decoration: underline; }
 
-  /* Empty state: one line icon, a title, one sentence, at most one action */
+  /* Empty state: one line icon, a title, one sentence, at most one action (components/empty_state.html:
+     the icon, one sentence and one tinted or secondary button) */
   .ui-empty { padding: 32px 24px; text-align: center; }
   .ui-empty > svg { width: 32px; height: 32px; margin: 0 auto; color: var(--ink-400); }
   .ui-empty-title { margin-top: 12px; font-size: 0.9375rem; line-height: 1.375rem; font-weight: 600; color: var(--ink-900); }
@@ -958,6 +1235,23 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .ui-spinner { width: 14px; height: 14px; border-radius: 9999px; border: 2px solid var(--ink-200); border-top-color: var(--info-500); animation: ui-spin 1s linear infinite; }
   @keyframes ui-spin { to { transform: rotate(360deg); } }
 }
+
+/* ── The floating primary and what it shares the bottom of a phone with (spec D5) ──
+   A page that shows components/primary_action.html sets has-fab on body. Below 1024px the button's
+   top is 8rem above the screen's bottom edge (its bottom 4.5rem up, clear of the phone bar, and 56px
+   tall), so the toasts rise 16px above it, to 9rem, as has-selection lifts them over the selection
+   bars; the page's room at the end and its scrollers' padding grow so its last line and a focused
+   control clear it (WCAG 2.4.11). It hides while a selection bar shows (visibility, so the header
+   keeps its height from 1024px). Unlayered on purpose: the toast host's rules are an unlayered <style>
+   (approvals/partials/_toasts.html) and the error toast's bottom (base.html, named by its test id) and
+   the room's height are utilities, which a layered rule would lose to. */
+@media (max-width: 1023px) {
+  body.has-fab #bb-toast-host { bottom: calc(9rem + env(safe-area-inset-bottom)); }
+  body.has-fab [data-testid="error-toast"] { bottom: calc(9rem + env(safe-area-inset-bottom)); }
+  body.has-fab [data-phone-bar-room] { height: 8.5rem; }
+  body.has-fab [data-phone-bar-scroll] { scroll-padding-bottom: calc(8.5rem + env(safe-area-inset-bottom)); }
+}
+body.has-selection .ui-fab, body.has-approval-selection .ui-fab { visibility: hidden; }
 
 
 /* ── Live-team parts (things utilities cannot express) ── */
@@ -974,12 +1268,12 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 /* Stage track: <ol class="stage-track"><li class="stage" data-state="done|working|needs-you|waiting|failed"> */
 .stage-track { display: flex; list-style: none; margin: 0; padding: 0; }
 .stage { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
-         font-size: 0.75rem; line-height: 1rem; font-weight: 500; color: var(--ink-600); text-align: center; }
+         font-size: 0.8125rem; line-height: 1rem; font-weight: 500; color: var(--ink-600); text-align: center; }
 .stage::before { content: ""; position: absolute; top: 7px; left: -50%; right: 50%; height: 2px; background: var(--ink-200); }
 .stage:first-child::before { display: none; }
 .stage:not([data-state="waiting"])::before { background: var(--success-500); }
 .stage-node { position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 9999px; background: var(--surface-0);
-              display: grid; place-items: center; color: #fff; }
+              display: grid; place-items: center; color: var(--on-fill); }
 .stage-node svg { width: 10px; height: 10px; }
 .stage[data-state="done"] .stage-node { background: var(--success-500); }
 .stage[data-state="failed"] .stage-node { background: var(--danger-500); }
@@ -996,33 +1290,35 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 .receipt-item:last-child { padding-bottom: 0; }
 .receipt-item:last-child::before { display: none; }
 .receipt-item time, .receipt-item .receipt-meta { color: var(--ink-500); font-variant-numeric: tabular-nums; }
-.receipt-node { flex: none; width: 16px; height: 16px; margin-top: 1px; border-radius: 9999px; background: var(--surface-0); display: grid; place-items: center; color: #fff; }
+.receipt-node { flex: none; width: 16px; height: 16px; margin-top: 1px; border-radius: 9999px; background: var(--surface-0); display: grid; place-items: center; color: var(--on-fill); }
 .receipt-node svg { width: 10px; height: 10px; }
 .receipt-item[data-state="done"] .receipt-node { background: var(--success-500); }
 .receipt-item[data-state="current"] .receipt-node { box-shadow: inset 0 0 0 2px var(--info-500); }
 .receipt-item[data-state="pending"] .receipt-node { box-shadow: inset 0 0 0 1.5px var(--ink-400); }   /* 3.57:1 + the word "Pending" */
 .receipt-item[data-state="failed"] .receipt-node { background: var(--danger-500); }
 
-/* Hour-bar chart: 24 bars, single series in ink, the current hour in ink-900, failures stacked in danger */
-.hour-chart { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; align-items: end; height: 96px; border-bottom: 1px solid var(--ink-300); }
+/* Hour-bar chart: 24 bars, single series in ink, the current hour in ink-900, failures stacked in danger.
+   The current hour and the timeline's now line are marks on the card, not surfaces: they keep ink-900,
+   which flips with the theme, so each stays the strongest mark (3:1 on the card in both themes). */
+.hour-chart { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; align-items: end; height: 96px; border-bottom: 1px solid var(--border-hover); }
 .hour-bar { display: flex; flex-direction: column; justify-content: flex-start; background: var(--ink-400); border-radius: 4px 4px 0 0; min-height: 0; }
 .hour-bar.is-now { background: var(--ink-900); }
 .hour-bar:hover, .hour-bar:focus-visible { background: var(--ink-600); }
 .hour-bar-fail { background: var(--danger-500); border-radius: 4px 4px 0 0; box-shadow: 0 2px 0 var(--surface-0); margin-bottom: 2px; }
-.chart-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.75rem; line-height: 1rem; font-weight: 500; color: var(--ink-500); font-variant-numeric: tabular-nums; }
-.chart-tip { background: var(--ink-900); color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 0.75rem; line-height: 1rem; box-shadow: var(--shadow-lg); pointer-events: none; }
+.chart-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.8125rem; line-height: 1rem; font-weight: 500; color: var(--ink-500); font-variant-numeric: tabular-nums; }
+.chart-tip { background: var(--surface-inverse); color: var(--text-on-inverse); border-radius: 8px; padding: 6px 10px; font-size: 0.8125rem; line-height: 1rem; box-shadow: var(--shadow-lg); pointer-events: none; }
 
 /* Next-24-hours timeline (desktop). Below 768px it renders as a plain list. */
 .timeline { position: relative; height: 150px; }
-.timeline-axis { position: absolute; left: 0; right: 0; top: 70px; height: 1px; background: var(--ink-300); }
+.timeline-axis { position: absolute; left: 0; right: 0; top: 70px; height: 1px; background: var(--border-hover); }
 .timeline-now { position: absolute; top: 22px; bottom: 30px; width: 2px; border-radius: 1px; background: var(--ink-900); }
 .timeline-quiet { position: absolute; top: 52px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
-                  font-size: 0.75rem; font-weight: 500; color: var(--ink-600);
+                  font-size: 0.8125rem; font-weight: 500; color: var(--ink-600);
                   background: repeating-linear-gradient(135deg, var(--ink-100) 0 6px, var(--ink-50) 6px 12px); }
 .timeline-event { position: absolute; top: 62px; transform: translateX(-8px); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .timeline-event.is-up { top: auto; bottom: 72px; flex-direction: column-reverse; }
-.timeline-event b { max-width: 168px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--ink-900); }
-.timeline-ticks { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--ink-500); font-variant-numeric: tabular-nums; }
+.timeline-event b { max-width: 168px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; line-height: 1rem; font-weight: 600; color: var(--ink-900); }
+.timeline-ticks { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; font-size: 0.8125rem; color: var(--ink-500); font-variant-numeric: tabular-nums; }
 
 /* Skeleton: appears only after 300ms so fast loads never flash it */
 .skeleton {
@@ -1038,6 +1334,42 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .toast-enter { animation: toast-in 240ms var(--ease-out); }
 
+/* The HTMX progress bar (base.html's #htmx-progress): 2px at the top while a request runs, its width
+   200ms, its fade 250ms. Moved here from base.html's own style block, as every local motion block is
+   (spec D7); its reduced form is in the block below. */
+#htmx-progress {
+  position: fixed; top: 0; left: 0; height: 2px; width: 0; max-width: 100%;
+  background: var(--primary); z-index: 9999; opacity: 0; pointer-events: none;
+  transition: width .2s var(--ease-out), opacity .25s ease;
+}
+#htmx-progress.active { opacity: 1; }
+
+/* ── Motion for the rebuilt screens (spec D7; DESIGN_SYSTEM §8) ──
+   Each runs on --dur-snap (200ms), a leaving sheet on --dur-exit (140ms), and each has its reduced
+   form in the block below, where nothing here moves. Unlayered, so the class wins over a transition a
+   component or a utility sets on the same element.
+   - .motion-rise: a message arriving, opacity and a 6px rise.
+   - .motion-sheet-*: a sheet's x-transition classes. enter "motion-sheet-enter", enter-start
+     "motion-sheet-out", enter-end "motion-sheet-in"; leave "motion-sheet-leave", leave-start
+     "motion-sheet-in", leave-end "motion-sheet-out". It comes up from the bottom below 1024px and in
+     from the right from 1024px.
+   - .motion-fill: the approve button filling with the server's words (§12.3).
+   - .motion-snap: the calendar chip settling into its new slot (its transform back to none). */
+@keyframes motion-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.motion-rise { animation: motion-rise var(--dur-snap) var(--ease-out); }
+.motion-sheet-enter { transition: transform var(--dur-snap) var(--ease-out); }
+.motion-sheet-leave { transition: transform var(--dur-exit) var(--ease-exit); }
+.motion-sheet-out { transform: translateY(100%); }
+.motion-sheet-in { transform: none; }
+@media (min-width: 1024px) {
+  .motion-sheet-out { transform: translateX(100%); }
+}
+.motion-fill {
+  transition: background-color var(--dur-snap) var(--ease-out), color var(--dur-snap) var(--ease-out),
+              border-color var(--dur-snap) var(--ease-out), box-shadow var(--dur-snap) var(--ease-out);
+}
+.motion-snap { transition: transform var(--dur-snap) var(--ease-out); }
+
 /* Reduced motion: no transforms, no loops; state words carry the meaning */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -1050,6 +1382,12 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .live-dot--working, .stage-node::after, .animate-spin, .ui-spinner { animation: none !important; }
   .skeleton { animation: none !important; background: var(--ink-100); }
   .skeleton-delay { opacity: 1; }
+  #htmx-progress { transition: opacity .1s; }
+  /* The motion classes do not run at all: a message appears, the fill swaps, the chip moves without
+     its snap, and a sheet appears and goes in place. */
+  .motion-rise { animation: none !important; }
+  .motion-sheet-enter, .motion-sheet-leave, .motion-fill, .motion-snap { transition: none !important; }
+  .motion-sheet-out { transform: none !important; }
 }
 
 /* Windows High Contrast / forced colours: states drawn with box-shadow get a real outline */
@@ -1057,6 +1395,7 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
   .sidebar-nav-item[aria-current="page"], .sidebar-nav-item.active,
   .ui-segment[aria-current="page"], .ui-btn-secondary, .ui-pill,
   [aria-selected="true"], [aria-pressed="true"], [aria-checked="true"][role="radio"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .ui-segment:has(> input:checked) { outline: 2px solid Highlight; outline-offset: -2px; }
   .live-dot, .stage-node, .receipt-node, .hour-bar, .hour-bar-fail { forced-color-adjust: none; }
   /* Toggles are drawn with background colours only, which forced colours flatten to Canvas: give the
      track an edge, the knob a system colour, and "on" the Highlight fill so on and off stay apart. */
@@ -1069,5 +1408,5 @@ span.flatpickr-weekday { font-size: 0.75rem; font-weight: 600; color: var(--text
 }
 
 /* Keyframes repeated outside @theme so plain CSS that reads var(--animate-*) always finds them */
-@keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgb(3 90 123 / .35); } 70% { box-shadow: 0 0 0 6px rgb(3 90 123 / 0); } 100% { box-shadow: 0 0 0 0 rgb(3 90 123 / 0); } }
+@keyframes live-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info-500) 35%, transparent); } 70% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--info-500) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info-500) 0%, transparent); } }
 @keyframes skeleton { from { background-position: 200% 0; } to { background-position: -200% 0; } }

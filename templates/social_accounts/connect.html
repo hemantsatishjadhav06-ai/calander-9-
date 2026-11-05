@@ -106,8 +106,8 @@
                     {% if request.user.is_staff %}
                     <p class="mt-2 text-xs leading-snug text-ink-600">
                         Create an app at console.x.com with OAuth 2.0 (Web App, confidential client) and the callback
-                        <code class="text-[11px] break-all">{{ request.scheme }}://{{ request.get_host }}{% url 'social_accounts:oauth_callback' platform='x' %}</code>,
-                        then set <code class="text-[11px]">PLATFORM_X_CLIENT_ID</code> and <code class="text-[11px]">PLATFORM_X_CLIENT_SECRET</code>
+                        <code class="text-xs break-all">{{ request.scheme }}://{{ request.get_host }}{% url 'social_accounts:oauth_callback' platform='x' %}</code>,
+                        then set <code class="text-xs">PLATFORM_X_CLIENT_ID</code> and <code class="text-xs">PLATFORM_X_CLIENT_SECRET</code>
                         (or add them under <span class="font-medium text-ink-700">Admin → Platform credentials</span>). Add API credits before connecting: X has no free tier.
                     </p>
                     {% else %}
@@ -121,7 +121,7 @@
                     <p class="mt-2 text-xs leading-snug text-ink-600">
                         Needs a developer app from this platform. Add its credentials under
                         <span class="font-medium text-ink-700">Admin → Platform credentials</span>
-                        (or the <code class="text-[11px]">PLATFORM_*</code> environment variables). The README walks through each platform's app review.
+                        (or the <code class="text-xs">PLATFORM_*</code> environment variables). The README walks through each platform's app review.
                     </p>
                     {% else %}
                     {# Customers are not the people who can fix this; server-admin instructions only confused them. The section line already says why it is not open; the row only adds a way to hear when it is. #}

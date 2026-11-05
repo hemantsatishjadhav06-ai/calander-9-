@@ -174,3 +174,11 @@ marketing:request_invite
 /platforms/
 /developers/
 /get-started/
+
+# The New post sheet on Home and Calendar (Phase 3, screen 1)
+studio:thread_start  405  # POST only: Home's conversation composer
+composer:compose  # Write it myself: Open the editor
+calendar:calendar?mode=list&tab=drafts  # the sheet's Drafts link
+composer:idea_create  405  # POST only: the sheet's Save idea
+composer:idea_upload_media  405  # POST only: the idea form's pictures
+composer:tag_create  405  # POST only: the idea form's Create tag

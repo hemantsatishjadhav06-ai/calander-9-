@@ -10,14 +10,14 @@
             <button hx-get="{% url 'composer:feed_list' workspace_id=workspace.id %}?feed_id=all"
                     hx-target="#feeds-tab-content"
                     hx-swap="innerHTML"
-                    class="ui-filter-chip {% if selected_feed_id == 'all' %}is-selected{% else %}bg-white ring-1 ring-inset ring-ink-200{% endif %}" aria-pressed="{% if selected_feed_id == 'all' %}true{% else %}false{% endif %}">
+                    class="ui-filter-chip {% if selected_feed_id == 'all' %}is-selected{% else %}bg-surface ring-1 ring-inset ring-ink-200{% endif %}" aria-pressed="{% if selected_feed_id == 'all' %}true{% else %}false{% endif %}">
                 All feeds
             </button>
             {% for feed in feeds %}
             <button hx-get="{% url 'composer:feed_list' workspace_id=workspace.id %}?feed_id={{ feed.id }}"
                     hx-target="#feeds-tab-content"
                     hx-swap="innerHTML"
-                    class="ui-filter-chip {% if selected_feed_id == feed.id|stringformat:'s' %}is-selected{% else %}bg-white ring-1 ring-inset ring-ink-200{% endif %}" aria-pressed="{% if selected_feed_id == feed.id|stringformat:'s' %}true{% else %}false{% endif %}">
+                    class="ui-filter-chip {% if selected_feed_id == feed.id|stringformat:'s' %}is-selected{% else %}bg-surface ring-1 ring-inset ring-ink-200{% endif %}" aria-pressed="{% if selected_feed_id == feed.id|stringformat:'s' %}true{% else %}false{% endif %}">
                 {{ feed.name }}
             </button>
             {% endfor %}
@@ -84,8 +84,8 @@
         <div x-show="showDeleteFeedModal" x-cloak
              class="fixed inset-0 z-[230] flex items-center justify-center"
              @keydown.escape.window="showDeleteFeedModal = false">
-            <div class="fixed inset-0 bg-ink-950/35" @click="showDeleteFeedModal = false"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6" @click.stop
+            <div class="fixed inset-0 bg-scrim/35" @click="showDeleteFeedModal = false"></div>
+            <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6" @click.stop
                  x-trap.noscroll="showDeleteFeedModal" role="dialog" aria-modal="true" aria-labelledby="delete-feed-title">
                 <h3 id="delete-feed-title" class="ui-modal-title mb-1.5">Delete feed?</h3>
                 <p class="text-sm text-ink-700 mb-6">
@@ -148,8 +148,8 @@
 <div x-show="showAddModal" x-cloak
      class="fixed inset-0 z-[220] flex items-center justify-center"
      @keydown.escape.window="showAddModal = false">
-    <div class="fixed inset-0 bg-ink-950/35" @click="showAddModal = false"></div>
-    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[560px] mx-4 p-6" @click.stop
+    <div class="fixed inset-0 bg-scrim/35" @click="showAddModal = false"></div>
+    <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-[560px] mx-4 p-6" @click.stop
          x-trap.noscroll="showAddModal" role="dialog" aria-modal="true" aria-labelledby="add-feed-title">
         <button type="button"
                 @click="showAddModal = false" aria-label="Close"

@@ -8,7 +8,7 @@ saved with no channel yet (channelless_drafts). Loaded via HTMX into #tab-conten
 
 <div x-data{% if is_htmx %} class="tab-slide-in"{% endif %}>
     {% if platform_posts or channelless_drafts %}
-    <ul class="ui-list rounded-xl border border-ink-200 bg-white shadow-xs overflow-hidden">
+    <ul class="ui-list rounded-xl border border-ink-200 bg-surface shadow-xs overflow-hidden">
         {% for draft in channelless_drafts %}
         <li class="ui-row is-clickable cursor-pointer items-start sm:items-center"
             @click="window.location='{% url 'composer:compose_edit' workspace_id=workspace.id post_id=draft.id %}'">

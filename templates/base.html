@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" style="{% block html_style %}{% endblock %}">
+<html lang="en" style="{% block html_style %}{% endblock %}"{% if theme_ready %} data-theme-ready{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
     <link rel="stylesheet" href="{% static 'js/vendor/flatpickr.min.css' %}">
     <script nonce="{{ request.csp_nonce }}">
+        {% include "components/theme_script.html" %}
         window.bbSidebarStorage = {
             get() { try { return localStorage.getItem('sidebarCollapsed') === 'true'; } catch (e) { return false; } },
             set(value) { try { localStorage.setItem('sidebarCollapsed', value); } catch (e) { /* Storage is optional. */ } },
@@ -44,12 +45,10 @@
         html.sidebar-is-collapsed .sidebar-initial .sidebar-section-label,
         html.sidebar-is-collapsed .sidebar-initial .sidebar-section-label-wrap,
         html.sidebar-is-collapsed .sidebar-initial .sidebar-badge { display: none; }
-        html.sidebar-is-collapsed .sidebar-initial .sidebar-new-label,
         html.sidebar-is-collapsed .sidebar-initial .sidebar-connect-channels { display: none; }
         /* Collapsed child overrides before Alpine */
         html.sidebar-is-collapsed .sidebar-initial .sidebar-ws-btn { justify-content: center; padding-left: 0; padding-right: 0; gap: 0; }
         html.sidebar-is-collapsed .sidebar-initial .sidebar-head { flex-direction: column; padding-left: 0.5rem; padding-right: 0.5rem; }
-        html.sidebar-is-collapsed .sidebar-initial .sidebar-new-wrap { padding-left: 0.5rem; padding-right: 0.5rem; }
         html.sidebar-is-collapsed .sidebar-initial .sidebar-nav { padding-left: 0.5rem; padding-right: 0.5rem; }
         html.sidebar-is-collapsed .sidebar-initial .sidebar-org-footer { padding: 0.5rem; }
         html.sidebar-is-collapsed .sidebar-initial .sidebar-org-expanded { display: none; }
@@ -95,7 +94,7 @@
             border: none; background: none; border-radius: var(--radius-lg);
             color: var(--text-tertiary); cursor: pointer; transition: color var(--dur-instant), background-color var(--dur-instant); z-index: 1;
         }
-        .idea-modal-close:hover { color: var(--text-primary); background: rgb(14 17 20 / .05); }
+        .idea-modal-close:hover { color: var(--text-primary); background: color-mix(in srgb, var(--ink-950) 5%, transparent); }
         @media (max-width: 1023px) { .idea-modal-close { width: 44px; height: 44px; top: 10px; right: 10px; } }
         .idea-modal-header {
             display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 56px 16px 24px;
@@ -124,7 +123,7 @@
         }
         .idea-pill-btn {
             display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px;
-            border: 0; box-shadow: inset 0 0 0 1px var(--ink-300), var(--shadow-xs); border-radius: 9999px; font-size: 0.8125rem;
+            border: 0; box-shadow: inset 0 0 0 1px var(--border-hover), var(--shadow-xs); border-radius: 9999px; font-size: 0.8125rem;
             font-weight: 500; color: var(--text-primary); background: var(--surface-0);
             cursor: pointer; transition: background-color var(--dur-instant); white-space: nowrap;
         }
@@ -187,10 +186,10 @@
             right: 8px;
             width: 38px;
             height: 38px;
-            border: 2px solid #fff;
+            border: 2px solid var(--color-white);   /* white over a photo, on the scrim: both stay as they are in dark */
             border-radius: 9999px;
-            background: rgb(14 17 20 / .72);
-            color: #fff;
+            background: color-mix(in srgb, var(--scrim) 72%, transparent);
+            color: var(--color-white);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -198,7 +197,7 @@
             padding: 0;
             transition: background-color var(--dur-instant);
         }
-        .idea-media-existing-card .remove-btn:hover { background: rgb(14 17 20 / .9); }
+        .idea-media-existing-card .remove-btn:hover { background: color-mix(in srgb, var(--scrim) 90%, transparent); }
         @media (max-width: 640px) {
             .idea-media-strip-layout {
                 gap: 10px;
@@ -208,7 +207,7 @@
         /* Neutral tag chip with a 24px remove target */
         .idea-selected-tags .idea-tag-chip {
             display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 2px 0 8px; border-radius: 9999px;
-            font-size: 0.75rem; font-weight: 600;
+            font-size: 0.8125rem; font-weight: 600;
             background: var(--ink-100); color: var(--ink-700);
         }
         .idea-selected-tags .idea-tag-chip button {
@@ -234,19 +233,13 @@
     </style>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="text-ink-900 min-h-screen bg-ink-50">
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:bg-white focus:px-4 focus:py-3 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-semibold focus:text-ink-900">Skip to content</a>
+<body class="text-ink-900 min-h-screen bg-ink-50{% block body_class %}{% endblock %}">
+    <a href="#main-content" data-control class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:bg-surface focus:px-4 focus:py-3 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-semibold focus:text-ink-900">Skip to content</a>
     {% csrf_token %}
     <!-- Global HTMX loading indicator: a thin top progress bar shown during
-         any HTMX request (calendar/analytics/publish swaps had no feedback). -->
+         any HTMX request (calendar/analytics/publish swaps had no feedback).
+         Its styles and reduced form are in styles.css. -->
     <div id="htmx-progress" aria-hidden="true"></div>
-    <style>
-      #htmx-progress{position:fixed;top:0;left:0;height:2px;width:0;max-width:100%;
-        background:var(--primary);z-index:9999;opacity:0;pointer-events:none;
-        transition:width .2s var(--ease-out), opacity .25s ease;}
-      #htmx-progress.active{opacity:1;}
-      @media (prefers-reduced-motion: reduce){ #htmx-progress{ transition:opacity .1s; } }
-    </style>
     <script nonce="{{ request.csp_nonce }}">
       (function(){
         var timer;
@@ -301,9 +294,9 @@
          class="fixed {% if nav.phone %}bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6{% else %}bottom-6 max-sm:bottom-4{% endif %} right-6 max-sm:inset-x-4 z-[100] sm:max-w-[420px]"
          role="alert" aria-live="assertive">
         <div class="ui-toast toast-enter">
-            <svg class="w-[18px] h-[18px] flex-shrink-0 mt-px text-danger-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>
+            <svg class="w-[18px] h-5 flex-shrink-0 text-danger-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>
             <p class="flex-1 min-w-0 break-words" x-text="message"></p>
-            <button type="button" @click="show = false" class="-m-1.5 flex-shrink-0 grid place-items-center w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg cursor-pointer text-ink-300 hover:text-white hover:bg-white/10 focus-visible:outline-white" aria-label="Dismiss">
+            <button type="button" @click="show = false" data-control class="-m-2 flex-shrink-0 grid place-items-center w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg cursor-pointer text-ink-300 hover:text-white hover:bg-white/10 focus-visible:outline-on-inverse" aria-label="Dismiss">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
@@ -344,16 +337,18 @@
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
              @click="mobileMenuOpen = false"
-             class="fixed inset-0 bg-ink-950/35 z-30 lg:hidden"></div>
+             class="fixed inset-0 bg-scrim/35 z-30 lg:hidden"></div>
 
         <!-- Sidebar: pale ink-100 with a hairline edge; a 280px drawer below 1024px.
              Below 1024px the closed drawer is inert (out of the tab order and the accessibility tree);
              open, it is a modal dialog that holds focus and hands it back to the menu button on close.
-             Opening New idea from it closes it first; the dialog's own trap then puts focus in its title. -->
+             The New post sheet (Home and Calendar) closes it first when it opens, then focuses its own field.
+             From 1024px lg:z-30 keeps its menus above the page: collapsed to 60px, the workspace and account
+             menus open wider than the sidebar, and main (later in the page) painted over them. -->
         <aside id="app-sidebar" class="flex flex-col flex-shrink-0 sidebar-initial
                       fixed inset-y-0 left-0 z-40 w-[280px] bg-ink-100 border-r border-ink-200
                       transition-transform duration-300 ease-out
-                      lg:relative lg:z-auto lg:translate-x-0"
+                      lg:relative lg:z-30 lg:translate-x-0"
                :class="[
                    sidebarCollapsed ? 'lg:w-[60px] sidebar-collapsed' : 'lg:w-60',
                    mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
@@ -368,12 +363,12 @@
 
             <!-- Sidebar header: the workspace switcher, then (desktop) Go to and the notifications bell.
                  Below 1024px those two live in the top bar instead. -->
-            <div class="sidebar-head relative px-3 pt-3 pb-1 flex items-center gap-1" :class="sidebarCollapsed && 'px-2 flex-col'" x-data="{ wsOpen: false }"
+            <div class="sidebar-head relative px-2 pt-2 flex items-center" :class="sidebarCollapsed && 'flex-col'" x-data="{ wsOpen: false }"
                  @keydown.escape="if (wsOpen) { $event.stopPropagation(); wsOpen = false; $refs.wsBtn.focus() }"
                  @focusout="if (wsOpen && $event.relatedTarget && !$el.contains($event.relatedTarget)) wsOpen = false">
-                <button x-ref="wsBtn" aria-haspopup="true" :aria-expanded="wsOpen" @click="wsOpen = !wsOpen"
-                        class="sidebar-ws-btn flex-1 min-w-0 flex items-center gap-2.5 px-2 py-1.5 min-h-10 max-lg:min-h-11 text-left rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer"
-                        :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-2.5 px-2'">
+                <button x-ref="wsBtn" aria-haspopup="true" :aria-expanded="wsOpen" @click="wsOpen = !wsOpen" data-control
+                        class="sidebar-ws-btn flex-1 min-w-0 flex items-center gap-3 px-3 py-1 min-h-10 max-lg:min-h-11 text-left rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer"
+                        :class="sidebarCollapsed && 'justify-center !px-2'">
                     {% with current_ws=request.workspace %}
                     {% if current_ws %}
                     {% if current_ws.icon %}
@@ -405,14 +400,14 @@
                      x-transition:leave="transition ease-in duration-75"
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0"
-                     class="absolute left-3 right-3 top-full mt-1 bg-white rounded-xl shadow-lg ring-1 ring-ink-200 p-1 z-50">
+                     data-control="menu" class="absolute left-2 right-2 top-full mt-2 min-w-[220px] bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 p-1 z-50">
                     {% for ws in sidebar_workspaces %}
                     <a href="{% url 'calendar:calendar' workspace_id=ws.id %}"
-                       class="flex items-center gap-2.5 px-2.5 py-1.5 min-h-[34px] max-lg:min-h-11 text-sm rounded-lg hover:bg-ink-50 transition-colors {% if request.workspace and ws.id == request.workspace.id %}bg-ink-50 font-semibold text-ink-950{% else %}text-ink-900{% endif %}">
+                       class="flex items-center gap-3 px-2 py-1 min-h-10 max-lg:min-h-11 text-sm rounded-lg hover:bg-ink-50 transition-colors {% if request.workspace and ws.id == request.workspace.id %}bg-ink-50 font-semibold text-ink-950{% else %}text-ink-900{% endif %}">
                         {% if ws.icon %}
-                        <img src="{{ ws.icon.url }}" alt="" class="w-7 h-7 rounded-[7px] object-cover flex-shrink-0 shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]">
+                        <img src="{{ ws.icon.url }}" alt="" class="w-7 h-7 rounded-[7px] object-cover flex-shrink-0 shadow-[var(--shadow-creative)]">
                         {% else %}
-                        <div class="w-7 h-7 rounded-[7px] flex items-center justify-center bg-ink-900 text-white text-[13px] font-semibold flex-shrink-0">
+                        <div class="w-7 h-7 rounded-[7px] flex items-center justify-center bg-inverse text-on-inverse text-[13px] font-semibold flex-shrink-0">
                             {{ ws.name|make_list|first|upper }}
                         </div>
                         {% endif %}
@@ -422,12 +417,12 @@
                         {% endif %}
                     </a>
                     {% empty %}
-                    <p class="px-2.5 py-2 text-sm text-ink-500">No workspaces</p>
+                    <p class="px-2 py-2 text-sm text-ink-500">No workspaces</p>
                     {% endfor %}
                     {% if can_create_workspace %}
                     <div class="border-t border-ink-200 mt-1 pt-1">
                         <button @click="wsOpen = false; $dispatch('open-create-ws')"
-                                class="flex items-center gap-2.5 px-2.5 py-1.5 min-h-[34px] max-lg:min-h-11 text-sm text-ink-900 rounded-lg hover:bg-ink-50 transition-colors w-full cursor-pointer">
+                                class="flex items-center gap-3 px-2 py-1 min-h-10 max-lg:min-h-11 text-sm text-ink-900 rounded-lg hover:bg-ink-50 transition-colors w-full cursor-pointer">
                             <div class="w-7 h-7 rounded-[7px] flex items-center justify-center border border-dashed border-ink-400 flex-shrink-0">
                                 <svg class="w-3.5 h-3.5 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                             </div>
@@ -438,7 +433,7 @@
                     {% if request.workspace %}
                     <div class="border-t border-ink-200 mt-1 pt-1">
                         <a href="{% url 'workspaces:settings' workspace_id=request.workspace.id %}"
-                           class="flex items-center gap-2.5 px-2.5 py-1.5 min-h-[34px] max-lg:min-h-11 text-sm text-ink-900 rounded-lg hover:bg-ink-50 transition-colors w-full cursor-pointer">
+                           class="flex items-center gap-3 px-2 py-1 min-h-10 max-lg:min-h-11 text-sm text-ink-900 rounded-lg hover:bg-ink-50 transition-colors w-full cursor-pointer">
                             <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0">
                                 <svg class="w-4 h-4 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                             </div>
@@ -452,286 +447,8 @@
                 {% include "components/notifications_bell.html" with bell_class="hidden lg:inline-flex" %}
             </div>
 
-            <!-- + New CTA -->
-            {% if request.workspace %}
-            <div class="sidebar-new-wrap px-3 pt-2 pb-2" :class="sidebarCollapsed && 'px-2'"
-                 x-data="sidebarNewMenu()">
-                <div class="relative"
-                     @keydown.escape="if (newMenuOpen) { $event.stopPropagation(); newMenuOpen = false; $refs.newBtn.focus() }"
-                     @focusout="if (newMenuOpen && $event.relatedTarget && !$el.contains($event.relatedTarget)) newMenuOpen = false">
-                    <button x-ref="newBtn" data-testid="sidebar-new-toggle" aria-haspopup="true" :aria-expanded="newMenuOpen" @click="newMenuOpen = !newMenuOpen"
-                            class="btn-outline w-full flex items-center justify-center gap-1.5 cursor-pointer"
-                            :style="sidebarCollapsed ? 'padding-left:1.15rem;padding-right:1.15rem' : ''">
-                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        <span class="sidebar-new-label" x-show="!sidebarCollapsed">New</span>
-                    </button>
-
-                    <!-- Dropdown -->
-                    <div x-show="newMenuOpen" x-cloak @click.away="newMenuOpen = false"
-                         x-transition:enter="transition ease-out duration-100"
-                         x-transition:enter-start="opacity-0 scale-95"
-                         x-transition:enter-end="opacity-100 scale-100"
-                         x-transition:leave="transition ease-in duration-75"
-                         x-transition:leave-start="opacity-100 scale-100"
-                         x-transition:leave-end="opacity-0 scale-95"
-                         class="absolute left-0 right-0 top-full mt-1.5 min-w-[220px] bg-white rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
-                        <a href="{% url 'composer:compose' workspace_id=request.workspace.id %}"
-                           class="flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-ink-50 transition-colors">
-                            <div class="w-9 h-9 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0">
-                                <svg class="w-[18px] h-[18px] text-ink-700" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                            </div>
-                            <div>
-                                <div class="text-sm font-semibold text-ink-900">Post</div>
-                                <div class="text-xs text-ink-500">Publish content to a channel</div>
-                            </div>
-                        </a>
-                        <button type="button" data-testid="sidebar-new-idea" @click="openCreateModal()"
-                                class="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-ink-50 transition-colors cursor-pointer">
-                            <div class="w-9 h-9 rounded-lg bg-ink-100 flex items-center justify-center flex-shrink-0">
-                                <svg class="w-[18px] h-[18px] text-ink-700" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                            </div>
-                            <div class="text-left">
-                                <div class="text-sm font-semibold text-ink-900">Idea</div>
-                                <div class="text-xs text-ink-500">Capture a content idea</div>
-                            </div>
-                        </button>
-                        {# The pages that were under More in the sidebar; Templates and Categories follow their switch. #}
-                        <div class="ui-menu-separator" role="none"></div>
-                        <a href="{% url 'composer:create_landing' workspace_id=request.workspace.id %}" data-testid="sidebar-new-ideas" class="ui-menu-item">
-                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 00-4 12.73V16a1 1 0 001 1h6a1 1 0 001-1v-1.27A7 7 0 0012 2z"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
-                            Ideas
-                        </a>
-                        <a href="{% url 'composer:csv_upload' workspace_id=request.workspace.id %}" data-testid="sidebar-new-csv" class="ui-menu-item">
-                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            Import from CSV
-                        </a>
-                        {% if features.templates %}
-                        <a href="{% url 'composer:template_list' workspace_id=request.workspace.id %}" data-testid="sidebar-new-templates" class="ui-menu-item">
-                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                            Templates
-                        </a>
-                        <a href="{% url 'composer:category_list' workspace_id=request.workspace.id %}" data-testid="sidebar-new-categories" class="ui-menu-item">
-                            <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                            Categories
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- Create Idea Modal -->
-                <template x-teleport="body">
-                    <div x-show="showCreateModal" x-cloak
-                         class="idea-modal-overlay"
-                         @click.self="closeCreateModal()"
-                         @keydown.escape.window="closeCreateModal()">
-                        <div class="idea-modal" @click.stop role="dialog" aria-modal="true" aria-label="New idea" x-trap.noscroll="showCreateModal">
-                            <button type="button" data-testid="idea-close" class="idea-modal-close" @click="closeCreateModal()" title="Close" aria-label="Close">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                            </button>
-                            <form action="{% url 'composer:idea_create' workspace_id=request.workspace.id %}"
-                                  method="post"
-                                  enctype="multipart/form-data"
-                                  @submit.prevent="submitCreateIdea($event)">
-                                {% csrf_token %}
-                                <input type="hidden" name="group" :value="createSelectedGroup">
-                                <input type="hidden" name="tags" :value="createSelectedTags.join(',')">
-                                <input type="hidden" name="media_asset_ids" :value="createMediaAssetIdsCsv()">
-                                <input type="hidden" name="media_asset_id" :value="createPrimaryMediaAssetId()">
-
-                                <!-- Header -->
-                                <div class="idea-modal-header">
-                                    <h2 class="text-h2 text-ink-950">New idea</h2>
-                                    <div class="flex items-center gap-2">
-                                        <!-- Column selector dropdown -->
-                                        <div class="relative" @click.away="createGroupDropdownOpen = false">
-                                            <button aria-haspopup="true" :aria-expanded="createGroupDropdownOpen" type="button" class="idea-pill-btn" @click="createGroupDropdownOpen = !createGroupDropdownOpen; createTagDropdownOpen = false">
-                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                                                <span x-text="createGroupLabel()"></span>
-                                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div x-show="createGroupDropdownOpen" x-cloak x-transition class="idea-pill-dropdown">
-                                                {% for col in sidebar_idea_columns %}
-                                                <button type="button"
-                                                        @click="createSelectedGroup = '{{ col.id }}'; createGroupDropdownOpen = false"
-                                                        :class="createSelectedGroup === '{{ col.id }}' && 'font-semibold'">
-                                                    <span>{{ col.label }}</span>
-                                                    <svg x-show="createSelectedGroup === '{{ col.id }}'" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" class="ml-auto text-brand-700" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-                                                </button>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-
-                                        <!-- Tags dropdown -->
-                                        <div class="relative" @click.away="createTagDropdownOpen = false">
-                                            <button aria-haspopup="true" :aria-expanded="createTagDropdownOpen" type="button" class="idea-pill-btn" @click="createTagDropdownOpen = !createTagDropdownOpen; createGroupDropdownOpen = false; if(createTagDropdownOpen) $nextTick(() => $refs.sidebarCreateTagSearchInput.focus())">
-                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                                                <span>Tags</span>
-                                                <span x-show="createSelectedTags.length" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold tabular-nums bg-ink-200 text-ink-700" x-text="createSelectedTags.length"></span>
-                                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div x-show="createTagDropdownOpen" x-cloak x-transition class="idea-pill-dropdown">
-                                                <div class="px-1 pt-0.5 pb-1.5 mb-1 border-b border-ink-200">
-                                                    <input type="text" x-ref="sidebarCreateTagSearchInput" x-model="createTagSearch"
-                                                           @keydown.enter.prevent="if (createTagSearch.trim() && !filteredCreateTags.includes(createTagSearch.trim())) { persistAndToggleCreateTag(createTagSearch.trim()); } else if (filteredCreateTags.length === 1) { toggleCreateTag(filteredCreateTags[0]); createTagSearch = ''; }"
-                                                           class="w-full text-sm px-2.5 h-8 rounded-lg border border-ink-400 bg-white placeholder:text-ink-500"
-                                                           placeholder="Search or create tag..." aria-label="Search or create tag">
-                                                </div>
-                                                <template x-for="tag in filteredCreateTags" :key="tag">
-                                                    <label>
-                                                        <input type="checkbox" class="bb-checkbox rounded"
-                                                               :checked="createSelectedTags.includes(tag)"
-                                                               @change="toggleCreateTag(tag)">
-                                                        <span x-text="tag"></span>
-                                                    </label>
-                                                </template>
-                                                <template x-if="!createTagSearch.trim() && !allTags.length">
-                                                    <div class="px-2.5 py-2 text-xs text-ink-500">No tags yet. Type to create one.</div>
-                                                </template>
-                                                <template x-if="createTagSearch.trim() && !filteredCreateTags.includes(createTagSearch.trim())">
-                                                    <div class="border-t border-ink-200 mt-1 pt-1">
-                                                        <button type="button" @click="persistAndToggleCreateTag(createTagSearch.trim())"
-                                                                class="font-medium text-brand-700">
-                                                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                                                            Create "<span x-text="createTagSearch.trim()"></span>"
-                                                        </button>
-                                                    </div>
-                                                </template>
-                                                <div class="border-t border-ink-200 mt-1 pt-1">
-                                                    <button type="button" @click="createTagDropdownOpen = false; showCreateTagModal = true; newTagName = createTagSearch; createTagSearch = ''; $nextTick(() => $refs.sidebarNewTagNameInput.focus())"
-                                                            class="flex items-center gap-2 w-full text-sm text-ink-900 cursor-pointer">
-                                                        <svg class="w-3.5 h-3.5 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                                                        Create new tag
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Selected tags chips -->
-                                <template x-if="createSelectedTags.length > 0">
-                                    <div class="idea-selected-tags" style="padding: 0 24px 8px;">
-                                        <template x-for="tag in createSelectedTags" :key="tag">
-                                            <span class="idea-tag-chip">
-                                                <span x-text="tag"></span>
-                                                <button :aria-label="'Remove tag ' + tag" type="button" @click="toggleCreateTag(tag)">
-                                                    <svg aria-hidden="true" width="8" height="8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                </button>
-                                            </span>
-                                        </template>
-                                    </div>
-                                </template>
-
-                                <!-- Body -->
-                                <div class="idea-modal-body" @click="createGroupDropdownOpen = false; createTagDropdownOpen = false">
-                                    <input type="text" name="title" required autofocus class="idea-title-input" placeholder="Give your idea a title" aria-label="Idea title" x-ref="sidebarIdeaTitle" data-testid="idea-title">
-                                    <textarea name="description" data-testid="idea-description" class="idea-desc-input" placeholder="Let it flow... or" aria-label="Idea description"></textarea>
-                                    <input type="file" name="media" x-ref="sidebarIdeaFileInput" accept="image/*,video/*,.gif" style="display:none" multiple
-                                           @change="_handleFileSelect($event)">
-
-                                    <div class="idea-media-strip-layout">
-                                        <template x-for="(media, index) in createMediaAssets" :key="media.asset_id + '-' + index">
-                                            <div class="idea-media-existing-card">
-                                                <template x-if="media.media_type === 'video'">
-                                                    <video :src="media.url" muted playsinline preload="metadata"></video>
-                                                </template>
-                                                <template x-if="media.media_type !== 'video'">
-                                                    <img :src="media.url" alt="Preview">
-                                                </template>
-                                                <button aria-label="Remove media" type="button" class="remove-btn" @click="_removeCreateMedia(index)" title="Remove">
-                                                    <svg aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                </button>
-                                            </div>
-                                        </template>
-                                        <div class="idea-media-zone"
-                                             :class="{ 'idea-media-zone-tile': true, 'drag-over': _mediaDragOver }"
-                                             @click="$refs.sidebarIdeaFileInput.click()"
-                                             @dragover.prevent="_mediaDragOver = true"
-                                             @dragleave.prevent="_mediaDragOver = false"
-                                             @drop.prevent="_mediaDragOver = false; _handleMediaDrop($event)">
-                                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                                            <span x-show="!createMediaAssets.length">Drag &amp; drop</span>
-                                            <span x-show="createMediaAssets.length">Add another file</span>
-                                            <span>or <strong class="font-semibold text-brand-700 underline underline-offset-2 cursor-pointer">select a file</strong></span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Footer -->
-                                <div class="idea-modal-footer" @click="createGroupDropdownOpen = false; createTagDropdownOpen = false">
-                                    <span style="margin-right: auto; display: flex; align-items: center; gap: 8px; color: var(--text-tertiary);">
-                                        <span style="width: 1px; height: 20px; background: var(--border);"></span>
-                                        <div class="relative">
-                                            <button data-testid="idea-emoji-toggle" aria-label="Insert emoji" aria-haspopup="true" :aria-expanded="emojiPickerOpen" type="button" @click.stop="emojiPickerOpen = !emojiPickerOpen" class="grid place-items-center w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg text-ink-500 hover:bg-ink-900/5 hover:text-ink-900 transition-colors cursor-pointer" title="Emoji">
-                                                <svg aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-                                            </button>
-                                            <div x-show="emojiPickerOpen" x-cloak @click.away="emojiPickerOpen = false"
-                                                 x-transition:enter="transition ease-out duration-100"
-                                                 x-transition:enter-start="opacity-0 scale-95"
-                                                 x-transition:enter-end="opacity-100 scale-100"
-                                                 class="emoji-picker-popup">
-                                                <div class="emoji-picker-search">
-                                                    <input type="text" data-testid="idea-emoji-search" placeholder="Search emoji..." aria-label="Search emoji" x-model="_emojiSearch"
-                                                           class="w-full px-2.5 h-8 text-sm rounded-lg border border-ink-400 bg-white placeholder:text-ink-500"
-                                                           @click.stop>
-                                                </div>
-                                                <div class="emoji-picker-grid">
-                                                    <template x-for="emoji in _filteredEmojis()" :key="emoji.e">
-                                                        <button type="button" data-testid="idea-emoji-option"
-                                                                class="emoji-picker-item"
-                                                                @click.stop="_insertEmoji(emoji.e); emojiPickerOpen = false"
-                                                                x-text="emoji.e"
-                                                                :title="emoji.n">
-                                                        </button>
-                                                    </template>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <span style="width: 1px; height: 20px; background: var(--border);"></span>
-                                    </span>
-                                    <button type="button" @click="closeCreateModal()"
-                                            class="ui-btn ui-btn-secondary">
-                                        Cancel
-                                    </button>
-                                    <button type="submit"
-                                            :disabled="createMediaUploadCount > 0 || isCreateSaving"
-                                            :class="(createMediaUploadCount > 0 || isCreateSaving) && 'opacity-50 cursor-not-allowed'"
-                                            class="ui-btn ui-btn-primary">
-                                        Save Idea
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    <div x-show="showCreateTagModal" x-cloak class="fixed inset-0 z-[220] flex items-center justify-center" @keydown.escape.window="closeCreateTagModal()">
-                        <div class="fixed inset-0 bg-ink-950/35" @click="closeCreateTagModal()"></div>
-                        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" @click.stop
-                             x-trap="showCreateTagModal" role="dialog" aria-modal="true" aria-labelledby="sidebar-create-tag-title">
-                            <h3 id="sidebar-create-tag-title" class="text-h3 text-ink-950 mb-4">Create new tag</h3>
-                            <input type="text" x-ref="sidebarNewTagNameInput" x-model="newTagName" aria-labelledby="sidebar-create-tag-title"
-                                   @keydown.enter.prevent="createTagFromModal()"
-                                   class="ui-input"
-                                   placeholder="Tag name...">
-                            <div class="flex justify-end gap-2 mt-4">
-                                <button type="button" @click="closeCreateTagModal()"
-                                        class="ui-btn ui-btn-ghost">
-                                    Cancel
-                                </button>
-                                <button type="button"
-                                        @click="createTagFromModal()"
-                                        class="ui-btn ui-btn-primary"
-                                        :class="newTagName.trim() ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'">
-                                    Create
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-            </div>
-            {% endif %}
-
             <!-- Navigation: the places from apps/common/navigation.build_nav, then Settings, the gear, at the bottom. -->
-            <nav class="sidebar-nav flex-1 overflow-y-auto pt-1 pb-3 px-3 flex flex-col gap-0.5" :class="sidebarCollapsed ? 'px-2' : 'px-3'" aria-label="Main" data-testid="sidebar-nav">
+            <nav class="sidebar-nav flex-1 overflow-y-auto pt-2 pb-2 px-2 flex flex-col" aria-label="Main" data-testid="sidebar-nav">
                 {% block sidebar_nav %}{% spaceless %}
                 {% for item in nav.items %}
                 {# Every link carries its name (and count) in aria-label: the collapsed sidebar hides the label and the badge. #}
@@ -753,12 +470,11 @@
             </nav>
 
             <!-- Organization footer -->
-            <div class="sidebar-org-footer relative px-3 py-3" x-data="{ orgMenuOpen: false }"
-                 :class="sidebarCollapsed ? 'px-2 py-2' : 'px-3 py-3'">
+            <div class="sidebar-org-footer relative px-2 py-2" x-data="{ orgMenuOpen: false }">
                 <!-- Expanded: single row with org button + collapse toggle -->
-                <div class="sidebar-org-expanded flex items-center gap-1" x-show="!sidebarCollapsed">
-                    <button aria-haspopup="true" :aria-expanded="orgMenuOpen" @click="orgMenuOpen = !orgMenuOpen"
-                            class="flex-1 flex items-center gap-2.5 px-2 py-1.5 min-h-11 rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer min-w-0">
+                <div class="sidebar-org-expanded flex items-center gap-2" x-show="!sidebarCollapsed">
+                    <button aria-haspopup="true" :aria-expanded="orgMenuOpen" @click="orgMenuOpen = !orgMenuOpen" data-control
+                            class="flex-1 flex items-center gap-3 px-3 py-1 min-h-11 rounded-lg hover:bg-ink-900/5 transition-colors cursor-pointer min-w-0">
                         {% if user.avatar %}
                         <img src="{{ user.avatar.url }}" alt="" class="w-7 h-7 rounded-full object-cover flex-shrink-0">
                         {% else %}
@@ -785,7 +501,7 @@
                         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="scale-x-[-1]"><path d="M9 3V21M16 15L13 12L16 9M5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3Z"/></svg>
                     </button>
                     <button aria-label="Account menu" aria-haspopup="true" :aria-expanded="orgMenuOpen" @click="orgMenuOpen = !orgMenuOpen"
-                            class="w-8 h-8 rounded-full {% if not user.avatar %}bg-ink-200{% endif %} flex items-center justify-center cursor-pointer hover:bg-ink-300 transition-colors">
+                            class="w-8 h-8 rounded-full {% if not user.avatar %}bg-ink-200{% endif %} flex items-center justify-center cursor-pointer hover:bg-line-strong transition-colors">
                         {% if user.avatar %}
                         <img src="{{ user.avatar.url }}" alt="" class="w-8 h-8 rounded-full object-cover">
                         {% else %}
@@ -802,16 +518,16 @@
                      x-transition:leave="transition ease-in duration-75"
                      x-transition:leave-start="opacity-100 scale-100"
                      x-transition:leave-end="opacity-0 scale-95"
-                     class="absolute bottom-full left-3 right-3 mb-2 min-w-[220px] bg-white rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
+                     data-control="menu" class="absolute bottom-full left-2 right-2 mb-2 min-w-[220px] bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 z-50 overflow-hidden p-1">
 
                     <!-- User info -->
-                    <div class="px-2.5 pt-2.5 pb-2">
+                    <div class="px-3 pt-3 pb-2">
                         <p class="text-[13px] text-ink-500 truncate">{{ user.email }}</p>
-                        <p class="text-sm font-semibold text-ink-900 mt-0.5">{{ request.org.name|default:"My Organization" }}</p>
+                        <p class="text-sm font-semibold text-ink-900 mt-1">{{ request.org.name|default:"My Organization" }}</p>
                     </div>
 
                     <!-- Manage Team button -->
-                    <div class="px-1.5 pb-2">
+                    <div class="px-1 pb-2">
                         <a href="{% url 'members:list' %}"
                            class="ui-btn ui-btn-secondary ui-btn-sm w-full">
                             <svg class="w-4 h-4 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
@@ -826,6 +542,19 @@
                             <svg class="w-4 h-4 text-ink-500" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             Account
                         </a>
+                    </div>
+
+                    <!-- Appearance: System, Light or Dark, kept on this device by the head script (components/theme_script.html). The menu reads the choice each time it opens, so a choice made in another tab shows here. -->
+                    <div class="border-t border-ink-200 mt-1 px-1 pt-2 pb-2" x-data="{ appearance: 'system' }" x-effect="if (orgMenuOpen) appearance = bbTheme.preference()">
+                        <fieldset{% if not theme_ready %} aria-describedby="appearance-note"{% endif %}>
+                            <legend class="px-2 text-[13px] leading-[18px] font-medium text-ink-600">Appearance</legend>
+                            <div class="ui-segmented mt-2 flex w-full">
+                                <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="system" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-system">System</label>
+                                <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="light" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-light">Light</label>
+                                <label class="ui-segment relative flex-1 cursor-pointer"><input type="radio" name="appearance" value="dark" class="absolute inset-0 m-0 size-full cursor-pointer opacity-0" x-model="appearance" @change="bbTheme.set($event.target.value)" data-testid="account-appearance-dark">Dark</label>
+                            </div>
+                            {% if not theme_ready %}<p id="appearance-note" class="mt-2 px-2 text-[13px] leading-[18px] text-ink-600">This page stays light for now.</p>{% endif %}
+                        </fieldset>
                     </div>
 
                     <div class="border-t border-ink-200 mt-1 pt-1">
@@ -861,13 +590,13 @@
                     {% with current_ws=request.workspace %}
                     {% if current_ws %}
                     {% if current_ws.icon %}
-                    <img src="{{ current_ws.icon.url }}" alt="" class="w-7 h-7 rounded-[7px] object-cover flex-shrink-0 shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]">
+                    <img src="{{ current_ws.icon.url }}" alt="" class="w-7 h-7 rounded-[7px] object-cover flex-shrink-0 shadow-[var(--shadow-creative)]">
                     {% else %}
-                    <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0 bg-ink-900 text-white text-[13px] font-semibold">{{ current_ws.name|make_list|first|upper }}</div>
+                    <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0 bg-inverse text-on-inverse text-[13px] font-semibold">{{ current_ws.name|make_list|first|upper }}</div>
                     {% endif %}
                     <span class="text-base font-semibold text-ink-950 truncate">{{ current_ws.name }}</span>
                     {% else %}
-                    <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0 bg-ink-900 text-white text-[13px] font-semibold">{{ SITE_NAME|make_list|first|upper }}</div>
+                    <div class="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0 bg-inverse text-on-inverse text-[13px] font-semibold">{{ SITE_NAME|make_list|first|upper }}</div>
                     <span class="text-base font-semibold text-ink-950 truncate">{{ SITE_NAME }}</span>
                     {% endif %}
                     {% endwith %}
@@ -880,13 +609,13 @@
             {% comment %}data-phone-bar-scroll (main and the scroller inside it): below 1024px each keeps the phone
                bar's height clear at the bottom (scroll-padding-bottom, styles.css), so a control focused from the
                keyboard never scrolls in under the bar (WCAG 2.4.11). Only where the bar shows (nav.phone).{% endcomment %}
-            <main id="main-content" data-testid="main-content" tabindex="-1" class="relative flex-1 min-w-0 bg-ink-50 px-4 pt-5 pb-12 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-16 overflow-y-auto flex flex-col focus:outline-none"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
+            <main id="main-content" data-testid="main-content" tabindex="-1" class="relative flex-1 min-w-0 bg-ink-50 px-4 pt-4 pb-12 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-16 overflow-y-auto flex flex-col focus:outline-none"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
                 {% block page_header %}{% endblock %}
                 {% if messages %}
-                <div class="mb-5 space-y-2 w-full max-w-[1180px] mx-auto">
+                <div class="mb-6 space-y-2 w-full max-w-[1180px] mx-auto">
                     {% for message in messages %}
-                    <div role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}" aria-live="{% if message.tags == 'error' %}assertive{% else %}polite{% endif %}" class="flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm ring-1 ring-inset {% if message.tags == 'error' %}bg-danger-50 text-danger-700 ring-danger-200{% elif message.tags == 'success' %}bg-success-50 text-success-700 ring-success-200{% elif message.tags == 'warning' %}bg-warning-50 text-warning-700 ring-warning-200{% else %}bg-info-50 text-info-700 ring-info-200{% endif %}">
-                        {% if message.tags == 'error' %}<svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>{% elif message.tags == 'success' %}<svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>{% elif message.tags == 'warning' %}<svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-warning-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>{% else %}<svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-info-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>{% endif %}
+                    <div role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}" aria-live="{% if message.tags == 'error' %}assertive{% else %}polite{% endif %}" class="flex items-start gap-2 rounded-xl p-4 text-sm ring-1 ring-inset {% if message.tags == 'error' %}bg-danger-50 text-danger-700 ring-danger-200{% elif message.tags == 'success' %}bg-success-50 text-success-700 ring-success-200{% elif message.tags == 'warning' %}bg-warning-50 text-warning-700 ring-warning-200{% else %}bg-info-50 text-info-700 ring-info-200{% endif %}">
+                        {% if message.tags == 'error' %}<svg class="w-4 h-5 flex-shrink-0 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v4M12 16h.01"/></svg>{% elif message.tags == 'success' %}<svg class="w-4 h-5 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>{% elif message.tags == 'warning' %}<svg class="w-4 h-5 flex-shrink-0 text-warning-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>{% else %}<svg class="w-4 h-5 flex-shrink-0 text-info-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>{% endif %}
                         <div class="min-w-0 flex-1">{{ message }}</div>
                     </div>
                     {% endfor %}
@@ -895,9 +624,10 @@
                 {% comment %}relative: the scrollers are the containing block, so an absolutely placed element
                    in the page (every sr-only label) scrolls and clips with it instead of stretching the
                    window past the app shell into blank canvas.
-                   -m-1 p-1: a 4px gutter inside the clip box, so the 2px focus ring at a 2px offset is never
-                   cut off on a full-width button, a card or a breadcrumb that touches the edge.{% endcomment %}
-                <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-1 p-1" data-testid="page-scroller"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
+                   -m-2 p-2: an 8px gutter inside the clip box (on the 8px grid; the content does not move), so the
+                   2px focus ring at a 2px offset is never cut off on a full-width button, a card or a
+                   breadcrumb that touches the edge.{% endcomment %}
+                <div class="relative flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden -m-2 p-2" data-testid="page-scroller"{% if nav.phone %} data-phone-bar-scroll{% endif %}>
                 {% block content %}{% endblock %}
                 {% comment %}
                   Below 1024px the phone bar is fixed along the bottom of the screen. This room at the end
@@ -925,15 +655,15 @@
                     {% for item in nav.phone %}
                     <li>
                         {% if item.url %}
-                        <a href="{{ item.url }}" data-testid="phone-bar-{{ item.key }}" class="relative flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-[11px] leading-4 font-medium rounded-lg {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}
+                        <a href="{{ item.url }}" data-testid="phone-bar-{{ item.key }}" data-control class="relative flex flex-col items-center justify-center gap-1 min-h-14 px-1 text-xs leading-4 font-medium rounded-lg {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == "approvals" %}
                            aria-label="Approvals{% if item.count %}, {{ item.count }} waiting{% endif %}"{% endif %}>
                             {% if item.active %}{% include "components/nav_icon.html" with key=item.key icon_class="text-brand-700" %}{% else %}{% include "components/nav_icon.html" with key=item.key icon_class="text-ink-500" %}{% endif %}
                             <span>{{ item.label }}</span>
-                            {% if item.count %}<span class="sidebar-badge{% if item.key == "approvals" %} is-turn{% endif %} absolute top-1 left-1/2 !ml-1.5">{{ item.count }}</span>{% endif %}
+                            {% if item.count %}<span class="sidebar-badge{% if item.key == "approvals" %} is-turn{% endif %} absolute top-1 left-1/2 !ml-2">{{ item.count }}</span>{% endif %}
                         </a>
                         {% else %}
-                        <button type="button" data-testid="phone-bar-{{ item.key }}" aria-controls="app-sidebar" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = true"
-                                class="w-full flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-[11px] leading-4 font-medium rounded-lg cursor-pointer {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}">
+                        <button type="button" data-testid="phone-bar-{{ item.key }}" aria-controls="app-sidebar" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = true" data-control
+                                class="w-full flex flex-col items-center justify-center gap-1 min-h-14 px-1 text-xs leading-4 font-medium rounded-lg cursor-pointer {% if item.active %}text-ink-950{% else %}text-ink-600{% endif %}">
                             {% if item.active %}{% include "components/nav_icon.html" with key=item.key icon_class="text-brand-700" %}{% else %}{% include "components/nav_icon.html" with key=item.key icon_class="text-ink-500" %}{% endif %}
                             <span>{{ item.label }}</span>
                         </button>
@@ -957,15 +687,15 @@
         <div x-show="notificationsOpen" x-cloak class="fixed inset-0 z-[100] flex justify-end" @keydown.escape.window="notificationsOpen = false">
             <div class="ui-overlay" @click="notificationsOpen = false"></div>
             <div data-testid="notifications-drawer" role="dialog" aria-modal="true" aria-label="Notifications" x-trap.noscroll="notificationsOpen"
-                 class="relative flex flex-col w-full max-w-[100vw] sm:max-w-sm h-full bg-white shadow-xl">
-                <div class="flex justify-end px-3 pt-3">
+                 class="relative flex flex-col w-full max-w-[100vw] sm:max-w-sm h-full bg-surface shadow-xl">
+                <div class="flex justify-end px-2 pt-2">
                     <button type="button" class="ui-btn ui-btn-icon" @click="notificationsOpen = false" aria-label="Close notifications">
                         <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
                 <div id="notification-drawer-content" class="flex flex-col flex-1 min-h-0"
                      hx-get="{% url 'notifications:drawer' %}" hx-trigger="open-notifications from:window" hx-swap="innerHTML">
-                    <p class="px-5 text-sm text-ink-600">Loading notifications…</p>
+                    <p class="px-4 text-sm text-ink-600">Loading notifications…</p>
                 </div>
             </div>
         </div>
@@ -987,17 +717,86 @@
             <div class="ui-overlay" @click="close()"></div>
             <div data-testid="palette-dialog" x-ref="dialog" role="dialog" aria-modal="true" aria-label="Go to a page" x-trap.noscroll.noautofocus.noreturn="open"
                  @keydown.escape.prevent.stop="close()" @focusout="lost($event)" class="ui-modal overflow-hidden">
-                <div class="p-3 border-b border-ink-200">
+                <div class="p-2 border-b border-ink-200">
                     <input x-ref="input" type="text" data-testid="palette-input" class="ui-input" placeholder="Go to…" aria-label="Find a page"
                            autocomplete="off" spellcheck="false" x-model="query"
                            @keydown.arrow-down.prevent="move(1)" @keydown.enter.prevent="openFirst()">
                 </div>
                 {# One line per entry: this list is on every page. The arrow keys bubble up from its links. #}
-                <ul x-ref="list" class="max-h-[60vh] overflow-y-auto p-1" aria-label="Pages" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)">
+                <ul x-ref="list" class="max-h-[60vh] overflow-y-auto p-2" aria-label="Pages" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)">
                     {% for entry in nav_palette %}<li x-show="matches({{ forloop.counter0 }})"><a href="{{ entry.url }}" data-testid="palette-item-{{ entry.key }}" class="ui-menu-item"><span class="flex-1 min-w-0 truncate">{{ entry.label }}</span>{% if entry.section %}<span class="text-xs text-ink-600">{{ entry.section }}</span>{% endif %}</a></li>{% endfor %}
                 </ul>
                 <p x-show="!shown" x-cloak class="px-4 pb-4 text-sm text-ink-600">Nothing matches.</p>
                 <p class="sr-only" aria-live="polite" x-text="announcement"></p>
+            </div>
+        </div>
+    </div>
+    {% comment %}
+      Keyboard shortcuts (spec D16): static/js/shortcuts.js runs the keys from 1024 px (n, / and ?) and
+      this list's shortcutsList(). ? and Ctrl/Cmd-/ open it; Escape (from anywhere: the window listener),
+      Close and the scrim close it. The list places the focus itself, on Close as it opens and back to the
+      opener as it closes; its x-trap (noautofocus, noreturn) only keeps Tab inside, on `trapped`, which
+      shortcutsList() holds until the plugin has started the trap (see there). The switch turns the single keys off on this device
+      (localStorage.shortcuts, WCAG 2.1.4); Ctrl/Cmd-/ still opens the list, so it can be turned back on.
+      n is listed, and data-new-post-url names where it goes away from the sheet (Home's #new-post), only
+      for someone who may start posts (new_post_url). Ctrl/Cmd-K does nothing while the list is open.
+      The switch's input covers its track (which lets clicks through) and the 44 by 44 px around it, as
+      large as the other switches' target, so it is the control a click reaches; the visible label's
+      for= keeps the words clickable too and stays its one label. data-control: a control's own steps.
+    {% endcomment %}
+    <div x-data="shortcutsList()" data-shortcuts{% if new_post_url %} data-new-post-url="{{ new_post_url }}"{% endif %} @open-shortcuts.window="show()"
+         @keydown.escape.window="if (open) { $event.preventDefault(); close(); }">
+        <div x-show="open" x-cloak class="fixed inset-0 z-[110] flex items-start justify-center px-4 pt-[12vh]">
+            <div class="ui-overlay" @click="close()"></div>
+            <div data-testid="shortcuts-dialog" x-ref="dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" x-trap.noscroll.noautofocus.noreturn="trapped"
+                 @keydown.escape.prevent.stop="close()" @keydown.ctrl.k.prevent.stop @keydown.meta.k.prevent.stop class="ui-modal max-w-md">
+                <div class="flex items-center justify-between gap-4 px-6 pt-6 pb-2">
+                    <h2 id="shortcuts-title" class="text-h2 text-ink-950">Keyboard shortcuts</h2>
+                    <button type="button" data-testid="shortcuts-close" x-ref="close" class="ui-btn ui-btn-icon -mr-2" @click="close()" aria-label="Close">
+                        <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                {# Every key has one look: the class is written once. #}
+                {% with kbd_class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-line-strong bg-ink-25 px-2 font-mono text-sm font-semibold text-ink-900" %}
+                <dl class="px-6 divide-y divide-ink-200">
+                    {% if new_post_url %}
+                    <div data-testid="shortcuts-new-post" class="flex items-center justify-between gap-4 py-2">
+                        <dt class="text-sm text-ink-900">New post</dt>
+                        <dd class="flex items-center gap-2"><kbd class="{{ kbd_class }}">n</kbd></dd>
+                    </div>
+                    {% endif %}
+                    <div data-testid="shortcuts-go-to" class="flex items-center justify-between gap-4 py-2">
+                        <dt class="text-sm text-ink-900">Go to a page</dt>
+                        <dd class="flex items-center gap-2">
+                            <kbd class="{{ kbd_class }}">/</kbd>
+                            <span class="text-sm text-ink-600">or</span>
+                            <kbd class="{{ kbd_class }}">Ctrl</kbd>
+                            <kbd class="{{ kbd_class }}">K</kbd>
+                        </dd>
+                    </div>
+                    <div data-testid="shortcuts-list" class="flex items-center justify-between gap-4 py-2">
+                        <dt class="text-sm text-ink-900">Keyboard shortcuts</dt>
+                        <dd class="flex items-center gap-2">
+                            <kbd class="{{ kbd_class }}">?</kbd>
+                            <span class="text-sm text-ink-600">or</span>
+                            <kbd class="{{ kbd_class }}">Ctrl</kbd>
+                            <kbd class="{{ kbd_class }}">/</kbd>
+                        </dd>
+                    </div>
+                </dl>
+                {% endwith %}
+                <div class="mx-6 mt-2 mb-6 flex items-center justify-between gap-4 border-t border-ink-200 pt-4">
+                    <div class="min-w-0">
+                        <label for="shortcuts-toggle" id="shortcuts-toggle-label" class="text-sm font-semibold text-ink-900">Single-key shortcuts</label>
+                        <p id="shortcuts-toggle-note" class="mt-2 text-sm text-ink-600">Turn them off if they get in your way, for example with speech input. Ctrl / still opens this list. Kept on this device.</p>
+                    </div>
+                    <span class="bb-toggle" data-control>
+                        <input id="shortcuts-toggle" type="checkbox" role="switch" data-testid="shortcuts-toggle" class="!size-11 -top-3 -left-1 !m-0 cursor-pointer"
+                               aria-labelledby="shortcuts-toggle-label" aria-describedby="shortcuts-toggle-note"
+                               :checked="enabled" @change="setEnabled($event.target.checked)">
+                        <span class="bb-toggle-track pointer-events-none" aria-hidden="true"></span>
+                    </span>
+                </div>
             </div>
         </div>
     </div>
@@ -1068,6 +867,7 @@
                 },
                 opener: null,
                 show() {
+                    if (document.body.classList.contains('has-sheet')) return; // not over the New post sheet: Ctrl/Cmd-K there does nothing (D16)
                     // The palette places the focus itself: into the field on opening and back to
                     // whatever opened it on closing. Its x-trap only keeps Tab inside the dialog
                     // (noautofocus, noreturn), because WebKit did not land the trap's own initial
@@ -1096,7 +896,7 @@
                     if (this.open && !event.relatedTarget) this.refocusSoon();
                 },
                 // The focus goes back on the next turn, never inside the browser's own focus change:
-                // another dialog's trap (the notifications drawer's, New idea's, the phone menu's)
+                // another dialog's trap (the notifications drawer's, the New post sheet's, the phone menu's)
                 // stays active for a moment while this one starts, and pulls the focus straight back,
                 // so handing it back at once made the two recurse until the stack overflowed. Once
                 // per turn, and at most 20 times per opening, so it can never fight forever.
@@ -1148,14 +948,18 @@
         });
     </script>
     {% block page_vendor_scripts %}{% endblock %}
+    {# The keyboard shortcuts and their list's shortcutsList(), before Alpine starts, where Go to is. #}
+    {% if nav_palette %}<script src="{% static 'js/shortcuts.js' %}" defer></script>{% endif %}
     <script src="{% static 'js/vendor/alpine-focus.min.js' %}" defer></script>
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
     <script src="{% static 'js/vendor/flatpickr.min.js' %}"></script>
     <script nonce="{{ request.csp_nonce }}">
         /* Analytics hero chart: read data attrs off the canvas, (re)create Chart.js.
            Lives in base.html so its CSP nonce matches the parent page — the chart
-           partial re-renders on HTMX swaps via the htmx:afterSwap hook below. */
-        function bbInitHeroChart(retries) {
+           partial re-renders on HTMX swaps via the htmx:afterSwap hook below. Its colours
+           are the theme's tokens, read when it draws (bbToken below); a theme change draws
+           it again (`quiet`: no entrance animation). */
+        function bbInitHeroChart(retries, quiet) {
             var canvas = document.getElementById('analytics-area-chart');
             if (!canvas) return;
             if (typeof Chart === 'undefined') {
@@ -1170,7 +974,11 @@
                 data = JSON.parse(canvas.dataset.series || '[]');
                 labels = JSON.parse(canvas.dataset.labels || '[]');
             } catch (e) { return; }
-            var color = '#1C1F24';
+            /* The line ink-900, the axis text ink-500, the grid ink-100: in light, the values
+               the chart drew before dark mode. */
+            var color = bbToken('ink-900');
+            var axisText = bbToken('ink-500');
+            var gridLine = bbToken('ink-100');
             /* The labels are ISO dates (YYYY-MM-DD); people read dates in words: "24 Sep",
                "Thu 24 Sep" in the tooltip. Anything else is shown as it came. */
             var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1185,14 +993,22 @@
             if (window._bbHeroChart) { window._bbHeroChart.destroy(); }
             var ctx = canvas.getContext('2d');
             var gradient = ctx.createLinearGradient(0, 0, 0, 260);
+            /* The token as rgba with alpha `a`; a value that is not six-digit hex (a stylesheet
+               that has not loaded) leaves the fill transparent rather than throwing. */
             function hexToRgba(c, a) {
-                var v = c.replace('#', '');
-                var r = parseInt(v.slice(0, 2), 16), g = parseInt(v.slice(2, 4), 16), b = parseInt(v.slice(4, 6), 16);
-                return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+                /* The minified stylesheet writes some colours with three hex digits: read both forms. */
+                var short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c);
+                if (short) c = '#' + short[1] + short[1] + short[2] + short[2] + short[3] + short[3];
+                var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c);
+                if (!m) return 'transparent';
+                return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + a + ')';
             }
             gradient.addColorStop(0, hexToRgba(color, 0.08));
             gradient.addColorStop(1, hexToRgba(color, 0.0));
-            window._bbHeroChart = new Chart(ctx, {
+            /* Chart.js draws its axis and tooltip text on the canvas at 12 px unless told;
+               the type floor is 13 px. */
+            if (Chart.defaults && Chart.defaults.font) { Chart.defaults.font.size = 13; }
+            var config = {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -1226,14 +1042,24 @@
                                 maxTicksLimit: 6,
                                 maxRotation: 0,
                                 autoSkipPadding: 12,
-                                color: '#656B73',
+                                color: axisText,
                                 callback: function (value) { return dayInWords(this.getLabelForValue(value)); },
                             },
                         },
-                        y: { beginAtZero: true, grid: { color: '#EDEFF2' }, ticks: { color: '#656B73' } },
+                        y: { beginAtZero: true, grid: { color: gridLine }, ticks: { color: axisText } },
                     },
                 },
-            });
+            };
+            if (quiet) { config.options.animation = false; }
+            window._bbHeroChart = new Chart(ctx, config);
+        }
+        /* A design token as the page shows it now: bbToken('ink-900') reads --ink-900 from <html>,
+           where the theme is set, so it follows the theme. Empty when it cannot be read.
+           static/js/live_board.js reads its tooltip colours through it too. */
+        function bbToken(name) {
+            try {
+                return getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim();
+            } catch (e) { return ''; }
         }
         // Wrap in a no-arg callback so the DOMContentLoaded event object
         // doesn't get passed as ``retries`` — that would make
@@ -1245,6 +1071,11 @@
             if (target && target.id === 'analytics-hero-chart') {
                 bbInitHeroChart();
             }
+        });
+        /* The Appearance choice fires bb:themechange on window: a drawn chart is drawn again
+           in the new theme's colours. */
+        window.addEventListener('bb:themechange', function () {
+            if (window._bbHeroChart) { bbInitHeroChart(0, true); }
         });
 
         /* flatpickr hides the real input and shows a generated altInput, which
@@ -1287,337 +1118,14 @@
             });
         });
     </script>
-    {% if request.workspace %}
-    <script nonce="{{ request.csp_nonce }}">
-        window.ideaModalHelpers = window.ideaModalHelpers || {
-            mediaAssetIdsCsv(items) {
-                return (items || []).map(function(item) { return item.asset_id; }).join(',');
-            },
-            appendUploadedMedia(items, data, file) {
-                if (!items || !data || !data.asset_id) return;
-                var exists = items.some(function(item) { return item.asset_id === data.asset_id; });
-                if (exists) return;
-                items.push({
-                    asset_id: data.asset_id,
-                    url: data.url || '',
-                    filename: data.filename || (file && file.name) || '',
-                    media_type: data.media_type || ((file && file.type && file.type.startsWith('video/')) ? 'video' : 'image'),
-                });
-            },
-            getCsrfToken() {
-                var tokenInput = document.querySelector('[name=csrfmiddlewaretoken]');
-                if (tokenInput && tokenInput.value) return tokenInput.value;
-                var cookieMatch = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-                return cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
-            },
-            triggerIdeaChanged() {
-                if (window.htmx && typeof window.htmx.trigger === 'function') {
-                    window.htmx.trigger(document.body, 'ideaChanged');
-                    return;
-                }
-                document.body.dispatchEvent(new CustomEvent('ideaChanged', { bubbles: true }));
-            },
-            submitIdeaForm(formEl, onSuccess) {
-                if (!formEl) return Promise.resolve(false);
-                var url = formEl.getAttribute('action') || formEl.getAttribute('hx-post');
-                if (!url) return Promise.resolve(false);
-                var csrfToken = this.getCsrfToken();
-                if (!csrfToken) {
-                    window.alert('Security token missing. Please reload the page.');
-                    return Promise.resolve(false);
-                }
-                var formData = new FormData(formEl);
-                return fetch(url, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken },
-                    body: formData,
-                })
-                    .then(async function(response) {
-                        if (!response.ok) {
-                            // Show the server's reason (a missing title, a file
-                            // that failed validation) instead of a generic alert.
-                            var text = '';
-                            try { text = await response.text(); } catch (e) {}
-                            var reason = (new DOMParser().parseFromString(text, 'text/html').body.textContent || '').trim();
-                            if (reason.charAt(0) === '{') {
-                                try { var j = JSON.parse(reason); reason = j.error || Object.values(j.errors || {}).flat().join(' '); } catch (e) {}
-                            }
-                            throw new Error(reason || 'Could not save the idea. Please try again.');
-                        }
-                    })
-                    .then(() => {
-                        this.triggerIdeaChanged();
-                        if (typeof onSuccess === 'function') onSuccess();
-                        return true;
-                    })
-                    .catch((err) => {
-                        window.dispatchEvent(new CustomEvent('htmx-error', { detail: { message: (err && err.message) || 'Could not save the idea. Please try again.' } }));
-                        return false;
-                    });
-            },
-            uploadIdeaMediaAsset(uploadUrl, file, onUploaded) {
-                var csrfToken = this.getCsrfToken();
-                if (!csrfToken) return Promise.reject(new Error('csrf_missing'));
-                var formData = new FormData();
-                formData.append('file', file);
-                return fetch(uploadUrl, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken },
-                    body: formData,
-                })
-                    .then(function(response) {
-                        if (!response.ok) {
-                            // A 400 names why the file was refused (wrong type, too large, quota).
-                            return response.json().catch(function() { return {}; }).then(function(data) {
-                                var err = new Error('upload_failed');
-                                err.userMessage = data && data.error;
-                                throw err;
-                            });
-                        }
-                        return response.json();
-                    })
-                    .then((data) => {
-                        if (!data.asset_id) throw new Error('upload_failed');
-                        if (typeof onUploaded === 'function') onUploaded(data, file);
-                        return true;
-                    });
-            },
-        };
-
-        function sidebarNewMenu() {
-            const ideaHelpers = window.ideaModalHelpers;
-            return {
-                newMenuOpen: false,
-                showCreateModal: false,
-                createSelectedGroup: '{% if sidebar_idea_columns %}{{ sidebar_idea_columns.0.id }}{% endif %}',
-                createSelectedTags: [],
-                createGroupDropdownOpen: false,
-                createTagDropdownOpen: false,
-                createTagSearch: '',
-                showCreateTagModal: false,
-                newTagName: '',
-                createMediaAssets: [],
-                createMediaUploadCount: 0,
-                isCreateSaving: false,
-                emojiPickerOpen: false,
-                _mediaDragOver: false,
-                allTags: [{% for tag in sidebar_idea_tags %}'{{ tag|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}],
-
-                _columnMap: { {% for col in sidebar_idea_columns %}'{{ col.id }}': '{{ col.label }}'{% if not forloop.last %}, {% endif %}{% endfor %} },
-                _defaultGroupId: '{% if sidebar_idea_columns %}{{ sidebar_idea_columns.0.id }}{% endif %}',
-
-                openCreateModal() {
-                    this.newMenuOpen = false;
-                    // On a phone the menu drawer is a modal with its own focus trap: close it first so it
-                    // cannot pull focus back. Its hand-back to the menu button is then overridden when the
-                    // dialog's trap starts, because the title carries autofocus (x-trap's initial focus).
-                    this.mobileMenuOpen = false;
-                    this.showCreateModal = true;
-                    this.createSelectedGroup = this._defaultGroupId;
-                    this.createSelectedTags = [];
-                    this.createTagSearch = '';
-                    this.showCreateTagModal = false;
-                    this.newTagName = '';
-                    this.createMediaAssets = [];
-                    this.createMediaUploadCount = 0;
-                    this.isCreateSaving = false;
-                    if (this.$refs.sidebarIdeaFileInput) this.$refs.sidebarIdeaFileInput.value = '';
-                    this.$nextTick(() => { if (this.$refs.sidebarIdeaTitle) this.$refs.sidebarIdeaTitle.focus(); });
-                },
-
-                closeCreateModal() {
-                    this.showCreateModal = false;
-                    this.createSelectedGroup = this._defaultGroupId;
-                    this.createSelectedTags = [];
-                    this.createGroupDropdownOpen = false;
-                    this.createTagDropdownOpen = false;
-                    this.createTagSearch = '';
-                    this.emojiPickerOpen = false;
-                    this._emojiSearch = '';
-                    this.closeCreateTagModal();
-                    this.createMediaAssets = [];
-                    this.createMediaUploadCount = 0;
-                    this.isCreateSaving = false;
-                    if (this.$refs.sidebarIdeaFileInput) this.$refs.sidebarIdeaFileInput.value = '';
-                },
-
-                createMediaAssetIdsCsv() {
-                    return ideaHelpers.mediaAssetIdsCsv(this.createMediaAssets);
-                },
-
-                createPrimaryMediaAssetId() {
-                    return this.createMediaAssets.length ? this.createMediaAssets[0].asset_id : '';
-                },
-
-                createGroupLabel() {
-                    return this._columnMap[this.createSelectedGroup] || 'Unassigned';
-                },
-
-                toggleCreateTag(tag) {
-                    var idx = this.createSelectedTags.indexOf(tag);
-                    if (idx === -1) { this.createSelectedTags.push(tag); }
-                    else { this.createSelectedTags.splice(idx, 1); }
-                },
-
-                get filteredCreateTags() {
-                    var q = this.createTagSearch.toLowerCase();
-                    return this.allTags.filter(function(t) { return !q || t.toLowerCase().includes(q); });
-                },
-
-                persistAndToggleCreateTag(name) {
-                    name = name.trim();
-                    if (!name) return;
-                    if (!this.allTags.includes(name)) { this.allTags.push(name); this.allTags.sort(); }
-                    if (!this.createSelectedTags.includes(name)) { this.createSelectedTags.push(name); }
-                    this.createTagSearch = '';
-                    this._persistTag(name);
-                },
-
-                closeCreateTagModal() {
-                    this.showCreateTagModal = false;
-                    this.newTagName = '';
-                },
-
-                createTagFromModal() {
-                    var name = this.newTagName.trim();
-                    if (!name) return;
-                    this.persistAndToggleCreateTag(name);
-                    this.closeCreateTagModal();
-                },
-
-                _persistTag(name) {
-                    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-                    if (!csrfToken) return;
-                    fetch('{% url "composer:tag_create" workspace_id=request.workspace.id %}', {
-                        method: 'POST',
-                        headers: { 'X-CSRFToken': csrfToken.value, 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: 'name=' + encodeURIComponent(name),
-                    });
-                },
-
-                // Emoji picker
-                _emojiSearch: '',
-                _emojiList: [
-                    {e:'😀',n:'grinning'},{e:'😃',n:'smiley'},{e:'😄',n:'smile'},{e:'😁',n:'grin'},{e:'😆',n:'laughing'},
-                    {e:'😅',n:'sweat smile'},{e:'🤣',n:'rofl'},{e:'😂',n:'joy'},{e:'🙂',n:'slight smile'},{e:'😊',n:'blush'},
-                    {e:'😇',n:'innocent'},{e:'🥰',n:'love'},{e:'😍',n:'heart eyes'},{e:'🤩',n:'star struck'},{e:'😘',n:'kiss'},
-                    {e:'😜',n:'wink tongue'},{e:'🤔',n:'thinking'},{e:'🤗',n:'hugging'},{e:'🤫',n:'shushing'},{e:'😎',n:'cool'},
-                    {e:'🥳',n:'party'},{e:'😤',n:'triumph'},{e:'😱',n:'scream'},{e:'🥺',n:'pleading'},{e:'😢',n:'cry'},
-                    {e:'👍',n:'thumbs up'},{e:'👎',n:'thumbs down'},{e:'👏',n:'clap'},{e:'🙌',n:'raised hands'},{e:'🤝',n:'handshake'},
-                    {e:'💪',n:'strong'},{e:'✌️',n:'peace'},{e:'🤞',n:'crossed fingers'},{e:'👋',n:'wave'},{e:'🫡',n:'salute'},
-                    {e:'❤️',n:'red heart'},{e:'🧡',n:'orange heart'},{e:'💛',n:'yellow heart'},{e:'💚',n:'green heart'},{e:'💙',n:'blue heart'},
-                    {e:'💜',n:'purple heart'},{e:'🖤',n:'black heart'},{e:'🤍',n:'white heart'},{e:'💯',n:'hundred'},{e:'💥',n:'boom'},
-                    {e:'⭐',n:'star'},{e:'🌟',n:'glowing star'},{e:'✨',n:'sparkles'},{e:'⚡',n:'lightning'},{e:'🔥',n:'fire'},
-                    {e:'🎉',n:'party popper'},{e:'🎊',n:'confetti'},{e:'🏆',n:'trophy'},{e:'🎯',n:'bullseye'},{e:'🚀',n:'rocket'},
-                    {e:'💡',n:'light bulb'},{e:'📌',n:'pin'},{e:'📎',n:'paperclip'},{e:'📝',n:'memo'},{e:'✏️',n:'pencil'},
-                    {e:'✅',n:'check mark'},{e:'❌',n:'cross mark'},{e:'⚠️',n:'warning'},{e:'❓',n:'question'},{e:'❗',n:'exclamation'},
-                    {e:'💬',n:'speech'},{e:'👀',n:'eyes'},{e:'🎨',n:'art'},{e:'📸',n:'camera'},{e:'🎬',n:'clapper'},
-                    {e:'📱',n:'phone'},{e:'💻',n:'laptop'},{e:'📊',n:'chart'},{e:'📈',n:'trending up'},{e:'📅',n:'calendar'},
-                    {e:'⏰',n:'alarm clock'},{e:'🔗',n:'link'},{e:'🔒',n:'lock'},{e:'🏷️',n:'label'},{e:'📣',n:'megaphone'},
-                    {e:'🌍',n:'globe'},{e:'☀️',n:'sun'},{e:'🌙',n:'moon'},{e:'🌈',n:'rainbow'},{e:'🍕',n:'pizza'},
-                    {e:'☕',n:'coffee'},{e:'🍺',n:'beer'},{e:'🎵',n:'music'},{e:'🐶',n:'dog'},{e:'🐱',n:'cat'},
-                    {e:'✍️',n:'writing'},{e:'🧠',n:'brain'},{e:'💎',n:'gem'},{e:'🪄',n:'magic wand'},{e:'🎁',n:'gift'},
-                ],
-
-                _filteredEmojis() {
-                    if (!this.emojiPickerOpen) return [];
-                    var q = (this._emojiSearch || '').toLowerCase().trim();
-                    if (!q) return this._emojiList;
-                    return this._emojiList.filter(function(em) { return em.n.includes(q); });
-                },
-
-                _insertEmoji(emoji) {
-                    var desc = document.querySelector('.idea-modal textarea.idea-desc-input');
-                    if (desc) {
-                        var start = desc.selectionStart;
-                        var end = desc.selectionEnd;
-                        desc.value = desc.value.substring(0, start) + emoji + desc.value.substring(end);
-                        desc.selectionStart = desc.selectionEnd = start + emoji.length;
-                        desc.focus();
-                        desc.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                    this._emojiSearch = '';
-                },
-
-                // Media file handling
-                _handleFileSelect(event) {
-                    this._enqueueMediaFiles(event.target.files);
-                    event.target.value = '';
-                },
-
-                _handleMediaDrop(event) {
-                    this._enqueueMediaFiles(event.dataTransfer.files);
-                },
-
-                _enqueueMediaFiles(fileList) {
-                    var files = Array.from(fileList || []);
-                    for (var i = 0; i < files.length; i += 1) {
-                        this._uploadIdeaMediaAsset(files[i]);
-                    }
-                },
-
-                _appendUploadedMedia(data, file) {
-                    ideaHelpers.appendUploadedMedia(this.createMediaAssets, data, file);
-                },
-
-                _removeCreateMedia(index) {
-                    if (index < 0 || index >= this.createMediaAssets.length) return;
-                    this.createMediaAssets.splice(index, 1);
-                },
-
-                _getCsrfToken() {
-                    return ideaHelpers.getCsrfToken();
-                },
-
-                _triggerIdeaChanged() {
-                    ideaHelpers.triggerIdeaChanged();
-                },
-
-                _submitIdeaForm(formEl) {
-                    return ideaHelpers.submitIdeaForm.call(ideaHelpers, formEl, () => {
-                        this.closeCreateModal();
-                        formEl.reset();
-                    });
-                },
-
-                submitCreateIdea(event) {
-                    if (this.createMediaUploadCount > 0 || this.isCreateSaving) return;
-                    this.isCreateSaving = true;
-                    this._submitIdeaForm(event.target).finally(() => {
-                        this.isCreateSaving = false;
-                    });
-                },
-
-                _uploadIdeaMediaAsset(file) {
-                    if (!file) return;
-                    this.createMediaUploadCount += 1;
-                    ideaHelpers
-                        .uploadIdeaMediaAsset(
-                            '{% url "composer:idea_upload_media" workspace_id=request.workspace.id %}',
-                            file,
-                            (data, uploadedFile) => {
-                                this._appendUploadedMedia(data, uploadedFile);
-                            }
-                        )
-                        .catch((err) => {
-                            window.alert((err && err.userMessage) || 'One of the files failed to upload. Please try again.');
-                        })
-                        .finally(() => {
-                            this.createMediaUploadCount = Math.max(0, this.createMediaUploadCount - 1);
-                        });
-                },
-            };
-        }
-    </script>
-    {% endif %}
     {% block extra_js %}{% endblock %}
     {% if can_create_workspace %}
     <!-- Create workspace modal -->
     <div x-data="{ createWsOpen: false }"
          @open-create-ws.window="createWsOpen = true; $nextTick(() => $refs.newWsName.focus())">
         <div x-show="createWsOpen" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center">
-            <div class="absolute inset-0 bg-ink-950/35" @click="createWsOpen = false"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6"
+            <div class="absolute inset-0 bg-scrim/35" @click="createWsOpen = false"></div>
+            <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-md mx-4 p-6"
                  role="dialog" aria-modal="true" aria-labelledby="create-ws-title"
                  x-trap.noscroll="createWsOpen"
                  x-show="createWsOpen"

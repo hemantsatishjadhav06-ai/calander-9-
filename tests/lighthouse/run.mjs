@@ -1,6 +1,8 @@
 // Authenticated, local-only Lighthouse CI without @lhci/cli's vulnerable dependency tree.
 // Start the e2e server with --reset --no-worker --static manifest, then:
-//   LIGHTHOUSE_BASE_URL=http://127.0.0.1:8151 node tests/lighthouse/run.mjs
+//   LIGHTHOUSE_BASE_URL=http://127.0.0.1:8151 node tests/lighthouse/run.mjs [--targets=a,b]
+// With no targets named (here or in LIGHTHOUSE_TARGETS) it measures CI's three, in .lighthouserc.json's
+// order; a named target (tests/lighthouse/targets.mjs) gets the same three runs and budgets.
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
@@ -14,15 +16,17 @@ import { chromium, request } from '@playwright/test';
 import { evaluate, interactionSummary, measurements, validateBaseURL, validateConfig } from './budgets.mjs';
 import { startLocalProxy } from './network.mjs';
 import { withCleanAuditTabs, withCpuSlowdown } from './lifecycle.mjs';
+import { selectTargets, targetOption } from './targets.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const config = JSON.parse(await readFile(path.join(root, '.lighthouserc.json'), 'utf8'));
 validateConfig(config);
+const targets = selectTargets(targetOption(process.argv.slice(2), process.env), config);
 const origin = validateBaseURL(process.env.LIGHTHOUSE_BASE_URL || 'http://127.0.0.1:8151');
 const runId = new Date().toISOString().replaceAll(':', '-');
 const output = path.resolve(process.env.LIGHTHOUSE_OUTPUT_DIR || path.join(root, '.lighthouseci', runId));
 await mkdir(output, { recursive: true });
-const summary = { runId, origin, lighthouseVersion: null, browserVersion: null, measurement: config.smbean.interactionMeasurement, status: 'running', pages: [] };
+const summary = { runId, origin, targets: targets.map((target) => target.name), lighthouseVersion: null, browserVersion: null, measurement: config.smbean.interactionMeasurement, status: 'running', pages: [] };
 const profile = await mkdtemp(path.join(os.tmpdir(), 'smbean-lighthouse-'));
 let context;
 let api;
@@ -84,7 +88,7 @@ async function gzipBytes(lhr, page) {
   return bytes + gzipSync(inline).length;
 }
 
-async function measureInteractions(page, name, reviewId) {
+async function measureInteractions(page, target, ctx) {
   const cdp = await context.newCDPSession(page);
   return withCpuSlowdown(cdp, async () => {
     await page.evaluate(() => {
@@ -97,49 +101,7 @@ async function measureInteractions(page, name, reviewId) {
       });
       window.__smbeanTiming.observer.observe({ type: 'event', buffered: false, durationThreshold: 16 });
     });
-    if (name !== 'home') {
-      // Closed filters defer their option bindings. Measure the first opening,
-      // a real selection and reopening at the same CPU slowdown as other inputs.
-      const timezone = page.getByTestId(name === 'calendar' ? 'ui-select-calendarFilters.tz' : 'ui-select-displayTimezone');
-      const toggle = timezone.getByTestId('ui-select-toggle');
-      await toggle.click();
-      await timezone.getByTestId('ui-select-option-UTC').waitFor({ state: 'visible' });
-      const filtered = page.waitForResponse((response) => response.url().startsWith(origin) && new URL(response.url()).searchParams.get('tz') === 'UTC');
-      await timezone.getByTestId('ui-select-option-UTC').click();
-      if (!(await filtered).ok()) throw new Error('Timezone filter failed.');
-      await toggle.click();
-      await timezone.getByTestId('ui-select-option-UTC').waitFor({ state: 'visible' });
-      await toggle.press('Escape');
-    }
-    if (name === 'home') {
-      const composer = page.getByTestId('thread-composer-body');
-      await composer.click();
-      await composer.pressSequentially('Plan next week', { delay: 40 });
-      await composer.press('ControlOrMeta+A');
-      await composer.press('Backspace');
-    } else if (name === 'approvals') {
-      const details = page.getByTestId(`approvals-row-${reviewId}`).getByTestId('approvals-row-details');
-      await details.click();
-      await details.click();
-    } else {
-      const listResponse = page.waitForResponse((response) => response.url().includes('_switch_mode=1'));
-      await page.getByTestId('calendar-mode-list').click();
-      if (!(await listResponse).ok()) throw new Error('Calendar list switch failed.');
-      const calendarResponse = page.waitForResponse((response) => response.url().includes('_switch_mode=1'));
-      await page.getByTestId('calendar-mode-calendar').click();
-      if (!(await calendarResponse).ok()) throw new Error('Calendar mode switch failed.');
-      await page.getByTestId('calendar-shell').waitFor();
-    }
-    // The picker now initializes only when opened. Include that first opening in
-    // the interaction budget so load-time work cannot simply be moved out of sight.
-    if (await page.getByTestId('mobile-menu-toggle').isVisible()) await page.getByTestId('mobile-menu-toggle').click();
-    await page.getByTestId('sidebar-new-toggle').click();
-    await page.getByTestId('sidebar-new-idea').click();
-    await page.getByTestId('idea-emoji-toggle').click();
-    await page.getByTestId('idea-emoji-option').first().waitFor();
-    await page.getByTestId('idea-emoji-search').pressSequentially('sparkles', { delay: 40 });
-    await page.getByTestId('idea-emoji-option').click();
-    await page.getByTestId('idea-close').click();
+    await target.interact(page, ctx);
     // Event Timing is delivered after the next paint, not synchronously at click resolution.
     await page.waitForTimeout(250);
     const measurement = await page.evaluate(() => {
@@ -176,25 +138,21 @@ try {
   });
   const port = Number((await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]);
   summary.browserVersion = context.browser()?.version() || 'Chromium';
-  const pages = [
-    { name: 'home', testId: 'home-today' },
-    { name: 'approvals', testId: 'approvals-list' },
-    { name: 'calendar', testId: 'calendar-shell' },
-  ];
-  for (let index = 0; index < pages.length; index++) {
-    const { name, testId } = pages[index];
-    const target = new URL(config.ci.collect.url[index], origin).href;
-    const result = { name, path: config.ci.collect.url[index], runs: [] };
+  const ctx = { origin, reviewId: review.post_id };
+  for (const target of targets) {
+    const { name, testId } = target;
+    const href = new URL(target.path, origin).href;
+    const result = { name, path: target.path, runs: [] };
     summary.pages.push(result);
     for (let run = 1; run <= config.ci.collect.numberOfRuns; run++) {
       const page = await context.newPage();
       try {
-        await checkPage(page, target, testId);
+        await checkPage(page, href, testId);
         const cache = await context.newCDPSession(page);
         await cache.send('Network.clearBrowserCache');
         await cache.detach();
         const openPagesBeforeAudit = context.pages().length;
-        const audit = await withCleanAuditTabs(context, () => lighthouse(target, {
+        const audit = await withCleanAuditTabs(context, () => lighthouse(href, {
           ...config.ci.collect.settings, port, output: ['html', 'json'], logLevel: 'error', disableStorageReset: true,
         }));
         const openPagesAfterAudit = context.pages().length;
@@ -202,9 +160,9 @@ try {
         summary.lighthouseVersion = audit.lhr.lighthouseVersion;
         await save(`${name}-${run}.html`, audit.report[0]);
         await save(`${name}-${run}.json`, audit.report[1]);
-        await checkPage(page, target, testId);
+        await checkPage(page, href, testId);
         const scripts = await gzipBytes(audit.lhr, page);
-        const interaction = await measureInteractions(page, name, review.post_id);
+        const interaction = await measureInteractions(page, target, ctx);
         const values = measurements(audit.lhr, interaction, scripts);
         result.runs.push({ run, values, interaction, openPagesBeforeAudit, openPagesAfterAudit, cpuThrottlingReset: true });
         console.log(`${name} ${run}/3: performance=${Math.round(values.performance * 100)}, LCP=${Math.round(values.lcp)}ms, CLS=${values.cls.toFixed(3)}, TBT(diagnostic)=${Math.round(values.tbt)}ms, lab INP<=${values.inp}ms, JS gzip=${values.gzipBytes}B`);

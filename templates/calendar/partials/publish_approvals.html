@@ -58,15 +58,15 @@ tear down the toast.
          x-transition:enter-start="translate-y-2 opacity-0" x-transition:enter-end="translate-y-0 opacity-100"
          class="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-[calc(100vw-2rem)]"
          role="region" aria-label="Selected posts" data-testid="approvals-bulk-bar">
-        <div class="flex items-center gap-1 pl-4 pr-1.5 py-1.5 bg-ink-900 text-white rounded-xl shadow-lg">
+        <div data-theme-scope="light" class="flex items-center gap-1 pl-4 pr-1.5 py-1.5 bg-inverse text-on-inverse rounded-xl shadow-lg">
             <span class="text-sm font-medium whitespace-nowrap tabular-nums" x-text="selectedPosts.length + ' selected'" aria-live="polite"></span>
             <span class="w-px h-5 bg-white/20 mx-1.5" aria-hidden="true"></span>
             <button type="button" hx-post="{% url 'approvals:bulk_action' workspace_id=workspace.id %}"
                     hx-include="[name='post_ids']" hx-vals='{"action": "approve"}' hx-swap="none"
-                    class="ui-btn ui-btn-tinted ui-btn-sm focus-visible:outline-white">Approve all</button>
+                    class="ui-btn ui-btn-tinted ui-btn-sm focus-visible:outline-on-inverse">Approve all</button>
             <button type="button" @click="rejectOpen = true"
-                    class="ui-btn ui-btn-sm text-danger-300 hover:bg-white/10 hover:text-danger-200 focus-visible:outline-white">Reject all</button>
-            <button type="button" aria-label="Clear selection" @click="selectedPosts = []" class="w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg flex items-center justify-center text-ink-300 hover:bg-white/10 hover:text-white focus-visible:outline-white">
+                    class="ui-btn ui-btn-sm text-danger-300 hover:bg-white/10 hover:text-danger-200 focus-visible:outline-on-inverse">Reject all</button>
+            <button type="button" aria-label="Clear selection" @click="selectedPosts = []" class="w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg flex items-center justify-center text-ink-300 hover:bg-white/10 hover:text-white focus-visible:outline-on-inverse">
                 <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>

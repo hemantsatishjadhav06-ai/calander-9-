@@ -40,7 +40,7 @@
     {% endif %}
 
     <!-- Type tag: neutral on every type; the word says what it is -->
-    <span class="ml-type-badge absolute top-2 left-2 bg-white/95 text-ink-700 ring-1 ring-inset ring-ink-950/10">
+    <span class="ml-type-badge absolute top-2 left-2 bg-surface/95 text-ink-700 ring-1 ring-inset ring-ink-950/10">
       {{ asset.get_media_type_display }}
     </span>
 
@@ -59,7 +59,7 @@
 
     <!-- Star button: 28px circle, 44px hit area; always shown on touch screens -->
     <button type="button" aria-label="{% if asset.is_starred %}Unstar{% else %}Star{% endif %} {{ asset.original_filename }}" aria-pressed="{% if asset.is_starred %}true{% else %}false{% endif %}" @click.stop
-            class="absolute bottom-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-white/95 shadow-sm ring-1 ring-ink-950/10 before:absolute before:-inset-2 before:content-[''] {% if asset.is_starred %}text-warning-500{% else %}text-ink-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100{% endif %} hover:text-ink-900 transition-opacity"
+            class="absolute bottom-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-surface/95 shadow-sm ring-1 ring-ink-950/10 before:absolute before:-inset-2 before:content-[''] {% if asset.is_starred %}text-warning-500{% else %}text-ink-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100{% endif %} hover:text-ink-900 transition-opacity"
             hx-post="{% url 'media_library:asset_star' workspace_id=workspace.id asset_id=asset.id %}"
             hx-swap="outerHTML"
             hx-target="closest .ml-asset-card">
@@ -69,7 +69,7 @@
     </button>
 
     {% if asset.file_type == 'video' and asset.duration_seconds %}
-    <span class="absolute bottom-2 left-2 text-xs font-semibold px-1.5 py-0.5 rounded-md bg-ink-950/75 text-white tabular-nums">
+    <span class="absolute bottom-2 left-2 text-xs font-semibold px-1.5 py-0.5 rounded-md bg-scrim/75 text-white tabular-nums">
       {% widthratio asset.duration_seconds 60 1 as mins %}
       {% widthratio asset.duration_seconds 1 1 as secs %}
       {{ mins }}:{{ secs|stringformat:"02d" }}

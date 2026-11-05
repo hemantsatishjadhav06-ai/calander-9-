@@ -3,7 +3,11 @@
 
 {% block page_vendor_scripts %}
 <script src="{% static 'js/vendor/Sortable.min.js' %}" defer></script>
+{% if can_start_posts %}<script src="{% static 'js/new-post-sheet.js' %}" defer></script>{% endif %}
 {% endblock %}
+
+{# New post (screen 1): the floating button lifts the toasts (has-fab) and hides under the selection bar. #}
+{% block body_class %}{% if can_start_posts %} has-fab{% endif %}{% endblock %}
 
 {% block title %}Publish - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
 
@@ -35,6 +39,10 @@
         </nav>
     </div>
 
+    {% comment %}The header's right-hand side: from 1024px New post at the top (the primary slot; below
+       1024px the button floats above the phone bar and the slot takes no room), List / Calendar at the bottom.{% endcomment %}
+    <div class="flex flex-col items-start lg:items-end lg:justify-end lg:gap-4 lg:self-stretch">
+    {% if can_start_posts %}<div data-primary-slot="header" class="lg:mb-auto">{% include "components/primary_action.html" with label="New post" testid="new-post-open" controls="new-post-sheet" dispatch="new-post:open" %}</div>{% endif %}
     <!-- List / Calendar: peer views, so a segmented control -->
     <div class="ui-segmented" role="group" aria-label="View" x-data="{ activeMode: '{{ mode|default:'calendar' }}' }">
         <button type="button" class="ui-segment view-btn gap-1.5{% if mode == 'list' %} is-active{% endif %}"
@@ -59,6 +67,7 @@
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             Calendar
         </button>
+    </div>
     </div>
 </div>
 {% endblock %}
@@ -93,7 +102,7 @@
     }
     .cal-day.past .day-num, .cal-day.other-month .day-num { color: var(--ink-500); font-weight: 500; }
     /* Today: an ink circle, like the "Now" line. Today is not an action, so never the accent. */
-    .cal-day.today .day-num { background: var(--ink-900); color: #fff; }
+    .cal-day.today .day-num { background: var(--ink-900); color: var(--on-fill); }
 
     /* Week and day cells already in the past, and the current hour */
     .cal-cell-past { background: var(--ink-25); }
@@ -104,9 +113,9 @@
         display: flex; align-items: center; gap: 6px; min-width: 0;
         height: 20px; margin-bottom: 2px; padding: 0 6px; border-radius: 6px;
         background: var(--ink-50); color: var(--ink-800);
-        font-size: 12px; font-weight: 500;
+        font-size: 13px; font-weight: 500;
     }
-    .cal-event-dot { width: 8px; height: 8px; border-radius: 9999px; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgb(14 17 20 / .12); }
+    .cal-event-dot { width: 8px; height: 8px; border-radius: 9999px; flex-shrink: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-950) 12%, transparent); }
 
     /* ── Post chip: one post on the grid ────────────────────────── */
     .post-chip {
@@ -116,11 +125,11 @@
         margin-bottom: 3px; padding: 0 6px;
         border-radius: 7px; border: 1px solid var(--border);
         background: var(--surface-0); color: var(--ink-900);
-        font-size: 12px; line-height: 16px; font-weight: 500;
+        font-size: 13px; line-height: 16px; font-weight: 500;
         text-decoration: none; overflow: hidden; cursor: pointer;
         transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
     }
-    .post-chip:hover { border-color: var(--ink-300); box-shadow: var(--shadow-sm); }
+    .post-chip:hover { border-color: var(--border-hover); box-shadow: var(--shadow-sm); }
     .post-chip .chip-glyph { display: inline-flex; flex-shrink: 0; }
     .post-chip .chip-glyph svg { width: 14px; height: 14px; }
     .post-chip .chip-thumb { width: 18px; height: 18px; border-radius: 4px; object-fit: cover; flex-shrink: 0; box-shadow: var(--shadow-creative); }
@@ -144,8 +153,8 @@
     .cal-legend-dot.is-success {
         width: 10px; height: 10px; border-radius: 0; box-shadow: none;
         background: var(--success-500);
-        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
-                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
     }
     .status-failed .chip-dot, .status-rejected .chip-dot,
     .cal-legend-dot.is-danger { width: 8px; height: 8px; border-radius: 1.5px; background: var(--danger-500); box-shadow: none; }
@@ -209,9 +218,9 @@
     .calendar-channel-slot {
         display: inline-flex; align-items: center; gap: 5px;
         max-width: 100%; min-height: 26px; padding: 2px 6px;
-        border-radius: 7px; border: 1px dashed var(--ink-300);
+        border-radius: 7px; border: 1px dashed var(--border-hover);
         background: var(--surface-0); color: var(--ink-700);
-        font-size: 12px; font-weight: 500;
+        font-size: 13px; font-weight: 500;
     }
     .calendar-channel-slot--week { width: 100%; gap: 4px; }
     .calendar-channel-slot.is-past-open { background: var(--ink-25); color: var(--ink-500); }
@@ -268,14 +277,14 @@
        Hover-reveal on chips; always shown once checked or when a selection is active. */
     .cal-select-box {
         width: 16px; height: 16px; flex-shrink: 0; border: 1.5px solid var(--ink-400);
-        border-radius: 4px; background: #fff; cursor: pointer; color: #fff;
+        border-radius: 4px; background: var(--surface-0); cursor: pointer; color: var(--on-fill);
         display: inline-flex; align-items: center; justify-content: center;
         opacity: 0; transition: opacity var(--dur-fast) ease, background-color var(--dur-fast) ease;
     }
     .post-chip:hover .cal-select-box,
     .cal-select-box.is-checked,
     body.has-selection .cal-select-box { opacity: 1; }
-    .cal-select-box.is-checked { background: var(--brand-700); border-color: var(--brand-700); }
+    .cal-select-box.is-checked { background: var(--brand-700); border-color: var(--brand-700); color: var(--on-fill); }
     .cal-select-box:hover { border-color: var(--brand-700); }
     /* Keyboard access: reveal the checkbox when its chip is focused. */
     .post-chip:focus-within .cal-select-box { opacity: 1; }
@@ -313,16 +322,16 @@ ticked (see the `sel` Alpine store). Below 1024px it sits above the phone bar
 (base.html: 58px and the safe area) where the bar shows; from 1024px it is unchanged.{% endcomment %}
 <div x-data="bulkBar()">
     {# Floating action bar: a dark surface, so white focus rings #}
-    <div x-cloak x-show="$store.sel.count > 0"
+    <div data-theme-scope="light" x-cloak x-show="$store.sel.count > 0"
          x-effect="document.body.classList.toggle('has-selection', $store.sel.count > 0)"
          role="region" aria-label="Selected posts" data-testid="calendar-bulk-bar"
-         class="fixed {% if nav.phone %}bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6{% else %}bottom-6 max-sm:bottom-4{% endif %} left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 max-w-[calc(100vw-2rem)] bg-ink-900 text-white rounded-xl shadow-lg pl-4 pr-1.5 py-1.5">
+         class="fixed {% if nav.phone %}bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6{% else %}bottom-6 max-sm:bottom-4{% endif %} left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 max-w-[calc(100vw-2rem)] bg-inverse text-on-inverse rounded-xl shadow-lg pl-4 pr-1.5 py-1.5">
         <span class="text-sm font-medium whitespace-nowrap tabular-nums" x-text="$store.sel.count + ' selected'" aria-live="polite"></span>
         <span class="w-px h-5 bg-white/20 mx-1.5" aria-hidden="true"></span>
-        <button type="button" @click="ask('draft')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-white hover:bg-white/10 focus-visible:outline-white transition-colors disabled:opacity-50">Draft</button>
-        <button type="button" @click="ask('publish')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg bg-brand-200 text-brand-950 hover:bg-brand-300 focus-visible:outline-white transition-colors disabled:opacity-50">Publish</button>
-        <button type="button" @click="ask('delete')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-danger-300 hover:bg-white/10 hover:text-danger-200 focus-visible:outline-white transition-colors disabled:opacity-50">Delete</button>
-        <button type="button" aria-label="Clear selection" @click="$store.sel.clear()" class="w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg text-ink-300 hover:bg-white/10 hover:text-white focus-visible:outline-white flex items-center justify-center transition-colors" title="Clear selection">
+        <button type="button" @click="ask('draft')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-white hover:bg-white/10 focus-visible:outline-on-inverse transition-colors disabled:opacity-50">Draft</button>
+        <button type="button" @click="ask('publish')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg bg-brand-200 text-brand-950 hover:bg-brand-300 focus-visible:outline-on-inverse transition-colors disabled:opacity-50">Publish</button>
+        <button type="button" @click="ask('delete')" :disabled="busy" class="h-8 max-lg:h-11 px-3 text-[13px] font-semibold rounded-lg text-danger-300 hover:bg-white/10 hover:text-danger-200 focus-visible:outline-on-inverse transition-colors disabled:opacity-50">Delete</button>
+        <button type="button" aria-label="Clear selection" @click="$store.sel.clear()" class="w-8 h-8 max-lg:w-11 max-lg:h-11 rounded-lg text-ink-300 hover:bg-white/10 hover:text-white focus-visible:outline-on-inverse flex items-center justify-center transition-colors" title="Clear selection">
             <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>
@@ -353,6 +362,7 @@ ticked (see the `sel` Alpine store). Below 1024px it sits above the phone bar
         </div>
     </div>
 </div>
+{% if can_start_posts %}{% include "components/new_post_sheet.html" with form=new_post_form %}{% endif %}
 {% endblock %}
 
 {% block extra_js %}

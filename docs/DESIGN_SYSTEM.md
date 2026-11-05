@@ -33,7 +33,7 @@ The palette, the contrast tables in section 23 and the reference mock-ups were p
 5. **Status is never colour alone.** Every status has a shape (icon or dot form) and a word, rendered by one partial. Status hues are lightness-staggered so they separate for colour-blind people too.
 6. **Depth is functional.** Hairline plus a 1px shadow for cards; real shadows only for what floats (menus, toasts, modals). No hover lifts, no coloured glows, no gradients in the app.
 7. **Motion explains a change, then gets out of the way.** 100–320ms, ease-out, no overshoot except the toggle knob; every animation has a reduced-motion equivalent that keeps the meaning.
-8. **Accessible by construction.** WCAG 2.2 AA everywhere (144 pairs checked, section 23), real 2px focus outlines that survive forced-colours mode, 24px minimum targets (44px on touch), sentence case, 12px minimum for words.
+8. **Accessible by construction.** WCAG 2.2 AA everywhere (144 pairs checked, section 23), real 2px focus outlines that survive forced-colours mode, 24px minimum targets (44px on touch), sentence case, 13px minimum for words.
 
 ---
 
@@ -160,10 +160,11 @@ These are the `:root` variables in Layer 2 of `theme/static_src/src/styles.css`.
 | Manager / specialist message | – | no bubble; ink-900 text on white, 28px ink-900 avatar |
 | Client bubble | – | white + 1px ink-200 + neutral "Client" tag |
 | Teammate bubble | – | ink-50 + 1px ink-200 |
-| Internal note | – | ink-25, 1px **dashed** ink-400, lock icon, "Note for the team" 12/600 ink-700 |
-| System line | – | centred 12/16 ink-500 between ink-200 hairlines |
+| Internal note | – | ink-25, 1px **dashed** ink-400, lock icon, "Note for the team" 13/600 ink-700 |
+| System line | – | centred 13/18 ink-500 between ink-200 hairlines |
 | Toast / tooltip | – | ink-900 fill, white text, ink-300 detail, brand-300 action |
 | Legacy status names | `--success-50/500/700`, `--warning-50/500/700`, `--info-50/500/700`, `--error-50/200/500/600/700`, `--error-soft`, `--warning-soft`, `--success-soft` | re-pointed to the new scales (`--error-*` → danger) |
+| On a fill / inverse surface / its text / scrim | `--on-fill` (`text-on-fill`), `--surface-inverse` (`bg-inverse`), `--text-on-inverse` (`text-on-inverse`), `--scrim` (`bg-scrim/NN`) | `#FFFFFF` / ink-900 / `#FFFFFF` / ink-950; dark values in §21 |
 | Retired | `--shadow-primary` (none), `--accent-*` (re-pointed to status), `--brand-green-*` (re-pointed to brand), `--color-illustration-*` (neutral) | kept only so nothing breaks |
 
 ---
@@ -175,29 +176,36 @@ These are the `:root` variables in Layer 2 of `theme/static_src/src/styles.css`.
 ```
 --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+--font-display: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 ```
+
+**Display stack: the system font's display cut, 0 KB.** `--font-display` (through `--brand-font-display`, the white-label hook) is set on `h1`, `h2`, `h3`, `.ui-page-title`, `.ui-card-title`, `.text-display`, `.text-h1`, `.text-h2` and `.text-h3`. `system-ui` switches to Apple's display optical size from 20px; Windows gets Segoe UI Variable Display ahead of Segoe UI. Titles and headings are 700; nothing is heavier (Segoe UI Variable and the committed Inter both stop at 700, and a synthesised 800 is worse than none). CSP `font-src 'self'` is unchanged.
+
+**Body token: running text is 16/24 below 1024px and 15/22 from 1024px.** `--read-size` and `--read-leading` in `styles.css`, set on `<body>` and offered as `text-read`. A rebuilt screen sets its running text (thread messages, captions, row titles, the Inbox message, the portal caption) with `text-read`, and its browser spec asserts the computed size with `expectReadSize` (`tests/e2e/support/type.ts`), because running text sets its own size and `<body>` alone proves nothing. `text-sm` (14px) stays for dense desktop tables and meta, never for running text in a rebuilt screen.
 
 Georgia (app) and Instrument Serif + Inter (marketing, 5 files, 95,428 bytes) are retired. If uniform cross-platform rendering is ever preferred, the OFL Inter variable woff2 already committed at `static/fonts/inter-latin-normal.woff2` (48,432 bytes, 0 new bytes) is the fallback option; it is not used now because native SF Pro is the most "Apple" choice there is.
 
 | Role | Tailwind | px / line-height | Weight | Tracking | Use |
 |---|---|---|---|---|---|
 | Marketing hero | `text-[64px]/[68px] font-bold tracking-[-0.035em]` | 64/68 (phone 40/44) | 700 | -0.035em | public site only |
-| Display | `text-display` | 40/44 | 700 | -0.025em | marketing section titles, login wordmark |
-| H1 | `text-h1` | 28/34 (phone 26/32) | 700 | -0.020em | page titles ("Good afternoon, Ana", "Your team", "Set up") |
-| H2 | `text-h2` | 20/26 | 600 | -0.015em | card titles (Today, Your team, Working now) |
-| H3 | `text-h3` | 16/22 (section heads 17/22) | 600 | -0.010em | row titles, modal sections, "Recent work" |
+| Display | `text-display` | 40/44 | 700 | -0.030em | marketing section titles, login wordmark |
+| H1 | `text-h1`, `.ui-page-title` | 28/34 (phone 26/32) | 700 | -0.020em | page titles ("Good afternoon, Ana", "Your team", "Set up") |
+| H2 | `text-h2`, `.ui-card-title` | 20/26 | 700 | -0.015em | card titles (Today, Your team, Working now) |
+| H3 | `text-h3` | 16/22 (section heads 17/22) | 700 | -0.010em | row titles, modal sections, "Recent work" |
+| Running text | `text-read` (the body token) | 16/24 below 1024px, 15/22 from 1024px | 400 | 0 | running text in a rebuilt screen: messages, captions, row titles |
 | Body large | `text-body-lg` | 15/24 | 400 | -0.005em | chat messages, composer, descriptions under H1 |
 | Body | `text-body` / `text-sm` | 14/20 | 400 (labels 500, emphasis 600) | 0 | default UI, buttons, rows, forms |
 | Table | `text-table` | 14/22 | 400 | 0 | dense tables |
 | Small | `text-small` | 13/18 | 400–500 | 0 | meta, helper text, card subtitles, live states |
-| Caption | `text-caption` | 12/16 | 500 (pills and group labels 600) | +0.005em | timestamps, pills, group labels, axis labels |
-| Micro | `text-micro` | 11/14 | 600 | +0.02em | **numerals only** (count badges) |
-| Mono | `font-mono text-[13px]/5` | 13/20 (owner boxes 12/18) | 400 | 0 | setting names the owner must type |
+| Caption | `text-caption` | 13/18 | 500 (pills and group labels 600) | +0.005em | timestamps, pills, group labels, axis labels |
+| Extra small | `text-xs` (Tailwind's, redefined) | 13/18 | 400–600 | 0 | the same as caption where a weight utility sets the weight |
+| Micro | `text-micro` | 13/18 | 600 | +0.02em | **numerals only** (count badges) |
+| Mono | `font-mono text-[13px]/5` | 13/20 (owner boxes 13/18) | 400 | 0 | setting names the owner must type |
 
 Rules:
 - Hierarchy by size and weight only. Negative tracking only at 20px and above.
-- **No uppercase, no wide tracking.** Group labels are 12/600 ink-500 in sentence case ("Waiting for you", "Done since yesterday", "Brief").
-- Words are never smaller than 12px. Inputs are 16px below 1024px (stops iOS zoom).
+- **No uppercase, no wide tracking.** Group labels are 13/600 ink-500 in sentence case ("Waiting for you", "Done since yesterday", "Brief").
+- Words are never smaller than 13px, wherever the stylesheet loads and on the standalone pages that do not load it (accept invite, the magic-link pages, legal, error, unsubscribe), and in the Analytics chart's canvas text. `apps/common/tests/test_type_floor.py` fails on any `text-[Npx]` under 13, any `font-size` under 13px and any `--text-*` token under 0.8125rem in templates, `static/js` and the stylesheets. Its two named allowlists: emails (the one exception: they do not load the stylesheet and keep literal values) and the public site's `marketing.css` (until screen 11; its pages in `templates/marketing/` set no small size and are not excused). Inputs are 16px below 1024px (stops iOS zoom).
 - `tabular-nums` on counts, badges, times, dates in lists, budgets, "5 of 11 done", tables, chart axes and the calendar grid; proportional figures in prose.
 - Reading measure ≤ 72ch; thread column ≤ 720px.
 
@@ -247,27 +255,30 @@ Removed: the orange glow (`0 4px 14px rgba(249,115,22,.28)`), every `translateY`
 | Token | Duration | Use |
 |---|---|---|
 | `--dur-instant` | 100ms | hover/press colour, button `:active` scale(.98) |
-| `--dur-fast` | 160ms | pill cross-fade, dropdown open, checkbox, toggle, count step |
-| `--dur-base` | 220ms | disclosure (grid rows 0fr→1fr) + chevron, popover, row collapse |
-| `--dur-slow` | 320ms | modal/sheet, sidebar collapse 240→60px, mobile drawer, Set up tick draw |
-| message in | 240ms | new chat message |
+| `--dur-fast` | 160ms | pill cross-fade, dropdown open, checkbox, toggle, count step, status cross-fade |
+| `--dur-snap` | 200ms | a rebuilt screen's micro-interactions and sheets: the approve fill, a message arriving, the calendar chip's snap, the row collapse or card exit; a sheet or drawer entering |
+| `--dur-exit` | 140ms | a rebuilt screen's sheet or drawer leaving: `calc(var(--dur-snap) * .7)` |
+| `--dur-base` | 220ms | pages not rebuilt: disclosure (grid rows 0fr→1fr) + chevron, popover, row collapse |
+| `--dur-slow` | 320ms | pages not rebuilt: modal/sheet, sidebar collapse 240→60px, mobile drawer, Set up tick draw |
 | live pulse | 2s loop | working dot and working stage node only |
+
+**New motion uses `--dur-fast` or `--dur-snap` only** (spec D7), and a leave `--dur-exit`: nothing on a rebuilt screen runs longer than 200ms. `--dur-base` and `--dur-slow` stay for the pages not rebuilt, and a rebuilt screen's templates never name them. The motion classes in `styles.css` carry it: `.motion-rise` (a message arriving: opacity and a 6px rise, 200ms), `.motion-sheet-*` (a sheet's `x-transition` classes: `motion-sheet-enter` / `-leave` for the phases, `motion-sheet-out` / `-in` for the positions; up from the bottom below 1024px, in from the right from 1024px; in 200ms, out 140ms), `.motion-fill` (the approve fill, 200ms) and `.motion-snap` (the calendar chip settling into its slot, 200ms). On a rebuilt screen, keyframes and reduced-motion blocks live in `styles.css`, never in its templates; the pages not yet rebuilt keep their own until their screen's gate (the composer, the media library and the approvals partials still have local `@keyframes`) (`base.html`'s progress bar moved there); `apps/common/tests/test_motion.py` checks the tokens, the classes and the templates of every gated screen.
 
 Easings: enter `cubic-bezier(0.22, 1, 0.36, 1)` (`--ease-out`); size changes `cubic-bezier(0.65, 0, 0.35, 1)` (`--ease-in-out`); exit `cubic-bezier(0.4, 0, 1, 1)` at 70% of the enter duration (`--ease-exit`); toggle knob only `cubic-bezier(0.34, 1.3, 0.64, 1)` (`--ease-spring`).
 
 Transitions that carry meaning:
-- **New message:** opacity 0→1 + translateY(6px)→0, 240ms; the "The team is writing" line fades out as the message fades in. Consecutive messages from one agent group under one avatar.
+- **New message:** opacity 0→1 + translateY(6px)→0, 200ms (`.motion-rise`, `--dur-snap`); the "The team is writing" line fades out as the message fades in. Consecutive messages from one agent group under one avatar.
 - **Status change** (Working → Ready for approval): 160ms cross-fade of colour, icon and word; the spinner is replaced, never popped. Announced with `aria-live="polite"`.
-- **Approve & schedule** (section 12.3): spinner ≥ 300ms → "Scheduled · Mon 10:10" (info) → hold 1.2s → row collapses 220ms → counts step → two-line toast with Undo.
+- **Approve & schedule** (section 12.3): spinner while the request is in flight (shown ≥ 300ms) → the button fills with "Scheduled · Mon 10:10" (info) in 200ms → hold 1.2s to read it → the row collapses or the card leaves in 200ms → counts step → two-line toast with Undo.
 - **Brief started:** a 2px indeterminate info-500 line runs along the brief card's bottom edge until the first agent step arrives.
 - **Auto-start countdown:** "Starting in 10 s · Stop" with a 2px info-500 line draining over 10s.
 - **Count badges** roll down one digit (4px slide + fade, 160ms).
 - **Set up step done:** ring fills success-500, tick draws (stroke-dashoffset 24→0, 320ms), progress widens 320ms, "5 of 11" → "6 of 11".
 - **HTMX:** 2px brand-700 bar at the top, width 200ms, fades out 250ms.
-- **Popover** translateY(-4px) + opacity 160ms; **modal** scale(.98) + opacity 220ms; **phone sheet** translateY(100%)→0 320ms.
+- **Popover** translateY(-4px) + opacity 160ms; **modal** scale(.98) + opacity 220ms (pages not rebuilt); **sheet** on a rebuilt screen (`.motion-sheet-*`): translateY(100%)→0 below 1024px, translateX(100%)→0 from 1024px, enters in 200ms (`--dur-snap`) and leaves in 140ms (`--dur-exit`, `--ease-exit`); a page not rebuilt keeps its phone sheet's 320ms.
 - **Skeleton** shimmer 1.4s linear, shown only after a 300ms delay.
 
-**Reduced motion** (`prefers-reduced-motion: reduce`): all transforms, slides, scales and loops are removed (global rule in Part B of `styles.css`); opacity fades of ≤ 120ms may stay (`.fade-safe`); the row collapse is instant; the working pulse and stage-node pulse stop (the filled dot and the word "Working" remain); spinners become a static ring beside the word; typing dots become the text "The team is writing…"; the skeleton is a static ink-100 block; the countdown updates text only; progress and HTMX bars appear without width animation; smooth scrolling is off.
+**Reduced motion** (`prefers-reduced-motion: reduce`): all transforms, slides, scales and loops are removed (global rule in Part B of `styles.css`, which cuts every animation and transition to 0.01ms); opacity fades of ≤ 120ms may stay (`.fade-safe`); the row collapse is instant; the working pulse and stage-node pulse stop (the filled dot and the word "Working" remain); spinners become a static ring beside the word; typing dots become the text "The team is writing…"; the skeleton is a static ink-100 block; the countdown updates text only; progress and HTMX bars appear without width animation; smooth scrolling is off. Every motion class has its own reduced form in the same block, so it does not run at all: a message appears without rising, the approve fill swaps at once (the words still show), the chip moves without its snap, and a sheet appears and goes in place with no transform. Each rebuilt screen names the reduced form of its new motion; `tests/e2e/self/reduced-motion.spec.ts` opens the shell's Go to and notifications drawer under reduce and finds nothing moving longer than 0.01ms; screen 1 added the New post sheet, which appears without a transform, and screens 2 and 3 add a new message and the approve fill.
 
 ---
 
@@ -275,7 +286,7 @@ Transitions that carry meaning:
 
 - **Focus ring:** `outline: 2px solid var(--focus-ring); outline-offset: 2px;` on `:focus-visible`, globally (Part B). brand-600 measures 5.98:1 on white, 5.58 on ink-50, 5.19 on the sidebar, 5.15 on the tinted button, 4.79 on a translucent bar over a navy creative. It is a real outline, so it survives Windows forced-colours mode (the Graphite must-fix). Utility form for explicit markup: `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600`.
 - **Text fields:** the edge becomes the ring: `border-color: brand-600; box-shadow: 0 0 0 1px brand-600, 0 0 0 4px rgb(30 112 87 / .18); outline: 2px solid transparent` (the transparent outline turns into a system outline under forced colours). No layout shift.
-- **Selected states** (not focus): selected row `bg-brand-50` + `aria-selected`; selected filter chip and segment are **ink**, never Pine (`bg-ink-900 text-white`; white segment on the ink track); checkbox/toggle on brand-700; active nav item white pill + 600 weight + brand-700 icon (8.64:1) + `aria-current="page"`. Under forced colours every box-shadow-only state gets `outline: 2px solid Highlight` (Part B).
+- **Selected states** (not focus): selected row `bg-brand-50` + `aria-selected`; selected filter chip and segment are **ink**, never Pine (`bg-ink-900 text-on-fill`; white segment on the ink track); checkbox/toggle on brand-700; active nav item white pill + 600 weight + brand-700 icon (8.64:1) + `aria-current="page"`. Under forced colours every box-shadow-only state gets `outline: 2px solid Highlight` (Part B).
 - **Text selection:** brand-100 background, ink-900 text.
 - `scroll-padding-top: 72px` on `html` so a focused control is never hidden under a sticky bar (WCAG 2.2, 2.4.11).
 
@@ -290,16 +301,18 @@ Global focus styles come from Part B, so the `focus-visible:` classes below are 
 | Variant | Recipe | Use |
 |---|---|---|
 | **Primary** (md) | `inline-flex items-center justify-center gap-1.5 h-9 max-lg:h-11 px-3.5 rounded-lg bg-brand-700 text-white text-sm font-semibold shadow-[var(--shadow-button)] hover:bg-brand-800 active:bg-brand-900 active:scale-[.98] transition-[background-color,transform] duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:bg-ink-100 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed` | the single most important action in the view |
-| Secondary | `inline-flex items-center justify-center gap-1.5 h-9 max-lg:h-11 px-3.5 rounded-lg bg-white text-ink-900 text-sm font-semibold ring-1 ring-inset ring-ink-300 shadow-xs hover:bg-ink-25 hover:ring-ink-400 active:bg-ink-50 transition-colors duration-100` | "New" in the sidebar, Manage, Change, Run now, Send while a brief waits |
+| Secondary | `inline-flex items-center justify-center gap-1.5 h-9 max-lg:h-11 px-3.5 rounded-lg bg-white text-ink-900 text-sm font-semibold ring-1 ring-inset ring-ink-300 shadow-xs hover:bg-ink-25 hover:ring-ink-400 active:bg-ink-50 transition-colors duration-100` | Manage, Change, Run now, Send while a brief waits |
 | **Tinted** | `inline-flex items-center justify-center gap-1.5 h-8 max-lg:h-11 px-3 rounded-lg bg-brand-100 text-brand-700 text-[13px] font-semibold hover:bg-brand-200 hover:text-brand-800 transition-colors duration-100` | repeated row actions: Approve & schedule, Use this angle, Approve in Approvals, Answer |
 | Ghost | `inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-ink-700 text-[13px] font-semibold hover:bg-ink-900/5 hover:text-ink-900 active:bg-ink-900/10` | Review, Change something, Cancel |
 | Icon | `inline-grid place-items-center size-8 max-lg:size-11 rounded-lg text-ink-500 hover:bg-ink-900/5 hover:text-ink-900` + `aria-label` | close, menu, overflow |
-| Danger (confirm in a modal only) | `… bg-danger-500 text-white hover:bg-danger-600` (8.46:1) | "Discard post" (the button repeats the verb) |
+| Danger (the confirm of a destructive act only) | `… bg-danger-500 text-white hover:bg-danger-600` (8.46:1) | "Discard post" (the button repeats the verb), inside an inline confirm (10.9); a modal only on a screen not yet rebuilt |
 | Danger ghost (in rows and menus) | `… text-danger-500 hover:bg-danger-50` | Delete, Discard; never a filled red button in a resting list |
 
 Sizes: sm `h-8 px-3 text-[13px]`, md `h-9 px-3.5 text-sm`, lg `h-11 px-[18px] text-[15px] rounded-[10px]`; every size is ≥ 44px tall below 1024px. Loading: keep the width, swap the icon for a 14px spinner, `aria-busy="true"`.
 
 **One solid primary per view.** Repeated actions are tinted. While a brief card waits for *Start*, the composer's *Send* renders secondary. Only the first unfinished Set up step gets a primary. Success green is never an action colour.
+
+**One primary, one place (rebuilt screens, spec D5).** A screen's own act (*New post*) is `components/primary_action.html` (`label`, `testid`, `href` for a link or a `<button>` otherwise, `controls` and `dispatch` when it opens a dialog: `aria-haspopup="dialog"`, `aria-expanded`, `aria-controls`). Below 1024px it is `.ui-fab`: a 56px pill with a 20px plus and its words, `fixed right-4` above the phone bar (`bottom-[calc(4.5rem+env(safe-area-inset-bottom))]`, the toasts' and the selection bars' bottom), `z-20` under the drawer and every dialog. From 1024px it is `lg:static`, an ordinary primary button in the page header: include it inside the header's element marked `data-primary-slot="header"`. The page sets `has-fab` on `body` while the button shows; the toasts then rise above it (11.1) and it hides (`visibility: hidden`) under `has-selection` and `has-approval-selection`, so it never covers a selection bar or a toast, nor is covered by one. A decision about one item (the post page, an Approvals card, a portal card, the Inbox reply) or a form (a Settings panel's Save, a sheet's Send) sits in its `data-decision-bar`: a bottom bar within thumb reach on a phone, primary on the right, and the end of the item or form on a desktop. A dialog or sheet is a view of its own (each `data-view` panel too) and has no floating button. Activity and Analytics only show work and have no primary. `apps/common/tests/test_one_primary.py` renders each gated screen for each role and fails on a second primary at a breakpoint or a primary anywhere else, within the screen's scope: what other screens own on its pages (a page-level primary a later screen rebuilds, a shell dialog) is named once, in its `LEFT_TO_LATER`, and counted at the owner's gate; everything else is counted.
 
 ### 10.2 Links
 
@@ -322,8 +335,9 @@ Sizes: sm `h-8 px-3 text-[13px]`, md `h-9 px-3.5 text-sm`, lg `h-11 px-[18px] te
 
 ### 10.4 Cards and rows
 
-- Card: `rounded-2xl border border-ink-200 bg-white p-5 max-sm:p-4 shadow-xs` (nested and list cards `rounded-xl p-4`). Header: `flex items-baseline justify-between gap-3`; title `text-h2 text-ink-950`; subtitle `mt-0.5 text-[13px]/[18px] text-ink-600`; standalone link right-aligned. Clickable: add `transition-[border-color,box-shadow] duration-150 hover:border-ink-300 hover:shadow-sm` (no transform).
+- Card: `.ui-card` (`rounded-2xl`, a hairline, `shadow-xs`), padded 20px below 1024px and 24px from 1024px; nested and list cards `.ui-card-nested` (`rounded-xl`, 16px). The padding is set in CSS, not by a utility; a `p-0` or `sm:p-6` override still wins outside a rebuilt screen. A screen's sections sit in `.ui-sections`, 32px apart. Header: `flex items-baseline justify-between gap-3`; title `text-h2 text-ink-950`; subtitle `mt-0.5 text-[13px]/[18px] text-ink-600`; standalone link right-aligned. Clickable: add `transition-[border-color,box-shadow] duration-150 hover:border-ink-300 hover:shadow-sm` (no transform).
 - List row: list `divide-y divide-ink-200`; row `flex items-center gap-3 min-h-14 px-4 py-3 hover:bg-ink-25 aria-selected:bg-brand-50`; leading 20–32px status glyph or 44×55 creative thumb (`rounded-[7px] shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)]`); title `text-sm font-semibold text-ink-900`; meta `text-xs text-ink-500 tabular-nums`; trailing actions or `size-4 text-ink-400` chevron.
+- Status border (spec D6): a row in the Approvals list, the Calendar list tabs and agenda, Inbox, Activity, the portal's decided list and the Analytics rows on phones carries `data-tone` from the one status mapping, `data-tone="{{ post.status|status_tone }}"` (`approval_extras.STATUS_META`) or `data-tone="{{ brief.status|brief_tone }}"` (`studio_status.BRIEF_STATUS_META`), and draws a 2px left border in the tone's 500 step (neutral `ink-500`, the pill's icon colour). It is an extra cue for scanning; the row keeps its pill. A `data-tone` is only ever one of the five tones (`apps/common/tests/test_components.py`).
 
 ### 10.5 Status pill, badges, chips
 
@@ -356,13 +370,14 @@ base `inline-flex items-center gap-1.5 h-[22px] pl-[7px] pr-2 rounded-full text-
 | `on_hold`, `paused` | On hold / Paused | neutral | pause |
 | connection ok / expired / disconnected | Connected / Expires soon / Disconnected | success / warning / danger | check / clock / x-octagon |
 
-- Count badge: `inline-flex items-center justify-center min-w-5 h-[18px] px-1.5 rounded-full bg-ink-200 text-ink-700 text-[11px] font-semibold tabular-nums`. Your-turn badge (Approvals waiting only): `bg-brand-700 text-white`. Failed-runs count: `bg-danger-500 text-white`.
+- Count badge: `inline-flex items-center justify-center min-w-5 h-[18px] px-1.5 rounded-full bg-ink-200 text-ink-700 text-xs font-semibold tabular-nums`. Your-turn badge (Approvals waiting only): `bg-brand-700 text-white`. Failed-runs count: `bg-danger-500 text-white`.
 - Filter chip: `h-8 max-lg:h-11 px-3 rounded-full text-[13px] font-medium text-ink-700 hover:bg-ink-100 aria-pressed:bg-ink-900 aria-pressed:text-white aria-pressed:font-semibold` (count `text-ink-500`, selected `text-ink-300`).
 - Tag chip: `inline-flex items-center gap-1 h-6 pl-2 pr-0.5 rounded-full bg-ink-100 text-xs font-semibold text-ink-700`; remove button `size-6 grid place-items-center rounded-full hover:bg-ink-200` (24px target).
 
 ### 10.6 Tabs
 
 - Peer views (Home / Routines / Team / Settings; List / Calendar) are a **segmented control**: track `inline-flex p-0.5 rounded-[9px] bg-ink-900/5` (`role="tablist"`); segment `px-3.5 py-[5px] rounded-[7px] text-[13px] font-medium text-ink-600 aria-selected:bg-white aria-selected:text-ink-950 aria-selected:font-semibold aria-selected:shadow-[var(--shadow-segment)]`.
+- A **choice** drawn as a segmented control (Appearance in the account menu: System / Light / Dark) is a `<fieldset>` named by its `<legend>`, each segment a `<label class="ui-segment relative">` around a real radio (`absolute inset-0 size-full opacity-0`) that covers it: a tap lands on the radio, the arrow keys move the choice, `.ui-segment:has(> input:checked)` draws the selected segment and `:has(> input:focus-visible)` the focus ring.
 - Section tabs (Queue / Drafts / Approvals / Sent; the Settings screen's seven tabs, each a link with `aria-current="page"`): `flex gap-6 border-b border-ink-200`; tab `h-10 -mb-px border-b-2 border-transparent text-sm font-medium text-ink-600 hover:text-ink-900 aria-selected:border-ink-900 aria-selected:text-ink-950 aria-selected:font-semibold`; counts are neutral badges. Tabs never use the accent.
 
 ### 10.7 Tables
@@ -375,16 +390,38 @@ Wrapper `overflow-hidden rounded-xl border border-ink-200 bg-white`. Header cell
 
 ### 10.9 Modal and sheet
 
-Overlay `fixed inset-0 bg-ink-950/35`. Dialog `w-full max-w-[560px] rounded-2xl bg-white shadow-xl` (sm 400, lg 720). Header `flex items-start justify-between px-6 pt-5 pb-4` with `text-h2` title and a 32px icon close; body `px-6 pb-5 text-sm text-ink-700`; footer `flex justify-end gap-2 px-6 py-4 border-t border-ink-200` (secondary then primary or danger). Below 640px: bottom sheet `fixed inset-x-0 bottom-0 rounded-t-2xl max-h-[92vh]` with a `mx-auto mt-2 h-[5px] w-9 rounded-full bg-ink-300` grabber. Focus is trapped; Escape closes; focus returns to the trigger.
+Overlay `fixed inset-0 bg-ink-950/35`. Dialog `w-full max-w-[560px] rounded-2xl bg-white shadow-xl` (sm 400, lg 720). Header `flex items-start justify-between px-6 pt-5 pb-4` with `text-h2` title and a 32px icon close; body `px-6 pb-5 text-sm text-ink-700`; footer `flex justify-end gap-2 px-6 py-4 border-t border-ink-200` (secondary then primary or danger). Below 640px: bottom sheet `fixed inset-x-0 bottom-0 rounded-t-2xl max-h-[92vh]` with a `mx-auto mt-2 h-[5px] w-9 rounded-full bg-ink-300` grabber. Focus is trapped; Escape closes; focus returns to the trigger. That is the recipe of the pages not rebuilt; a rebuilt screen's sheet is the one below.
+
+**Sheet and drawer (rebuilt screens; the New post sheet, screen 1).** `templates/components/new_post_sheet.html`, run by `newPostSheet()` (`static/js/new-post-sheet.js`) inside the shell's Alpine scope. One element is both shapes:
+
+| Part | Below 1024px: bottom sheet | From 1024px: drawer |
+|---|---|---|
+| Frame | full width, `rounded-t-2xl`, at most `max-h-[92vh]`, height from its content | `lg:w-[480px]` on the right, full height, square corners, `lg:border-l border-ink-200` |
+| Surface | `bg-surface shadow-xl` over `.ui-overlay` (the scrim token), both themes | the same |
+| Grabber | `mx-auto mt-2 mb-4 h-[5px] w-9 rounded-full bg-line-strong`, `aria-hidden`; a cue only, there is no drag | none |
+| Header | sticky at the top (`data-sheet-head`, `bg-surface`, `px-4 pb-4`): the `text-h2` title, whose words follow the view ("New post", "New idea") while the dialog keeps one static `aria-labelledby`; a 44px icon *Close* (`.ui-btn-icon`, 32px from 1024px); then the mode as a segmented control (`role="group"` named "How to start", `.ui-segment` buttons with `aria-pressed`, full width; not shown with the idea form) | `lg:px-6 lg:pt-6` |
+| Body | each `data-view` panel's fields, `px-4 pb-6`, 24px between fields; running help in `text-small text-ink-600` | `lg:px-6` |
+| Foot links | `nav` "Other ways to start": `.ui-link`s, 44px tall on touch, 24px apart | 32px tall |
+| Decision bar | sticky at the bottom (`data-decision-bar data-sheet-foot`, `border-t border-ink-200 bg-surface px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))]`): the error line, the allowance line where the act is paid, then a ghost on the left (*Save it as an idea instead*, *Back to New post*) and the view's one primary on the right (*Send*, *Open the editor*, *Save idea*) | `lg:px-6 lg:pb-6`, at the drawer's foot |
+
+- *Layout.* The dialog is the scroller (`overflow-y-auto overscroll-contain`). Each panel is `display: contents`, so its body (`order-1`), the foot links (`order-2`) and its bar (`order-3`) line up in the dialog's one column while each panel stays one element and one view for the one-primary counter (10.1). The script keeps the dialog's `scroll-padding-top` and `-bottom` equal to the header and the shown bar (a `ResizeObserver` on both) and scrolls a focused control the browser left under either clear of it, so a control the keyboard reaches is never hidden (WCAG 2.2 SC 2.4.11; the page's own `scroll-padding-top` does not reach inside a dialog).
+- *Opening.* The trigger (11, `new-post-open`), `n` from 1024px, `#new-post` on load and the window event `new-post:open` (with `mode` `team`, `self` or `idea`, and a Calendar cell's `date`, `time` and `account`) open it. Opening closes the phone drawer first, remembers the opener, sets `has-sheet` on `body` and keeps `aria-expanded` on the trigger current. `x-trap.noscroll.noautofocus.noreturn`: the script places the focus itself, in the mode's first field once the mode's panel shows (WebKit can show it a frame late; the script waits for it), and gives it back.
+- *Closing.* Escape, *Close* and the scrim close it and return the focus to the opener. What was typed stays until the page goes. Ctrl/Cmd-K (Go to) and `/` do nothing while it is open.
+- *Refusals.* The error line is always in the page, empty until a refusal: `role="alert"`, `text-small text-danger-500`, its 14px icon shown only beside words (`peer-empty:hidden`). A refused *Send* or *Save idea* writes its sentence there (the form's `data-inline-error`, never `data-no-error-toast`), keeps every word typed and puts the focus back on the button that was pressed.
+- *Motion.* `.motion-sheet-*` (8): up from the bottom below 1024px, in from the right from 1024px, 200ms in and 140ms out; the scrim fades on the same two tokens. Under reduced motion it appears and goes in place.
+- *Dark.* Every colour is a token (`bg-surface`, `bg-line-strong`, `border-ink-200`, the scrim); Home and Calendar are dark-ready (21), so the sheet follows the device there.
+
+**Inline confirm (spec D8).** On a rebuilt screen a destructive or paid act never asks in a modal, an `hx-confirm` or the browser's `confirm()`: `components/inline_confirm.html` (`confirm_id`, `label`, `words`, `confirm_label`, `tone`, `action` or `hx_post` with `hx_target` and `hx_swap`, `testid`). The act's button (danger ghost; secondary for a paid act) carries `aria-expanded` and `aria-controls`; it opens, just under it, a `role="group"` region named by its words (one sentence: what it removes or starts) on `bg-ink-50 ring-1 ring-inset ring-ink-200 rounded-xl p-4`, with **Cancel** (ghost) and then the confirm on the right, which repeats the act (`ui-btn-danger`; tinted for a paid act, never the view's primary). Opening moves focus to Cancel, so the words are read first; Cancel and Escape close it and return focus to the act, and Escape stops there, so an enclosing dialog stays open. A gated screen's templates contain no `hx-confirm` and no `confirm(` (`test_components.py`).
 
 ### 10.10 Empty state, skeleton, progress, callouts, menus
 
 - Empty state: `px-6 py-8 text-center`; 32px line icon `text-ink-400` stroke 1.5; title `mt-3 text-[15px] font-semibold text-ink-900`; body `mt-1 mx-auto max-w-[44ch] text-sm text-ink-600`; at most one action (secondary; primary only if it is the page's main action). No illustrations, no sparkles. Example: "Nothing in progress" / "Tell your team what you want and follow it here."
+  On a rebuilt screen it is `components/empty_state.html` (spec D8): a place's 32px line icon (`icon`, a `components/nav_icon.html` key), one sentence (`sentence`) and one button that says the act (`action_label` with `action_href`, or `action_dispatch` and `action_controls` when it opens a dialog), tinted or, with `action_tone="secondary"`, secondary. Never primary: the screen's primary is its floating button (10.1).
 - Skeleton: `.skeleton` blocks at real sizes (text lines 10–12px tall, 6px gaps, thumbnails at their real radius) inside a `.skeleton-delay` container with `aria-busy="true"`.
 - Progress: track `h-1 rounded-full bg-ink-200`, fill `h-1 rounded-full bg-brand-600` (4.69:1 against the track), label `text-[13px] font-semibold text-ink-900 tabular-nums` ("5 of 11 done").
 - Neutral callout ("Nothing goes out without you"): `flex gap-3 rounded-xl bg-ink-50 ring-1 ring-inset ring-ink-200 p-4`; 16px lock `text-ink-700`; title `text-sm font-semibold text-ink-900`; body `text-[13px]/[18px] text-ink-600`. Warning/danger callouts use their 50 / 200 / 600 tones plus an icon.
 - Owner box ("For the owner"): `rounded-md bg-ink-50 ring-1 ring-inset ring-ink-200 px-3 py-2 text-xs/[18px] text-ink-700`; label `font-semibold text-ink-900`; setting names in `font-mono`. Copy describes the step in plain words, with no vendor names ("Add the writing key to the web and worker services").
-- Menu / popover: `rounded-xl bg-white p-1 shadow-lg ring-1 ring-ink-200`; item `flex h-[34px] items-center gap-2 rounded-lg px-2.5 text-sm text-ink-900 hover:bg-ink-50`; destructive item `text-danger-500`; separator `my-1 h-px bg-ink-200`.
+- Menu / popover: `rounded-xl bg-white p-1 shadow-lg ring-1 ring-ink-200`, the panel marked `data-control="menu"` (a menu's panel and rows are part of the control, so their 4px and 12px steps pass the 8px guard); item `.ui-menu-item` (34px tall, 44px on touch, 12px inset: its words sit 16px in from the panel's edge, where a header line in the same menu starts with `px-3`); destructive item `text-danger-500`; separator `my-1 h-px bg-ink-200`.
 - Tooltip: `rounded-md bg-ink-900 px-2 py-1 text-xs font-medium text-white`, 400ms delay, no arrow.
 
 ---
@@ -393,23 +430,24 @@ Overlay `fixed inset-0 bg-ink-950/35`. Dialog `w-full max-w-[560px] rounded-2xl 
 
 | Part | Treatment |
 |---|---|
-| Sidebar | `w-60` (collapsed `w-[60px]`), `bg-ink-100 border-r border-ink-200 px-3 py-3 flex flex-col gap-0.5`. Workspace switcher: 28px mark (client icon, or `bg-ink-900` with a white initial, `rounded-[7px]`), name 14/600. "New" = secondary button, full width. Nav items `.sidebar-nav-item` (32px tall, 44px on touch; icon 18px stroke 1.75 ink-500; label 14/500 ink-700; hover `bg-ink-900/5`; active = white pill + `--shadow-nav-active` + 600 ink-950 label + brand-700 icon + `aria-current="page"`). Section label `.sidebar-section-label` 12/600 ink-500 sentence case. Badges `.sidebar-badge` (neutral) / `.sidebar-badge.is-turn` (Approvals). Footer: 28px ink-200 avatar, name 13/600, role 12 ink-500. |
+| Sidebar | `w-60` (collapsed `w-[60px]`), `bg-ink-100 border-r border-ink-200`, an 8px gutter (`px-2`, each block `pt-2`) on the 8px grid; the nav's items touch (32px pitch, 44px on touch). One column: the workspace mark, every nav icon, a section label's words and the account avatar start 20px from the edge (the switcher and the account button `px-3`, `.sidebar-nav-item` and `.sidebar-section-label` 12px), and each label follows its glyph after 12px. Workspace switcher: 28px mark (client icon, or `bg-ink-900` with a white initial, `rounded-[7px]`), name 14/600. There is no New menu (it left with screen 1): a screen's own act is its primary in the page header (below), and New post lives on Home and Calendar. Nav items `.sidebar-nav-item` (32px tall, 44px on touch; icon 18px stroke 1.75 ink-500; label 14/500 ink-700; hover `bg-ink-900/5`; active = white pill + `--shadow-nav-active` + 600 ink-950 label + brand-700 icon + `aria-current="page"`). Section label `.sidebar-section-label` 13/600 ink-500 sentence case. Badges `.sidebar-badge` (neutral) / `.sidebar-badge.is-turn` (Approvals). Footer: 28px ink-200 avatar, name 13/600, role 13 ink-500. |
 | Main | `flex-1 min-w-0 bg-ink-50 px-10 pt-8 pb-16 max-lg:px-6 max-sm:px-4`; the inset white sheet is removed: cards sit directly on the canvas. |
-| Page header | `text-h1 text-ink-950` → status line `mt-1.5 text-sm text-ink-600` with `·` separators in ink-400 and underlined links → segmented tabs `mt-5` → content `mt-6`. |
+| Page header | `text-h1 text-ink-950` → status line `mt-1.5 text-sm text-ink-600` with `·` separators in ink-400 and underlined links → segmented tabs `mt-5` → content `mt-6`. On a rebuilt screen with a screen-level act, the title row ends in the primary slot (`data-primary-slot="header"`), which holds `components/primary_action.html`: floating below 1024px, top right from 1024px (10.1). On Home and Calendar that act is **New post** (`new-post-open`, `aria-controls="new-post-sheet"`), shown only to whoever may start posts (`create_posts` and not a plain client); it opens the New post sheet (10.9) and the page carries `has-fab`. |
 | Phone top bar | 52px `.translucent-bar sticky top-0`: menu icon, workspace 16/600, spacer, Go to and the bell (`.ui-btn-icon`). The Approvals count is in the phone bar (11.1). Drawer 280px over `bg-ink-950/35`. |
 | Widths | Home, Publish, Approvals, Activity, Settings 1180px (a Settings panel 672–960px); Routines (the form's error page) 960px; Set up 880px; thread column ≤ 720px; Home grid `grid-cols-[minmax(0,1fr)_372px] gap-6` at ≥ 1280px, one column below with Today first only when something waits. |
-| Rhythm | 4px base: 4, 8, 12, 16, 20, 24, 32, 40, 64. Card padding 20 (16 phone); gap between cards 24; section gap 40; group label top margin 18; page padding 32/40 desktop, 24 tablet, 16 phone. |
+| Rhythm | 4px base: 4, 8, 12, 16, 20, 24, 32, 40, 64. Card padding 20 below 1024px, 24 from 1024px (nested 16); gap between cards 24; section gap 40 (32 in a rebuilt screen, `.ui-sections`); group label top margin 18; page padding 32/40 desktop, 24 tablet, 16 phone. **Rebuilt screens space on 8px steps** (Tailwind 2, 4, 6, 8, 10, 12, 16, 20 …): 4px and 12px (1 and 3) only inside a control (`ui-btn`, `ui-input`, `ui-select`, `ui-chip`, `ui-tab`, `ui-pill` or `data-control`) or as the gap of an icon and its label; no `.5` steps, no `px` spacing, no arbitrary value off the 8px grid. `apps/common/tests/test_spacing_grid.py` checks every gated screen's templates and the shell (`base.html` and what it includes), which every screen extends (spec D4). |
 | Breakpoints | phone < 640, tablet 640–1023 (sidebar becomes a drawer, 44px targets), desktop ≥ 1024, wide ≥ 1280. |
 
 ### 11.1 Navigation
 
 `apps/common/navigation.py` decides what shows and what is lit; `templates/base.html` draws it with the classes above. No tokens of its own.
 
-- **Sidebar:** "New", then six places in this order: Home, Approvals, Calendar, Inbox, Analytics, Activity, and Blog as a seventh only with its switch. Each is a `.sidebar-nav-item` with its 18px icon (`components/nav_icon.html`). Approvals carries `.sidebar-badge.is-turn` and names its count in `aria-label` ("Approvals, 3 waiting"); Inbox a neutral `.sidebar-badge`. No section labels and no *More* disclosure. One place is lit.
+- **Sidebar:** six places in this order: Home, Approvals, Calendar, Inbox, Analytics, Activity, and Blog as a seventh only with its switch. Each is a `.sidebar-nav-item` with its 18px icon (`components/nav_icon.html`). Approvals carries `.sidebar-badge.is-turn` and names its count in `aria-label` ("Approvals, 3 waiting"); Inbox a neutral `.sidebar-badge`. No section labels and no *More* disclosure. One place is lit. No New menu: starting a post is the **New post** button on Home and Calendar (the page header's primary, floating above the phone bar on a phone), and its sheet's foot links reach Ideas, Drafts, Import from CSV, Templates and Categories.
 - **The gear:** Settings is a `.sidebar-nav-item` with the gear icon, pushed to the bottom of the nav (`mt-auto`), lit on Settings and on every page a setting lives on. The account menu below it says **Account** for the person's own settings.
 - **Bell and Go to:** two `.ui-btn-icon`s in the sidebar header (desktop) and again in the phone top bar; each page shows one of the two copies. The bell's unread count is a neutral `.sidebar-badge` at its top right, never Pine. It opens a right-hand drawer (white, `max-w-sm`, `shadow-xl`, over `.ui-overlay`).
-- **Phone bar (below 1024px):** `fixed inset-x-0 bottom-0 z-20 .translucent-bar border-t border-ink-200`, plus the bottom safe area; five equal columns: Home, Approvals, Calendar, Inbox, More. Each is at least 56px tall, icon over an 11/16 500 label; the lit one has an ink-950 label, a brand-700 icon and `aria-current="page"`, the rest ink-600 and an ink-500 icon. Approvals' count is `.sidebar-badge.is-turn` over its icon. More is a button that opens the drawer. A 64px spacer ends the page so its last line scrolls clear; toasts, selection bars and sticky save bars sit above the bar. The post page and the composer show no phone bar, so their own action bar keeps the bottom edge.
-- **Go to (command palette):** a `.ui-modal` dialog over `.ui-overlay`, 12vh from the top: a `.ui-input` ("Go to…"), then the places as `.ui-menu-item`s, a Settings tab with "Settings" after it in `text-xs text-ink-600`; "Nothing matches." when the filter empties it. Focus is trapped while it is open and returns where it was on Escape.
+- **Phone bar (below 1024px):** `fixed inset-x-0 bottom-0 z-20 .translucent-bar border-t border-ink-200`, plus the bottom safe area; five equal columns: Home, Approvals, Calendar, Inbox, More. Each is at least 56px tall, icon over a 13/16 500 label; the lit one has an ink-950 label, a brand-700 icon and `aria-current="page"`, the rest ink-600 and an ink-500 icon. Approvals' count is `.sidebar-badge.is-turn` over its icon. More is a button that opens the drawer. A 64px spacer ends the page so its last line scrolls clear; toasts, selection bars and sticky save bars sit above the bar. Where a screen's floating primary shows (`body.has-fab`, 10.1) the toasts rise above it too, to `calc(9rem + env(safe-area-inset-bottom))` (the button's 4.5rem bottom, its 56px and a 16px gap), and the spacer and the scrollers' bottom padding grow to 8.5rem so the last line and a focused control clear it (WCAG 2.4.11). The post page and the composer show no phone bar, so their own action bar keeps the bottom edge.
+- **Go to (command palette):** a `.ui-modal` dialog over `.ui-overlay`, 12vh from the top: a `.ui-input` ("Go to…"), then the places as `.ui-menu-item`s, a Settings tab with "Settings" after it in `text-xs text-ink-600`; "Nothing matches." when the filter empties it. Focus is trapped while it is open and returns where it was on Escape. It does not open over the New post sheet.
+- **Keyboard shortcuts (spec D16):** from 1024px, `n` New post (the sheet where its button is; elsewhere Home's `#new-post`; only for whoever may start posts), `/` Go to, `?` the list (`static/js/shortcuts.js`). Each is ignored in a text field, a select or an editable region, with Ctrl, Alt or Cmd, while a dialog shows and below 1024px. The list is a `.ui-modal` dialog like Go to (`shortcuts-dialog`): each key a `kbd` (`h-8 min-w-8 rounded-lg border border-line-strong bg-ink-25 font-mono text-sm font-semibold`), then the switch **Single-key shortcuts** (`.bb-toggle`, `role="switch"`), which turns `n`, `/` and `?` off on this device (local storage; WCAG 2.1.4). Ctrl/Cmd-/ opens the list from anywhere, a field included and with single keys off, so they can always be turned back on.
 
 ---
 
@@ -418,7 +456,7 @@ Overlay `fixed inset-0 bg-ink-950/35`. Dialog `w-full max-w-[560px] rounded-2xl 
 | Element | Treatment |
 |---|---|
 | **You** (person bubble) | right-aligned, `max-w-[78%] rounded-[18px] rounded-br-md bg-ink-100 px-3.5 py-2.5 text-body-lg text-ink-900`; meta "You · 15:35" `text-xs font-medium text-ink-500 text-right` above. No longer a filled orange bubble. |
-| **Account manager / specialist** | left, no bubble: 28px `bg-ink-900 text-white` avatar (11/600 initials), name `text-[13px] font-semibold text-ink-900` + "· 15:35" ink-500; body `text-body-lg text-ink-900`. Consecutive messages group under one avatar. Action cards (brief, draft, routine) nest below at `rounded-xl`. Full width on phones. Specialist avatars are neutral (`bg-ink-100 text-ink-700`); colour is never per agent. |
+| **Account manager / specialist** | left, no bubble: 28px `bg-ink-900 text-white` avatar (13/600 initials), name `text-[13px] font-semibold text-ink-900` + "· 15:35" ink-500; body `text-body-lg text-ink-900`. Consecutive messages group under one avatar. Action cards (brief, draft, routine) nest below at `rounded-xl`. Full width on phones. Specialist avatars are neutral (`bg-ink-100 text-ink-700`); colour is never per agent. |
 | Client | left, `bg-white ring-1 ring-ink-200 rounded-[18px] rounded-bl-md`, name + neutral "Client" tag. |
 | Teammate | left, `bg-ink-50 ring-1 ring-ink-200`. |
 | **Internal note** | `rounded-xl bg-ink-25 border border-dashed border-ink-400 px-3.5 py-2.5`; 14px lock + "Note for the team" `text-xs font-semibold text-ink-700`. "Not sent" is carried by the dashed shape, so warning keeps its one meaning. |
@@ -436,12 +474,12 @@ Container `rounded-xl border border-ink-400 bg-white p-3 pb-2.5 focus-within:bor
 
 ### 12.3 Approve sequence (Today, Approvals, portal)
 
-1. Click the tinted "Approve & schedule": width-locked 14px spinner (shown ≥ 300ms).
-2. The button cross-fades (160ms) into an info pill with a calendar icon: "Scheduled · Mon 10:10". **Not** success green, so a Pine action and a green status are never side by side.
-3. Hold 1.2s, then the row collapses (height via grid rows + opacity, 220ms in-out).
+1. Click the tinted "Approve & schedule": a width-locked 14px spinner shows while the request is in flight. It shows for at least 300ms: a display time that stops a flash, not motion.
+2. The button fills with the server's words in 200ms (`.motion-fill`, `--dur-snap`) and becomes an info pill with a calendar icon: "Scheduled · Mon 10:10". **Not** success green, so a Pine action and a green status are never side by side. The words are the server's answer, never a time the browser worked out (spec D13).
+3. Hold 1.2s: reading time, before the list reload replaces the row or card. Then the row collapses (height via grid rows + opacity) or the card leaves, in 200ms (`--dur-snap`).
 4. The "waiting for you" count and the sidebar badge step together (4px slide + fade, 160ms); `aria-live="polite"` announces "Scheduled for Monday 26 October, 10:10".
 5. Two-line toast: "Scheduled for Mon 26 Oct, 10:10" / "Same tower. A fairer number. · LinkedIn" + Undo (6s, pauses on hover/focus).
-Reduced motion: the swap and collapse are instant; the toast still appears.
+Reduced motion: the fill and the exit are instant; the words still show, and the toast still appears.
 
 ---
 
@@ -451,12 +489,12 @@ Hero card (`rounded-2xl p-5`), 372px right column on desktop. Header "Today" `te
 
 | Group | Row |
 |---|---|
-| Waiting for you | 44×55 creative thumb · title 14/600 (2-line clamp) · meta 12 ink-500 with 14px platform glyphs (≥ 8px from any button) · tinted "Approve & schedule" sm + ghost "Review" sm. After approval the row shows the info "Scheduled" pill, then collapses. |
+| Waiting for you | 44×55 creative thumb · title 14/600 (2-line clamp) · meta 13 ink-500 with 14px platform glyphs (≥ 8px from any button) · tinted "Approve & schedule" sm + ghost "Review" sm. After approval the row shows the info "Scheduled" pill, then collapses. |
 | Done since yesterday | 16px success-500 check + 13px ink-700 text + ink-500 time; repeats grouped ("3 drafts ready"); collapses after 3 ("Show 4 more"). |
 | Needs a look | 16px danger-500 triangle + text + underlined link "Run it again". |
 | Footer | "Next planned run: Fri 23 Oct, 10:30" `text-xs text-ink-500`. |
 
-Group labels 12/600 ink-500, sentence case, 18px top margin. On phones Today comes first only when something is waiting; otherwise it collapses to one line ("Nothing waiting · next run Fri 10:30").
+Group labels 13/600 ink-500, sentence case, 18px top margin. On phones Today comes first only when something is waiting; otherwise it collapses to one line ("Nothing waiting · next run Fri 10:30").
 
 ---
 
@@ -487,7 +525,7 @@ Markup: `<span class="live-state"><i class="live-dot live-dot--working" aria-hid
 | waiting | 16px ring 1.5px ink-400 + label ink-600 | 3.57:1 |
 | failed | 16px danger-500 disc + white x | 8.46:1 |
 
-Connectors are 2px: success-500 between reached nodes, ink-200 ahead (decorative; nodes carry the state). Labels 12/16 500 ink-600, never wrap (≤ 6 stages; on phones 11px allowed only if the label still fits, otherwise show the current stage name only). Standard stages for a post: Brief → Angles → Copy → Design → Check → For you. Routines show their own (Read results → Your answer → Four briefs).
+Connectors are 2px: success-500 between reached nodes, ink-200 ahead (decorative; nodes carry the state). Labels 13/16 500 ink-600, never wrap (≤ 6 stages; on phones, if the labels do not fit, show the current stage name only). Standard stages for a post: Brief → Angles → Copy → Design → Check → For you. Routines show their own (Read results → Your answer → Four briefs).
 
 ### 14.3 Delivery receipt (post status, grafted from Harbour)
 
@@ -498,18 +536,18 @@ Connectors are 2px: success-500 between reached nodes, ink-200 ahead (decorative
 Form: one magnitude series over time → bars, one hue (dataviz rule: colour comes last; status colours stay reserved).
 - Card header "Last 24 hours" + caption "Tasks finished"; three hero numbers above (28/700 ink-950 tabular: tasks done, stopped, posts ready).
 - `.hour-chart`: 24 bars, 2px gaps, 96px tall, 4px rounded tops anchored to an ink-300 baseline; bars ink-400 (3.57:1), **current hour ink-900**, stopped tasks stacked on top in danger-500 with a 2px surface gap. No gridlines. Never Pine (the accent is not a data colour).
-- Axis: `.chart-axis` 12/500 ink-500 tabular, every 6 hours + "Now".
+- Axis: `.chart-axis` 13/500 ink-500 tabular, every 6 hours + "Now".
 - Legend always present (three series roles): Done · Stopped · This hour, with 10px swatches; text stays in ink.
 - Hover/focus: bar darkens to ink-600 and shows `.chart-tip` ("10:00–11:00 · 6 done · 0 stopped").
 - Accessibility: the chart is `role="img"` with a one-sentence `aria-label` summary ("Busiest at 10:00 with 6. One task stopped at 14:00.") plus a "Show as table" disclosure with the 24 rows.
 
 ### 14.5 Next 24 hours timeline
 
-Desktop (`.timeline`, 150px tall): a 1px ink-300 axis from Now to +24h; a 2px ink-900 "Now" line; ticks every 6 hours at the bottom (12px ink-500 tabular); quiet hours as a hatched band (`ink-100 / ink-50` at 135°) with its label inside ("Quiet hours 22:00–07:00", ink-600).
+Desktop (`.timeline`, 150px tall): a 1px ink-300 axis from Now to +24h; a 2px ink-900 "Now" line; ticks every 6 hours at the bottom (13px ink-500 tabular); quiet hours as a hatched band (`ink-100 / ink-50` at 135°) with its label inside ("Quiet hours 22:00–07:00", ink-600).
 
 | Event | Marker | Caption |
 |---|---|---|
-| Scheduled post | 16px info-500 disc + white calendar glyph | title 12/600 ink-900 (≤ 168px, ellipsis) + platform glyph + time |
+| Scheduled post | 16px info-500 disc + white calendar glyph | title 13/600 ink-900 (≤ 168px, ellipsis) + platform glyph + time |
 | Routine run | 12px ink-700 diamond | name + "Routine · 09:00" |
 | Approval due | 16px ring 2px warning-500 + clock | "Approve by 18:00" + count |
 | Run that stopped | 9px danger-500 square | name + "Stopped" |
@@ -555,9 +593,287 @@ One stroke set (the inline Feather/Lucide-style SVGs already in the templates): 
 
 Sentence case everywhere (buttons, labels, statuses, tabs). No model or vendor names in visible copy; describe the step ("Add the writing key to the web and worker services") and show exact setting names in mono only where the owner must type them. Dates and times in the owner's time zone, "Mon 26 Oct, 10:10". Status words come from the fixed list in 10.5. Numbers are tabular.
 
-## 21. Dark mode later (out of scope now)
+## 21. Dark mode
 
-Light mode is the product. The tokens are ready: utilities read Layer 1 variables inline (`@theme inline`), so a later `[data-theme="dark"]` block redefines `--ink-*`, `--brand-*`, status scales and Layer 2 surfaces/text and every `bg-ink-*`, `text-brand-*` class follows. Two prerequisites: codemod `bg-white` (315 uses) → `bg-surface` and `text-white` on fills → an on-primary token; and choose dark steps (links brand-300, primary fill brand-500 with ink-950 text) and re-check every pair in section 23 against the dark surfaces. The toast and tooltip are already dark and verified.
+Light is what everyone sees until a page is declared ready: a page turns dark only when it is listed in `DARK_READY` (`apps/common/screens.py`), which each screen does at its own gate once its browser specs pass axe in dark on three devices (spec D2). An undeclared page renders light whatever the device or the person's choice.
+
+**How it is chosen.** A declared page's `<html>` carries `data-theme-ready`. `:root[data-theme="dark"]` holds the dark theme, and the same declarations sit under `@media (prefers-color-scheme: dark)` for `:root[data-theme-ready]:not([data-theme="light"])`, so a declared page follows a dark device without JavaScript and a person's Light choice wins over the device. *Appearance* in the account menu (System, Light, Dark, kept on the device) sets `data-theme` through the nonce'd script in `<head>` before the first paint (spec D2); without it, the media block alone applies. The contrast test holds the media block and the attribute block equal, declaration by declaration.
+
+**How it works.** Layer 1 is redefined, so every `bg-ink-*`, `text-brand-*` and `ring-success-*` utility follows without edits (they are declared `@theme inline` and read the variable where they are used). Each step keeps its role (§3): ink-0 is the card, ink-50 the canvas (the darkest step), ink-950 the strongest text; brand-700 is the primary fill and the link; status 50 is the soft fill, 500 the icon and the solid dot, 600 the chip text. So in dark the scales run from dark (0–200) to light (600–950). Layer 2 sets only what does not follow Layer 1 (the second table below) and writes no colour of its own: it points at a Layer 1 step or mixes one with `color-mix(in srgb, …)`.
+
+**What the checker decided.** Every value below came from `tools/contrast.py`; no dark pair was accepted under its bar, and the one light pair under its bar is named below (it was so before dark mode).
+
+- The primary is a lighter Pine, brand-700 `#4CAD8C`, with dark text through `--on-fill` (7.01:1). One step is both the fill and the link (5.79:1 or more on every surface); the earlier sketch here split them (links at brand-300, the fill at brand-500), which would have given one role two steps.
+- Success leans a little toward leaf-yellow in dark (hue 142, 500 and 600 lighter), so Pine and an "Approved" chip's text stay 14.0 apart (OKLab ΔE ×100; 14.2 in light, §3.5).
+- The brand and status 300 steps keep their light values. Their role is text and icons on the inverse surface (toast action brand-300, the status icons on a toast, *Delete* and *Reject all* in danger-300 on the selection bars), and that surface stays dark in both themes. ink-300 is the exception: it changes with the rest of the ink scale (`#CED2D7` in light, `#91969D` in dark), and because it is the toast's detail text and icons it must read 4.5:1 on the dark inverse surface (next bullet).
+- `--surface-inverse` in dark is ink-200 `#2A2E34`, a raised dark grey, so a toast or tooltip still stands off the canvas (1.41:1) and the cards (1.32:1). Because ink-300 must read on it (4.58:1), ink-300 is a text-grade grey in dark (6.03:1 on a card, against 1.52:1 in light). So an edge is never drawn in ink-300: a secondary button's edge, a hover edge, a table header rule and a chart's axis use `--border-hover` (`border-line-strong`, `ring-line-strong`), which is ink-300 in light and, in dark, ink-300 mixed 20 % into ink-200 (`#3F4349`, 1.80:1 on a card). The checker holds every edge between 1.20:1 and 2.50:1 in both themes. Nor is a fill drawn in ink-300: the collapsed sidebar's account button fills on hover with `bg-line-strong`, the same token, which carries its ink-600 icon at 4.79:1 in light and 5.00:1 in dark (ink-300 itself would be 1.49:1 there). ink-400 and ink-500 sit just above ink-300, so the order 300 < 400 < 500 holds.
+- The two selection bars stay dark in both themes and carry the light content scope: their children use 200 steps (*Publish* on brand-200, the hover of *Delete* in danger-200) that flip in dark, where danger-200 on the dark inverse surface would read 1.21:1. Inside the scope they read exactly as in light; the checker measures them there. A toast needs no scope: its children use white, ink-300 and the constant 300 steps.
+- The current hour on the Activity chart and the timeline's now line are marks on a card, not surfaces: they keep ink-900, which flips, so each stays the strongest mark (14.6:1 on a dark card). The spec listed them with the inverse elements, but the inverse surface would sit at 1.32:1 on a dark card and the mark would vanish.
+- The selected filter chip (`.ui-filter-chip[aria-pressed="true"]`, and the composer's override chip) is ink-900 with `text-on-fill` words, as the current hour keeps ink-900: the owner's choice before Home and Calendar were declared ready (plan T22). Light does not move (the inverse surface and its words were the same `#1C1F24` and white there); in dark the chip is a light pill that stands 14.61:1 off a card and 15.63:1 off the canvas, where the inverse surface the spec listed sat 1.32:1 and 1.41:1 and the selected state rested on that fill change and the weight. A count on the chip takes `text-on-fill-muted`: ink-300 in light, as before, and in dark on-fill mixed 70 % into ink-900 (`#4D5054`, 6.58:1 on the chip), where ink-300 would read 2.42:1.
+- Shadows are the scrim's colour, which stays dark: `--shadow-*` mix `--scrim` in light and the dark theme sets its own strengths. The `shadow-*` utilities read those tokens (`@theme` points at them), because Tailwind writes an `@theme` shadow's value into its utility. The select chevron is a data URI, which cannot read a variable, so `--select-chevron` carries one per theme, each drawn in that theme's `--text-tertiary` (a test holds them equal).
+- Status icons are checked on every surface and on their own chip, as the control edge and the focus ring are. One pair is held in dark only and named in the checker's `LIGHT_EXCEPTIONS`: success-500 on the sidebar ink-100 is 2.93:1 in light, as it was before dark mode, and light must not move (7.37:1 in dark). So a success icon never sits on the sidebar or a neutral chip; the other three statuses read on ink-100 in both themes.
+- Not yet measured in dark: §23's colour-vision tables. For normal vision, the closest pair of status icons is info-500 against ink-500 at 8.9 (OKLab ΔE ×100); the simulation was not re-run.
+
+**New tokens.** Their light values are exactly what they replace, so light cannot move (the contrast test checks it).
+
+| Token | Utility | Light | Dark | For |
+|---|---|---|---|---|
+| `--on-fill` | `text-on-fill` | ink-0 `#FFFFFF` | ink-50 `#0C0F13` | text and icons on a solid fill: brand 700–900, danger 500–600, ink 800–900, a status 500 disc (where `text-white` sat on a fill) |
+| `--on-fill-muted` | `text-on-fill-muted` | ink-300 `#CED2D7` | on-fill 70 % into ink-900, `#4D5054` | secondary words on an ink-900 fill: the selected filter chip's count (where `text-ink-300` sat on it; T22) |
+| `--surface-inverse` | `bg-inverse` | ink-900 `#1C1F24` | ink-200 `#2A2E34` | dark in both themes: toast, tooltip, chart tip, the selection bars (not the selected filter chip, which is ink-900) |
+| `--text-on-inverse` | `text-on-inverse` | ink-0 `#FFFFFF` | ink-950 `#F2F3F6` | text on it (`text-white` written on its children stays) |
+| `--scrim` | `bg-scrim/NN` | ink-950 `#0E1114` | ink-50 `#0C0F13` | behind dialogs and sheets |
+
+**The light content scope.** `data-theme-scope="light"` on the root of a platform preview or a creative re-declares the light Layer 1 and Layer 2 and `color-scheme: light`, so everything inside it reads light values in both themes and looks the way the platform shows it (the composer's previews, `components/post_preview.html`; each screen that shows a preview asserts in dark that its computed background is still white). The contrast test holds the scope equal to the light `:root`, property by property, and resolves it the way a browser inherits. It resets tokens, not inherited properties: an element inside the scope that inherits `color` from outside keeps the outer colour, so a preview sets its own text colour.
+
+**In a page declared ready,** write no `bg-white` outside the light scope (use `bg-surface`), no `text-white` on a fill that flips (use `text-on-fill`), and no raw colour (a hex, `rgb()`, `hsl()` or the named `white` and `black`) in a template, style block or `style=`. `python tools/recolor.py --check` enforces these on every template that loads the stylesheet (the raw-colour rule on the trees of the pages in `DARK_READY` and the rebuilt screens' fragments), flags white text (`#fff`, `white`) on a background that flips in a template's own CSS, in the same rule or in the element's own rule without the state (`.cal-select-box` for `.cal-select-box.is-checked`, reported on the fill's line), and a white background there, the CSS form of `bg-white` (use `var(--surface-0)`) (it cannot pick the role, so a person rewrites it: an inverse surface takes `var(--surface-inverse)` and `var(--text-on-inverse)` and keeps its white children, a mark or a button keeps its fill and takes `var(--on-fill)`), flags a colour that flips on an inverse surface (an ancestor's, or the element's own when it is its only fill) and an edge drawn in ink-300 (a utility such as `border-ink-300`, an arbitrary value such as `shadow-[inset_0_0_0_1px_var(--ink-300)]`, or an edge property in a template's CSS: a `<style>` block, `style=`, or a partial of bare CSS included in a `<style>` block) and a fill in ink-300 (`bg-ink-300` in any state, solid or from 50 %; use `bg-line-strong`), and finds any colour `styles.css` writes outside Layer 1 but the palette lock. `python tools/recolor.py` rewrites what it can: `bg-white` to `bg-surface`, `text-white` to `text-on-fill` on a fill that flips (its own or the nearest ancestor's), a dark fill whose children use white or 200/300 steps (or that `INVERSE_ROLES` names: logo marks, a tooltip) to `bg-inverse`/`text-on-inverse`, scrims to `bg-scrim/NN` (a black photo overlay, `bg-black/NN`, stays: black is the palette lock and does not flip, and the scrim would move light from `#000` to ink-950), white edges by what they sit on, ink-300 edges to the edge token (`line-strong`, `var(--border-hover)`), ink-300 fills to `bg-line-strong`. In `static/js` and the Python class strings each quoted string is one element, judged by its own fills: `text-white`, `bg-white/NN` or `hover:bg-white/NN` in a string that also sets a fill that flips is flagged, and rewritten to `text-on-fill` (a tint to `bg-on-fill/NN`). White over a photo or a scrim stays (`recolor: keep` where the rule cannot tell). What the check does not yet follow, though no template does it today: a descendant rule on a fill drawn in a template's CSS (`.bar { background: var(--surface-inverse) } .bar a { color: var(--danger-200) }`, or white text in `.toast .t` under a flipping `.toast`), and a `text-white` class inside an element whose flipping fill comes from template CSS or `style=`; the class forms of the same cases are flagged.
+
+**The tables.** `python tools/contrast.py --markdown`, pasted verbatim. `python tools/contrast.py` exits 1 if any pair fails in either theme, if a token has no dark value, if the two dark blocks differ or if the light scope differs from the light `:root`; `apps/common/tests/test_contrast.py` runs the same checks.
+
+#### Layer 1 in both themes
+
+| Scale | 0 | 25 | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ink light | `#FFFFFF` | `#FBFCFD` | `#F6F7F8` | `#EDEFF2` | `#E1E4E8` | `#CED2D7` | `#83888F` | `#656B73` | `#52575F` | `#3E434A` | `#2E3238` | `#1C1F24` | `#0E1114` |
+| ink dark | `#14171C` | `#191C20` | `#0C0F13` | `#1E2127` | `#2A2E34` | `#91969D` | `#959AA1` | `#9CA1A9` | `#B3B8BF` | `#C8CCD3` | `#D7DBE0` | `#E5E8EC` | `#F2F3F6` |
+| brand light |  |  | `#EFFAF5` | `#DDF3EA` | `#BFE7D6` | `#94D2BA` | `#62B194` | `#388E71` | `#1E7057` | `#115641` | `#0D4534` | `#0B3629` | `#062118` |
+| brand dark |  |  | `#12261F` | `#113529` | `#0F4232` | `#94D2BA` | `#34856A` | `#369375` | `#3EA080` | `#4CAD8C` | `#68C2A2` | `#85D4B6` | `#BFE9D8` |
+| success light |  |  | `#EDFCED` | `#DAF8DA` | `#BCF0BC` | `#95E097` | `#6CC871` | `#429E4A` | `#317F38` | `#28682D` | `#215525` | `#193F1B` | `#0E2810` |
+| success dark |  |  | `#162614` | `#1A3218` | `#22471E` | `#95E097` | `#4F9B48` | `#6AC361` | `#82D67A` | `#A0E298` | `#B5ECAF` | `#CDF3C8` | `#E2F8DF` |
+| warning light |  |  | `#FFF7EB` | `#FFEED4` | `#FFDDAE` | `#FFCA82` | `#FCAA38` | `#9B5A00` | `#7F4700` | `#683904` | `#552C04` | `#432105` | `#2C1302` |
+| warning dark |  |  | `#2E200F` | `#3C280E` | `#573606` | `#FFCA82` | `#B47825` | `#E19A3D` | `#F2B366` | `#FCC687` | `#FFD5A4` | `#FFE2BD` | `#FFEED9` |
+| danger light |  |  | `#FFF3F1` | `#FFE4E0` | `#FFCDC6` | `#FEA69C` | `#EF675C` | `#991618` | `#7C1213` | `#6A0E0E` | `#570E0D` | `#450D0B` | `#2C0806` |
+| danger dark |  |  | `#341916` | `#461D19` | `#642722` | `#FEA69C` | `#C35047` | `#ED756A` | `#FB988D` | `#FFB4AB` | `#FFC7BF` | `#FFD9D3` | `#FFE7E4` |
+| info light |  |  | `#EFF8FD` | `#DDF1FC` | `#BEE3F8` | `#95CDEB` | `#4F9CC2` | `#035A7B` | `#044E6B` | `#064058` | `#073548` | `#082A3A` | `#041B26` |
+| info dark |  |  | `#12242E` | `#102F3E` | `#0F4359` | `#95CDEB` | `#4189AD` | `#57A9D2` | `#81C5E8` | `#A0D7F4` | `#B7E2F9` | `#CEEDFE` | `#E2F5FF` |
+
+#### Layer 2 tokens the dark theme sets
+
+| Token | Light | Dark |
+|---|---|---|
+| `color-scheme` | `light` | `dark` |
+| `--on-fill` | `var(--ink-0)` | `var(--ink-50)` |
+| `--on-fill-muted` | `var(--ink-300)` | `color-mix(in srgb, var(--on-fill) 70%, var(--ink-900))` |
+| `--surface-inverse` | `var(--ink-900)` | `var(--ink-200)` |
+| `--text-on-inverse` | `var(--ink-0)` | `var(--ink-950)` |
+| `--scrim` | `var(--ink-950)` | `var(--ink-50)` |
+| `--primary-halo` | `color-mix(in srgb, var(--brand-600) 18%, transparent)` | `color-mix(in srgb, var(--brand-600) 32%, transparent)` |
+| `--surface-sticky` | `color-mix(in srgb, var(--ink-50) 92%, transparent)` | `color-mix(in srgb, var(--ink-50) 92%, transparent)` |
+| `--overlay` | `color-mix(in srgb, var(--scrim) 36%, transparent)` | `color-mix(in srgb, var(--scrim) 64%, transparent)` |
+| `--text-inverse` | `var(--text-on-inverse)` | `var(--text-on-inverse)` |
+| `--color-illustration-card` | `var(--ink-0)` | `var(--ink-0)` |
+| `--border-hover` | `var(--ink-300)` | `color-mix(in srgb, var(--ink-300) 20%, var(--ink-200))` |
+| `--select-chevron` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23656B73' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E")` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239CA1A9' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E")` |
+| `--shadow-xs` | `0 1px 2px color-mix(in srgb, var(--scrim) 5%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent)` |
+| `--shadow-sm` | `0 1px 2px color-mix(in srgb, var(--scrim) 4%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 6%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 36%, transparent), 0 1px 3px color-mix(in srgb, var(--scrim) 48%, transparent)` |
+| `--shadow-md` | `0 4px 12px -2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 4%, transparent)` | `0 4px 12px -2px color-mix(in srgb, var(--scrim) 56%, transparent), 0 2px 4px -1px color-mix(in srgb, var(--scrim) 36%, transparent)` |
+| `--shadow-lg` | `0 12px 32px -8px color-mix(in srgb, var(--scrim) 16%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 6%, transparent)` | `0 12px 32px -8px color-mix(in srgb, var(--scrim) 72%, transparent), 0 4px 8px -2px color-mix(in srgb, var(--scrim) 40%, transparent)` |
+| `--shadow-xl` | `0 24px 64px -12px color-mix(in srgb, var(--scrim) 24%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 8%, transparent)` | `0 24px 64px -12px color-mix(in srgb, var(--scrim) 80%, transparent), 0 8px 16px -4px color-mix(in srgb, var(--scrim) 48%, transparent)` |
+| `--shadow-button` | `0 1px 2px color-mix(in srgb, var(--scrim) 12%, transparent), inset 0 1px 0 color-mix(in srgb, var(--on-fill) 12%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink-950) 16%, transparent)` |
+| `--shadow-nav-active` | `0 1px 2px color-mix(in srgb, var(--scrim) 6%, transparent), 0 0 0 1px color-mix(in srgb, var(--scrim) 4%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 40%, transparent), 0 0 0 1px color-mix(in srgb, var(--ink-950) 6%, transparent)` |
+| `--shadow-segment` | `0 1px 2px color-mix(in srgb, var(--scrim) 8%, transparent), 0 0 0 .5px color-mix(in srgb, var(--scrim) 6%, transparent)` | `0 1px 2px color-mix(in srgb, var(--scrim) 48%, transparent), 0 0 0 .5px color-mix(in srgb, var(--ink-950) 8%, transparent)` |
+| `--shadow-creative` | `inset 0 0 0 1px color-mix(in srgb, var(--scrim) 6%, transparent)` | `inset 0 0 0 1px color-mix(in srgb, var(--ink-950) 8%, transparent)` |
+
+#### Text on surfaces
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| title ink-950 on card ink-0 | 4.50:1 | `#0E1114` on `#FFFFFF` | 18.94:1 | `#F2F3F6` on `#14171C` | 16.19:1 | PASS |
+| title ink-950 on sheet ink-25 | 4.50:1 | `#0E1114` on `#FBFCFD` | 18.44:1 | `#F2F3F6` on `#191C20` | 15.41:1 | PASS |
+| title ink-950 on canvas ink-50 | 4.50:1 | `#0E1114` on `#F6F7F8` | 17.65:1 | `#F2F3F6` on `#0C0F13` | 17.31:1 | PASS |
+| title ink-950 on sidebar ink-100 | 4.50:1 | `#0E1114` on `#EDEFF2` | 16.44:1 | `#F2F3F6` on `#1E2127` | 14.54:1 | PASS |
+| title ink-950 on selected row brand-50 | 4.50:1 | `#0E1114` on `#EFFAF5` | 17.73:1 | `#F2F3F6` on `#12261F` | 14.31:1 | PASS |
+| text ink-900 on card ink-0 | 4.50:1 | `#1C1F24` on `#FFFFFF` | 16.52:1 | `#E5E8EC` on `#14171C` | 14.61:1 | PASS |
+| text ink-900 on sheet ink-25 | 4.50:1 | `#1C1F24` on `#FBFCFD` | 16.09:1 | `#E5E8EC` on `#191C20` | 13.91:1 | PASS |
+| text ink-900 on canvas ink-50 | 4.50:1 | `#1C1F24` on `#F6F7F8` | 15.41:1 | `#E5E8EC` on `#0C0F13` | 15.63:1 | PASS |
+| text ink-900 on sidebar ink-100 | 4.50:1 | `#1C1F24` on `#EDEFF2` | 14.34:1 | `#E5E8EC` on `#1E2127` | 13.12:1 | PASS |
+| text ink-900 on selected row brand-50 | 4.50:1 | `#1C1F24` on `#EFFAF5` | 15.47:1 | `#E5E8EC` on `#12261F` | 12.92:1 | PASS |
+| body-2 ink-700 on card ink-0 | 4.50:1 | `#3E434A` on `#FFFFFF` | 9.97:1 | `#C8CCD3` on `#14171C` | 11.15:1 | PASS |
+| body-2 ink-700 on sheet ink-25 | 4.50:1 | `#3E434A` on `#FBFCFD` | 9.71:1 | `#C8CCD3` on `#191C20` | 10.61:1 | PASS |
+| body-2 ink-700 on canvas ink-50 | 4.50:1 | `#3E434A` on `#F6F7F8` | 9.29:1 | `#C8CCD3` on `#0C0F13` | 11.92:1 | PASS |
+| body-2 ink-700 on sidebar ink-100 | 4.50:1 | `#3E434A` on `#EDEFF2` | 8.65:1 | `#C8CCD3` on `#1E2127` | 10.01:1 | PASS |
+| body-2 ink-700 on selected row brand-50 | 4.50:1 | `#3E434A` on `#EFFAF5` | 9.33:1 | `#C8CCD3` on `#12261F` | 9.85:1 | PASS |
+| secondary ink-600 on card ink-0 | 4.50:1 | `#52575F` on `#FFFFFF` | 7.27:1 | `#B3B8BF` on `#14171C` | 9.00:1 | PASS |
+| secondary ink-600 on sheet ink-25 | 4.50:1 | `#52575F` on `#FBFCFD` | 7.08:1 | `#B3B8BF` on `#191C20` | 8.57:1 | PASS |
+| secondary ink-600 on canvas ink-50 | 4.50:1 | `#52575F` on `#F6F7F8` | 6.78:1 | `#B3B8BF` on `#0C0F13` | 9.63:1 | PASS |
+| secondary ink-600 on sidebar ink-100 | 4.50:1 | `#52575F` on `#EDEFF2` | 6.31:1 | `#B3B8BF` on `#1E2127` | 8.08:1 | PASS |
+| secondary ink-600 on selected row brand-50 | 4.50:1 | `#52575F` on `#EFFAF5` | 6.81:1 | `#B3B8BF` on `#12261F` | 7.96:1 | PASS |
+| tertiary ink-500 on card ink-0 | 4.50:1 | `#656B73` on `#FFFFFF` | 5.38:1 | `#9CA1A9` on `#14171C` | 6.92:1 | PASS |
+| tertiary ink-500 on sheet ink-25 | 4.50:1 | `#656B73` on `#FBFCFD` | 5.24:1 | `#9CA1A9` on `#191C20` | 6.58:1 | PASS |
+| tertiary ink-500 on canvas ink-50 | 4.50:1 | `#656B73` on `#F6F7F8` | 5.01:1 | `#9CA1A9` on `#0C0F13` | 7.39:1 | PASS |
+| tertiary ink-500 on sidebar ink-100 | 4.50:1 | `#656B73` on `#EDEFF2` | 4.67:1 | `#9CA1A9` on `#1E2127` | 6.21:1 | PASS |
+| tertiary ink-500 on selected row brand-50 | 4.50:1 | `#656B73` on `#EFFAF5` | 5.04:1 | `#9CA1A9` on `#12261F` | 6.11:1 | PASS |
+| link brand-700 on card ink-0 | 4.50:1 | `#115641` on `#FFFFFF` | 8.64:1 | `#4CAD8C` on `#14171C` | 6.56:1 | PASS |
+| link brand-700 on sheet ink-25 | 4.50:1 | `#115641` on `#FBFCFD` | 8.41:1 | `#4CAD8C` on `#191C20` | 6.24:1 | PASS |
+| link brand-700 on canvas ink-50 | 4.50:1 | `#115641` on `#F6F7F8` | 8.05:1 | `#4CAD8C` on `#0C0F13` | 7.01:1 | PASS |
+| link brand-700 on sidebar ink-100 | 4.50:1 | `#115641` on `#EDEFF2` | 7.50:1 | `#4CAD8C` on `#1E2127` | 5.89:1 | PASS |
+| link brand-700 on selected row brand-50 | 4.50:1 | `#115641` on `#EFFAF5` | 8.09:1 | `#4CAD8C` on `#12261F` | 5.79:1 | PASS |
+| link hover brand-800 on card ink-0 | 4.50:1 | `#0D4534` on `#FFFFFF` | 10.95:1 | `#68C2A2` on `#14171C` | 8.41:1 | PASS |
+| link hover brand-800 on sheet ink-25 | 4.50:1 | `#0D4534` on `#FBFCFD` | 10.66:1 | `#68C2A2` on `#191C20` | 8.00:1 | PASS |
+| link hover brand-800 on canvas ink-50 | 4.50:1 | `#0D4534` on `#F6F7F8` | 10.21:1 | `#68C2A2` on `#0C0F13` | 8.99:1 | PASS |
+| link hover brand-800 on sidebar ink-100 | 4.50:1 | `#0D4534` on `#EDEFF2` | 9.50:1 | `#68C2A2` on `#1E2127` | 7.55:1 | PASS |
+| link hover brand-800 on selected row brand-50 | 4.50:1 | `#0D4534` on `#EFFAF5` | 10.25:1 | `#68C2A2` on `#12261F` | 7.43:1 | PASS |
+| title ink-950 on the sticky bar over navy | 4.50:1 | `#0E1114` on `#E5E6E8` | 15.16:1 | `#F2F3F6` on `#0D1116` | 17.07:1 | PASS |
+| title ink-950 on the sticky bar over orange | 4.50:1 | `#0E1114` on `#F6ECE6` | 16.29:1 | `#F2F3F6` on `#1F1713` | 15.90:1 | PASS |
+| title ink-950 on the sticky bar over white | 4.50:1 | `#0E1114` on `#F7F8F9` | 17.81:1 | `#F2F3F6` on `#1F2226` | 14.39:1 | PASS |
+| text ink-900 on the sticky bar over navy | 4.50:1 | `#1C1F24` on `#E5E6E8` | 13.23:1 | `#E5E8EC` on `#0D1116` | 15.41:1 | PASS |
+| text ink-900 on the sticky bar over orange | 4.50:1 | `#1C1F24` on `#F6ECE6` | 14.21:1 | `#E5E8EC` on `#1F1713` | 14.35:1 | PASS |
+| text ink-900 on the sticky bar over white | 4.50:1 | `#1C1F24` on `#F7F8F9` | 15.54:1 | `#E5E8EC` on `#1F2226` | 12.99:1 | PASS |
+| body-2 ink-700 on the sticky bar over navy | 4.50:1 | `#3E434A` on `#E5E6E8` | 7.98:1 | `#C8CCD3` on `#0D1116` | 11.75:1 | PASS |
+| body-2 ink-700 on the sticky bar over orange | 4.50:1 | `#3E434A` on `#F6ECE6` | 8.57:1 | `#C8CCD3` on `#1F1713` | 10.95:1 | PASS |
+| body-2 ink-700 on the sticky bar over white | 4.50:1 | `#3E434A` on `#F7F8F9` | 9.38:1 | `#C8CCD3` on `#1F2226` | 9.91:1 | PASS |
+| secondary ink-600 on the sticky bar over navy | 4.50:1 | `#52575F` on `#E5E6E8` | 5.82:1 | `#B3B8BF` on `#0D1116` | 9.49:1 | PASS |
+| secondary ink-600 on the sticky bar over orange | 4.50:1 | `#52575F` on `#F6ECE6` | 6.25:1 | `#B3B8BF` on `#1F1713` | 8.84:1 | PASS |
+| secondary ink-600 on the sticky bar over white | 4.50:1 | `#52575F` on `#F7F8F9` | 6.84:1 | `#B3B8BF` on `#1F2226` | 8.00:1 | PASS |
+| link brand-700 on the sticky bar over navy | 4.50:1 | `#115641` on `#E5E6E8` | 6.92:1 | `#4CAD8C` on `#0D1116` | 6.91:1 | PASS |
+| link brand-700 on the sticky bar over orange | 4.50:1 | `#115641` on `#F6ECE6` | 7.43:1 | `#4CAD8C` on `#1F1713` | 6.44:1 | PASS |
+| link brand-700 on the sticky bar over white | 4.50:1 | `#115641` on `#F7F8F9` | 8.12:1 | `#4CAD8C` on `#1F2226` | 5.83:1 | PASS |
+| link hover brand-800 on the sticky bar over navy | 4.50:1 | `#0D4534` on `#E5E6E8` | 8.77:1 | `#68C2A2` on `#0D1116` | 8.86:1 | PASS |
+| link hover brand-800 on the sticky bar over orange | 4.50:1 | `#0D4534` on `#F6ECE6` | 9.42:1 | `#68C2A2` on `#1F1713` | 8.26:1 | PASS |
+| link hover brand-800 on the sticky bar over white | 4.50:1 | `#0D4534` on `#F7F8F9` | 10.30:1 | `#68C2A2` on `#1F2226` | 7.47:1 | PASS |
+
+#### On a fill
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| on-fill on brand-700 | 4.50:1 | `#FFFFFF` on `#115641` | 8.64:1 | `#0C0F13` on `#4CAD8C` | 7.01:1 | PASS |
+| on-fill on brand-800 | 4.50:1 | `#FFFFFF` on `#0D4534` | 10.95:1 | `#0C0F13` on `#68C2A2` | 8.99:1 | PASS |
+| on-fill on brand-900 | 4.50:1 | `#FFFFFF` on `#0B3629` | 13.34:1 | `#0C0F13` on `#85D4B6` | 11.06:1 | PASS |
+| on-fill on danger-500 | 4.50:1 | `#FFFFFF` on `#991618` | 8.46:1 | `#0C0F13` on `#ED756A` | 6.73:1 | PASS |
+| on-fill on danger-600 | 4.50:1 | `#FFFFFF` on `#7C1213` | 10.75:1 | `#0C0F13` on `#FB988D` | 9.13:1 | PASS |
+| on-fill on ink-800 | 4.50:1 | `#FFFFFF` on `#2E3238` | 12.89:1 | `#0C0F13` on `#D7DBE0` | 13.81:1 | PASS |
+| on-fill on ink-900 | 4.50:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#0C0F13` on `#E5E8EC` | 15.63:1 | PASS |
+| on-fill icon on a solid success-500 disc | 3.00:1 | `#FFFFFF` on `#429E4A` | 3.38:1 | `#0C0F13` on `#6AC361` | 8.77:1 | PASS |
+| on-fill icon on a solid warning-500 disc | 3.00:1 | `#FFFFFF` on `#9B5A00` | 5.45:1 | `#0C0F13` on `#E19A3D` | 8.13:1 | PASS |
+| on-fill icon on a solid info-500 disc | 3.00:1 | `#FFFFFF` on `#035A7B` | 7.63:1 | `#0C0F13` on `#57A9D2` | 7.33:1 | PASS |
+
+#### Tinted buttons, chips and callouts
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| tinted button brand-700 on brand-100 | 4.50:1 | `#115641` on `#DDF3EA` | 7.44:1 | `#4CAD8C` on `#113529` | 4.90:1 | PASS |
+| tinted button hover brand-800 on brand-200 | 4.50:1 | `#0D4534` on `#BFE7D6` | 8.14:1 | `#68C2A2` on `#0F4232` | 5.32:1 | PASS |
+| success chip text success-600 on success-50 | 4.50:1 | `#317F38` on `#EDFCED` | 4.68:1 | `#82D67A` on `#162614` | 8.97:1 | PASS |
+| warning chip text warning-600 on warning-50 | 4.50:1 | `#7F4700` on `#FFF7EB` | 7.05:1 | `#F2B366` on `#2E200F` | 8.59:1 | PASS |
+| danger chip text danger-600 on danger-50 | 4.50:1 | `#7C1213` on `#FFF3F1` | 9.90:1 | `#FB988D` on `#341916` | 7.70:1 | PASS |
+| info chip text info-600 on info-50 | 4.50:1 | `#044E6B` on `#EFF8FD` | 8.46:1 | `#81C5E8` on `#12242E` | 8.41:1 | PASS |
+| success alert body success-700 on success-50 | 4.50:1 | `#28682D` on `#EDFCED` | 6.35:1 | `#A0E298` on `#162614` | 10.46:1 | PASS |
+| warning alert body warning-700 on warning-50 | 4.50:1 | `#683904` on `#FFF7EB` | 9.08:1 | `#FCC687` on `#2E200F` | 10.20:1 | PASS |
+| danger alert body danger-700 on danger-50 | 4.50:1 | `#6A0E0E` on `#FFF3F1` | 11.50:1 | `#FFB4AB` on `#341916` | 9.54:1 | PASS |
+| info alert body info-700 on info-50 | 4.50:1 | `#064058` on `#EFF8FD` | 10.37:1 | `#A0D7F4` on `#12242E` | 10.26:1 | PASS |
+| neutral chip ink-700 on ink-100 | 4.50:1 | `#3E434A` on `#EDEFF2` | 8.65:1 | `#C8CCD3` on `#1E2127` | 10.01:1 | PASS |
+| count badge ink-700 on ink-200 | 4.50:1 | `#3E434A` on `#E1E4E8` | 7.82:1 | `#C8CCD3` on `#2A2E34` | 8.47:1 | PASS |
+| ink-900 body on a success-50 callout | 4.50:1 | `#1C1F24` on `#EDFCED` | 15.54:1 | `#E5E8EC` on `#162614` | 12.93:1 | PASS |
+
+#### Status text
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| success text success-600 on card ink-0 | 4.50:1 | `#317F38` on `#FFFFFF` | 4.97:1 | `#82D67A` on `#14171C` | 10.14:1 | PASS |
+| success text success-600 on canvas ink-50 | 4.50:1 | `#317F38` on `#F6F7F8` | 4.64:1 | `#82D67A` on `#0C0F13` | 10.84:1 | PASS |
+| warning text warning-600 on card ink-0 | 4.50:1 | `#7F4700` on `#FFFFFF` | 7.49:1 | `#F2B366` on `#14171C` | 9.76:1 | PASS |
+| warning text warning-600 on canvas ink-50 | 4.50:1 | `#7F4700` on `#F6F7F8` | 6.98:1 | `#F2B366` on `#0C0F13` | 10.44:1 | PASS |
+| danger text danger-600 on card ink-0 | 4.50:1 | `#7C1213` on `#FFFFFF` | 10.75:1 | `#FB988D` on `#14171C` | 8.53:1 | PASS |
+| danger text danger-600 on canvas ink-50 | 4.50:1 | `#7C1213` on `#F6F7F8` | 10.03:1 | `#FB988D` on `#0C0F13` | 9.13:1 | PASS |
+| info text info-600 on card ink-0 | 4.50:1 | `#044E6B` on `#FFFFFF` | 9.10:1 | `#81C5E8` on `#14171C` | 9.48:1 | PASS |
+| info text info-600 on canvas ink-50 | 4.50:1 | `#044E6B` on `#F6F7F8` | 8.49:1 | `#81C5E8` on `#0C0F13` | 10.14:1 | PASS |
+| success icon-as-text success-500 on card ink-0 | 3.00:1 | `#429E4A` on `#FFFFFF` | 3.38:1 | `#6AC361` on `#14171C` | 8.20:1 | PASS |
+| warning icon-as-text warning-500 on card ink-0 | 4.50:1 | `#9B5A00` on `#FFFFFF` | 5.45:1 | `#E19A3D` on `#14171C` | 7.61:1 | PASS |
+| danger icon-as-text danger-500 on card ink-0 | 4.50:1 | `#991618` on `#FFFFFF` | 8.46:1 | `#ED756A` on `#14171C` | 6.29:1 | PASS |
+| info icon-as-text info-500 on card ink-0 | 4.50:1 | `#035A7B` on `#FFFFFF` | 7.63:1 | `#57A9D2` on `#14171C` | 6.85:1 | PASS |
+
+#### Inverse surfaces (toast, tooltip, chart tip, selection bars)
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| text-on-inverse on surface-inverse | 4.50:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#F2F3F6` on `#2A2E34` | 12.30:1 | PASS |
+| white (palette lock) on surface-inverse | 4.50:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#FFFFFF` on `#2A2E34` | 13.65:1 | PASS |
+| detail and icons ink-300 on surface-inverse | 4.50:1 | `#CED2D7` on `#1C1F24` | 10.88:1 | `#91969D` on `#2A2E34` | 4.58:1 | PASS |
+| action brand-300 on surface-inverse | 4.50:1 | `#94D2BA` on `#1C1F24` | 9.59:1 | `#94D2BA` on `#2A2E34` | 7.92:1 | PASS |
+| success-300 on surface-inverse | 3.00:1 | `#95E097` on `#1C1F24` | 10.53:1 | `#95E097` on `#2A2E34` | 8.70:1 | PASS |
+| warning-300 on surface-inverse | 3.00:1 | `#FFCA82` on `#1C1F24` | 11.03:1 | `#FFCA82` on `#2A2E34` | 9.11:1 | PASS |
+| danger-300 on surface-inverse | 4.50:1 | `#FEA69C` on `#1C1F24` | 8.77:1 | `#FEA69C` on `#2A2E34` | 7.24:1 | PASS |
+| info-300 on surface-inverse | 3.00:1 | `#95CDEB` on `#1C1F24` | 9.61:1 | `#95CDEB` on `#2A2E34` | 7.93:1 | PASS |
+
+#### Selection bars (inside the light scope, dark in both themes)
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| label white on surface-inverse (light scope) | 4.50:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | PASS |
+| clear icon ink-300 on surface-inverse (light scope) | 3.00:1 | `#CED2D7` on `#1C1F24` | 10.88:1 | `#CED2D7` on `#1C1F24` | 10.88:1 | PASS |
+| Delete and Reject all danger-300 on surface-inverse (light scope) | 4.50:1 | `#FEA69C` on `#1C1F24` | 8.77:1 | `#FEA69C` on `#1C1F24` | 8.77:1 | PASS |
+| their hover danger-200 on surface-inverse (light scope) | 4.50:1 | `#FFCDC6` on `#1C1F24` | 11.65:1 | `#FFCDC6` on `#1C1F24` | 11.65:1 | PASS |
+| Publish brand-950 on brand-200 (light scope) | 4.50:1 | `#062118` on `#BFE7D6` | 12.61:1 | `#062118` on `#BFE7D6` | 12.61:1 | PASS |
+| Publish hover brand-950 on brand-300 (light scope) | 4.50:1 | `#062118` on `#94D2BA` | 9.84:1 | `#062118` on `#94D2BA` | 9.84:1 | PASS |
+| Approve all brand-700 on brand-100 (light scope) | 4.50:1 | `#115641` on `#DDF3EA` | 7.44:1 | `#115641` on `#DDF3EA` | 7.44:1 | PASS |
+| focus outline on-inverse on surface-inverse (light scope) | 3.00:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | PASS |
+
+#### Selected filter chip (ink-900 with on-fill words)
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| selected filter chip ink-900 on card ink-0 | 3.00:1 | `#1C1F24` on `#FFFFFF` | 16.52:1 | `#E5E8EC` on `#14171C` | 14.61:1 | PASS |
+| selected filter chip ink-900 on canvas ink-50 | 3.00:1 | `#1C1F24` on `#F6F7F8` | 15.41:1 | `#E5E8EC` on `#0C0F13` | 15.63:1 | PASS |
+| its words on-fill on ink-900 | 4.50:1 | `#FFFFFF` on `#1C1F24` | 16.52:1 | `#0C0F13` on `#E5E8EC` | 15.63:1 | PASS |
+| its count on-fill-muted on ink-900 | 4.50:1 | `#CED2D7` on `#1C1F24` | 10.88:1 | `#4D5054` on `#E5E8EC` | 6.58:1 | PASS |
+
+#### Edges stay edges (between 1.20:1 and 2.50:1)
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| hover edge border-hover on card ink-0 | 1.20:1 to 2.50:1 | `#CED2D7` on `#FFFFFF` | 1.52:1 | `#3F4349` on `#14171C` | 1.80:1 | PASS |
+| hover edge border-hover on sheet ink-25 | 1.20:1 to 2.50:1 | `#CED2D7` on `#FBFCFD` | 1.48:1 | `#3F4349` on `#191C20` | 1.71:1 | PASS |
+| hover edge border-hover on canvas ink-50 | 1.20:1 to 2.50:1 | `#CED2D7` on `#F6F7F8` | 1.42:1 | `#3F4349` on `#0C0F13` | 1.92:1 | PASS |
+| hover edge border-hover on sidebar ink-100 | 1.20:1 to 2.50:1 | `#CED2D7` on `#EDEFF2` | 1.32:1 | `#3F4349` on `#1E2127` | 1.62:1 | PASS |
+
+#### Non-text: control edges, focus, status icons (3:1)
+
+| Pair | Needs | Light | Ratio | Dark | Ratio | Result |
+|---|---:|---|---:|---|---:|---|
+| control border on card ink-0 | 3.00:1 | `#83888F` on `#FFFFFF` | 3.57:1 | `#959AA1` on `#14171C` | 6.34:1 | PASS |
+| control border on sheet ink-25 | 3.00:1 | `#83888F` on `#FBFCFD` | 3.47:1 | `#959AA1` on `#191C20` | 6.04:1 | PASS |
+| control border on canvas ink-50 | 3.00:1 | `#83888F` on `#F6F7F8` | 3.33:1 | `#959AA1` on `#0C0F13` | 6.78:1 | PASS |
+| control border on sidebar ink-100 | 3.00:1 | `#83888F` on `#EDEFF2` | 3.10:1 | `#959AA1` on `#1E2127` | 5.69:1 | PASS |
+| control border on selected row brand-50 | 3.00:1 | `#83888F` on `#EFFAF5` | 3.34:1 | `#959AA1` on `#12261F` | 5.61:1 | PASS |
+| current hour and now line ink-900 on card ink-0 | 3.00:1 | `#1C1F24` on `#FFFFFF` | 16.52:1 | `#E5E8EC` on `#14171C` | 14.61:1 | PASS |
+| toggle knob on-fill on the off track ink-400 | 3.00:1 | `#FFFFFF` on `#83888F` | 3.57:1 | `#0C0F13` on `#959AA1` | 6.78:1 | PASS |
+| toggle knob on-fill on the on track brand-700 | 3.00:1 | `#FFFFFF` on `#115641` | 8.64:1 | `#0C0F13` on `#4CAD8C` | 7.01:1 | PASS |
+| ink-600 icon on the sidebar's hover fill (line-strong) | 3.00:1 | `#52575F` on `#CED2D7` | 4.79:1 | `#B3B8BF` on `#3F4349` | 5.00:1 | PASS |
+| focus ring on card ink-0 | 3.00:1 | `#1E7057` on `#FFFFFF` | 5.98:1 | `#3EA080` on `#14171C` | 5.60:1 | PASS |
+| focus ring on sheet ink-25 | 3.00:1 | `#1E7057` on `#FBFCFD` | 5.82:1 | `#3EA080` on `#191C20` | 5.33:1 | PASS |
+| focus ring on canvas ink-50 | 3.00:1 | `#1E7057` on `#F6F7F8` | 5.58:1 | `#3EA080` on `#0C0F13` | 5.99:1 | PASS |
+| focus ring on sidebar ink-100 | 3.00:1 | `#1E7057` on `#EDEFF2` | 5.19:1 | `#3EA080` on `#1E2127` | 5.03:1 | PASS |
+| focus ring on selected row brand-50 | 3.00:1 | `#1E7057` on `#EFFAF5` | 5.60:1 | `#3EA080` on `#12261F` | 4.95:1 | PASS |
+| focus ring on tinted button brand-100 | 3.00:1 | `#1E7057` on `#DDF3EA` | 5.15:1 | `#3EA080` on `#113529` | 4.18:1 | PASS |
+| focus ring on the sticky bar over navy | 3.00:1 | `#1E7057` on `#E5E6E8` | 4.79:1 | `#3EA080` on `#0D1116` | 5.90:1 | PASS |
+| focus ring on the sticky bar over orange | 3.00:1 | `#1E7057` on `#F6ECE6` | 5.14:1 | `#3EA080` on `#1F1713` | 5.50:1 | PASS |
+| focus ring on the sticky bar over white | 3.00:1 | `#1E7057` on `#F7F8F9` | 5.63:1 | `#3EA080` on `#1F2226` | 4.98:1 | PASS |
+| success-500 icon on card ink-0 | 3.00:1 | `#429E4A` on `#FFFFFF` | 3.38:1 | `#6AC361` on `#14171C` | 8.20:1 | PASS |
+| success-500 icon on sheet ink-25 | 3.00:1 | `#429E4A` on `#FBFCFD` | 3.29:1 | `#6AC361` on `#191C20` | 7.81:1 | PASS |
+| success-500 icon on canvas ink-50 | 3.00:1 | `#429E4A` on `#F6F7F8` | 3.15:1 | `#6AC361` on `#0C0F13` | 8.77:1 | PASS |
+| success-500 icon on sidebar ink-100 | 3.00:1 | `#429E4A` on `#EDEFF2` | 2.93:1 | `#6AC361` on `#1E2127` | 7.37:1 | PASS in dark; light excepted: light pre-existing, 2.93:1; a success icon never sits on the sidebar ink-100 or a neutral chip |
+| success-500 icon on selected row brand-50 | 3.00:1 | `#429E4A` on `#EFFAF5` | 3.16:1 | `#6AC361` on `#12261F` | 7.25:1 | PASS |
+| success-500 icon on success-50 chip | 3.00:1 | `#429E4A` on `#EDFCED` | 3.17:1 | `#6AC361` on `#162614` | 7.26:1 | PASS |
+| warning-500 icon on card ink-0 | 3.00:1 | `#9B5A00` on `#FFFFFF` | 5.45:1 | `#E19A3D` on `#14171C` | 7.61:1 | PASS |
+| warning-500 icon on sheet ink-25 | 3.00:1 | `#9B5A00` on `#FBFCFD` | 5.30:1 | `#E19A3D` on `#191C20` | 7.24:1 | PASS |
+| warning-500 icon on canvas ink-50 | 3.00:1 | `#9B5A00` on `#F6F7F8` | 5.08:1 | `#E19A3D` on `#0C0F13` | 8.13:1 | PASS |
+| warning-500 icon on sidebar ink-100 | 3.00:1 | `#9B5A00` on `#EDEFF2` | 4.73:1 | `#E19A3D` on `#1E2127` | 6.83:1 | PASS |
+| warning-500 icon on selected row brand-50 | 3.00:1 | `#9B5A00` on `#EFFAF5` | 5.10:1 | `#E19A3D` on `#12261F` | 6.72:1 | PASS |
+| warning-500 icon on warning-50 chip | 3.00:1 | `#9B5A00` on `#FFF7EB` | 5.12:1 | `#E19A3D` on `#2E200F` | 6.69:1 | PASS |
+| danger-500 icon on card ink-0 | 3.00:1 | `#991618` on `#FFFFFF` | 8.46:1 | `#ED756A` on `#14171C` | 6.29:1 | PASS |
+| danger-500 icon on sheet ink-25 | 3.00:1 | `#991618` on `#FBFCFD` | 8.24:1 | `#ED756A` on `#191C20` | 5.99:1 | PASS |
+| danger-500 icon on canvas ink-50 | 3.00:1 | `#991618` on `#F6F7F8` | 7.89:1 | `#ED756A` on `#0C0F13` | 6.73:1 | PASS |
+| danger-500 icon on sidebar ink-100 | 3.00:1 | `#991618` on `#EDEFF2` | 7.34:1 | `#ED756A` on `#1E2127` | 5.65:1 | PASS |
+| danger-500 icon on selected row brand-50 | 3.00:1 | `#991618` on `#EFFAF5` | 7.92:1 | `#ED756A` on `#12261F` | 5.56:1 | PASS |
+| danger-500 icon on danger-50 chip | 3.00:1 | `#991618` on `#FFF3F1` | 7.79:1 | `#ED756A` on `#341916` | 5.67:1 | PASS |
+| info-500 icon on card ink-0 | 3.00:1 | `#035A7B` on `#FFFFFF` | 7.63:1 | `#57A9D2` on `#14171C` | 6.85:1 | PASS |
+| info-500 icon on sheet ink-25 | 3.00:1 | `#035A7B` on `#FBFCFD` | 7.43:1 | `#57A9D2` on `#191C20` | 6.52:1 | PASS |
+| info-500 icon on canvas ink-50 | 3.00:1 | `#035A7B` on `#F6F7F8` | 7.11:1 | `#57A9D2` on `#0C0F13` | 7.33:1 | PASS |
+| info-500 icon on sidebar ink-100 | 3.00:1 | `#035A7B` on `#EDEFF2` | 6.62:1 | `#57A9D2` on `#1E2127` | 6.15:1 | PASS |
+| info-500 icon on selected row brand-50 | 3.00:1 | `#035A7B` on `#EFFAF5` | 7.14:1 | `#57A9D2` on `#12261F` | 6.06:1 | PASS |
+| info-500 icon on info-50 chip | 3.00:1 | `#035A7B` on `#EFF8FD` | 7.09:1 | `#57A9D2` on `#12242E` | 6.08:1 | PASS |
+
+Pairs checked: 154 in each theme; failures: 0; excepted in light only: 1.
 
 ## 22. White-label guard
 
@@ -568,6 +884,8 @@ Light mode is the product. The tokens are ready: utilities read Layer 1 variable
 ## 23. Verified contrast and colour-vision tables
 
 Computed in the design round (WCAG 2.x relative luminance; OKLab ΔE ×100; Machado 2009 colour-vision simulation at full severity) from the exact hexes in Layer 1 of `styles.css`. Output pasted verbatim. "Sticky bar over navy" is the translucent bar (ink-50 at 92%) blended over a Neopolis navy creative `#1E2533`, the worst case a scrolling bar can sit on.
+
+**How the contrast rows are made now.** `tools/contrast.py` reads Layer 1 and Layer 2 from `styles.css` for both themes, resolves `var()` chains and `color-mix(in srgb, …)`, blends the translucent sticky bar over a creative in 8-bit sRGB as the screen paints it, and computes the WCAG 2.x relative-luminance ratio (text 4.5:1, large text and non-text 3:1). `apps/common/tests/test_contrast.py` proves the method on five rows below, reproduced to two decimals (title ink-950 on white 18.94, tertiary ink-500 on ink-100 4.67, control border ink-400 on ink-100 3.10, white on brand-700 8.64, text ink-900 on the sticky bar over navy 13.23), and fails when any pair in the checker's list falls under its bar in either theme. The checker's list carries this section's text pairs, the fills, chips, inverse surfaces and 3:1 marks in both themes; its tables are in §21. The tables below stay as the October record of the light design, with the ΔE and colour-vision tables the checker does not compute.
 
 #### Text (body and small text need 4.5:1; large 3:1)
 

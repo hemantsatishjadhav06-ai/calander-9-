@@ -1,7 +1,10 @@
 {% comment %}
 Month view grid - 7 columns, N rows of weeks.
-Context: calendar_weeks, month_name, prev_month, next_month, day_names, unscheduled_drafts, workspace.
+Context: calendar_weeks, month_name, prev_month, next_month, day_names, unscheduled_drafts, workspace,
+cells_open_sheet.
 Enhanced with: holidays, custom events, category colors, recurring badges.
+A day's "+" links to the composer with its date at 09:00; with cells_open_sheet (the New post sheet is on
+the page) it opens the sheet in Write it myself with the same values instead (T17).
 {% endcomment %}
 
 <div class="overflow-x-auto tab-slide-in">
@@ -22,7 +25,7 @@ Enhanced with: holidays, custom events, category colors, recurring badges.
         <div class="cal-day cal-add-cell cal-drop {% if day.posts %}has-posts{% endif %} {% if day.is_today %}today{% elif day.is_past %}past{% endif %} {% if not day.is_current_month %}other-month{% endif %}"
              data-date="{{ day.date|date:'Y-m-d' }}" data-time="09:00">
             {% if not day.is_past %}
-            <a href="{% url 'composer:compose' workspace_id=workspace.id %}?scheduled_date={{ day.date|date:'Y-m-d' }}&scheduled_time=09:00" class="cal-add-btn" title="Create post" aria-label="Create post on {{ day.date|date:'M j' }}">
+            <a href="{% url 'composer:compose' workspace_id=workspace.id %}?scheduled_date={{ day.date|date:'Y-m-d' }}&scheduled_time=09:00" class="cal-add-btn" title="Create post" aria-label="Create post on {{ day.date|date:'M j' }}"{% if cells_open_sheet %} aria-haspopup="dialog" @click.prevent="$dispatch('new-post:open', {mode: 'self', date: '{{ day.date|date:'Y-m-d' }}', time: '09:00', account: ''})"{% endif %}>
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
             </a>
             {% endif %}

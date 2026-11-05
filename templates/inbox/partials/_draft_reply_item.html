@@ -1,6 +1,6 @@
 {% load humanize %}
 {# One pending reply: a draft awaiting review, or a failed send awaiting retry. #}
-<div class="rounded-xl px-3.5 py-3 ring-1 ring-inset {% if draft.status == 'failed' %}bg-danger-50 ring-danger-200{% else %}bg-white ring-ink-200{% endif %}">
+<div class="rounded-xl px-3.5 py-3 ring-1 ring-inset {% if draft.status == 'failed' %}bg-danger-50 ring-danger-200{% else %}bg-surface ring-ink-200{% endif %}">
     <div class="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
         {% if draft.status == 'failed' %}
         <span class="ui-pill ui-pill-danger">

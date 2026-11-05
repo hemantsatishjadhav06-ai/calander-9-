@@ -1,10 +1,12 @@
 """The rest of the audit's yellow list, each pinned by the thing a user sees.
 
 - The connect page offers only platforms that can actually be connected; the
-  sidebar no longer looks up channels at all (no template drew them).
+  sidebar no longer looks up channels at all (no template drew them), nor the
+  idea columns and tags (the New post sheet's, read by Home and Calendar).
 - Six real pages (Drafts, Queues, Posting schedule, Templates, Categories,
   CSV import) are reachable by clicking, from the Calendar page's header and
-  the New menu; Queues, Templates and Categories follow their switches.
+  the New post sheet's foot links (the shell's New menu went with Phase 3
+  T19); Queues, Templates and Categories follow their switches.
 - The calendar's repeat-icon lookup no longer costs one query per chip.
 - Logging out is a POST: a GET must not end the session.
 - An external client does not get the org roster.
@@ -57,6 +59,9 @@ CHANNEL_TABLES = (
     "social_accounts_platform_visibility",
     "credentials_platform_credential",
 )
+#: The New idea form's columns and tags, which the sidebar read on every render until the New post sheet
+#: took them (Phase 3, T18).
+IDEA_TABLES = ("composer_idea_group", "composer_tag")
 
 
 class SidebarTests(WorkspaceBase):
@@ -91,17 +96,27 @@ class SidebarTests(WorkspaceBase):
         with CaptureQueriesContext(connection) as ctx:
             context = sidebar_context(request)
 
-        for key in ("sidebar_channels", "sidebar_unhealthy_channels", "sidebar_connectable_platforms"):
+        for key in (
+            "sidebar_channels",
+            "sidebar_unhealthy_channels",
+            "sidebar_connectable_platforms",
+            "sidebar_idea_columns",
+            "sidebar_idea_tags",
+        ):
             self.assertNotIn(key, context)
         read = [q["sql"] for q in ctx.captured_queries if any(f'"{t}"' in q["sql"] for t in CHANNEL_TABLES)]
         self.assertEqual(read, [])
-        # Analytics platforms, workspaces, unread inbox, approvals, idea columns and tags: four fewer
-        # than before (two channel lists, the visible platforms and the configured credentials).
-        self.assertLessEqual(len(ctx.captured_queries), 6, [q["sql"] for q in ctx.captured_queries])
+        # The idea columns and tags are the New post sheet's now, read by Home and Calendar for whoever
+        # gets the sheet (Phase 3, T18), not on every render.
+        ideas = [q["sql"] for q in ctx.captured_queries if any(f'"{t}"' in q["sql"] for t in IDEA_TABLES)]
+        self.assertEqual(ideas, [])
+        # Analytics platforms, workspaces, unread inbox and approvals: six fewer than before (two channel
+        # lists, the visible platforms and the configured credentials; the idea columns and tags, T18).
+        self.assertLessEqual(len(ctx.captured_queries), 4, [q["sql"] for q in ctx.captured_queries])
 
     def test_the_six_orphaned_pages_are_linked(self):
-        """From the Calendar page: its header and the New menu (plan T9), Queues, Templates and
-        Categories with their switches on."""
+        """From the Calendar page: its header (plan T9) and the New post sheet's foot links (Phase 3
+        T19 took the shell's New menu away), Queues, Templates and Categories with their switches on."""
         AgencySettings.objects.create(workspace=self.ws, features={"queues": True, "templates": True})
         self.client.force_login(self.owner)
         response = self.client.get(self.calendar_url)

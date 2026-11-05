@@ -7,7 +7,7 @@ Shows all published/partially_published platform posts. Loaded via HTMX into #ta
 
 <div x-data{% if is_htmx %} class="tab-slide-in"{% endif %}>
     {% if platform_posts %}
-    <ul class="ui-list rounded-xl border border-ink-200 bg-white shadow-xs overflow-hidden">
+    <ul class="ui-list rounded-xl border border-ink-200 bg-surface shadow-xs overflow-hidden">
         {% for pp in platform_posts %}
         <li class="ui-row is-clickable cursor-pointer items-start sm:items-center"
             @click="window.location='{% url 'composer:compose_edit' workspace_id=workspace.id post_id=pp.post_id %}?account={{ pp.social_account_id }}'">

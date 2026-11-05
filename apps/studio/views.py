@@ -17,10 +17,13 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
+from django_ratelimit.exceptions import Ratelimited
 
+from apps.composer.ideas import idea_form_context
 from apps.members.decorators import require_permission
 
 from . import budget, design, images, llm, services, style
@@ -56,6 +59,16 @@ def is_plain_client(membership) -> bool:
         membership is not None
         and membership.workspace_role == WorkspaceMembership.WorkspaceRole.CLIENT
         and membership.custom_role_id is None
+    )
+
+
+def can_start_posts(membership) -> bool:
+    """Who gets New post (the button and the sheet on Home and Calendar): ``create_posts`` and not a
+    plain client, the rule ``create`` itself enforces (``require_permission`` and ``_workspace``)."""
+    return bool(
+        membership is not None
+        and membership.effective_permissions.get("create_posts", False)
+        and not is_plain_client(membership)
     )
 
 
@@ -155,6 +168,7 @@ def _index_context(request, workspace, form=None):
         thread["home_panel"] = True  # Home's main column; the partial may size itself for it.
     routine_rows = _routine_rows(request, workspace, perms)
     live_strip = _live_strip(request, workspace, perms)
+    starts_posts = can_start_posts(request.workspace_membership)
     return {
         "workspace": workspace,
         "live": live_strip,
@@ -171,6 +185,10 @@ def _index_context(request, workspace, form=None):
         "routine_rows": routine_rows,
         "can_manage_settings": bool(perms.get("manage_workspace_settings")),
         "can_create": perms.get("create_posts", False),
+        # New post: the button and the sheet, whose Ask the team panel renders ``form`` (index builds it)
+        # and whose idea form offers the idea columns and, with the templates switch, the tags.
+        "can_start_posts": starts_posts,
+        **(idea_form_context(request, workspace) if starts_posts else {}),
         "can_approve": perms.get("approve_posts", False),
         "can_edit_brand": _can_edit_brand(request),
         "greeting": _greeting(request, workspace),
@@ -237,9 +255,53 @@ def index(request, workspace_id):
     return render(request, "studio/index.html", _index_context(request, workspace, BriefForm(workspace=workspace)))
 
 
+#: Said when the team has no provider yet, on the page and in the New post sheet alike.
+_NOT_CONNECTED = "Your team isn't connected yet. Ask the workspace owner to finish Set up."
+#: The New post sheet's over-budget sentence. ``budget.over_budget_message`` keeps its own words (the
+#: amount and the older place name) for its other callers.
+_ALLOWANCE_USED = "This month's allowance for the team is used up. An owner can raise it in Settings → Autopilot."
+#: What the sheet says once a job has started for the idea (only then: see ``create``).
+_WITH_YOUR_MANAGER = "Your idea is with your manager. What we're making appears here in a moment."
+#: The sheet's answer past ``create``'s rate limit (429). No numbers: the rate is not the person's concern.
+_TOO_MANY_SENDS = "You've sent a lot in the last minute. Try again in a moment."
+
+
+def _sheet_refusal(errors, *, status: int = 400) -> HttpResponse:
+    """A refusal for the New post sheet: 400 (429 past the rate limit) with the words alone.
+
+    ``base.html``'s ``htmx:responseError`` handler (htmx reports every 4xx and 5xx there) writes the
+    response's text into the element the form names with ``data-inline-error``, the sheet's error
+    line; rendered without a request, so no context processor runs.
+    """
+    body = render_to_string("studio/partials/new_post_team_error.html", {"errors": errors})
+    return HttpResponse(body, status=status)
+
+
+def _with_channels(form, channels):
+    """The read form, with the channels field ``create`` set aside for validation put back.
+
+    The page re-render's sheet lists the channels from the form (none ticked, as sent); without the
+    field it would show an empty legend and say no channel is connected.
+    """
+    if channels is not None:
+        form.fields["accounts"] = channels
+    return form
+
+
+def _form_errors(form) -> list[str]:
+    """Each of the form's errors in its own words; a field's error is led by the field's label."""
+    words = []
+    for name, errors in form.errors.items():
+        label = form.fields[name].label if name in form.fields else ""
+        words += [f"{label}: {error}" if label else str(error) for error in errors]
+    return words
+
+
 @login_required
 @require_permission("create_posts")
-@ratelimit(key="user", rate="10/m", method="POST", block=True)
+# block=False: ``create`` answers the limit itself, first of all (see its docstring). The rate, the key
+# and the group (named after this function) are what they were with block=True.
+@ratelimit(key="user", rate="10/m", method="POST", block=False)
 @require_POST
 def create(request, workspace_id):
     """An idea from the form becomes its own conversation with your manager, in the person's own words.
@@ -248,23 +310,44 @@ def create(request, workspace_id):
     fields of the brief, never as sentences put in the person's mouth. The
     manager answers in the thread with the brief; nothing is made until the
     person goes ahead (or the workspace is set to go ahead for its team).
+
+    A request from the New post sheet (HTMX) gets 204 with ``HX-Redirect`` to the
+    idea's thread once the idea is saved, and 400 with the refusal's words alone
+    otherwise; the guards and their order are the same for both. Without HTMX the
+    answers are the page's: a message and a redirect, or a 400 re-render.
+
+    The rate limit comes before everything else. Past it the sheet gets 429 with
+    one sentence for its error line, and the page gets what the decorator's
+    ``block=True`` gave it: ``Ratelimited``, which Django answers with the 403 page.
     """
     import uuid
 
     from . import chat, customer_workflow
 
+    if getattr(request, "limited", False):
+        if request.htmx:
+            return _sheet_refusal([_TOO_MANY_SENDS], status=429)
+        raise Ratelimited
     workspace = _workspace(request, workspace_id)
+    sheet = bool(request.htmx)
     form = BriefForm(request.POST, workspace=workspace)
-    # Destinations are optional here: the brief defaults to the workspace's usual accounts.
-    if not request.POST.getlist("accounts"):
-        form.fields.pop("accounts")
+    # Destinations are optional here: the brief defaults to the workspace's usual accounts. Only the
+    # validation goes without the field; a page re-render gets it back (see ``_with_channels``).
+    channels = None if request.POST.getlist("accounts") else form.fields.pop("accounts")
     if not llm.is_configured():
-        messages.error(request, "Your team isn't connected yet. Ask the workspace owner to finish Set up.")
+        if sheet:
+            return _sheet_refusal([_NOT_CONNECTED])
+        messages.error(request, _NOT_CONNECTED)
         return redirect("studio:index", workspace_id=workspace.id)
     if not budget.can_spend(workspace):
+        if sheet:
+            return _sheet_refusal([_ALLOWANCE_USED])
         messages.error(request, budget.over_budget_message(workspace))
         return redirect("studio:index", workspace_id=workspace.id)
     if not form.is_valid():
+        if sheet:
+            return _sheet_refusal(_form_errors(form))
+        form = _with_channels(form, channels)
         return render(request, "studio/index.html", _index_context(request, workspace, form), status=400)
     picture = form.cleaned_data["source_picture"]
     try:
@@ -284,8 +367,16 @@ def create(request, workspace_id):
             style_mode="brand" if request.POST.get("style_lock") else "",
         )
     except (chat.ChatError, customer_workflow.WorkflowError) as exc:
+        if sheet:
+            return _sheet_refusal([str(exc)])
         form.add_error(None, str(exc))
+        form = _with_channels(form, channels)
         return render(request, "studio/index.html", _index_context(request, workspace, form), status=400)
+    # No job started (the daily reply cap, say): the idea is saved and its note says why, never
+    # that the idea is with the manager.
+    if sheet:
+        messages.info(request, started.note if started.job is None else _WITH_YOUR_MANAGER)
+        return HttpResponse(status=204, headers={"HX-Redirect": chat.staff_thread_url(conversation)})
     messages.info(
         request,
         started.note if started.job is None else "Your idea is with your manager. The brief appears here in a moment.",

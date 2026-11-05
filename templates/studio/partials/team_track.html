@@ -11,7 +11,7 @@ Context: track (one item of live.tracks), compact (optional: Home's card, withou
         {% if track.started_text %}<span class="text-xs text-ink-500 tabular-nums whitespace-nowrap">{% if track.status == 'working' %}Started {{ track.started_text }} · <span data-live-elapsed="{{ track.started_at|date:'U' }}">{{ track.elapsed_text }}</span>{% else %}Waiting since {{ track.started_text }}{% endif %}</span>{% endif %}
     </div>
     <div class="mt-1.5 flex items-start gap-2 text-[13px]/[18px] text-ink-600">
-        <span class="inline-flex size-[22px] flex-none items-center justify-center rounded-full text-[10px] font-semibold {% if track.agent.slug == 'account_manager' %}bg-ink-900 text-white{% else %}bg-ink-100 text-ink-700{% endif %}" aria-hidden="true">{{ track.agent.initials }}</span>
+        <span class="inline-flex size-[22px] flex-none items-center justify-center rounded-full text-xs font-semibold {% if track.agent.slug == 'account_manager' %}bg-ink-900 text-on-fill{% else %}bg-ink-100 text-ink-700{% endif %}" aria-hidden="true">{{ track.agent.initials }}</span>
         <p class="min-w-0 pt-0.5">
             {{ track.doing }}{% if track.policy_url %} <a href="{{ track.policy_url }}" class="link-inline">{{ track.policy_link|default:"Open the setting" }}</a>{% endif %}{% if track.platforms %}<span class="text-ink-500"> · {{ track.platforms|join:", " }}</span>{% endif %}
             {% if track.status == 'queued' %}

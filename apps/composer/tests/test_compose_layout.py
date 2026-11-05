@@ -74,7 +74,7 @@ class ComposerLayoutTests(TestCase):
         self.assertIn('id="composer-comments"', panel_html)
         # Collapsed unless there is feedback to address.
         self.assertNotIn(
-            'id="composer-approval-panel" class="group flex-shrink-0 border-t border-ink-200 bg-white" open', body
+            'id="composer-approval-panel" class="group flex-shrink-0 border-t border-ink-200 bg-surface" open', body
         )
 
     def test_feedback_to_address_opens_the_panel(self):
@@ -84,7 +84,7 @@ class ComposerLayoutTests(TestCase):
         )
         body = self._body(post)
         self.assertIn(
-            'id="composer-approval-panel" class="group flex-shrink-0 border-t border-ink-200 bg-white" open', body
+            'id="composer-approval-panel" class="group flex-shrink-0 border-t border-ink-200 bg-surface" open', body
         )
         self.assertIn("Use the new photo", body)
 

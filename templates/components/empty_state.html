@@ -1,0 +1,17 @@
+{% comment %}
+An empty state (spec D8; DESIGN_SYSTEM.md 10.10): a 32px line icon, one sentence, one tinted or
+secondary button. Never primary: the screen's primary is components/primary_action.html.
+Context:
+  icon            a place's icon (components/nav_icon.html: home, approvals, calendar, inbox,
+                  analytics, activity, blog, settings).
+  sentence        one sentence: what is missing and what to do.
+  action_label    the button's words; they say the act. Without them there is no button.
+  action_href     a link; or
+  action_dispatch the window event a button sends on a click, with action_controls, the id of the
+                  dialog it opens (aria-haspopup, aria-expanded, aria-controls).
+  action_tone     "secondary"; anything else is tinted.
+  testid          data-testid on the block; "<testid>-action" on its button.
+{% endcomment %}<div class="ui-empty"{% if testid %} data-testid="{{ testid }}"{% endif %}>{% include "components/nav_icon.html" with key=icon icon_class="size-8" %}
+    <p class="ui-empty-body mt-4">{{ sentence }}</p>
+    {% if action_label %}<div class="mt-4">{% if action_href %}<a href="{{ action_href }}"{% else %}<button type="button"{% if action_dispatch %} @click="$dispatch('{{ action_dispatch }}')"{% endif %}{% if action_controls %} aria-haspopup="dialog" aria-expanded="false" aria-controls="{{ action_controls }}"{% endif %}{% endif %}{% if testid %} data-testid="{{ testid }}-action"{% endif %} class="ui-btn {% if action_tone == 'secondary' %}ui-btn-secondary{% else %}ui-btn-tinted{% endif %}">{{ action_label }}{% if action_href %}</a>{% else %}</button>{% endif %}</div>{% endif %}
+</div>

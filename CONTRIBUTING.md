@@ -67,7 +67,8 @@ concurrent suites. SQLite cannot exercise the row-locking tests.
 | Template accessibility | `.venv/bin/pytest apps/common/tests/test_a11y_sweep.py` | HTML-level labels, dialogs and contrast conventions |
 | Palette | `.venv/bin/python tools/recolor.py --check` | No mapped old palette classes or hex values remain |
 | Browser and axe | `CI=1 npm run test:e2e` | Golden paths and accessibility checks on Desktop Chrome, iPhone 13 and Pixel 7 |
-| Performance | `node tests/lighthouse/run.mjs` after starting the manifest server below | Authenticated mobile performance budgets on Home, Approvals and Calendar |
+| Visual | CI's **Visual (Playwright)** job; baselines from `.github/workflows/visual-baselines.yml` | Screens under `tests/e2e/visual/` match their committed baselines (compared in CI only) |
+| Performance | `node tests/lighthouse/run.mjs [--targets=a,b]` after starting the manifest server below | Authenticated mobile performance budgets on Home, Approvals and Calendar, or on a screen's named targets |
 
 Run a single Python app during development with `.venv/bin/pytest apps/studio`;
 run the **full** suite before a phase gate. An app subset is not a full-suite
@@ -96,13 +97,29 @@ the local configuration uses Chromium with the iPhone viewport and touch
 settings, which does not establish Safari coverage. Traces and screenshots
 are kept on failure under `test-results/`; the HTML report is in
 `playwright-report/`. See [the e2e guide](tests/e2e/README.md) for the named
-fixtures, probes, socket guard and session setup. CI retains browser reports and
-failure traces as `playwright-evidence` for seven days, including failed runs.
+fixtures, probes, socket guard and session setup. CI runs the browser cases as
+one shard per device project and retains each shard's reports and failure
+traces as `playwright-evidence-<project>` (`desktop-chrome`, `iphone-13`,
+`pixel-7`) for seven days, including failed runs.
 
 Every path runs axe against the screens it reaches; serious and critical
 violations fail. Path 12 is the only declared pending golden path: TOTP is
-implemented in Phase 4. Count those cases as pending, never passing. Visual
-baselines are a Phase 3 task, not an existing Phase 1 guarantee.
+implemented in Phase 4. Count those cases as pending, never passing.
+
+Visual baselines live under `tests/e2e/__screenshots__/` and are compared only
+in CI, by the **Visual (Playwright)** job (`E2E_VISUAL=1`); a local run, `CI=1`
+included, skips `tests/e2e/visual/`. That job runs only once a baseline PNG is
+committed (before the first `visual:` commit it is skipped with a notice), and
+then a missing or changed image fails it; it keeps its actual, expected and
+diff images as `visual-evidence`. Baselines are written only on CI's runner by
+`.github/workflows/visual-baselines.yml`, started with
+`gh workflow run visual-baselines.yml --ref <branch> -f specs=<files>` or once
+by the `visual-baselines` label on the pull request (which registers it for
+dispatch). It uploads the images as the artifact `visual-baselines` and
+commits the changed ones back to the branch in one `visual:` commit naming the
+specs and the run; on a fork's pull request it only uploads. Its push starts
+no CI run, so pull it before pushing again. See
+[the e2e guide](tests/e2e/README.md#visual-baselines).
 
 CI also retains full Python JUnit results and JSON coverage as `pytest-evidence`.
 Lighthouse reports and measurements are retained as `lighthouse-evidence`; review
@@ -121,7 +138,18 @@ Once `/health/` answers successfully, run:
 
 ```bash
 LIGHTHOUSE_BASE_URL=http://127.0.0.1:8151 node tests/lighthouse/run.mjs
+# A screen's own targets (names from tests/lighthouse/targets.mjs), same runs and budgets:
+LIGHTHOUSE_BASE_URL=http://127.0.0.1:8151 node tests/lighthouse/run.mjs --targets=home,calendar
 ```
+
+With no target named by `--targets=` or `LIGHTHOUSE_TARGETS`, the runner
+measures CI's three in `.lighthouserc.json`'s order; an unknown name is refused
+before a page opens. To measure named targets on CI's runner, start
+`.github/workflows/lighthouse-targets.yml` with
+`gh workflow run lighthouse-targets.yml --ref <branch> -f targets=<names>`
+(the `lighthouse-targets` label on the pull request runs it once and registers
+it for dispatch); it uploads `.lighthouseci/` as the artifact
+`lighthouse-targets`.
 
 The harness collects the static files and WhiteNoise serves the compressed
 manifest assets. The runner signs in through a test session fixture and
@@ -166,7 +194,8 @@ gitleaks detect --source . --redact --no-banner
 - CI retries are zero. Quarantine a flaky test with a linked issue the same
   day; do not mask it with retries or count quarantine as a pass.
 - Screenshot changes need a `visual:` commit with a before/after pair in the
-  PR. Do not create Phase 3 baselines as part of Phase 1.
+  PR. Never write baselines locally: the baseline workflow writes them on
+  CI's runner and makes that commit.
 - The Phase 1 gate needs the full pytest suite, three consecutive complete
   browser runs and green CI with all new jobs. Record the tested commit,
   commands, counts, pending cases and CI link in `docs/specs/CHANGELOG.md`.
@@ -189,7 +218,7 @@ ruff check --fix .
 ruff format .
 ```
 
-CI runs **Agency UI state tests**, **Lint (ruff)**, **Type check (mypy)**, **Test (pytest)** (with migration checks and `compilemessages`), **Docker build**, **Secret scan (gitleaks)**, **Dependency audit**, **E2E (Playwright)** and **Lighthouse CI** on every pull request and on pushes to `main`. The owner manages the required-check ruleset separately. Never commit real API keys, tokens, or passwords. Put them in your local `.env` (which is gitignored) and reference them by name in `.env.example`.
+CI runs **Agency UI state tests**, **Lint (ruff)**, **Type check (mypy)**, **Test (pytest)** (with migration checks and `compilemessages`), **Docker build**, **Secret scan (gitleaks)**, **Dependency audit**, **E2E (Playwright)** (one shard per device project, summarised in one check of that name), **Visual (Playwright)** (once a baseline is committed) and **Lighthouse CI** on every pull request and on pushes to `main`. **Visual baselines** and **Lighthouse targets** run only when started by hand or by their label on the pull request. The owner manages the required-check ruleset separately. Never commit real API keys, tokens, or passwords. Put them in your local `.env` (which is gitignored) and reference them by name in `.env.example`.
 
 ## Submitting Changes
 

@@ -1,5 +1,5 @@
 <div id="intel-panel-benchmark-channel" role="tabpanel" aria-labelledby="intel-tab-benchmark-channel" class="intel-panel mt-5 grid-cols-1 gap-5 lg:grid-cols-2">
-    <div class="min-w-0 rounded-2xl border border-ink-200 bg-white shadow-xs">
+    <div class="min-w-0 rounded-2xl border border-ink-200 bg-surface shadow-xs">
         <div class="flex items-center justify-between gap-3 border-b border-ink-200 px-5 py-3.5 max-sm:px-4">
             <h2 class="text-h3 text-ink-950">Benchmark channel</h2>
             <span class="ui-pill flex-shrink-0 tabular-nums">5 credits</span>
@@ -20,7 +20,7 @@
                            placeholder="https://youtube.com/@theo-t3-gg"
                            value="{% if is_preview %}{{ preview_inputs.benchmark_channel.url }}{% endif %}"
                            class="intel-input">
-                    <p class="intel-helper">Accepts <code class="font-mono text-[12px]">@handle</code>, <code class="font-mono text-[12px]">/channel/UC…</code>, <code class="font-mono text-[12px]">/c/&lt;name&gt;</code>, or <code class="font-mono text-[12px]">/user/&lt;legacy&gt;</code>.</p>
+                    <p class="intel-helper">Accepts <code class="font-mono text-xs">@handle</code>, <code class="font-mono text-xs">/channel/UC…</code>, <code class="font-mono text-xs">/c/&lt;name&gt;</code>, or <code class="font-mono text-xs">/user/&lt;legacy&gt;</code>.</p>
                 </div>
                 <div>
                     <button type="submit" class="intel-submit ui-btn ui-btn-primary"{% if is_preview %} disabled aria-disabled="true"{% endif %}>
@@ -39,7 +39,7 @@
         </div>
     </div>
 
-    <div class="min-w-0 rounded-2xl border border-ink-200 bg-white shadow-xs">
+    <div class="min-w-0 rounded-2xl border border-ink-200 bg-surface shadow-xs">
         <div class="border-b border-ink-200 px-5 py-3.5 max-sm:px-4">
             <h2 class="text-h3 text-ink-950">Result</h2>
         </div>

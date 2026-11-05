@@ -64,6 +64,27 @@ pair. Use `data-testid` selectors in e2e, leave invariant tests unchanged, and
 observe a failing test before changing behaviour. A flaky test needs an
 issue and quarantine; CI has zero retries.
 
+**Visual baselines.** `tests/e2e/visual/` compares screenshots only where
+`E2E_VISUAL=1`, which only CI's **Visual (Playwright)** job and the baseline
+workflow set; a local run, `CI=1` included, skips those specs with the reason
+"baselines are made and compared in CI (D9)", because this machine's fonts
+are not the runner's. Baselines are written only by
+`.github/workflows/visual-baselines.yml` (CI, `E2E_VISUAL=1` and
+`E2E_UPDATE_BASELINES=1` together; never locally), started by hand on the
+branch with `gh workflow run visual-baselines.yml --ref <branch> -f
+specs=<files>`; it uploads them as the artifact `visual-baselines` and commits
+the changed ones back to that branch in one `visual:` commit naming the specs
+and the run (a branch of this repository only, never a fork's). That push
+starts no CI run: pull the commit before pushing again, and look at every
+image in it.
+**Visual (Playwright)** runs only once a PNG is committed under
+`tests/e2e/__screenshots__/`, is skipped with a notice before that, and fails
+on a missing or changed image after it.
+Visual specs freeze the server's clock and hold its worker (`visual_clock`),
+use the fixed `visual_workspace` and photograph with reduced motion
+(`visualWorld`); `data-visual-dynamic` marks what prints the real date and is
+the one non-test-id selector, for masking only. See `tests/e2e/README.md`.
+
 **Performance.** In a separate terminal, start the manifest-static test server
 on its own database and port, then run the Lighthouse runner against it:
 
@@ -84,6 +105,14 @@ including inline code. TBT is retained as a navigation diagnostic, not used
 as an INP substitute or a second interaction gate. The real-input measurement
 does not establish field p75 INP.
 Run the budget parser's own tests with `node --test tests/lighthouse/*.test.mjs`.
+A screen's own pages are named targets in `tests/lighthouse/targets.mjs`:
+`node tests/lighthouse/run.mjs --targets=a,b` (or `LIGHTHOUSE_TARGETS=a,b`)
+measures them with the same three runs and budgets, and with none named the
+runner measures CI's three. On CI's runner,
+`gh workflow run lighthouse-targets.yml --ref <branch> -f targets=<names>`
+(`.github/workflows/lighthouse-targets.yml`; the `lighthouse-targets` label on
+the pull request runs it once and registers it for dispatch) uploads
+`.lighthouseci/` as the artifact `lighthouse-targets`.
 
 **Audits and catalogues.** These require `pip-audit` 2.10.1 and GNU gettext's
 `msgfmt` in addition to the toolchain above:
@@ -99,9 +128,16 @@ gitleaks detect --source . --redact --no-banner
 CI (`.github/workflows/ci.yml`) runs **Agency UI state tests**, **Lint (ruff)**,
 **Type check (mypy)**, **Test (pytest)** (full Postgres suite with coverage,
 migration check and `compilemessages`), **Docker build**, **Secret scan
-(gitleaks)**, **Dependency audit**, **E2E (Playwright)** and **Lighthouse CI**
-on every pull request and on pushes to `main`. Pre-commit hooks provide an
-earlier subset;
+(gitleaks)**, **Dependency audit**, **E2E (Playwright)** (one shard per device
+project, each with its own server and database, and one summary check of that
+name), **Visual (Playwright)** and **Lighthouse CI** on every pull request and
+on pushes to `main`. Each shard keeps its report and failure traces as
+`playwright-evidence-<project>`, the Visual job as `visual-evidence`, beside
+`pytest-evidence` and `lighthouse-evidence` (seven days). Two workflows run
+only when started by hand or by their label on the pull request: **Visual
+baselines** (`visual-baselines` label), which commits the baselines back to
+the branch, and **Lighthouse targets** (`lighthouse-targets` label). Pre-commit
+hooks provide an earlier subset;
 passing them does not replace the full CI gate. At the Phase 1 gate, run the
 full pytest suite and three consecutive complete browser runs, report the
 pending TOTP cases separately, and record the tested SHA and CI run in
@@ -268,6 +304,20 @@ uncertain send or delivery is held for a person, never replayed.
   **Health** includes the Set up checklist and follows the same owner-only rule:
   the exact names to set (environment variables, providers) show to owners only,
   and everyone else reads "Ask your owner."
+- **New post** is how a post starts: one button on Home and Calendar, for
+  whoever may start posts (`create_posts` and not a plain client:
+  `apps/studio/views.can_start_posts`), opens the New post sheet (a bottom
+  sheet on a phone, a drawer from 1024px) with **Ask the team** (posts to
+  `studio:create`), **Write it myself** (**Open the editor**, the composer)
+  and **Save it as an idea instead**. There is no New menu; Ideas, Drafts,
+  Import from CSV, Templates and Categories are the sheet's foot links. Home's
+  conversation composer still talks to the team (`studio:thread_start`).
+- **Keyboard shortcuts** (from 1024px, `static/js/shortcuts.js`): `n` New post,
+  `/` Go to, `?` the list of keys, each ignored in a field, in a dialog and
+  with a modifier. The list's switch, **Single-key shortcuts**, turns the
+  single keys off on this device (WCAG 2.1.4); Ctrl/Cmd-/ opens the list from
+  anywhere, a field included, so they can always be turned back on. A new
+  single key is added to that list and obeys the switch.
 - One sentence per screen on what to do. Status in words: "Waiting for you",
   "The team is working", "Paused: autopilot is off", "Needs your review".
 - No environment-variable names, worker names, token counts, contrast ratios,
@@ -395,9 +445,13 @@ Inbound — a new command or button:
   fake team, HTTP mocks, background worker and named fixture/probe endpoints.
   These endpoints are never mounted by the production URL configuration.
 - `tests/e2e/support/`, `self/`, `golden/`, `screens/` — Playwright fixtures,
-  network and axe checks, harness self-checks, the twelve golden paths and the
+  network and axe checks, harness self-checks, the twelve golden paths, the
   Phase 2 screens (navigation, Approvals, Settings, Activity, switches, the
-  public site) on three devices.
+  public site) and Phase 3's (the New post sheet, Home and Calendar in dark)
+  on three devices.
+- `tests/e2e/visual/` and `tests/e2e/__screenshots__/` — the Phase 3 visual
+  specs and their baselines (`support/visual.ts` `snap`, `support/schemes.ts`
+  `forSchemes`), compared in CI only.
 - `tests/test_product_map_urls.py` — no URL `docs/PRODUCT_MAP.md` lists, now or
   before Phase 2 (`tests/fixtures/product_map_urls.txt`), answers 404 or 500;
   a URL the map gains needs its line in the fixture.

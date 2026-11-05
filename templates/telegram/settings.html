@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load tz %}
 {% block title %}Telegram · {{ workspace.name }}{% endblock %}
-{% block extra_head %}{% if not internal %}<style>.sidebar-new-wrap, [data-palette-open] { display: none; }</style>{% endif %}{% endblock %}
+{% block extra_head %}{% if not internal %}<style>[data-palette-open] { display: none; }</style>{% endif %}{% endblock %}
 {# The phone bar and the room left for it: build_nav leaves both out for someone not on the team (apps/common/navigation.py). #}
 {% block command_palette %}{% if internal %}{{ block.super }}{% endif %}{% endblock %}
 {% block sidebar_nav %}
@@ -33,13 +33,13 @@ show a leaf tick and keep only quiet controls. Setting names appear only in the 
     {% if internal %}
     <li class="ui-card" data-step="deployment">
       <div class="flex items-start gap-3">
-        {% if deployment_ready %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500 text-white" aria-hidden="true"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>{% else %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]" aria-hidden="true">1</span>{% endif %}
+        {% if deployment_ready %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500 text-on-fill" aria-hidden="true"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>{% else %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]" aria-hidden="true">1</span>{% endif %}
         <div class="min-w-0 flex-1">
           <h2 class="text-h3 text-ink-950">Deployment ready</h2>
           {% if deployment_ready %}
           <p class="mt-1 text-sm text-ink-700">Ready. This app can receive Telegram messages.</p>
           {% elif can_manage and is_owner %}
-          <p class="mt-2 ui-owner-box break-words [&_code]:rounded [&_code]:bg-white [&_code]:px-1 [&_code]:text-ink-900 [&_code]:ring-1 [&_code]:ring-inset [&_code]:ring-ink-200">Not ready. Set <code>TELEGRAM_WEBHOOK_BASE_URL</code> to this app's public https address{% if webhook_base %} (now <code>{{ webhook_base }}</code>){% endif %} and <code>TELEGRAM_WEBHOOK_READY=true</code>{% if webhook_flag %} (set){% else %} (not set){% endif %} on both services, deploy, then come back.</p>
+          <p class="mt-2 ui-owner-box break-words [&_code]:rounded [&_code]:bg-surface [&_code]:px-1 [&_code]:text-ink-900 [&_code]:ring-1 [&_code]:ring-inset [&_code]:ring-ink-200">Not ready. Set <code>TELEGRAM_WEBHOOK_BASE_URL</code> to this app's public https address{% if webhook_base %} (now <code>{{ webhook_base }}</code>){% endif %} and <code>TELEGRAM_WEBHOOK_READY=true</code>{% if webhook_flag %} (set){% else %} (not set){% endif %} on both services, deploy, then come back.</p>
           {% else %}
           <p class="mt-1 text-sm text-ink-700">Not ready yet. Ask your owner.</p>
           {% endif %}
@@ -50,7 +50,7 @@ show a leaf tick and keep only quiet controls. Setting names appear only in the 
 
     <li class="ui-card" data-step="bot">
       <div class="flex items-start gap-3">
-        {% if bot_state == 'listening' %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500 text-white" aria-hidden="true"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>{% elif bot_state == 'connecting' or bot_state == 'saved' %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]" aria-hidden="true">!</span>{% else %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]" aria-hidden="true">2</span>{% endif %}
+        {% if bot_state == 'listening' %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500 text-on-fill" aria-hidden="true"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>{% elif bot_state == 'connecting' or bot_state == 'saved' %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-bold text-warning-500 shadow-[inset_0_0_0_2px_var(--warning-500)]" aria-hidden="true">!</span>{% else %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]" aria-hidden="true">2</span>{% endif %}
         <div class="min-w-0 flex-1 space-y-3 max-lg:[&_input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden])]:min-h-11 max-lg:[&_select]:min-h-11">
           <h2 class="text-h3 text-ink-950">Bot connected</h2>
           {% if bot_state == 'listening' %}
@@ -92,7 +92,7 @@ show a leaf tick and keep only quiet controls. Setting names appear only in the 
 
     <li class="ui-card" data-step="pairing" id="telegram-personal-setup">
       <div class="flex items-start gap-3">
-        {% if paired %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500 text-white" aria-hidden="true"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>{% else %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]" aria-hidden="true">3</span>{% endif %}
+        {% if paired %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500 text-on-fill" aria-hidden="true"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>{% else %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]" aria-hidden="true">3</span>{% endif %}
         <div class="min-w-0 flex-1 space-y-3">
           <h2 class="text-h3 text-ink-950">You are paired</h2>
           {% if paired %}
@@ -108,7 +108,7 @@ show a leaf tick and keep only quiet controls. Setting names appear only in the 
           <div role="status" class="space-y-2.5 rounded-xl bg-ink-50 p-4 ring-1 ring-inset ring-ink-200" data-personal-pairing x-data="{ left: {{ pairing_seconds|default:0 }} }" x-init="setInterval(() => { if (left > 0) left -= 1 }, 1000)">
             {% if pairing_url %}<a href="{{ pairing_url }}" target="_blank" rel="noopener noreferrer" class="ui-btn ui-btn-primary">Open Telegram and pair</a>
             <p class="text-[13px] text-ink-700">Or send this in the private chat with @{{ connection.bot_username }}:</p>{% else %}<p class="text-[13px] text-ink-700">Send this in the bot's private chat:</p>{% endif %}
-            <code class="block select-all break-all rounded-md bg-white px-3 py-2 font-mono text-[13px] text-ink-900 ring-1 ring-inset ring-ink-200">{{ pairing_command }}</code>
+            <code class="block select-all break-all rounded-md bg-surface px-3 py-2 font-mono text-[13px] text-ink-900 ring-1 ring-inset ring-ink-200">{{ pairing_command }}</code>
             <p class="text-xs text-ink-600">Expires <span class="tabular-nums" x-text="left > 0 ? 'in ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') : 'now'">at {{ expires_at|date:"H:i T" }}</span>. One use; shown only now.</p>
           </div>
           {% endif %}
@@ -125,7 +125,7 @@ show a leaf tick and keep only quiet controls. Setting names appear only in the 
     {% if internal %}
     <li class="ui-card" data-step="approvals">
       <div class="flex items-start gap-3">
-        {% if approvals_on %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500 text-white" aria-hidden="true"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>{% else %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]" aria-hidden="true">4</span>{% endif %}
+        {% if approvals_on %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500 text-on-fill" aria-hidden="true"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>{% else %}<span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-semibold text-ink-500 shadow-[inset_0_0_0_1.5px_var(--ink-400)]" aria-hidden="true">4</span>{% endif %}
         <div class="min-w-0 flex-1 space-y-3">
           <h2 class="text-h3 text-ink-950">Approvals from Telegram</h2>
           {% if approvals_on %}
@@ -155,7 +155,7 @@ show a leaf tick and keep only quiet controls. Setting names appear only in the 
           <section id="telegram-group-setup" class="space-y-3" aria-labelledby="telegram-group-heading">
             <h3 id="telegram-group-heading" class="text-sm font-semibold text-ink-900">Team and client groups</h3>
             <p class="text-[13px]/[18px] text-ink-700">Add @{{ connection.bot_username|default:'your bot' }} to the group, make sure you are its administrator, then create a one-use group code and send it there yourself. Keep the client group and the team group separate; you control who is in each.</p>
-            {% if pairing_purpose == 'chat' %}<div role="status" class="space-y-2 rounded-xl bg-ink-50 p-4 ring-1 ring-inset ring-ink-200" data-group-pairing><p class="text-sm font-semibold text-ink-900">Send this yourself in the {% if pairing_audience == 'client' %}client{% else %}internal team{% endif %} group:</p><code class="block select-all break-all rounded-md bg-white px-3 py-2 font-mono text-[13px] text-ink-900 ring-1 ring-inset ring-ink-200">{{ pairing_command }}</code><p class="text-xs text-ink-600">Expires {{ expires_at|date:"j M Y, H:i T" }}. Only in that group.</p></div>{% endif %}
+            {% if pairing_purpose == 'chat' %}<div role="status" class="space-y-2 rounded-xl bg-ink-50 p-4 ring-1 ring-inset ring-ink-200" data-group-pairing><p class="text-sm font-semibold text-ink-900">Send this yourself in the {% if pairing_audience == 'client' %}client{% else %}internal team{% endif %} group:</p><code class="block select-all break-all rounded-md bg-surface px-3 py-2 font-mono text-[13px] text-ink-900 ring-1 ring-inset ring-ink-200">{{ pairing_command }}</code><p class="text-xs text-ink-600">Expires {{ expires_at|date:"j M Y, H:i T" }}. Only in that group.</p></div>{% endif %}
             <form method="post" action="{% url 'telegram:pair' workspace_id=workspace.id %}" class="space-y-3">{% csrf_token %}
               {{ group_pair_form.purpose }}
               {% if group_pair_form.errors %}<div role="alert" class="ui-callout ui-callout-danger text-sm"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><div>{{ group_pair_form.non_field_errors }}{% for field in group_pair_form %}{{ field.errors }}{% endfor %}</div></div>{% endif %}
@@ -188,7 +188,7 @@ show a leaf tick and keep only quiet controls. Setting names appear only in the 
             <h3 id="telegram-managed-heading" class="text-sm font-semibold text-ink-900">Create this client's bot with Telegram confirmation</h3>
             <p class="text-[13px]/[18px] text-ink-700">A manager bot you have paired with can create a separate bot for this workspace after you confirm in Telegram. SM Bean then connects it for you.</p>
             {% if managed_latest_request %}
-            <div role="status" class="rounded-xl bg-white p-3 text-[13px] text-ink-800 ring-1 ring-inset ring-ink-200" data-managed-bot-status>
+            <div role="status" class="rounded-xl bg-surface p-3 text-[13px] text-ink-800 ring-1 ring-inset ring-ink-200" data-managed-bot-status>
               <p class="font-semibold text-ink-900">{% if managed_request_expired %}Telegram confirmation expired{% else %}{{ managed_latest_request.get_status_display }}{% endif %} · {{ managed_latest_request.requested_name }}</p>
               {% if managed_latest_request.error %}<p class="mt-1 break-words">{{ managed_latest_request.error }}</p>{% endif %}
               {% if managed_latest_request.status == 'pending' %}<p class="mt-1">Confirm with your paired Telegram account before {{ managed_latest_request.expires_at|date:"j M Y, H:i T" }}.</p>{% endif %}

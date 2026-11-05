@@ -1,13 +1,22 @@
 {% extends "base.html" %}
-{% load tz %}
+{% load static tz %}
 
 {% block title %}Home - {{ workspace.name }} - {{ SITE_NAME }}{% endblock %}
+
+{# New post (screen 1): the floating button lifts the toasts (has-fab); the sheet's script runs before Alpine. #}
+{% block body_class %}{% if can_start_posts %} has-fab{% endif %}{% endblock %}
+{% block page_vendor_scripts %}{% if can_start_posts %}<script src="{% static 'js/new-post-sheet.js' %}" defer></script>{% endif %}{% endblock %}
 
 {% block content %}
 <div class="max-w-[1180px] min-w-0">
     {# ---- Greeting and one status line ---- #}
     <header class="mb-5">
-        <h1 class="ui-page-title">{{ greeting }}</h1>
+        {% comment %}The title row ends in the primary slot: New post floats above the phone bar below 1024px and sits here from 1024px.
+           The layout classes sit on the title's wrapper, so the h1 stays class="ui-page-title" as every page title is.{% endcomment %}
+        <div class="flex items-center justify-between lg:gap-4">
+            <div class="min-w-0 flex-1"><h1 class="ui-page-title" data-visual-dynamic>{{ greeting }}</h1></div>
+            {% if can_start_posts %}<div data-primary-slot="header" class="shrink-0">{% include "components/primary_action.html" with label="New post" testid="new-post-open" controls="new-post-sheet" dispatch="new-post:open" %}</div>{% endif %}
+        </div>
         {# Each part may wrap (a bot name can be long); only a part's link stays on one line. #}
         <p class="ui-page-status break-words" data-home-status>
             {% for part in status_parts %}{% if not forloop.first %}<span class="mx-1.5 text-ink-400" aria-hidden="true">·</span>{% endif %}<span>{{ part.text }}{% if part.url %} · <a href="{{ part.url }}" class="whitespace-nowrap font-medium link-inline">{{ part.link }}</a>{% endif %}</span>{% endfor %}
@@ -27,7 +36,7 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex items-baseline justify-between gap-3">
                             <h2 id="today-heading" class="ui-card-title">Today</h2>
-                            <p class="text-[13px] text-ink-500 tabular-nums whitespace-nowrap">{% timezone tzname %}{% now "D j M" %}{% endtimezone %}</p>
+                            <p class="text-[13px] text-ink-500 tabular-nums whitespace-nowrap" data-visual-dynamic>{% timezone tzname %}{% now "D j M" %}{% endtimezone %}</p>
                         </div>
                         {% if not today.quiet %}
                         <p class="mt-0.5 text-[13px]/[18px] text-ink-600 tabular-nums">
@@ -197,7 +206,7 @@
             {% for brief in briefs %}
             <li class="min-w-0">
                 <a href="{% url 'studio:detail' workspace_id=workspace.id brief_id=brief.id %}"
-                   class="group flex h-full flex-col overflow-hidden rounded-[14px] border border-ink-200 bg-white shadow-xs ui-card-link">
+                   class="group flex h-full flex-col overflow-hidden rounded-[14px] border border-ink-200 bg-surface shadow-xs ui-card-link">
                     <div class="aspect-[4/5] bg-ink-50 flex items-center justify-center overflow-hidden shadow-[inset_0_-1px_0_var(--ink-200)]">
                         {% if brief.graphic %}
                         <img src="{% if brief.graphic.thumbnail %}{{ brief.graphic.thumbnail.url }}{% else %}{{ brief.graphic.file.url }}{% endif %}" alt="" class="w-full h-full object-cover" loading="lazy">
@@ -212,7 +221,7 @@
                     <div class="flex-1 p-3 sm:px-3.5">
                         <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1.5">
                             {% include "studio/partials/status_badge.html" with status=brief.status label=brief.get_status_display %}
-                            <span class="text-xs text-ink-500 whitespace-nowrap">{{ brief.created_at|timesince }} ago</span>
+                            <span class="text-xs text-ink-500 whitespace-nowrap" data-visual-dynamic>{{ brief.created_at|timesince }} ago</span>
                         </div>
                         <p class="text-sm font-semibold text-ink-900 line-clamp-2 group-hover:underline underline-offset-2">{{ brief.title }}</p>
                     </div>
@@ -229,4 +238,5 @@
         {% endif %}
     </section>
 </div>
+{% if can_start_posts %}{% include "components/new_post_sheet.html" %}{% endif %}
 {% endblock %}

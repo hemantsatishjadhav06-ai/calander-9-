@@ -1,0 +1,118 @@
+name: Lighthouse targets
+
+# Measures named Lighthouse targets on CI's runner (spec D10, plan T11, command C12): the runner, the
+# three mobile runs and the budgets in .lighthouserc.json are CI's own; only the pages differ. A
+# screen's gate names the targets it added (tests/lighthouse/targets.mjs) and records this run's
+# medians. With no targets named it measures CI's three (Home, Approvals, Calendar month).
+#
+#   gh workflow run lighthouse-targets.yml --ref claude/trusting-dijkstra-m7nul1 -f targets=home,calendar
+#
+# Its own file, so starting it never cancels a CI run (ci.yml cancels an in-progress run of the same
+# ref). Its concurrency group is the job's, per branch, and queues instead of cancelling, so a second
+# dispatch or the label waits for the first instead of cutting its measurement short. It is not at
+# workflow level because every label added to the pull request starts this workflow (its job then
+# skips), and such a run in a workflow-level group would replace a measurement waiting its turn
+# (GitHub cancels a pending run of a group in favour of the newer one, cancel-in-progress or not).
+# GitHub offers a workflow for dispatch once it has run or is on the default branch: the
+# `lighthouse-targets` label on the pull request runs it once (CI's three) and registers it; if a
+# dispatch is refused, re-label once.
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Target names from tests/lighthouse/targets.mjs, separated by commas; empty measures CI's three"
+        required: false
+        default: ""
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: Lighthouse targets
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'lighthouse-targets'
+    # Per branch, whichever way it was started; a second run waits for this one instead of cancelling it.
+    concurrency:
+      group: lighthouse-targets-${{ github.head_ref || github.ref_name }}
+      cancel-in-progress: false
+    # Keep browser installation on the image supported by the locked version.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "1"
+      DB_HOST: "127.0.0.1"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: smbean_lighthouse_targets_e2e
+      E2E_PORT: "8151"
+      LIGHTHOUSE_BASE_URL: http://127.0.0.1:8151
+      # Passed through the environment, never written into a script; the runner refuses any name
+      # tests/lighthouse/targets.mjs does not register before it opens a page.
+      TARGETS: ${{ inputs.targets }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # The branch as pushed, not the pull request's merge commit.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install locked Python dependencies
+        run: pip install --require-hashes -r requirements.lock
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            theme/static_src/package-lock.json
+      - name: Install locked browser dependencies and build CSS
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix theme/static_src
+          npm run build --prefix theme/static_src
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Measure the named targets (mobile performance and interactions)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tests.e2e.server --reset --no-worker --static manifest --port "$E2E_PORT" > /tmp/lighthouse-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 120); do
+            if curl --fail --silent "$LIGHTHOUSE_BASE_URL/health/" >/dev/null && curl --fail --silent "$LIGHTHOUSE_BASE_URL/__e2e__/ping" >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lighthouse-server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          curl --fail --silent "$LIGHTHOUSE_BASE_URL/health/" >/dev/null
+          curl --fail --silent "$LIGHTHOUSE_BASE_URL/__e2e__/ping" >/dev/null
+          node tests/lighthouse/run.mjs --targets="$TARGETS"
+
+      - name: Retain every performance measurement
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lighthouse-targets
+          path: .lighthouseci/
+          include-hidden-files: true
+          retention-days: 14

@@ -20,7 +20,7 @@
 {% block content %}
 <div class="w-full max-w-[880px] min-w-0">
     {% if drafts %}
-    <ul class="ui-list rounded-xl border border-ink-200 bg-white shadow-xs overflow-hidden">
+    <ul class="ui-list rounded-xl border border-ink-200 bg-surface shadow-xs overflow-hidden">
         {% for draft in drafts %}
         <li>
         <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=draft.id %}"

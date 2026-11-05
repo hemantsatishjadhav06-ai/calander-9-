@@ -15,7 +15,7 @@
     box-shadow: var(--shadow-xs);
     transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
   }
-  .ml-asset-card:hover { border-color: var(--ink-300); box-shadow: var(--shadow-sm); }
+  .ml-asset-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-sm); }
   /* Type filters: filter chips (selected is ink-900) */
   .ml-filter-pill {
     display: inline-flex; align-items: center;
@@ -29,10 +29,10 @@
   }
   @media (max-width: 1023px) { .ml-filter-pill { height: 44px; } }
   .ml-filter-pill:hover { background: var(--ink-100); }
-  .ml-filter-pill.active { background: var(--ink-900); color: #fff; font-weight: 600; }
-  /* File type tag on a card: sentence case, 12px, neutral */
+  .ml-filter-pill.active { background: var(--surface-inverse); color: var(--text-on-inverse); font-weight: 600; }
+  /* File type tag on a card: sentence case, 13px, neutral */
   .ml-type-badge {
-    font-size: 12px;
+    font-size: 13px;
     line-height: 18px;
     font-weight: 600;
     padding: 0 6px;

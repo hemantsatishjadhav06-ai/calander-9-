@@ -6,12 +6,12 @@ Context: week_days, week_slots, today, default_workspace.
 <div class="overflow-auto" style="max-height: calc(100vh - 260px);">
     <div class="min-w-[760px]">
         <!-- Day headers -->
-        <div class="sticky top-0 z-10 grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-ink-200 bg-white">
+        <div class="sticky top-0 z-10 grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-ink-200 bg-surface">
             <div class="border-r border-ink-200"></div>
             {% for day in week_days %}
             <div class="border-r border-ink-200 px-2 py-2 text-center last:border-r-0 {% if day == today %}bg-ink-25{% endif %}">
                 <div class="text-caption font-semibold text-ink-500">{{ day|date:"D" }}</div>
-                <div class="mx-auto mt-0.5 grid size-7 place-items-center rounded-full text-sm font-semibold tabular-nums {% if day == today %}bg-ink-900 text-white{% else %}text-ink-900{% endif %}" {% if day == today %}aria-current="date"{% endif %}>{{ day.day }}</div>
+                <div class="mx-auto mt-0.5 grid size-7 place-items-center rounded-full text-sm font-semibold tabular-nums {% if day == today %}bg-ink-900 text-on-fill{% else %}text-ink-900{% endif %}" {% if day == today %}aria-current="date"{% endif %}>{{ day.day }}</div>
             </div>
             {% endfor %}
         </div>

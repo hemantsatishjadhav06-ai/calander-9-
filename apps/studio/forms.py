@@ -73,7 +73,7 @@ class BriefForm(forms.Form):
         widget=forms.CheckboxSelectMultiple(attrs={"class": "w-4 h-4 rounded accent-brand-700"}),
     )
     style_lock = forms.BooleanField(
-        label="Match the look of the last post",
+        label="Keep the brand look",
         required=False,
         initial=True,
         widget=forms.CheckboxInput(attrs={"class": "mt-0.5 w-4 h-4 rounded accent-brand-700"}),
@@ -99,7 +99,7 @@ class BriefForm(forms.Form):
             .order_by("-created_at")[:24]
         )
         self.photo_objects = {str(p.pk): p for p in photos}
-        self.fields["source_picture"].choices = [("", "Generate a picture with AI")] + [
+        self.fields["source_picture"].choices = [("", "The team makes the picture")] + [
             (pk, f"Use “{(p.title or p.filename)[:60]}”") for pk, p in self.photo_objects.items()
         ]
         self.fields["source_picture"].widget.attrs["class"] = _FIELD
@@ -232,7 +232,7 @@ class BrandProfileForm(forms.ModelForm):
         self.initial["logo"] = str(self.instance.logo_id or "")
         for name, field in self.fields.items():
             if name in ("primary_color", "accent_color"):
-                field.widget.attrs["class"] = "h-10 w-16 rounded-lg border border-ink-400 bg-white p-1 cursor-pointer"
+                field.widget.attrs["class"] = "h-10 w-16 rounded-lg border border-ink-400 bg-surface p-1 cursor-pointer"
             else:
                 field.widget.attrs.setdefault("class", _FIELD)
 

@@ -10,7 +10,7 @@
     </div>
 
     {% if subscription and subscription.status == "active" %}
-    <div class="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-white px-4 py-1.5 shadow-xs ring-1 ring-inset ring-ink-200">
+    <div class="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-surface px-4 py-1.5 shadow-xs ring-1 ring-inset ring-ink-200">
         <dl class="flex items-center gap-4">
             <div>
                 <dt class="text-caption text-ink-600">Plan</dt>
@@ -218,8 +218,8 @@
         text-align: left;
         text-transform: none;
         letter-spacing: normal;
-        color: #fff;
-        background: var(--ink-900);
+        color: var(--text-on-inverse);
+        background: var(--surface-inverse);
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-lg);
         z-index: 20;
@@ -240,7 +240,7 @@
         position: absolute;
         top: 100%;
         border: 4px solid transparent;
-        border-top-color: var(--ink-900);
+        border-top-color: var(--surface-inverse);
     }
     .intel-tooltip[data-align="left"]::after  { left: 0.75rem; }
     .intel-tooltip[data-align="right"]::after { right: 0.75rem; }
@@ -253,8 +253,8 @@
         border-radius: 9999px;
         background: var(--ink-100);
         color: var(--ink-700);
-        box-shadow: inset 0 0 0 1px var(--ink-300);
-        font-size: 0.625rem;
+        box-shadow: inset 0 0 0 1px var(--border-hover);
+        font-size: 0.8125rem;
         font-weight: 700;
     }
     .intel-tooltip-trigger:hover .intel-tooltip-icon { background: var(--ink-200); color: var(--ink-900); }

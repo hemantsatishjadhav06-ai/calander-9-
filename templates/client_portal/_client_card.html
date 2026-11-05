@@ -7,7 +7,7 @@ through the team thread: the client's change request is recorded first, then the
 A post waiting for the client opens expanded, so its actions are visible at once; decided posts start closed.
 {% endcomment %}
 {% load tz approval_extras %}
-<article class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xs" data-testid="portal-card"
+<article class="overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-xs" data-testid="portal-card"
      x-data="{ open: {% if post.client_pending %}true{% else %}false{% endif %}, panel: null, comment: '' }">
     <div class="cursor-pointer p-5 max-sm:p-4" @click="open = !open">
         <div class="mb-3 flex flex-wrap items-center gap-2">
@@ -35,7 +35,7 @@ A post waiting for the client opens expanded, so its actions are visible at once
         <div class="mt-4 flex flex-wrap gap-2">
             {% for pm in post.media_attachments.all %}
             {% if pm.media_asset.thumbnail %}
-            <img src="{{ pm.media_asset.thumbnail.url }}" alt="" class="size-24 rounded-[10px] object-cover shadow-[inset_0_0_0_1px_rgba(14,17,20,.06)] ring-1 ring-ink-200">
+            <img src="{{ pm.media_asset.thumbnail.url }}" alt="" class="size-24 rounded-[10px] object-cover shadow-[var(--shadow-creative)] ring-1 ring-ink-200">
             {% elif pm.media_asset.file and pm.media_asset.media_type == 'image' %}
             <img src="{{ pm.media_asset.file.url }}" alt="" class="size-24 rounded-[10px] object-cover ring-1 ring-ink-200">
             {% else %}
@@ -46,7 +46,7 @@ A post waiting for the client opens expanded, so its actions are visible at once
         {% endif %}
 
         <div class="mt-4 flex items-center gap-2">
-            <span class="flex size-5 flex-shrink-0 items-center justify-center rounded-full bg-ink-100 text-[10px] font-semibold text-ink-700" aria-hidden="true">{{ post.author.display_name|default:"?"|make_list|first|upper }}</span>
+            <span class="flex size-5 flex-shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700" aria-hidden="true">{{ post.author.display_name|default:"?"|make_list|first|upper }}</span>
             <span class="text-xs text-ink-500">by {{ post.author.display_name|default:"Unknown" }} · {{ workspace.name }}</span>
             <button type="button" class="ui-btn ui-btn-icon ml-auto size-8 max-lg:size-11" @click.stop="open = !open" :aria-expanded="open.toString()" aria-label="Show or hide the details">
                 <svg class="transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
@@ -60,12 +60,12 @@ A post waiting for the client opens expanded, so its actions are visible at once
             <p class="mb-2 text-xs font-semibold text-ink-500">From the team</p>
             {% for c in post.visible_comments %}
             <div class="mb-3 flex gap-2.5">
-                <span class="flex size-6 flex-shrink-0 items-center justify-center rounded-full bg-ink-100 text-[10px] font-semibold text-ink-700" aria-hidden="true">{{ c.author.display_name|default:"?"|make_list|first|upper }}</span>
+                <span class="flex size-6 flex-shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700" aria-hidden="true">{{ c.author.display_name|default:"?"|make_list|first|upper }}</span>
                 <div class="min-w-0"><span class="text-xs font-semibold text-ink-900">{{ c.author.display_name|default:"Team" }}</span><p class="text-sm text-ink-700">{{ c.body }}</p></div>
             </div>
             {% for reply in c.replies.all %}
             <div class="mb-3 ml-8 flex gap-2.5 border-l border-ink-200 pl-3">
-                <span class="flex size-6 flex-shrink-0 items-center justify-center rounded-full bg-ink-100 text-[10px] font-semibold text-ink-700" aria-hidden="true">{{ reply.author.display_name|default:"?"|make_list|first|upper }}</span>
+                <span class="flex size-6 flex-shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700" aria-hidden="true">{{ reply.author.display_name|default:"?"|make_list|first|upper }}</span>
                 <div class="min-w-0"><span class="text-xs font-semibold text-ink-900">{{ reply.author.display_name|default:"Team" }}</span><p class="text-sm text-ink-700">{{ reply.body }}</p></div>
             </div>
             {% endfor %}

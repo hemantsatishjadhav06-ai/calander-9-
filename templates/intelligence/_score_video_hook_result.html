@@ -34,7 +34,7 @@
         <div class="text-right">
             <div class="text-caption font-semibold text-ink-600 mb-2">Archetype</div>
             {% if result.primary_archetype %}
-            <span class="ui-pill mb-1 !bg-ink-900 !text-white !shadow-none">
+            <span class="ui-pill mb-1 !bg-ink-900 !text-on-fill !shadow-none">
                 {{ result.primary_archetype|humanize_slug }}
             </span>
             {% endif %}
@@ -74,7 +74,7 @@
     {% if result.transcript %}
     <div class="mt-6 pt-5 border-t border-ink-200">
         <div class="text-caption font-semibold text-ink-600 mb-2">Transcript</div>
-        <blockquote class="border-l-2 border-ink-300 pl-3 text-sm text-ink-700 italic leading-relaxed">
+        <blockquote class="border-l-2 border-line-strong pl-3 text-sm text-ink-700 italic leading-relaxed">
             "{{ result.transcript }}"
         </blockquote>
     </div>

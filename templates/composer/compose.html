@@ -54,7 +54,7 @@
     .acct-pill {
         display: flex; align-items: center; gap: 8px;
         min-height: 40px; padding: 4px 12px 4px 8px; border-radius: 9999px;
-        border: 1px solid var(--ink-300);
+        border: 1px solid var(--border-hover);
         background: var(--surface-0);
         box-shadow: var(--shadow-xs);
         cursor: pointer; user-select: none;
@@ -79,7 +79,7 @@
     .platform-icon {
         width: 26px; height: 26px; border-radius: 7px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 12px; font-weight: 700; color: white; flex-shrink: 0;
+        font-size: 13px; font-weight: 700; color: white; flex-shrink: 0;
     }
     .pi-facebook   { background: #1877F2; }
     .pi-instagram  { background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF); }
@@ -203,12 +203,12 @@
         width: 24px; height: 24px; border-radius: 50%;
         background: rgb(14 17 20 / .6); color: white;
         display: flex; align-items: center; justify-content: center;
-        font-size: 12px; cursor: pointer;
+        font-size: 13px; cursor: pointer;
         transition: background-color var(--dur-fast) ease;
         z-index: 2;
     }
     @media (max-width: 1023px) { .media-thumb .remove-btn { width: 44px; height: 44px; } }
-    .media-thumb .remove-btn:hover { background: var(--danger-500); }
+    .media-thumb .remove-btn:hover { background: var(--danger-500); color: var(--on-fill); }
     .media-thumb .remove-btn:focus-visible { outline-color: #fff; }
 
     /* Upload progress overlay */
@@ -227,7 +227,7 @@
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         gap: 2px; cursor: pointer; z-index: 3;
         background: rgb(14 17 20 / .55); color: white;
-        font-size: 12px; font-weight: 600;
+        font-size: 13px; font-weight: 600;
         border: none; border-radius: 10px;
     }
     .media-thumb .retry-btn:hover { background: rgb(14 17 20 / .7); }
@@ -260,7 +260,7 @@
     /* Toast notification */
     .toast-saved {
         position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-        background: var(--ink-900); color: white;
+        background: var(--surface-inverse); color: var(--text-on-inverse);
         padding: 10px 14px; border-radius: var(--radius-xl);
         font-size: 14px; font-weight: 500;
         box-shadow: var(--shadow-lg);
@@ -298,7 +298,7 @@
      @keydown.ctrl.s.prevent="saveDraft()">
 
     <!-- Page header -->
-    <div class="flex items-center gap-2 px-4 sm:px-6 py-2.5 bg-white border-b border-ink-200 flex-shrink-0">
+    <div class="flex items-center gap-2 px-4 sm:px-6 py-2.5 bg-surface border-b border-ink-200 flex-shrink-0">
         <button type="button" aria-label="Back" @click="if (document.referrer && document.referrer.startsWith(location.origin)) { history.back(); } else { location.href='{% url 'composer:create_landing' workspace_id=workspace.id %}'; }"
                 class="ui-btn ui-btn-icon -ml-2">
             <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -350,7 +350,7 @@
                            :aria-pressed="selectedAccounts.includes('{{ account.id }}') ? 'true' : 'false'"
                            @click="toggleAccount('{{ account.id }}')">
                         <span class="checkmark">
-                            <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            <svg class="w-3 h-3 text-on-fill" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                         </span>
                         <span class="relative flex-shrink-0">
                             {% if account.avatar_url %}
@@ -360,7 +360,7 @@
                                 {% include "partials/_platform_icon.html" with platform=account.platform size="sm" %}
                             </span>
                             {% endif %}
-                            <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full flex items-center justify-center">
+                            <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-surface rounded-full flex items-center justify-center">
                                 {% include "partials/_platform_icon.html" with platform=account.platform size="sm" %}
                             </span>
                         </span>
@@ -493,7 +493,7 @@
                                 </button>
                                 <div x-show="showSaveTemplate" x-cloak x-transition
                                      @click.outside="showSaveTemplate = false"
-                                     class="absolute z-50 mt-1 right-0 p-3 bg-white rounded-xl shadow-lg ring-1 ring-ink-200 w-72 max-w-[calc(100vw-2rem)]">
+                                     class="absolute z-50 mt-1 right-0 p-3 bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 w-72 max-w-[calc(100vw-2rem)]">
                                     <div x-data="{ tplName: '', tplDesc: '' }">
                                         <input type="text" x-model="tplName" placeholder="Template name…" aria-label="Template name"
                                                class="ui-input mb-2">
@@ -524,7 +524,7 @@
                             <div x-ref="templatePicker"
                                  x-show="showTemplatePicker" x-cloak x-transition
                                  @click.outside="showTemplatePicker = false"
-                                 class="absolute z-50 top-full mt-1 right-0 bg-white rounded-xl shadow-lg ring-1 ring-ink-200 w-80 max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto"
+                                 class="absolute z-50 top-full mt-1 right-0 bg-surface rounded-xl shadow-lg ring-1 ring-ink-200 w-80 max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto"
                                  hx-get="{% url 'composer:template_picker' workspace_id=workspace.id %}"
                                  hx-trigger="load-picker, templateSaved from:body, templateChanged from:body"
                                  hx-target="this"
@@ -592,7 +592,7 @@
                 <template x-for="accId in selectedAccounts" :key="'facebook-video-settings-' + accId">
                     <div x-show="charLimits[accId]?.platform === 'facebook' && hasSingleVideoAttached"
                          x-data="{ facebookPostType: platformExtras[accId]?.post_type || 'video' }"
-                         class="border border-ink-200 rounded-xl bg-white p-4 space-y-3">
+                         class="border border-ink-200 rounded-xl bg-surface p-4 space-y-3">
                         {% comment %}
                         Marks the panel as present in the submit even when no video is
                         attached, so a save can clear a stale Reel hint but a non-composer
@@ -632,7 +632,7 @@
                                  .catch(() => {})
                                  .finally(() => { boardsLoading = false; });
                          }"
-                         class="border border-ink-200 rounded-xl bg-white p-4 space-y-3">
+                         class="border border-ink-200 rounded-xl bg-surface p-4 space-y-3">
                         <div class="flex items-center gap-2">
                             <span class="platform-icon w-5 h-5 rounded-[5px] flex items-center justify-center"
                                   :class="'pi-' + (charLimits[accId]?.platform || '')"
@@ -763,7 +763,7 @@
                 <!-- YouTube settings (auto-visible when any YouTube account is selected) -->
                 <template x-for="accId in selectedAccounts" :key="'yt-settings-' + accId">
                     <div x-show="charLimits[accId]?.platform === 'youtube'"
-                         class="border border-ink-200 rounded-xl bg-white p-4 space-y-3">
+                         class="border border-ink-200 rounded-xl bg-surface p-4 space-y-3">
                         <div class="flex items-center gap-2">
                             <span class="platform-icon w-5 h-5 rounded-[5px] flex items-center justify-center"
                                   :class="'pi-' + (charLimits[accId]?.platform || '')"
@@ -779,7 +779,7 @@
                             <div class="flex items-stretch gap-3">
                                 {% include "composer/partials/choose_from_video_card.html" with mode="upload" %}
                                 <template x-if="!platformExtras[accId]?.thumbnail_url">
-                                    <div class="flex-1 max-w-[480px] rounded-lg border border-dashed border-ink-300 bg-ink-25 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-ink-300 hover:bg-brand-50 transition-colors min-h-[104px]"
+                                    <div class="flex-1 max-w-[480px] rounded-lg border border-dashed border-line-strong bg-ink-25 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-line-strong hover:bg-brand-50 transition-colors min-h-[104px]"
                                          @dragover.prevent="$el.classList.add('border-ink-400', 'bg-brand-50')"
                                          @dragleave="$el.classList.remove('border-ink-400', 'bg-brand-50')"
                                          @drop.prevent="handleThumbnailDrop(accId, $event); $el.classList.remove('border-ink-400', 'bg-brand-50')"
@@ -794,7 +794,7 @@
                                              class="h-[104px] w-auto max-w-[480px] object-cover rounded-lg border border-ink-200">
                                         <button aria-label="Remove thumbnail" type="button" @click="clearThumbnail(accId)"
                                                 title="Remove thumbnail"
-                                                class="absolute top-2 right-2 w-7 h-7 rounded-full bg-ink-950/60 hover:bg-danger-500 text-white flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-white">
+                                                class="absolute top-2 right-2 w-7 h-7 rounded-full bg-scrim/60 hover:bg-danger-500 text-white hover:text-on-fill flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-white">
                                             <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </div>
@@ -928,7 +928,7 @@
                                  .catch(() => { ttLoaded = true; })
                                  .finally(() => { ttLoading = false; });
                          }"
-                         class="border border-ink-200 rounded-xl bg-white p-4 space-y-3">
+                         class="border border-ink-200 rounded-xl bg-surface p-4 space-y-3">
                         <div class="flex items-center gap-2">
                             <span class="platform-icon w-5 h-5 rounded-[5px] flex items-center justify-center"
                                   :class="'pi-' + (charLimits[accId]?.platform || '')"
@@ -971,7 +971,7 @@
                                         @keydown.arrow-up.prevent="openMenu()"
                                         :aria-expanded="open"
                                         aria-haspopup="listbox"
-                                        class="w-full text-sm px-3 py-2 rounded-lg border border-ink-200 bg-white outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all flex items-center justify-between gap-2 text-left cursor-pointer">
+                                        class="w-full text-sm px-3 py-2 rounded-lg border border-ink-200 bg-surface outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 transition-all flex items-center justify-between gap-2 text-left cursor-pointer">
                                     <span :class="ttPrivacy ? 'text-ink-800' : 'text-ink-500'"
                                           x-text="ttPrivacy ? ttLabel(ttPrivacy) : 'Select who can view this post'"></span>
                                     <svg class="w-4 h-4 text-ink-400 flex-shrink-0 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
@@ -985,7 +985,7 @@
                                     @keydown.home.prevent="$refs.list.querySelector('button[role=option]:not([disabled])')?.focus()"
                                     @keydown.end.prevent="[...$refs.list.querySelectorAll('button[role=option]:not([disabled])')].pop()?.focus()"
                                     role="listbox"
-                                    class="absolute z-50 top-full mt-1 left-0 w-full bg-white rounded-lg shadow-lg ring-1 ring-ink-200 py-1">
+                                    class="absolute z-50 top-full mt-1 left-0 w-full bg-surface rounded-lg shadow-lg ring-1 ring-ink-200 py-1">
                                     <template x-for="lvl in ttOptions" :key="lvl">
                                         <li class="relative group">
                                             <button type="button"
@@ -1003,7 +1003,7 @@
                                             <!-- Required hover prompt for the disabled private option (mouse); the
                                                  always-visible note below the dropdown covers keyboard/SR users. -->
                                             <span x-show="ttBrandContent && lvl === 'SELF_ONLY'"
-                                                  class="pointer-events-none absolute left-3 -top-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity bg-ink-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-50 shadow">
+                                                  class="pointer-events-none absolute left-3 -top-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity bg-inverse text-on-inverse text-xs rounded px-2 py-1 whitespace-nowrap z-50 shadow">
                                                 Branded content visibility cannot be set to private.
                                             </span>
                                         </li>
@@ -1036,7 +1036,7 @@
                                              class="h-[104px] w-auto max-w-[480px] object-cover rounded-lg border border-ink-200">
                                         <button aria-label="Reset to default cover" type="button" @click="clearTiktokCover(accId)"
                                                 title="Reset to default cover"
-                                                class="absolute top-2 right-2 w-7 h-7 rounded-full bg-ink-950/60 hover:bg-danger-500 text-white flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-white">
+                                                class="absolute top-2 right-2 w-7 h-7 rounded-full bg-scrim/60 hover:bg-danger-500 text-white hover:text-on-fill flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-white">
                                             <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </div>
@@ -1047,7 +1047,7 @@
                                               x-text="'Cover at ' + formatTimecode((platformExtras[accId]?.video_cover_timestamp_ms || 0) / 1000)"></span>
                                         <button aria-label="Reset to default cover" type="button" @click="clearTiktokCover(accId)"
                                                 title="Reset to default cover"
-                                                class="absolute top-2 right-2 w-7 h-7 rounded-full bg-ink-950/60 hover:bg-danger-500 text-white flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-white">
+                                                class="absolute top-2 right-2 w-7 h-7 rounded-full bg-scrim/60 hover:bg-danger-500 text-white hover:text-on-fill flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-white">
                                             <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </div>
@@ -1169,7 +1169,7 @@
                     <template x-for="accId in selectedAccounts" :key="'toggle-' + accId">
                         <button type="button"
                                 class="inline-flex items-center gap-1 h-8 max-lg:h-11 px-3 text-xs font-semibold rounded-full transition-colors cursor-pointer"
-                                :class="overrides[accId] ? 'bg-ink-900 text-white' : 'bg-white text-ink-700 ring-1 ring-inset ring-ink-300 hover:bg-ink-25'"
+                                :class="overrides[accId] ? 'bg-ink-900 text-on-fill' : 'bg-surface text-ink-700 ring-1 ring-inset ring-line-strong hover:bg-ink-25'"
                                 :data-testid="'compose-override-toggle-' + accId"
                                 @click="overrides[accId] = !overrides[accId]"
                                 x-show="!overrides[accId]">
@@ -1181,7 +1181,7 @@
 
                 <!-- Platform-specific overrides -->
                 <template x-for="accId in selectedAccounts" :key="'override-' + accId">
-                    <div class="border border-ink-200 rounded-xl bg-white p-4"
+                    <div class="border border-ink-200 rounded-xl bg-surface p-4"
                          x-show="overrides[accId]" x-transition>
                         <div class="flex items-center gap-2 mb-3">
                             <span class="platform-icon w-5 h-5 rounded-[5px] flex items-center justify-center"
@@ -1290,7 +1290,7 @@
                     <input type="hidden" name="tags" :value="tags.join(',')">
 
                     <!-- Selected tags chips + trigger -->
-                    <div class="flex flex-wrap items-center gap-1.5 w-full min-h-9 max-lg:min-h-11 px-3 py-1.5 rounded-lg border border-ink-400 bg-white hover:border-ink-500 transition-[border-color,box-shadow] duration-150 cursor-pointer"
+                    <div class="flex flex-wrap items-center gap-1.5 w-full min-h-9 max-lg:min-h-11 px-3 py-1.5 rounded-lg border border-ink-400 bg-surface hover:border-ink-500 transition-[border-color,box-shadow] duration-150 cursor-pointer"
                          :class="tagDropdownOpen && '!border-brand-600 shadow-[0_0_0_1px_var(--focus-ring),0_0_0_4px_var(--primary-halo)]'"
                          @click="tagDropdownOpen = !tagDropdownOpen; if(tagDropdownOpen) $nextTick(() => { $refs.tagSearchInput.focus(); $refs.tagSearchInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); })">
                         <template x-for="(tag, idx) in tags" :key="tag">
@@ -1358,8 +1358,8 @@
                     <!-- Create Tag Modal (teleported to body to escape stacking contexts) -->
                     <template x-teleport="body">
                         <div x-show="showCreateTagModal" x-cloak class="fixed inset-0 z-[200] flex items-center justify-center" @keydown.escape.window="showCreateTagModal = false">
-                            <div class="fixed inset-0 bg-ink-950/35" @click="showCreateTagModal = false"></div>
-                            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6" @click.stop
+                            <div class="fixed inset-0 bg-scrim/35" @click="showCreateTagModal = false"></div>
+                            <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-[400px] mx-4 p-6" @click.stop
                                  x-trap.noscroll="showCreateTagModal" role="dialog" aria-modal="true" aria-labelledby="compose-create-tag-title">
                                 <h3 id="compose-create-tag-title" class="ui-modal-title mb-4">Create a tag</h3>
                                 <input type="text" x-ref="newTagNameInput" x-model="newTagName" aria-labelledby="compose-create-tag-title"
@@ -1454,7 +1454,7 @@
                     <!-- Mode selector (left) -->
                     <button type="button" id="publish-mode-btn"
                             :disabled="selectedAccounts.length === 0"
-                            class="inline-flex items-center gap-1.5 h-9 max-lg:h-11 pl-2.5 sm:pl-3 pr-2 text-sm font-semibold text-ink-900 bg-white rounded-l-lg hover:bg-ink-25 ring-1 ring-inset ring-ink-300 transition-colors duration-100 cursor-pointer disabled:bg-ink-50 disabled:hover:bg-ink-50 disabled:text-ink-500 disabled:ring-ink-200 disabled:cursor-not-allowed"
+                            class="inline-flex items-center gap-1.5 h-9 max-lg:h-11 pl-2.5 sm:pl-3 pr-2 text-sm font-semibold text-ink-900 bg-surface rounded-l-lg hover:bg-ink-25 ring-1 ring-inset ring-line-strong transition-colors duration-100 cursor-pointer disabled:bg-ink-50 disabled:hover:bg-ink-50 disabled:text-ink-500 disabled:ring-ink-200 disabled:cursor-not-allowed"
                             aria-haspopup="menu" aria-label="When to publish">
                         <svg id="publish-mode-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span id="publish-mode-label" class="hidden sm:inline">Next available</span>
@@ -1463,7 +1463,7 @@
                     <!-- Action button (right) -->
                     <button type="submit" id="publish-action-btn" name="action" value="add_to_queue"
                             :disabled="selectedAccounts.length === 0"
-                            class="inline-flex items-center gap-1.5 h-9 max-lg:h-11 px-3.5 sm:px-4 text-sm font-semibold text-white bg-brand-700 rounded-r-lg hover:bg-brand-800 active:bg-brand-900 shadow-[var(--shadow-button)] transition-colors duration-100 cursor-pointer disabled:bg-ink-100 disabled:hover:bg-ink-100 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed">
+                            class="inline-flex items-center gap-1.5 h-9 max-lg:h-11 px-3.5 sm:px-4 text-sm font-semibold text-on-fill bg-brand-700 rounded-r-lg hover:bg-brand-800 active:bg-brand-900 shadow-[var(--shadow-button)] transition-colors duration-100 cursor-pointer disabled:bg-ink-100 disabled:hover:bg-ink-100 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed">
                         <span id="publish-action-label">Add to queue</span>
                     </button>
 
@@ -1581,7 +1581,7 @@
           Outside #composer-form on purpose: the comment form and the review buttons are forms and
           hx-post buttons of their own.
         {% endcomment %}
-        <details id="composer-approval-panel" class="group flex-shrink-0 border-t border-ink-200 bg-white"{% if show_resubmit_button and latest_feedback %} open{% endif %}>
+        <details id="composer-approval-panel" class="group flex-shrink-0 border-t border-ink-200 bg-surface"{% if show_resubmit_button and latest_feedback %} open{% endif %}>
             <summary class="flex items-center gap-3 px-4 sm:px-6 py-2 min-h-11 cursor-pointer list-none hover:bg-ink-25 focus-visible:outline-offset-[-2px] [&::-webkit-details-marker]:hidden">
                 <span class="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium">
                     {% if post.status == 'pending_review' %}
@@ -1616,7 +1616,7 @@
                 <!-- Reviewer feedback to address (latest changes-requested / rejected comment) -->
                 {% if show_resubmit_button and latest_feedback %}
                 <div class="flex gap-3 p-4 rounded-xl mb-3 bg-ink-50 ring-1 ring-inset ring-ink-200">
-                    <span class="w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center text-xs font-semibold flex-shrink-0" aria-hidden="true">{{ latest_feedback.user.display_name|default:"?"|make_list|first|upper }}</span>
+                    <span class="w-7 h-7 rounded-full bg-ink-900 text-on-fill flex items-center justify-center text-xs font-semibold flex-shrink-0" aria-hidden="true">{{ latest_feedback.user.display_name|default:"?"|make_list|first|upper }}</span>
                     <div class="min-w-0">
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="text-[13px] font-semibold text-ink-900">{{ latest_feedback.user.display_name|default:"Reviewer" }}</span>
@@ -1741,8 +1741,8 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="absolute inset-0 bg-ink-950/35" @click="showMediaPicker = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[640px] mx-2 sm:mx-0 max-h-[85vh] sm:max-h-[70vh] overflow-hidden"
+        <div class="absolute inset-0 bg-scrim/35" @click="showMediaPicker = false"></div>
+        <div class="relative bg-surface rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[640px] mx-2 sm:mx-0 max-h-[85vh] sm:max-h-[70vh] overflow-hidden"
              x-trap.noscroll="showMediaPicker" role="dialog" aria-modal="true" aria-labelledby="compose-media-picker-title"
              data-testid="compose-media-picker"
              x-transition:enter="transition ease-out duration-200"
@@ -1778,8 +1778,8 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="absolute inset-0 bg-ink-950/35" @click="showThumbnailPicker = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[640px] mx-2 sm:mx-0 max-h-[85vh] sm:max-h-[70vh] overflow-hidden"
+        <div class="absolute inset-0 bg-scrim/35" @click="showThumbnailPicker = false"></div>
+        <div class="relative bg-surface rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[640px] mx-2 sm:mx-0 max-h-[85vh] sm:max-h-[70vh] overflow-hidden"
              x-trap.noscroll="showThumbnailPicker" role="dialog" aria-modal="true" aria-labelledby="compose-thumbnail-picker-title">
             <div class="px-4 sm:px-6 py-4 border-b border-ink-200 flex items-center justify-between">
                 <h2 id="compose-thumbnail-picker-title" class="text-h3 text-ink-950">Choose a thumbnail</h2>
@@ -1810,14 +1810,14 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="absolute inset-0 bg-ink-950/35" @click="closeUnsplashModal()"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[760px] mx-2 sm:mx-0 h-[640px] max-h-[85vh] flex flex-col overflow-hidden"
+        <div class="absolute inset-0 bg-scrim/35" @click="closeUnsplashModal()"></div>
+        <div class="relative bg-surface rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[760px] mx-2 sm:mx-0 h-[640px] max-h-[85vh] flex flex-col overflow-hidden"
              x-trap.noscroll="showUnsplashModal" role="dialog" aria-modal="true" aria-labelledby="compose-unsplash-title"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100">
             <div class="px-4 sm:px-6 py-4 border-b border-ink-200 flex items-center gap-3">
-                <span class="w-9 h-9 rounded-lg bg-ink-900 text-white flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                <span class="w-9 h-9 rounded-lg bg-ink-900 text-on-fill flex items-center justify-center flex-shrink-0" aria-hidden="true">
                     <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.5 6.75V0h9v6.75h-9zm9 3.75H24V24H0V10.5h7.5v6.75h9V10.5z"/></svg>
                 </span>
                 <div class="min-w-0">
@@ -1830,7 +1830,7 @@
                 </button>
             </div>
             <div class="px-4 sm:px-6 pt-4 space-y-3 flex-shrink-0">
-                <div class="flex items-center gap-2 rounded-xl border border-ink-400 bg-white hover:border-ink-500 focus-within:border-brand-600 focus-within:shadow-[0_0_0_1px_var(--focus-ring),0_0_0_4px_var(--primary-halo)] transition-[border-color,box-shadow] pl-3.5 pr-1 py-1">
+                <div class="flex items-center gap-2 rounded-xl border border-ink-400 bg-surface hover:border-ink-500 focus-within:border-brand-600 focus-within:shadow-[0_0_0_1px_var(--focus-ring),0_0_0_4px_var(--primary-halo)] transition-[border-color,box-shadow] pl-3.5 pr-1 py-1">
                     <svg class="w-4 h-4 text-ink-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     <input type="text" x-model="unsplashQuery" aria-label="Search Unsplash photos"
                            @keydown.enter.prevent="unsplashActiveChip = ''; searchUnsplash()"
@@ -1864,10 +1864,10 @@
                             <img :src="photo.thumb" :alt="photo.alt" loading="lazy"
                                  class="w-full block" :style="photo.color ? `background:${photo.color}` : ''">
                             <span class="absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
-                                  :class="unsplashSelected[photo.id] ? 'bg-brand-700 border-white' : 'bg-ink-950/30 border-white/90'">
-                                <svg x-show="unsplashSelected[photo.id]" class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                  :class="unsplashSelected[photo.id] ? 'bg-brand-700 border-white' : 'bg-scrim/30 border-white/90'">
+                                <svg x-show="unsplashSelected[photo.id]" class="w-3.5 h-3.5 text-on-fill" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                             </span>
-                            <span class="absolute inset-x-0 bottom-0 bg-ink-950/65 px-2 py-1 text-xs text-white truncate opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                            <span class="absolute inset-x-0 bottom-0 bg-scrim/65 px-2 py-1 text-xs text-white truncate opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                                   x-text="photo.photographer + ' / Unsplash'"></span>
                         </div>
                     </template>
@@ -1902,8 +1902,8 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="absolute inset-0 bg-ink-950/35" @click="closeFramePicker()"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[720px] mx-2 sm:mx-0 max-h-[90vh] flex flex-col overflow-hidden"
+        <div class="absolute inset-0 bg-scrim/35" @click="closeFramePicker()"></div>
+        <div class="relative bg-surface rounded-2xl shadow-xl w-[calc(100vw-1rem)] sm:w-[720px] mx-2 sm:mx-0 max-h-[90vh] flex flex-col overflow-hidden"
              x-trap.noscroll="showFramePicker" role="dialog" aria-modal="true" aria-labelledby="compose-frame-picker-title"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 scale-95"
@@ -1926,7 +1926,7 @@
                            muted playsinline preload="metadata"
                            @loadedmetadata="frameDuration = $el.duration"
                            @timeupdate="frameCurrentTime = $el.currentTime"></video>
-                    <span class="absolute top-3 right-3 px-2 py-1 rounded-md bg-ink-950/70 text-white text-xs font-mono tabular-nums"
+                    <span class="absolute top-3 right-3 px-2 py-1 rounded-md bg-scrim/70 text-white text-xs font-mono tabular-nums"
                           x-text="formatTimecode(frameCurrentTime) + ' / ' + formatTimecode(frameDuration)"></span>
                 </div>
                 <input type="range" min="0" :max="frameDuration || 0" step="0.04" aria-label="Video position"
@@ -1941,7 +1941,7 @@
                     <template x-for="(frame, idx) in filmstrip" :key="idx">
                         <button type="button"
                                 class="flex-shrink-0 rounded-md overflow-hidden border-2 transition-colors cursor-pointer"
-                                :class="Math.abs(frameCurrentTime - frame.time) < (frameDuration / 16) ? 'border-ink-900' : 'border-transparent hover:border-ink-300'"
+                                :class="Math.abs(frameCurrentTime - frame.time) < (frameDuration / 16) ? 'border-ink-900' : 'border-transparent hover:border-line-strong'"
                                 @click="frameCurrentTime = frame.time; if ($refs.frameVideo) $refs.frameVideo.currentTime = frame.time">
                             <img :src="frame.dataUrl" class="w-[76px] aspect-video object-cover block" :alt="'Frame at ' + formatTimecode(frame.time)">
                         </button>
@@ -1984,7 +1984,7 @@
 
     <!-- Error toast -->
     <div x-show="formError" x-cloak role="alert" aria-live="assertive"
-         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-3.5 py-3 rounded-xl bg-ink-900 text-white text-sm font-medium shadow-lg max-w-[min(420px,90vw)] whitespace-pre-line"
+         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-3.5 py-3 rounded-xl bg-inverse text-on-inverse text-sm font-medium shadow-lg max-w-[min(420px,90vw)] whitespace-pre-line"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0 translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
@@ -1994,7 +1994,7 @@
         <span class="flex items-start gap-2.5">
             <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-danger-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             <span x-text="formError"></span>
-            <button type="button" @click="formError = ''" class="ml-2 -my-1 w-7 h-7 rounded-md flex-shrink-0 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 focus-visible:outline-white cursor-pointer max-lg:w-11 max-lg:h-11" aria-label="Dismiss error">&times;</button>
+            <button type="button" @click="formError = ''" class="ml-2 -my-1 w-7 h-7 rounded-md flex-shrink-0 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 focus-visible:outline-on-inverse cursor-pointer max-lg:w-11 max-lg:h-11" aria-label="Dismiss error">&times;</button>
         </span>
     </div>
 
@@ -2004,7 +2004,7 @@
          @open-delete-modal.window="showDeleteModal = true">
         <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center"
              @keydown.escape.window="showDeleteModal = false">
-            <div class="fixed inset-0 bg-ink-950/35" @click="showDeleteModal = false"
+            <div class="fixed inset-0 bg-scrim/35" @click="showDeleteModal = false"
                  x-show="showDeleteModal"
                  x-transition:enter="transition ease-out duration-150"
                  x-transition:enter-start="opacity-0"
@@ -2012,7 +2012,7 @@
                  x-transition:leave="transition ease-in duration-100"
                  x-transition:leave-start="opacity-100"
                  x-transition:leave-end="opacity-0"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl p-6 w-full max-w-[400px] mx-4"
+            <div class="relative bg-surface rounded-2xl shadow-xl p-6 w-full max-w-[400px] mx-4"
                  x-show="showDeleteModal"
                  x-trap.noscroll="showDeleteModal" role="dialog" aria-modal="true" aria-labelledby="compose-delete-title"
                  x-transition:enter="transition ease-out duration-150"

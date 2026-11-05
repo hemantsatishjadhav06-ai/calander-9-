@@ -24,7 +24,7 @@
     {% endif %}
 
     <!-- Type tag: neutral on every type; the word says what it is -->
-    <span class="ml-type-badge absolute top-2 left-2 bg-white/95 text-ink-700 ring-1 ring-inset ring-ink-950/10">
+    <span class="ml-type-badge absolute top-2 left-2 bg-surface/95 text-ink-700 ring-1 ring-inset ring-ink-950/10">
       {{ asset.get_media_type_display }}
     </span>
 
@@ -49,7 +49,7 @@
             @click="menuOpen = !menuOpen"
             aria-haspopup="true" :aria-expanded="menuOpen"
             @click.outside="menuOpen = false"
-            class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer bg-white/95 text-ink-700 shadow-sm ring-1 ring-ink-950/10 hover:text-ink-950 before:absolute before:-inset-2 before:content-['']"
+            class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer bg-surface/95 text-ink-700 shadow-sm ring-1 ring-ink-950/10 hover:text-ink-950 before:absolute before:-inset-2 before:content-['']"
             aria-label="Asset actions">
       <svg aria-hidden="true" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
         <path d="M10 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/>

@@ -4,7 +4,9 @@
   "scripts": {
     "heroku-postbuild": "cd theme/static_src && npm ci && npm run build",
     "test:ui": "node --test tests/js/*.test.cjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "pairs": "playwright test -c playwright.pairs.config.ts",
+    "pairs:diff": "PAIR_SIDE=diff playwright test -c playwright.pairs.config.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
