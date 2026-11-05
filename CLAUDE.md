@@ -304,6 +304,20 @@ uncertain send or delivery is held for a person, never replayed.
   **Health** includes the Set up checklist and follows the same owner-only rule:
   the exact names to set (environment variables, providers) show to owners only,
   and everyone else reads "Ask your owner."
+- **New post** is how a post starts: one button on Home and Calendar, for
+  whoever may start posts (`create_posts` and not a plain client:
+  `apps/studio/views.can_start_posts`), opens the New post sheet (a bottom
+  sheet on a phone, a drawer from 1024px) with **Ask the team** (posts to
+  `studio:create`), **Write it myself** (**Open the editor**, the composer)
+  and **Save it as an idea instead**. There is no New menu; Ideas, Drafts,
+  Import from CSV, Templates and Categories are the sheet's foot links. Home's
+  conversation composer still talks to the team (`studio:thread_start`).
+- **Keyboard shortcuts** (from 1024px, `static/js/shortcuts.js`): `n` New post,
+  `/` Go to, `?` the list of keys, each ignored in a field, in a dialog and
+  with a modifier. The list's switch, **Single-key shortcuts**, turns the
+  single keys off on this device (WCAG 2.1.4); Ctrl/Cmd-/ opens the list from
+  anywhere, a field included, so they can always be turned back on. A new
+  single key is added to that list and obeys the switch.
 - One sentence per screen on what to do. Status in words: "Waiting for you",
   "The team is working", "Paused: autopilot is off", "Needs your review".
 - No environment-variable names, worker names, token counts, contrast ratios,
@@ -431,9 +445,10 @@ Inbound — a new command or button:
   fake team, HTTP mocks, background worker and named fixture/probe endpoints.
   These endpoints are never mounted by the production URL configuration.
 - `tests/e2e/support/`, `self/`, `golden/`, `screens/` — Playwright fixtures,
-  network and axe checks, harness self-checks, the twelve golden paths and the
+  network and axe checks, harness self-checks, the twelve golden paths, the
   Phase 2 screens (navigation, Approvals, Settings, Activity, switches, the
-  public site) on three devices.
+  public site) and Phase 3's (the New post sheet, Home and Calendar in dark)
+  on three devices.
 - `tests/e2e/visual/` and `tests/e2e/__screenshots__/` — the Phase 3 visual
   specs and their baselines (`support/visual.ts` `snap`, `support/schemes.ts`
   `forSchemes`), compared in CI only.

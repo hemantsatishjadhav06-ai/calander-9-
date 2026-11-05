@@ -91,6 +91,32 @@ month's allowance of a workspace the test made (it refuses A and B), and `new_po
 (`?workspace_id&since=`) reads the conversations, messages by kind, chat jobs, briefs, ideas and tags
 made since a moment; both are pinned by `tests/test_e2e_steps_p3.py`. `self/phone-bar-overlap` holds
 the floating New post button's place and `self/reduced-motion` the sheet's still entrance.
+`screens/dark-shell.spec.ts` (dark, three projects) looks at Home and Calendar declared dark-ready:
+axe, the dark canvas and the selection bars on the inverse surface. `self/shortcuts.spec.ts`
+(desktop-chrome only, said in its skip: phones have no keys) runs `n`, `/`, `?`, the list and its
+switch; `self/sheet-late-frames.spec.ts` holds every animation frame back until after the timers
+already due, as WebKit orders them, and the sheet must still put the focus in each mode's first field;
+`self/emoji-picker` and `self/phone-menu-focus` reach the idea form through the sheet.
+
+**Screen 1's hooks.** The button: `new-post-open` (Home and Calendar, for whoever may start posts;
+`aria-controls="new-post-sheet"`, `aria-expanded` kept current). The sheet: `new-post-sheet` (the
+dialog), `new-post-close`, `new-post-mode-team`, `new-post-mode-self` (`aria-pressed`); Ask the team's
+`new-post-team` (the form), `new-post-team-idea`, `new-post-team-channels`, `new-post-team-send`,
+`new-post-team-error` (`role="alert"`, empty until a refusal) and `new-post-save-idea`; Write it
+myself's `new-post-self-open`; the foot links `new-post-link-ideas`, `-drafts`, `-csv`, and
+`-templates` and `-categories` with the `templates` switch. The idea form keeps every `idea-*` id
+(`idea-title`, `idea-save`, `idea-close`, `idea-emoji-toggle|search|option` …). The sheet's sticky
+parts carry `data-sheet-head` and `data-sheet-foot` (and its grabber `data-sheet-grabber`): its script
+reads them to keep a focused control clear of both, and a spec may too. The shortcut list:
+`shortcuts-dialog`, `shortcuts-close`, `shortcuts-toggle` (the switch), and its rows
+`shortcuts-new-post`, `shortcuts-go-to`, `shortcuts-list`. Open the sheet as a person does: a click
+on `new-post-open`, or on desktop a Calendar cell's "+" (`calendar-week-cell-<date>-<HHMM>`, hovered:
+it sends `new-post:open` with the cell's date and time); only a spec of the route itself dispatches
+`new-post:open` by hand (`self/phone-menu-focus`). Wait for the mode's first field to be focused before
+typing: the sheet places the focus once the panel shows, a frame or two late on WebKit. **Retired with the New menu (T19):** `sidebar-new-toggle`, `sidebar-new-idea`,
+`sidebar-new-ideas`, `sidebar-new-csv`, `sidebar-new-templates` and `sidebar-new-categories`; no
+template contains `sidebar-new-` (`apps/common/tests/test_navigation_render.py` fails if one does), and
+no golden spec used them.
 
 Phase 1 also checks the manager's approval and the client's request for changes in
 `golden/05-06-role-variants.spec.ts`, and foreign IDs in form bodies and query strings in

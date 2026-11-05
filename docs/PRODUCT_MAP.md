@@ -39,10 +39,10 @@ Roles and permissions: `apps/members` (`WorkspaceMembership`,
 from the counts `apps/common/context_processors.sidebar_context` already has
 and the workspace's switches; `templates/base.html` draws it.
 
-- **Sidebar**: **New** at the top, then six places: Home · Approvals ·
-  Calendar · Inbox · Analytics · Activity. Analytics shows while analytics is
-  on for at least one platform (`AnalyticsPlatformConfig`, site-wide); **Blog**
-  is a seventh place only when the workspace's `blog` switch is on. **Settings**
+- **Sidebar**: six places: Home · Approvals · Calendar · Inbox · Analytics ·
+  Activity. Analytics shows while analytics is on for at least one platform
+  (`AnalyticsPlatformConfig`, site-wide); **Blog** is a seventh place only
+  when the workspace's `blog` switch is on. **Settings**
   is the gear at the bottom. Approvals carries the count of posts waiting,
   Inbox the unread count. There is no *More*. A place shows only to someone
   its screen lets in (the checks Go to uses: Inbox needs `use_inbox`, Analytics
@@ -61,19 +61,56 @@ and the workspace's switches; `templates/base.html` draws it.
   client admin, social accounts, notification preferences, the workspace and
   approval settings). The composer, Drafts, Ideas, Media and your account light
   none.
-- **New** (a menu): Post (the composer), Idea (the idea dialog), then Ideas
-  (`composer:create_landing`), Import from CSV (`composer:csv_upload`), and
-  Templates (`composer:template_list`) and Categories
-  (`composer:category_list`) only with the `templates` switch.
+- **New post** (Phase 3, screen 1): there is no New menu. Home and Calendar
+  carry one **New post** button for whoever may start posts (`create_posts`
+  and not a plain client: `apps/studio/views.can_start_posts`, the rule
+  `studio:create` enforces); a viewer and a plain client see none. On a phone
+  it floats above the phone bar; from 1024px it sits at the right of the page
+  header. It, the `n` key and `#new-post` open the **New post sheet**: a
+  bottom sheet on a phone, a 480px drawer on the right from 1024px, one
+  labelled dialog with three ways to start:
+  - **Ask the team** (the default): your idea, the channels and, under
+    *More*, goal, direction, picture and *Keep the brand look*. **Send** posts
+    to `studio:create` (its guards unchanged: rate limit, set up, the month's
+    allowance, then the idea saved and started) and lands on the idea's own
+    thread, where your manager replies with what we're making; nothing is
+    made until a person goes ahead. A refusal (not set up, the allowance used
+    up, a form error, the rate limit) shows in the sheet's own error line,
+    and the words typed stay.
+  - **Write it myself**: **Open the editor** (`composer:compose`); opened
+    from a Calendar cell it carries that cell's date, time and account.
+    *Start from a template* with the `templates` switch.
+  - **Save it as an idea instead**: the idea form (`composer:idea_create`;
+    media through `composer:idea_upload_media`, tags through
+    `composer:tag_create` and only with the `templates` switch).
+  - At its foot: Ideas (`composer:create_landing`), Drafts (the Calendar's
+    Drafts tab, `calendar:calendar?mode=list&tab=drafts`), Import from CSV
+    (`composer:csv_upload`), and Templates (`composer:template_list`) and
+    Categories (`composer:category_list`) only with the `templates` switch.
+
+  Escape, Close and the scrim close it and give the focus back; what was
+  typed stays until the page goes. Code: `templates/components/new_post_sheet.html`,
+  `templates/studio/partials/new_post_team.html`, `new_post_self.html`,
+  `templates/composer/partials/new_post_idea.html`,
+  `templates/components/primary_action.html`, `static/js/new-post-sheet.js`.
+- **Keyboard shortcuts** (from 1024px, `static/js/shortcuts.js`): `n` New
+  post (the sheet on Home and Calendar; elsewhere it goes to Home's
+  `#new-post`; only for whoever may start posts), `/` Go to, `?` the list of
+  keys. They are ignored while typing in a field, in an open dialog, with
+  Ctrl, Alt or Cmd, and on a phone. The list (`?`, or Ctrl/Cmd-/ from
+  anywhere, a field included) has the switch **Single-key shortcuts**, which
+  turns `n`, `/` and `?` off on this device; Ctrl/Cmd-/ still opens the list
+  so they can be turned back on.
 - **Sidebar header**: the workspace switcher (its menu opens other workspaces
   and Workspace settings, which lands on Settings → Brand), **Go to** and the
   **bell**.
 - **Bell**: the unread count; opens the notifications drawer, a labelled dialog
   that loads `notifications:drawer` each time it opens. Escape closes it and
   the focus goes back to the bell. `/notifications/` stays the full history.
-- **Go to** (the command palette): the Go to button or Ctrl/Cmd-K opens a
-  labelled dialog. Typing filters the places this person may open (the checks
-  their pages make: Inbox needs `use_inbox`, Analytics `view_analytics`),
+- **Go to** (the command palette): the Go to button, Ctrl/Cmd-K or `/` opens
+  a labelled dialog (not while the New post sheet is open). Typing filters the
+  places this person may open (the checks their pages make: Inbox needs
+  `use_inbox`, Analytics `view_analytics`),
   Settings and the Settings tabs they may use. The arrow keys or Tab move,
   Enter opens, Escape closes and the focus goes back. It offers the sidebar's
   places: a plain client none of the agency's screens, with Approvals as the
@@ -111,7 +148,8 @@ code is (views, templates, services).
 ### Home — `studio:index` · `/studio/`
 
 - **Who:** every member. The first page staff see.
-- **What:** a greeting and one status line (set-up, "Autopilot on · 5 a week",
+- **What:** the **New post** button (for whoever may start posts) and a
+  greeting and one status line (set-up, "Autopilot on · 5 a week",
   whether Telegram is listening and you are paired); the **Today** card, built
   from plain queries: *Waiting for you* (with Review and Approve buttons),
   *Going out today*, *Done since yesterday*, *Needs your review* (paused,
@@ -124,12 +162,15 @@ code is (views, templates, services).
   **Routines** (the next three, for staff, with *All routines*, which opens
   Activity's routines section); **Recent work**; the onboarding checklist card
   while set-up is incomplete.
-- **Next:** a message in the composer becomes a `chat` job that the account
-  manager answers in the worker. An idea typed as a new post (`studio:create`)
-  becomes its own thread. Review opens the post page; Approve goes through the
-  approval gate.
+- **Next:** a message typed in the conversation's composer posts to
+  `studio:thread_start` (the general thread, kind question) and becomes a
+  `chat` job that the account manager answers in the worker. An idea sent
+  from the New post sheet's *Ask the team* posts to `studio:create`, becomes
+  its own thread, and the person lands on it. Review opens the post page;
+  Approve goes through the approval gate.
 - **Code:** `apps/studio/views.py` (`index`, `_index_context`, `create`,
-  `_journeys`), `apps/studio/dashboard.py` (`today`, `needs_review`, `tabs`),
+  `can_start_posts`, `_journeys`), `apps/studio/views_chat.thread_start`,
+  `apps/studio/dashboard.py` (`today`, `needs_review`, `tabs`),
   `apps/studio/views_setup.status_line`, `apps/studio/chat.py` (threads),
   `apps/studio/customer_workflow.py` (ideas). Templates
   `templates/studio/index.html`, `templates/studio/partials/thread*.html`,
@@ -172,9 +213,12 @@ code is (views, templates, services).
 ### Calendar — `calendar:calendar` · `/calendar/`
 
 - **Who:** every member.
-- **What:** month, week and day grids; the list view's tabs Drafts, Queue,
-  Approvals, Sent; drag to reschedule (an approver dragging is approving the
-  new time); calendar events. The header links Drafts (`composer:drafts_list`),
+- **What:** the **New post** button (for whoever may start posts); month,
+  week and day grids, where a cell's "+" opens the New post sheet in *Write
+  it myself* with that cell's date and time (without JavaScript it still
+  opens the composer); the list view's tabs Drafts, Queue, Approvals, Sent;
+  drag to reschedule (an approver dragging is approving the new time);
+  calendar events. The header links Drafts (`composer:drafts_list`),
   **Queues** (`calendar:queue_list`, with the `queues` switch), **Posting
   schedule** (`calendar:posting_slots`), which the team's scheduler reads to
   propose times, and Media (`media_library:index`).
@@ -429,9 +473,9 @@ The hand-driven composer and the library. The team's posts land in the same
 `Post` and `PlatformPost` rows and the same approval queue.
 
 - Ideas (`composer:create_landing`) and Import from CSV (`composer:csv_upload`):
-  in the New menu.
+  at the foot of the New post sheet (Home and Calendar).
 - Templates (`composer:template_list`) and Categories (`composer:category_list`):
-  in the New menu with the `templates` switch.
+  at the foot of the New post sheet with the `templates` switch.
 - Drafts (`composer:drafts_list`), Queues (`calendar:queue_list`, with the
   `queues` switch), Posting schedule (`calendar:posting_slots`) and Media
   (`media_library:index`, `apps/media_library`): in the Calendar's header.
@@ -523,7 +567,7 @@ working, and nothing scheduled, queued or planned stops.
 |---|---|---|---|
 | `blog` | on when the workspace has an enabled blog website | the Blog place and its Go to entry; the autopilot form's articles per month and website fields (the stored values are kept) | the blog pages, articles, their publishing |
 | `queues` | off | Queues in the Calendar's header; the composer's queue order | Next available, the posting schedule, recurring posts, the queue pages |
-| `templates` | off | Templates and Categories in the New menu; the composer's Use template, Save as template and tag picker (a post's tags are kept); the Ideas page's Templates tab, tag filter and tag pickers; the tag filter on the Calendar list and Approvals | Import from CSV, the Templates and Categories pages |
+| `templates` | off | Templates and Categories at the foot of the New post sheet, *Start from a template* in *Write it myself* and the idea form's tags; the composer's Use template, Save as template and tag picker (a post's tags are kept); the Ideas page's Templates tab, tag filter and tag pickers; the tag filter on the Calendar list and Approvals | Import from CSV, the Templates and Categories pages |
 | `extra_providers` | off | Bluesky, Mastodon, DEV.to, Threads and TikTok on the connect screen and the client connection page, unless the workspace already has an account there; their forms refuse a new connection in words | reconnect, the OAuth callbacks, accounts already connected |
 | `advanced_settings` | off | Verified facts, Creative memory and Outcomes in Settings → Advanced | their pages, and the links to Verified facts from onboarding and the readiness line |
 
@@ -571,9 +615,11 @@ the three pages and the legal pages.
 
 ### An idea becomes a post
 
-1. **Idea.** A staff member types on Home (`studio:create` →
-   `customer_workflow.save_idea` + `start_idea`) or in a paired Telegram chat
-   (`apps/telegram/conversations.handle_message`). Either way the words become
+1. **Idea.** A staff member sends it from the New post sheet's *Ask the
+   team* on Home or Calendar (`studio:create` →
+   `customer_workflow.save_idea` + `start_idea`; past the daily reply cap the
+   idea is saved, no job starts and the person is told why), or types it in a
+   paired Telegram chat (`apps/telegram/conversations.handle_message`). Either way the words become
    a `Message` in a `Conversation` and a `chat` job
    (`apps/studio/chat.post_message`, kind `create`). Nothing is spliced into
    the person's words; guidance travels as job input.
