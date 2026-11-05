@@ -3,31 +3,207 @@
 One entry per phase of [`docs/BETA_PLAN.md`](../BETA_PLAN.md): the date, what changed, and what the
 phase gate (section 6) said. Newest first.
 
-## In progress — Phase 3 · Screen 1: New post sheet
+## 5 Nov 2026 — Phase 3 · Screen 1 — New post sheet
 
-Plan [`phase-3.md`](phase-3.md) Part B (T14–T25); T25's gate entry takes this one's place.
+Spec [`03-rebuild-screens.md`](03-rebuild-screens.md) ("P0 — Screen 1"), plan [`phase-3.md`](phase-3.md)
+(Part B, T14–T25), shaping notes [`screen-1-new-post-notes.md`](screen-1-new-post-notes.md). PR #26.
+Gate evidence, waiting for the owner's sign-off on the pair.
 
-- *Lighthouse measures the sheet (T23).* The shell's New menu left with T19, so the measured inputs
-  (`tests/lighthouse/targets.mjs`) no longer press `sidebar-new-*`: on this branch the old inputs
-  failed the runner's first Home run (`locator.click` timed out waiting for `sidebar-new-toggle`).
-  Home (after the thread typing) and Calendar (after the timezone filter and the mode switch) now
-  press New post (`new-post-open`, floating on a phone), wait for `new-post-sheet`, type in *Ask the
-  team*, press *Save it as an idea instead*, and measure the emoji picker's first opening, a search, a
-  choice and *Back to New post*. Approvals has no trigger and measures its filter and details only.
-  `run.mjs` is unchanged: T11 had already moved its New-menu lines (`:134-142` on `045978b`) here.
-- Local C9, budgets as configured, three alternating rounds against main `045978b` on its own server
-  and database (this machine misses the lab INP budget on main too, so it is compared with main, not
-  the budgets). Median of the rounds' medians, this branch against main: Home 0.92 / 0.91, LCP 2,172
-  / 2,157 ms, CLS 0.061 / 0.078, lab INP 336 (272–360) / 248 (240–256) ms; Approvals 0.89 / 0.91,
-  2,072 / 2,085 ms, 0.011 / 0.011, 112 (96–120) / 240 (224–288) ms; Calendar 0.89 / 0.88, 1,383 /
-  1,388 ms, 0.007 / 0.007, 304 (256–312) / 224 (192–256) ms. gzip JavaScript 79,959 / 70,520,
-  63,848 / 62,623 and 89,646 / 80,347 bytes. Every interaction completed on all three targets in
-  every run; the runs that missed a budget missed lab INP or performance, as main's did. Home's one
-  layout shift is its main column, as on main; neither the floating button nor the sheet shifts.
-  The slowest input on Home and Calendar, on both sides, is the emoji picker's first opening (replays
-  at 4× slowdown: Home 192–248 ms against main's 168–224, Calendar 288–312 against 224–264); the
-  sheet's opening takes 96–152 ms on Home, where main's New menu and New idea took 200–224. The
-  Lighthouse CI job and C12 at T25 give the numbers the gate records.
+**What changed.** One way to start a post, on Home and Calendar.
+
+- *The button (T16).* **New post** (`components/primary_action.html`, `new-post-open`) on Home and
+  Calendar for whoever may start posts (`create_posts` and not a plain client:
+  `apps/studio/views.can_start_posts`, the rule `studio:create` already enforced). A viewer and a plain
+  client see none, where the old New menu showed them links that answered 403. Below 1024 px it floats
+  16 px from the right above the phone bar; from 1024 px it sits at the right of the page header.
+  `n` (from 1024 px) and `#new-post` open the sheet too.
+- *The sheet (T15–T18).* A bottom sheet on a phone and a 480 px drawer from 1024 px: one labelled,
+  trapped dialog with **Ask the team** (the default: the idea, the channels and, under *More*, goal,
+  direction, picture and *Keep the brand look*), **Write it myself** (**Open the editor**, carrying a
+  Calendar cell's date, time and account) and **Save it as an idea instead** (the old idea dialog's
+  form; tags only with the `templates` switch), and foot links to Ideas, Drafts, Import from CSV, and
+  Templates and Categories with their switch. *Send* posts to `studio:create`, whose guards are
+  unchanged; from the sheet it answers 204 with `HX-Redirect` to the idea's thread, or 400 (429 past
+  the rate limit) with the refusal's sentence alone, written into the sheet's error line with the
+  words kept. Nothing is made before *Go ahead*. Over budget the sheet says "This month's allowance for
+  the team is used up. An owner can raise it in Settings → Autopilot."; `budget.over_budget_message`
+  is unchanged for its other callers. Without HTMX the view behaves as before.
+- *The New menu left the shell (T19)*, with its idea and tag dialogs and their scripts; the two
+  queries `sidebar_context` ran on every request for them moved to Home's and Calendar's context.
+- *Keyboard (T20).* `n`, `/` (Go to) and `?` (the list) from 1024 px, ignored while typing, in a
+  dialog or with a modifier; the list's switch, **Single-key shortcuts**, turns them off on this
+  device; Ctrl/Cmd-/ opens the list from anywhere.
+- *Dark (T22).* Home and Calendar are declared dark-ready: their raw colours became tokens with light
+  unchanged, and the selected filter chip is ink-900 with on-fill words.
+- *Measured, photographed, documented (T23–T25).* Lighthouse presses New post on Home and Calendar;
+  the visual spec photographs the button and the sheet in each mode; `DESIGN_SYSTEM.md` §10.9 and §11,
+  `PRODUCT_MAP.md`, `CLAUDE.md` and `tests/e2e/README.md` describe the sheet, the button and the keys
+  (`ab8fd47`).
+- *Gated (T25, `420c82e`).* `SCREENS["new_post"].gated` is true, so the spacing, one-primary,
+  inline-confirm and motion guards read the sheet's tree. The spacing, inline-confirm and motion
+  guards found nothing in it. The one-primary check runs within the screen's scope (below). No
+  template changed at the gate, so nothing photographed moves.
+
+**Decisions taken by default** (each the plan's or the notes' default; the owner may overrule):
+
+- *One primary, option (a)* of the plan's "Open before T25" note. `apps/common/tests/test_one_primary.py`
+  gains a per-screen scope: `LEFT_TO_LATER` names, once, what other screens own on a gated screen's
+  pages, each with its page and the screen whose gate counts it: Home's `thread-composer-send`
+  (screen 2 tints it), Calendar's *Add event* (calendar mode) and its `bulk-confirm` dialog (screen 4),
+  and the shell's `create-ws` dialog (owners; its *Create* sits outside a decision bar). The check
+  leaves exactly those out and counts everything else, so the sheet's three panels, its tag dialog,
+  the button's place and anything new on the two pages are checked. Red first: with `gated = True`
+  alone the test failed for the note's reasons for owner, manager and editor. New tests prove that on
+  the real pages a second primary in the sheet's bar, the button out of the header slot, an unnamed
+  primary, or `thread-composer-send` on Calendar still fail, and that every entry is owned by a screen
+  not yet gated (or the shell) and still found on the pages. The shell's dialog has no screen of its
+  own in the plan: it is set aside for screen 1 only, so the next gate meets it again unless it has
+  moved into its place first. **Please confirm**, or choose option (b).
+- *The help line under the fields* ("Your manager replies with what we're making. Nothing is made
+  until you go ahead."; notes, open decision 10). On a phone it is below the fold until the person
+  scrolls.
+- *The selected filter chip ink-900 with on-fill words* (T22): 14.6:1 on a dark card, light unchanged.
+- Still the owner's, defaults standing: the grabber as a cue without a drag (notes 1), *Ask the team*
+  with no connected account can only fail (4), `92vh` rather than `dvh` with the iOS keyboard (7).
+
+**D5's toast rule.** D5 asks that the button and a toast never cover each other. The shell lifts the
+toast host above the button with a body class (`has-fab`: `calc(9rem + env(safe-area-inset-bottom))`
+on phones), as it already lifted toasts above the selection bars, so the toast rises above the button
+rather than the reverse, with no script measuring heights; the button hides under a selection bar.
+The outcome is the one D5 requires. **F4's browser case is done:** `tests/e2e/self/phone-bar-overlap.spec.ts`
+(T21) holds the button above the phone bar on phones and in the header on desktop, on Home and
+Calendar, an error toast and an approval toast above it, and the button hidden while posts are
+selected in Calendar's list; green on three projects below.
+
+**Audits** (T25a: `impeccable` audit and critique, `design-is`; 390 and 1440 px, both schemes; one
+context, since this workflow step had no sub-agents, which the report says). Scores: `impeccable`
+audit 13/20 before the fixes and 14/20 after, critique 29/40, `design-is` 21/30 (verdict REFINE: the
+bones are right; fix the phone geometry, the slot sentence and the rough states). The detector found
+nothing (in its degraded regex mode). Must-fix, both fixed red first:
+
+- M1 (`e295ffd`). After a refused *Send* or *Save idea* the keyboard focus fell to `<body>`, outside the
+  modal dialog (WCAG 2.4.3). The focus now goes back to the button that was pressed. Red: the new case
+  in `screens/new-post.spec.ts` failed on all three projects ("the focus is back on Send … Received:
+  inactive").
+- M2 (`1574d80`). Tab moved the focus to controls hidden under the sheet's sticky header or decision
+  bar (*Goal* and *Keep the brand look* at 390 × 664, *Direction* on Pixel 7, *Picture* in the drawer
+  at 1280 × 720, the channels and foot links at 844 × 390; WCAG 2.2 SC 2.4.11). The sheet keeps its
+  scroll padding equal to the two sticky parts and scrolls a focused control clear of them; no class
+  or visual change. Red: the new case failed on all three projects.
+
+Should and nits, for the owner and later screens (none fixed: each changes visuals, copy or shared
+parts): S1 the phone sheet's height follows the mode, so *Write it myself* moves the mode switch 145 px
+under the finger; S2 the sticky header and bar take 45 % of a phone sheet (71 % held sideways); S3
+from a Calendar cell, *Write it myself* does not say which slot the editor will carry; S4 the dark
+phone sheet has no top hairline; S5 the emoji picker's first opening is the slowest input on Home and
+Calendar (within noise of main locally, under budget in CI); S6 two sentences at 14 px where running
+text takes the body token; S7 "Security token missing" and a reasonless save error; S8 no count near
+the 2,000-character limit; S9 Tab reaches the bar before the foot links above it; S10 (shared) the
+selected segment reads pressed in dark; S11 (shell) axe's moderate `region` and `landmark-unique`.
+Nits N1–N6: the bar's ghost buttons start 12 px in, *Ideas* and *Drafts* under 44 px wide on touch,
+the drawer's foot links far below the help line, the idea title's browser bubble, two ways to create a
+tag, *Send* could name whom it goes to.
+
+**CI failures found and fixed on the way.**
+
+- `e613d4a`: CI's pytest failed `test_reset_rate_limits_clears_a_views_counter`: django-ratelimit counts
+  in fixed one-minute windows, so a burst straddling a window's end let the eleventh post through. The
+  test holds the window still. The full suite met the same cause locally at this gate in
+  `apps/blog/tests/test_seo_pages.py::test_the_check_up_button_is_rate_limited` (302 where 403 was due),
+  fixed the same way, red first (`e7f130f`).
+- `8f04b4f`, `10b1976`: CI's desktop shard failed two shortcut cases. Alpine's focus plugin starts
+  `x-trap`'s trap 15 ms after the list opens and the list relied on it for its focus, so a key pressed
+  in that window was lost; worse, a list closed inside it let go of a trap not yet started, the plugin
+  then started it on the closed list and Tab moved nowhere on the page (a keyboard trap, WCAG 2.1.2).
+  The list places its own focus and holds the trap until the plugin has started it, behind Alpine's
+  flush (the second commit, after an independent review found an ordering the first missed).
+- `f176792`: CI's iPhone 13 (WebKit) shard put the focus on *Close* after a switch of mode: Alpine
+  shows a panel on the next animation frame and WebKit runs the focus timer first. The sheet waits a
+  frame at a time until the mode's panel shows; `self/sheet-late-frames.spec.ts` reproduces WebKit's
+  order on Chromium. `ea83b3b`'s hold, which answered a cause that was not there, was removed.
+
+**Gate G** (code at `e7f130f`; the browser run on `420c82e`, whose application code is the same: the
+commits after it change only the by-hand pairs runner, `tests/e2e/README.md` and one pytest).
+
+1. *390 px first.* Shaped at 390 px first (T14's notes), then the 480 px drawer at 1440 px; the pair
+   is at 390 and 1440.
+2. *Light and dark.* Home and Calendar are in `screens.DARK_READY`; the screen's axe and visual cases
+   run in both schemes; the dark after pair is attached.
+3. *One primary.* `test_one_primary.py` passes with screen 1 gated (option (a), above).
+4. *Reduced motion.* `self/reduced-motion.spec.ts`'s sheet case passes (C8).
+5. *Audits.* Run; both must-fix findings fixed before the pair.
+6. *axe.* 0 serious or critical in every axe case of the specs below, light and dark, three local
+   projects (Chromium, so the iPhone 13 project is not Safari coverage). CI with WebKit: `<CI: to fill>`.
+7. *Lighthouse.* Local C9 below; C12 medians: `<CI: to fill>`.
+8. *E2E.* C8 locally, `screens/new-post`, `screens/dark-shell`, `self/shortcuts`,
+   `self/sheet-late-frames`, `self/phone-bar-overlap`, `self/reduced-motion`, `self/emoji-picker` and
+   goldens 02, 03, 04 and 07 on three projects: **139 passed, 0 failed, 26 skipped** (the declared
+   desktop-only and phone-only cases), 10.6 min. CI run `<CI: to fill>`; the E2E shards' wall times
+   (desktop-chrome `<CI: to fill>`, iPhone 13 `<CI: to fill>`, Pixel 7 `<CI: to fill>`, against the
+   35-minute limit) and the Visual job's `<CI: to fill>`. Goldens unedited.
+9. *Palette.* C6: "recolor: nothing left to do".
+10. *Suite.* C10 (full pytest, `DB_NAME=p3_t25b_full`): on `420c82e` **7,055 passed, 1 failed, 1 skipped**
+    in 18 min 11 s, the failure the rate-limit window above; on `e7f130f` **7,056 passed, 1 skipped** (the
+    Redis-only one) in 18 min 2 s, with `tests/test_protected_tests.py` green: no protected test touched.
+    On `e7f130f` too: C2 ruff and format clean (919 files), C3 mypy clean (1,011 files), C4 no missing
+    migration, C6 clean. On `420c82e`: C5 the CSS builds (identical to a fresh build), C7 129 UI state
+    tests and 37 Lighthouse tests pass, C11 154 pairs in each theme, 0 problems. (Run alone,
+    `test_backup_restore_round_trip_preserves_application_rows` failed here twice on `information_schema`,
+    the known issue `STATUS.md` lists; it passed in both full runs and is untouched.)
+11. *Baseline.* `bf8f6f9`, `visual: baselines for tests/e2e/visual (run 41533712883)`: 24 new images for
+    the sheet (the button at rest and the sheet in *Ask the team*, *Write it myself* and the idea form,
+    light and dark, three projects) and the shell's three refreshed because its date mask's width
+    follows the real date (76 to 100 pixels, 0.01 to 0.03 % of the image; nothing else moved). Every
+    image was looked at. The shell's earlier refreshes in this screen: `477056e` (the button arrives on
+    Home) and `b94ed9e` (the New menu leaves the desktop sidebar).
+12. *Sign-off.* Not yet: the pair is with the owner.
+
+**Lighthouse, locally** (C9; budgets as configured; three alternating rounds against main `045978b`,
+each on its own manifest-static server, database and port, main measured by its own runner, which
+still presses the New menu). Median of the rounds' medians, this branch against main:
+
+| Page | Performance | LCP | CLS | Lab INP (round medians) | gzip JS |
+|---|---|---|---|---|---|
+| Home | 0.96 / 0.96 | 2,174 / 1,972 ms | 0.061 / 0.078 | 200 (160–240) / 160 (152–216) ms | 82,573 / 70,520 B |
+| Approvals | 0.97 / 0.96 | 1,513 / 1,765 ms | 0.011 / 0.011 | 80 (64–104) / 176 (152–176) ms | 64,986 / 62,623 B |
+| Calendar | 0.92 / 0.94 | 2,276 / 2,030 ms | 0.007 / 0.007 | 216 (144–224) / 192 (144–200) ms | 92,260 / 80,347 B |
+
+Every interaction completed in every run. Only lab INP missed a budget: on this branch once in each
+round (Home 240 ms in the first, Calendar 224 and 216 ms in the others), on main once (Home 216 ms).
+This machine misses that budget on main too, so the local numbers are judged against main's:
+performance, CLS and Approvals are level or better; Home's and Calendar's lab INP sit
+24–40 ms above main's at the median with overlapping ranges, and their LCP 200–250 ms later, within
+the 2,500 ms budget. The scripts the screen adds (the sheet's and the shortcuts') add about 12 KB of
+gzip JavaScript on Home and Calendar, far under 150 KB. The slowest input on both sides is the emoji
+picker's first opening (T25a's replays, S5); one Calendar run of round 2 read performance 0.77 with
+753 ms of blocking time, an outlier its round's median absorbs. T23's earlier three rounds on a busier
+machine read the same direction (Home 0.92 / 0.91, Calendar 0.89 / 0.88). The gate's numbers are C12's:
+`<CI: to fill>` (Home, Approvals and Calendar, budgets unchanged). CI's Lighthouse job on `352295a`
+read Home 0.95, Approvals 0.98, Calendar 0.94, lab INP 136–168 ms.
+
+**The pair** (`tests/e2e/pairs/01-new-post.pair.ts`, `npm run pairs`): before from main `045978b` on its
+own server, database and port (Home, the New menu open, the New idea dialog, Calendar month; light);
+after from this branch (Home with the button, the sheet in *Ask the team* and *Write it myself*, the
+idea form, Calendar month), light and dark; 390 × 844 and 1440 × 900. 8 and 20 images, sent to the
+owner in the session, never committed. The dark after side is new in the pairs runner (`32f9004`: a
+state may carry `scheme: 'dark'` and its name ends in `-dark`). Local Chromium with the local
+`system-ui`, so not a typeface sign-off; WebKit's are the baseline run's.
+
+**Follow-ups.**
+
+- Go to, and possibly the sheet, may leave the same plugin trap behind when closed within 15 ms of
+  opening (the race `8f04b4f` and `10b1976` closed for the shortcut list); not yet probed.
+- The shell spec's date mask sits near the 0.1 % limit on some dates (its width follows the date).
+- The audit's S1–S11 and N1–N6 above; the shell's `create-ws` dialog (set aside, above).
+- Other tests that burst a per-minute rate limit (`apps/studio/tests/test_routines.py`,
+  `apps/studio/tests/test_new_post_sheet.py`, `tests/test_e2e_server.py`'s sign-in burst,
+  `apps/marketing/tests/test_request_invite.py`) may meet the same window edge; not audited here.
+
+**Working days.** Commits for screen 1 since the owner's foundations sign-off (`ce3f427`, 2 Nov 07:27
+UTC): 2 Nov (07:50–22:07 UTC, T14–T24 and the baselines) and 5 Nov (T25); none on 3 and 4 Nov. Two
+working days against the spec's estimate of 1.5–2 for screen 1 (size L): within it, at its upper end.
+
+Stop: screen 2 starts after the owner signs off this pair.
 
 ## 2 Nov 2026 — Phase 3 · Foundations: gate evidence, waiting for the owner's sign-off on the shell
 
