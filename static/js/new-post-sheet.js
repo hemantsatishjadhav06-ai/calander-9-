@@ -21,6 +21,8 @@
  *   that was pressed when it fell out of the sheet: each is disabled while its request is in flight, and
  *   a focused button that is disabled drops the focus to the page behind the dialog (WCAG 2.4.3). The
  *   error line is heard through its role="alert".
+ * - Opens each view (the sheet itself, and each change of mode) at its top, so its first field and that
+ *   field's label show below the sticky header.
  * - Keeps a control the keyboard reaches clear of the dialog's sticky header (data-sheet-head) and the
  *   shown panel's sticky decision bar (data-sheet-foot), which would otherwise cover it, wholly on a short
  *   screen (WCAG 2.4.11): the dialog's scroll padding follows their heights (a ResizeObserver: a mode's
@@ -576,7 +578,7 @@
           // shortcuts.js) and on every switch of mode (CI's iPhone 13, WebKit, put the focus on Close
           // after Save it as an idea and Write it myself). Try again on the next frames, then settle
           // for what shows.
-          var dialog = root.querySelector('[data-testid="new-post-sheet"]');
+          var dialog = root.querySelector(DIALOG);
           var panel = root.querySelector('[data-view="' + mode + '"]');
           var target = root.querySelector(FIRST_FIELD[mode]);
           var panelShows = visible(target) || !!(panel && Array.prototype.some.call(panel.querySelectorAll(FOCUSABLE), visible));
@@ -595,6 +597,11 @@
           }
           if (!visible(target)) target = root.querySelector('[data-testid="new-post-close"]');
           if (!target) return;
+          // A new view starts at its top, so its first field and that field's label show below the
+          // sticky header. The dialog kept the last view's scroll: switching from Ask the team, scrolled
+          // down to reach Save it as an idea instead, opened the idea form with its Title under the
+          // header (CI's iPhone 13).
+          if (dialog) dialog.scrollTop = 0;
           sheet.keepClear();
           target.focus();
           if (afterDrawer) sheet._reclaimFocus(target);
