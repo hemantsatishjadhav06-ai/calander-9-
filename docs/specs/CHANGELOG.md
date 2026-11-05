@@ -90,6 +90,16 @@ nothing (in its degraded regex mode). Must-fix, both fixed red first:
   at 1280 × 720, the channels and foot links at 844 × 390; WCAG 2.2 SC 2.4.11). The sheet keeps its
   scroll padding equal to the two sticky parts and scrolls a focused control clear of them; no class
   or visual change. Red: the new case failed on all three projects.
+- M3, found at the gate by CI (`80b87cf`). The dialog kept the last view's scroll when it changed
+  mode: on a phone, *Ask the team* scrolled down to reach *Save it as an idea instead* opened the idea
+  form scrolled too, its *Title* label under the sticky header and the field's top cut off. CI's
+  visual job on `579501e` failed the iPhone 13 (WebKit) idea form by 3 % of its pixels, and the
+  baseline run started to look (42005719644, `4c3cfaf`) recorded exactly that state, so it was not
+  accepted. Red on WebKit: the new case "switching to Save it as an idea leaves the title, its label
+  and the sheet where they were", pushed alone (`09786a8`), failed CI's iPhone 13 shard ("the sheet
+  did not scroll", 24 where 0 was due); Chromium centres the field as it takes the focus, so it
+  passed locally. Each view (opening the sheet, every change of mode) now starts at its top; `44303c6`
+  reverts `4c3cfaf`, putting back `bf8f6f9`'s images of that state.
 
 Should and nits, for the owner and later screens (none fixed: each changes visuals, copy or shared
 parts): S1 the phone sheet's height follows the mode, so *Write it myself* moves the mode switch 145 px
@@ -122,8 +132,9 @@ tag, *Send* could name whom it goes to.
   frame at a time until the mode's panel shows; `self/sheet-late-frames.spec.ts` reproduces WebKit's
   order on Chromium. `ea83b3b`'s hold, which answered a cause that was not there, was removed.
 
-**Gate G** (code at `e7f130f`; the browser run on `420c82e`, whose application code is the same: the
-commits after it change only the by-hand pairs runner, `tests/e2e/README.md` and one pytest).
+**Gate G** (CI on `44303c6`, run 42009720965, all 17 checks green; the local runs below on `e7f130f`
+and `420c82e`, before M3's one-line fix and its browser case, which ran locally on the screen's specs:
+106 passed, 26 declared skips, three projects).
 
 1. *390 px first.* Shaped at 390 px first (T14's notes), then the 480 px drawer at 1440 px; the pair
    is at 390 and 1440.
@@ -133,14 +144,17 @@ commits after it change only the by-hand pairs runner, `tests/e2e/README.md` and
 4. *Reduced motion.* `self/reduced-motion.spec.ts`'s sheet case passes (C8).
 5. *Audits.* Run; both must-fix findings fixed before the pair.
 6. *axe.* 0 serious or critical in every axe case of the specs below, light and dark, three local
-   projects (Chromium, so the iPhone 13 project is not Safari coverage). CI with WebKit: `<CI: to fill>`.
-7. *Lighthouse.* Local C9 below; C12 medians: `<CI: to fill>`.
+   projects (Chromium, so the iPhone 13 project is not Safari coverage). CI with WebKit for iPhone 13 (run 42009720965): every axe case green on the three shards.
+7. *Lighthouse.* Local C9 below; C12 on `44303c6` (run 42009750088), medians of three, every budget
+   met: Home 0.95, LCP 2,210 ms, CLS 0.061, lab INP 152 ms, 82,717 B gzip JS; Approvals 0.97,
+   1,883 ms, 0.012, 56 ms, 64,986 B; Calendar 0.93, 1,659 ms, 0.007, 136 ms, 92,404 B.
 8. *E2E.* C8 locally, `screens/new-post`, `screens/dark-shell`, `self/shortcuts`,
    `self/sheet-late-frames`, `self/phone-bar-overlap`, `self/reduced-motion`, `self/emoji-picker` and
    goldens 02, 03, 04 and 07 on three projects: **139 passed, 0 failed, 26 skipped** (the declared
-   desktop-only and phone-only cases), 10.6 min. CI run `<CI: to fill>`; the E2E shards' wall times
-   (desktop-chrome `<CI: to fill>`, iPhone 13 `<CI: to fill>`, Pixel 7 `<CI: to fill>`, against the
-   35-minute limit) and the Visual job's `<CI: to fill>`. Goldens unedited.
+   desktop-only and phone-only cases), 10.6 min. CI run 42009720965 on `44303c6`, `CI=1`, WebKit for
+   iPhone 13, zero retries: green. The E2E shards' wall times desktop-chrome 8 min 43 s, iPhone 13
+   12 min 53 s, Pixel 7 8 min 50 s, against the 35-minute limit (70 % is 24.5 min); the Visual job
+   2 min 47 s. Goldens unedited.
 9. *Palette.* C6: "recolor: nothing left to do".
 10. *Suite.* C10 (full pytest, `DB_NAME=p3_t25b_full`): on `420c82e` **7,055 passed, 1 failed, 1 skipped**
     in 18 min 11 s, the failure the rate-limit window above; on `e7f130f` **7,056 passed, 1 skipped** (the
@@ -155,7 +169,9 @@ commits after it change only the by-hand pairs runner, `tests/e2e/README.md` and
     light and dark, three projects) and the shell's three refreshed because its date mask's width
     follows the real date (76 to 100 pixels, 0.01 to 0.03 % of the image; nothing else moved). Every
     image was looked at. The shell's earlier refreshes in this screen: `477056e` (the button arrives on
-    Home) and `b94ed9e` (the New menu leaves the desktop sidebar).
+    Home) and `b94ed9e` (the New menu leaves the desktop sidebar). `4c3cfaf` (run 42005719644)
+    photographed M3's regression and was reverted by `44303c6`, back to `bf8f6f9`'s images; CI's visual
+    job then compared the fixed sheet green against them on WebKit.
 12. *Sign-off.* Not yet: the pair is with the owner.
 
 **Lighthouse, locally** (C9; budgets as configured; three alternating rounds against main `045978b`,
@@ -178,7 +194,7 @@ gzip JavaScript on Home and Calendar, far under 150 KB. The slowest input on bot
 picker's first opening (T25a's replays, S5); one Calendar run of round 2 read performance 0.77 with
 753 ms of blocking time, an outlier its round's median absorbs. T23's earlier three rounds on a busier
 machine read the same direction (Home 0.92 / 0.91, Calendar 0.89 / 0.88). The gate's numbers are C12's:
-`<CI: to fill>` (Home, Approvals and Calendar, budgets unchanged). CI's Lighthouse job on `352295a`
+C12 on `44303c6` above (Home 0.95, Approvals 0.97, Calendar 0.93; lab INP 152, 56 and 136 ms; budgets unchanged). CI's Lighthouse job on `352295a`
 read Home 0.95, Approvals 0.98, Calendar 0.94, lab INP 136–168 ms.
 
 **The pair** (`tests/e2e/pairs/01-new-post.pair.ts`, `npm run pairs`): before from main `045978b` on its
