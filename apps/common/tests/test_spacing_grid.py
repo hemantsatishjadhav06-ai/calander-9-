@@ -21,8 +21,8 @@ bound ``:class`` or ``x-bind:class`` (``{'mt-4':open}``, ``open?'pb-4':'pb-2'``)
 ``*class*="…"`` arguments of an include or with tag (their element is in another file, so they get no
 exemption).
 
-The list of gated screens is empty until screen 1's gate; each rule is proved here on fixture strings,
-and the wiring on fixture templates. The card padding is set in CSS, not by a utility, so the guard
+Screen 1 (the New post sheet) is gated from its gate; each rule is also proved here on fixture
+strings, and the wiring on fixture templates. The card padding is set in CSS, not by a utility, so the guard
 never sees it: ``.ui-card`` is 20 px below 1024 px and 24 px from 1024 px, ``.ui-card-nested`` 16 px,
 and ``.ui-sections`` puts 32 px between a screen's sections (``tests/e2e/self/foundations.spec.ts``
 measures the card in the browser).

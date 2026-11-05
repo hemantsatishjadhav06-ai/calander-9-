@@ -73,6 +73,9 @@ SCREENS: dict[str, Screen] = {
     # Screen 1, the New post sheet (docs/specs/03-rebuild-screens.md, screen 1; docs/specs/phase-3.md,
     # T14-T25): a component Home and Calendar include, with its three panels (Ask the team, Write it
     # myself, the idea form). Shown to whoever may start posts: create_posts, never a plain client.
+    # Gated at its gate (T25): the guards read its tree, and the one-primary check renders both pages
+    # for each role within the screen's scope (what later screens own on them is named once, in
+    # apps/common/tests/test_one_primary.py LEFT_TO_LATER).
     "new_post": Screen(
         templates=(
             "components/new_post_sheet.html",
@@ -85,6 +88,7 @@ SCREENS: dict[str, Screen] = {
         fragments=("studio/partials/new_post_team_error.html",),
         pages=(("studio", "index"), ("calendar", "calendar")),
         roles=("owner", "manager", "editor"),
+        gated=True,
     ),
     # Home (screen 2) and Calendar (screen 4), declared dark-ready with screen 1 (T22) before their own
     # screens rebuild them. Each entry holds its page's root and what the page picks at run time (a

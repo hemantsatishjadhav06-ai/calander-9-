@@ -24,6 +24,7 @@ from django.utils import timezone
 from apps.common.tests.test_navigation_render import ABOVE_THE_BAR
 from apps.common.tests.test_one_primary import (
     BREAKPOINTS,
+    LEFT_TO_LATER,
     Node,
     elements,
     is_primary,
@@ -43,15 +44,23 @@ CALENDAR = ("calendar", "calendar")
 PAGES = (HOME, CALENDAR)
 STARTERS = ("owner", "manager", "editor")
 TEMPLATES = Path(__file__).resolve().parents[3] / "templates"
-#: The templates T16 writes; the spacing guard reads them once screen 1 is gated (T25).
+#: The templates T16 writes; the spacing guard reads them since screen 1 is gated (T25).
 NEW_TEMPLATES = ("components/new_post_sheet.html", "studio/partials/new_post_team.html")
 ALLOWANCE = "This starts the team's work and counts toward this month's allowance."
 HELP = "Your manager replies with what we're making. Nothing is made until you go ahead."
 LOOK = "Keep the brand look"
-#: Primaries already on these pages that other tasks move (each in its own place, not the sheet's):
-#: Home's thread Send becomes tinted in screen 2 (spec, "Screen 2 · Home"); Calendar's Add event is
-#: screen 4's. The count below proves the button adds exactly one primary beside them.
-MOVED_LATER = {HOME: {"thread-composer-send"}, CALENDAR: {"Add event"}}
+#: Primaries already on these pages that later screens own, read from the one place they are named
+#: (test_one_primary.LEFT_TO_LATER, which also leaves two dialogs to their owners): Home's thread Send
+#: becomes tinted in screen 2 (spec, "Screen 2 · Home"); Calendar's Add event is screen 4's. The count
+#: below proves the button adds exactly one primary beside them.
+MOVED_LATER = {
+    page: {
+        later.name
+        for later in LEFT_TO_LATER["new_post"]
+        if page in later.pages and not later.name.startswith("dialog ")
+    }
+    for page in PAGES
+}
 
 
 def _url(world, page, **kwargs):
@@ -451,7 +460,7 @@ def test_calendar_reads_only_what_the_form_reads_and_the_idea_columns(client, wo
     assert with_sheet - without == len(form_reads) + 1
 
 
-# ── The 8 px grid, ahead of the gate (T25) ──────────────────────────────────────────────────────
+# ── The 8 px grid (the spacing guard reads the whole tree since the gate, T25) ─────────────────
 
 
 @pytest.mark.parametrize("name", NEW_TEMPLATES)

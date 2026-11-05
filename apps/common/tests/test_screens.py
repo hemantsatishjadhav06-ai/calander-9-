@@ -224,7 +224,9 @@ NEW_POST_TEMPLATES = (
 
 def test_screen_one_is_registered_as_its_start_task_adds_it():
     """The New post sheet: its templates, on Home and Calendar, for the three roles that may start
-    posts (``create_posts`` and not a plain client), not gated until its gate (T25). Its one fragment
+    posts (``create_posts`` and not a plain client), gated from its gate (T25), so the spacing,
+    one-primary, inline-confirm and motion guards read it (the one-primary check within its scope,
+    ``test_one_primary.LEFT_TO_LATER``). Its one fragment
     is the 400 answer ``studio:create`` gives the sheet (T15), which HTMX loads and the page writes
     into the sheet's error line, so the guards that read a screen's fragments read it too."""
     entry = screens.SCREENS["new_post"]
@@ -233,7 +235,7 @@ def test_screen_one_is_registered_as_its_start_task_adds_it():
     assert entry.fragments == ("studio/partials/new_post_team_error.html",)
     assert entry.pages == (HOME, CALENDAR)
     assert entry.roles == ("owner", "manager", "editor")
-    assert entry.gated is False
+    assert entry.gated is True
     assert screens.PAGE_TEMPLATES[HOME] == ("studio/index.html",)
     assert screens.PAGE_TEMPLATES[CALENDAR] == ("calendar/calendar.html",)
     # A component the two pages include (from T16): its own tree never holds their roots, so no guard

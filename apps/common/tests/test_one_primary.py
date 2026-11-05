@@ -37,14 +37,23 @@ of the item or form on a desktop; Activity and Analytics have none):
 * a primary anywhere else fails, so a departure the owner has not accepted cannot slip in.
 
 Then every ``gated`` screen (``apps/common/screens.py``) is rendered page by page for each of its
-roles and must have no finding. No screen is gated until screen 1's gate, so the counter is proved
-here on fixture HTML, the wiring with a stand-in renderer, and the renderer on a real page.
+roles and must have no finding, **within its scope**. A screen's pages also carry what other screens
+own: a page-level primary a later screen rebuilds, or a dialog of the shell. Those are named once, in
+``LEFT_TO_LATER``, each with the page it is on and the screen whose gate counts it; the gated screen's
+check leaves exactly those out (a named dialog as a whole view, a named primary of the page from the
+page's count and place) and counts everything else. So the scope works by naming what is left, never
+by naming what is checked: anything new on the page, a second primary in a screen's own dialog, or its
+button out of its place still fails. Screen 1 (the New post sheet) is gated from its gate (T25),
+with option (a) of the plan's "Open before T25" note: its check counts the sheet's views and the
+button's place, and leaves Home's thread Send (screen 2), Calendar's Add event and its bulk confirm
+(screen 4) and the shell's Create workspace dialog to their own gates. The counter is proved here on
+fixture HTML, the wiring with a stand-in renderer, and the renderer and the scope on real pages.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterator, Mapping
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from types import SimpleNamespace
@@ -388,11 +397,17 @@ class Finding:
         return f"{self.view}, {self.breakpoint}, line {self.line}: {self.reason}"
 
 
-def primary_findings(html: str) -> list[Finding]:
-    """Every view and breakpoint with more than one primary, and every primary out of its place."""
+def primary_findings(html: str, leave: Collection[str] = ()) -> list[Finding]:
+    """Every view and breakpoint with more than one primary, and every primary out of its place.
+
+    *leave* names what another screen's gate counts (``LEFT_TO_LATER``): a view by its name (``dialog
+    'create-ws-title'``) is left out whole, and a primary of the page by its name (``Node.name()``:
+    its test id, label or words) is left out of the page's count and place. Nothing else is."""
     findings: list[Finding] = []
     for view in views(html):
-        primaries = [node for node in view.members if is_primary(node)]
+        if view.name in leave:
+            continue
+        primaries = [node for node in view.members if is_primary(node) and not (view.is_page and node.name() in leave)]
         for breakpoint in BREAKPOINTS:
             shown = [node for node in primaries if breakpoint in shown_at(node)]
             if len(shown) > 1:
@@ -409,6 +424,51 @@ def primary_findings(html: str) -> list[Finding]:
 
 Render = Callable[[screens.Page, str], str]
 
+HOME: screens.Page = ("studio", "index")
+CALENDAR: screens.Page = ("calendar", "calendar")
+#: The owner of what sits on every page and no screen rebuilds: ``base.html``'s own dialogs. Left out at
+#: one screen's gate only, so the next gate meets it again unless it has moved into its place.
+SHELL = "shell"
+
+
+@dataclass(frozen=True)
+class Later:
+    """Something on a gated screen's page that another screen owns, so that screen's gate counts it."""
+
+    name: str  # a view's name (``dialog '<name>'``) or a page primary's ``Node.name()``
+    pages: tuple[screens.Page, ...]
+    owner: str  # the screen whose gate counts it (a key of ``screens.SCREENS``), or ``SHELL``
+    why: str
+
+
+#: Per gated screen, what on its pages another screen owns (spec D5; option (a) of "Open before T25",
+#: docs/specs/phase-3.md): the one place it is named. The screen's check leaves these out and counts
+#: everything else. An entry goes when its owner's gate puts it in its place (or takes it away), and
+#: ``test_what_a_gated_screen_leaves_to_later_is_owned_by_a_screen_not_yet_gated`` makes it go then.
+LEFT_TO_LATER: dict[str, tuple[Later, ...]] = {
+    "new_post": (
+        Later("thread-composer-send", (HOME,), "home", "Home's thread Send: tinted at screen 2 (spec, Screen 2)"),
+        Later("Add event", (CALENDAR,), "calendar", "Calendar's event form, in calendar mode: screen 4"),
+        Later(
+            "dialog 'bulk-confirm-title'",
+            (CALENDAR,),
+            "calendar",
+            "Calendar's Publish now / Delete posts confirm for a selection (D8): screen 4",
+        ),
+        Later(
+            "dialog 'create-ws-title'",
+            (HOME, CALENDAR),
+            SHELL,
+            "the shell's Create workspace dialog (base.html, owners): its Create sits outside a decision bar",
+        ),
+    ),
+}
+
+
+def left_to_later(screen: str, page: screens.Page) -> frozenset[str]:
+    """The names *screen*'s check leaves out on *page*."""
+    return frozenset(later.name for later in LEFT_TO_LATER.get(screen, ()) if page in later.pages)
+
 
 def gated_pages(registry: Mapping[str, screens.Screen] | None = None) -> list[tuple[str, screens.Page, str]]:
     """``(screen, page, role)`` for every page of every gated screen and every role that may open it."""
@@ -420,10 +480,12 @@ def gated_pages(registry: Mapping[str, screens.Screen] | None = None) -> list[tu
 
 
 def screen_findings(render: Render, registry: Mapping[str, screens.Screen] | None = None) -> list[str]:
+    """Every gated screen's findings on its pages, for each of its roles, within its scope."""
     findings: list[str] = []
     for name, page, role in gated_pages(registry):
         findings += [
-            f"{name}: {page[0]}:{page[1]} as {role}: {finding}" for finding in primary_findings(render(page, role))
+            f"{name}: {page[0]}:{page[1]} as {role}: {finding}"
+            for finding in primary_findings(render(page, role), leave=left_to_later(name, page))
         ]
     return findings
 
@@ -515,6 +577,128 @@ def test_the_renderer_reads_a_real_page_and_its_shell_dialogs(render):
     assert found[0].is_page and len(found[0].members) > 50
     dialogs = {view.name for view in found[1:]}
     assert "dialog 'notifications-drawer'" in dialogs and "dialog 'palette-dialog'" in dialogs, dialogs
+
+
+# ── A gated screen's scope: what it leaves to later screens, and only that ──────────────────────
+
+
+def test_what_a_gated_screen_leaves_to_later_is_owned_by_a_screen_not_yet_gated() -> None:
+    """Each entry names a gated screen's own page and an owner whose gate will count it: a screen of the
+    registry that is not gated yet (once it is, its own check renders the page without the entry and
+    the entry must go), or the shell. Nothing is left on a page the screen does not render."""
+    for name, entries in LEFT_TO_LATER.items():
+        screen = screens.SCREENS[name]
+        assert screen.gated, f"{name} leaves things to later screens but is not gated"
+        assert len({entry.name for entry in entries}) == len(entries), name
+        for entry in entries:
+            assert entry.why and entry.pages, entry
+            assert set(entry.pages) <= set(screen.pages), entry
+            assert entry.owner != name, entry
+            if entry.owner != SHELL:
+                owner = screens.SCREENS[entry.owner]
+                assert not owner.gated, f"{entry.name!r} is {entry.owner}'s, whose gate has passed: put it in its place"
+                assert set(entry.pages) <= set(owner.pages), entry
+
+
+def _calendar_mode(client, team) -> str:
+    """Calendar as the owner in calendar mode (a workspace without a connected account opens on the list):
+    the grids and the event form, whose Add event a later screen owns."""
+    client.force_login(team.member("owner"))
+    url = reverse("calendar:calendar", kwargs={"workspace_id": team.ws.id}) + "?mode=calendar"
+    response = client.get(url)
+    assert response.status_code == 200
+    return response.content.decode()
+
+
+def test_screen_one_leaves_exactly_what_later_screens_own_on_its_pages(client, team, render) -> None:
+    """On the real pages, as the owner: every entry screen 1 leaves is there to leave (Add event in
+    calendar mode), the page's findings without the scope are exactly about those entries, and with it
+    there are none. Screen 1's own views, the sheet's three panels and its tag dialog, are counted."""
+    pages = {
+        "home": (HOME, render(HOME, "owner")),
+        "calendar": (CALENDAR, render(CALENDAR, "owner")),
+        "calendar mode": (CALENDAR, _calendar_mode(client, team)),
+    }
+    met: set[str] = set()
+    for label, (page, html) in pages.items():
+        leave = left_to_later("new_post", page)
+        named = {view.name for view in views(html)} | {
+            node.name() for node in views(html)[0].members if is_primary(node)
+        }
+        met |= leave & named
+        unscoped = primary_findings(html)
+        assert all(any(name == f.view or f"'{name}'" in f.reason for name in leave) for f in unscoped), (
+            label,
+            [str(f) for f in unscoped],
+        )
+        assert primary_findings(html, leave=leave) == [], label
+        sheet = sorted(view.name for view in views(html) if view.name.startswith("dialog 'new-post-sheet'"))
+        assert sheet == [
+            "dialog 'new-post-sheet', panel 'idea'",
+            "dialog 'new-post-sheet', panel 'self'",
+            "dialog 'new-post-sheet', panel 'team'",
+        ], label
+    assert met == {entry.name for entry in LEFT_TO_LATER["new_post"]}, "an entry nothing on the pages needs"
+
+
+#: Changes to a real page that screen 1's scope must still catch, each on its own page.
+SEND = '<button type="submit" data-testid="new-post-team-send"'
+SECOND_SEND = '<button type="submit" class="ui-btn ui-btn-primary" data-testid="second-send">Send too</button>'
+BREAKS = {
+    "a second primary in the sheet's Ask the team bar": (
+        HOME,
+        lambda html: html.replace(SEND, SECOND_SEND + SEND, 1),
+        "dialog 'new-post-sheet', panel 'team'",
+        "2 primaries",
+    ),
+    "the button out of the header slot": (
+        HOME,
+        lambda html: html.replace('data-primary-slot="header"', "", 1),
+        "the page",
+        "page header's data-primary-slot",
+    ),
+    "an unnamed primary on the page beside the button": (
+        CALENDAR,
+        lambda html: html.replace(
+            "</main>", '<div data-decision-bar><button class="ui-btn ui-btn-primary">Stray</button></div></main>', 1
+        ),
+        "the page",
+        "2 primaries",
+    ),
+    "Home's thread Send on Calendar, where nothing leaves it": (
+        CALENDAR,
+        lambda html: html.replace(
+            "</main>",
+            '<button class="ui-btn ui-btn-primary" data-testid="thread-composer-send">Send</button></main>',
+            1,
+        ),
+        "the page",
+        "'thread-composer-send'",
+    ),
+}
+
+
+@pytest.mark.parametrize("change", BREAKS, ids=list(BREAKS))
+def test_screen_one_s_scope_still_fails_what_screen_one_owns(render, change) -> None:
+    """The scope leaves only what LEFT_TO_LATER names on that page: a second primary inside the sheet,
+    the New post button out of its place, a primary nobody named, or a named one on another page each
+    fail screen 1's gate on the real pages, for every role that may start posts."""
+    page, mutate, view, reason = BREAKS[change]
+
+    def broken(rendered: screens.Page, role: str) -> str:
+        html = render(rendered, role)
+        if rendered != page:
+            return html
+        changed = mutate(html)
+        assert changed != html, f"{change}: the page no longer has what the change edits"
+        return changed
+
+    findings = screen_findings(broken, {"new_post": screens.SCREENS["new_post"]})
+
+    for role in screens.SCREENS["new_post"].roles:
+        mine = [f for f in findings if f.startswith(f"new_post: {page[0]}:{page[1]} as {role}: {view}")]
+        assert any(reason in f for f in mine), (change, role, findings)
+    assert all(f.startswith(f"new_post: {page[0]}:{page[1]} ") for f in findings), findings
 
 
 # ── The count, on fixture HTML ─────────────────────────────────────────────────────────────────

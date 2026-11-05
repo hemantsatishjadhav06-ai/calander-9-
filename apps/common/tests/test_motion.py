@@ -16,8 +16,8 @@ its reduced-motion form in the stylesheet's reduced-motion block:
 
 The global reduced-motion rule stays as it is. ``base.html`` keeps no ``@keyframes`` and no local
 reduced-motion block (its progress bar's moved into styles.css), and neither does any template in a
-``gated`` screen's tree, which also never reaches for ``--dur-base`` or ``--dur-slow``. The list of
-gated screens is empty until screen 1's gate, so the tree guard is proved on fixture templates.
+``gated`` screen's tree, which also never reaches for ``--dur-base`` or ``--dur-slow``: screen 1's
+(the New post sheet) from its gate, and the tree guard is proved on fixture templates too.
 ``tests/e2e/self/reduced-motion.spec.ts`` checks the same in the browser.
 """
 
